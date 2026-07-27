@@ -1,0 +1,4 @@
+Lee @documentos/ y @AGENTS.md.
+
+No escribas código todavía.
+Quiero un plan técnico completo del proyecto, con módulos, arquitectura, estructura de carpetas, endpoints esperados, riesgos y secuencia de construcción.

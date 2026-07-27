@@ -1,0 +1,279 @@
+@if (conversation(); as convo) {
+  <div class="eas-animate-rise mb-5 flex items-center gap-3">
+    <button
+      type="button"
+      (click)="goBack()"
+      class="cd__back"
+      aria-label="Volver"
+    >
+      <mat-icon [style.font-size.px]="18" [style.width.px]="18" [style.height.px]="18">arrow_back</mat-icon>
+    </button>
+    <p class="text-sm text-eas-muted">
+      <a routerLink="/app/conversations" class="font-semibold text-eas-forest hover:underline">Conversaciones</a>
+      / {{ convo.clientName }}
+    </p>
+  </div>
+
+  <div class="grid gap-5 lg:grid-cols-[1fr_320px]">
+    <!-- Thread -->
+    <div class="eas-card flex h-[calc(100vh-190px)] flex-col overflow-hidden">
+      <div class="flex items-center gap-3 border-b border-eas-forest/8 p-4">
+        <eas-avatar [name]="convo.clientName" [imageUrl]="convo.clientAvatarUrl" [size]="44"></eas-avatar>
+        <div class="min-w-0 flex-1">
+          <p class="truncate font-display text-base text-eas-ink">{{ convo.clientName }}</p>
+          <p class="truncate text-xs text-eas-muted">{{ convo.clientPhone }}</p>
+        </div>
+        <eas-status-badge [status]="convo.status"></eas-status-badge>
+        <eas-priority-chip [priority]="convo.priority"></eas-priority-chip>
+        @if (sentiment(); as s) {
+          <span
+            class="cd__sent"
+            [class.cd__sent--pos]="s.sentiment === 'POSITIVO'"
+            [class.cd__sent--neu]="s.sentiment === 'NEUTRO'"
+            [class.cd__sent--risk]="s.sentiment === 'RIESGO'"
+            [title]="s.intent + ' · ' + urgencyLabels[s.urgency]"
+          >
+            <mat-icon [style.font-size.px]="15" [style.width.px]="15" [style.height.px]="15">{{ sentimentIcon(s.sentiment) }}</mat-icon>
+            {{ sentimentLabels[s.sentiment] }}
+          </span>
+        }
+        @if (suggestion()) {
+          <button type="button" class="cd__ai-btn" (click)="openAiQuote()" title="Cotizar con IA">
+            <mat-icon [style.font-size.px]="18" [style.width.px]="18" [style.height.px]="18">auto_awesome</mat-icon>
+            <span class="hidden sm:inline">Cotizar con IA</span>
+          </button>
+        }
+      </div>
+
+      @if (suggestion()?.shouldAsk) {
+        <div class="cd__ai-banner">
+          <span class="cd__ai-banner__icon"><mat-icon>auto_awesome</mat-icon></span>
+          <div class="cd__ai-banner__text">
+            <p class="cd__ai-banner__q">{{ suggestion()?.question }}</p>
+            <p class="cd__ai-banner__r">{{ suggestion()?.reason }}</p>
+          </div>
+          <button type="button" class="cd__ai-banner__cta" (click)="openAiQuote()">
+            <mat-icon [style.font-size.px]="16" [style.width.px]="16" [style.height.px]="16">bolt</mat-icon>
+            Generar
+          </button>
+        </div>
+      }
+
+      <div class="flex-1 space-y-4 overflow-y-auto p-5">
+        @if (loading()) {
+          <div class="eas-skeleton h-14 w-2/3 rounded-2xl"></div>
+          <div class="eas-skeleton ml-auto h-14 w-1/2 rounded-2xl"></div>
+        } @else if (messages().length === 0) {
+          <p class="py-10 text-center text-sm text-eas-muted">Aún no hay mensajes en esta conversación.</p>
+        } @else {
+          @for (message of messages(); track message.id) {
+            <div class="flex" [class.justify-end]="message.senderType !== 'CLIENT'">
+              <div class="max-w-[75%]">
+                <div
+                  class="cd__bubble text-sm leading-relaxed"
+                  [class.cd__bubble--in]="message.senderType === 'CLIENT'"
+                  [class.cd__bubble--note]="message.senderType === 'SYSTEM'"
+                  [class.cd__bubble--out]="message.senderType !== 'CLIENT' && message.senderType !== 'SYSTEM'"
+                >
+                  {{ message.body }}
+                </div>
+                <p class="mt-1 px-1 text-[11px] text-eas-muted" [class.text-right]="message.senderType !== 'CLIENT'">
+                  {{ senderLabel(message) }} · {{ message.sentAt | timeAgo }}
+                </p>
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <div class="border-t border-eas-forest/8 p-4">
+        <div class="mb-2 flex justify-end">
+          <button
+            type="button"
+            class="cd__suggest-btn"
+            [disabled]="replyLoading()"
+            (click)="suggestReply()"
+          >
+            @if (replyLoading()) {
+              <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+              Pensando…
+            } @else {
+              <mat-icon [style.font-size.px]="16" [style.width.px]="16" [style.height.px]="16">auto_awesome</mat-icon>
+              Sugerir respuesta
+            }
+          </button>
+        </div>
+        <div class="flex items-end gap-3">
+          <textarea
+            rows="1"
+            [ngModel]="replyText()"
+            (ngModelChange)="replyText.set($event)"
+            (keydown.enter)="$event.preventDefault(); send()"
+            placeholder="Escribe tu respuesta…"
+            class="max-h-32 flex-1 resize-none rounded-xl border border-eas-forest/12 bg-eas-snow px-4 py-3 text-sm text-eas-ink placeholder:text-eas-muted focus:border-eas-leaf focus:bg-white focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
+          ></textarea>
+          <button
+            type="button"
+            [disabled]="!replyText().trim() || sending()"
+            (click)="send()"
+            class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-eas-brand text-eas-on-brand transition hover:bg-eas-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+            aria-label="Enviar mensaje"
+          >
+            <mat-icon>send</mat-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Side panel -->
+    <div class="space-y-4">
+      <div class="eas-card p-5">
+        <div class="mb-3 flex items-center justify-between">
+          <p class="text-xs font-semibold uppercase tracking-wide text-eas-muted">Resumen IA</p>
+          <button type="button" class="cd__mini-btn" [disabled]="summaryLoading()" (click)="loadSummary()">
+            @if (summaryLoading()) {
+              <mat-spinner diameter="14" strokeWidth="2"></mat-spinner>
+            } @else {
+              <mat-icon [style.font-size.px]="15" [style.width.px]="15" [style.height.px]="15">summarize</mat-icon>
+              {{ summary() ? 'Actualizar' : 'Generar' }}
+            }
+          </button>
+        </div>
+        @if (summary(); as sm) {
+          <p class="text-sm leading-relaxed text-eas-ink">{{ sm.summary }}</p>
+          @if (sm.keyPoints.length) {
+            <ul class="cd__keypoints">
+              @for (point of sm.keyPoints; track point) {
+                <li><mat-icon [style.font-size.px]="14" [style.width.px]="14" [style.height.px]="14">check_circle</mat-icon>{{ point }}</li>
+              }
+            </ul>
+          }
+          <div class="cd__nextstep">
+            <mat-icon [style.font-size.px]="16" [style.width.px]="16" [style.height.px]="16">bolt</mat-icon>
+            <span>{{ sm.nextStep }}</span>
+          </div>
+        } @else {
+          <p class="text-sm text-eas-muted">Genera un resumen del chat con puntos clave y el siguiente paso sugerido.</p>
+        }
+      </div>
+
+      <div class="eas-card p-5">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-eas-muted">Estado</p>
+        <div class="flex flex-wrap gap-2">
+          @for (s of statusOptions; track s) {
+            <button type="button" class="eas-chip" [class.is-active]="convo.status === s" (click)="changeStatus(s)">
+              {{ statusLabels[s] }}
+            </button>
+          }
+        </div>
+
+        <p class="mb-3 mt-5 text-xs font-semibold uppercase tracking-wide text-eas-muted">Prioridad</p>
+        <div class="flex flex-wrap gap-2">
+          @for (p of priorityOptions; track p) {
+            <button type="button" class="eas-chip" [class.is-active]="convo.priority === p" (click)="changePriority(p)">
+              {{ priorityLabels[p] }}
+            </button>
+          }
+        </div>
+
+        <p class="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-eas-muted">Asesor asignado</p>
+        <select
+          [ngModel]="convo.assignedUserId ?? ''"
+          (ngModelChange)="changeAssignee($event)"
+          class="w-full rounded-xl border border-eas-forest/10 bg-eas-snow px-3 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
+        >
+          <option value="" disabled>Sin asignar</option>
+          @for (advisor of advisors(); track advisor.id) {
+            <option [value]="advisor.id">{{ advisor.fullName }}</option>
+          }
+        </select>
+
+        <p class="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-eas-muted">Transferir a</p>
+        <select
+          [ngModel]="transferUserId()"
+          (ngModelChange)="transferTo($event)"
+          [disabled]="actionBusy()"
+          class="w-full rounded-xl border border-eas-forest/10 bg-eas-snow px-3 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
+        >
+          <option value="">Elegir asesor…</option>
+          @for (advisor of advisors(); track advisor.id) {
+            <option [value]="advisor.id" [disabled]="advisor.id === convo.assignedUserId">{{ advisor.fullName }}</option>
+          }
+        </select>
+
+        <p class="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-eas-muted">Acciones</p>
+        <div class="flex flex-wrap gap-2">
+          @if (convo.status !== 'RESOLVED' && convo.status !== 'ARCHIVED') {
+            <button type="button" class="eas-btn-secondary text-sm" [disabled]="actionBusy()" (click)="closeWithNotes()">
+              <mat-icon>task_alt</mat-icon>
+              Cerrar
+            </button>
+            <button type="button" class="eas-btn-secondary text-sm" [disabled]="actionBusy()" (click)="archive()">
+              <mat-icon>inventory_2</mat-icon>
+              Archivar
+            </button>
+          } @else {
+            <button type="button" class="eas-btn-secondary text-sm" [disabled]="actionBusy()" (click)="reopen()">
+              <mat-icon>restart_alt</mat-icon>
+              Reabrir
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="eas-card p-5">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-eas-muted">Etiquetas</p>
+        <div class="flex flex-wrap gap-2 mb-3">
+          @for (tag of convo.tags; track tag.id) {
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold"
+              [style.background]="tag.color + '1a'"
+              [style.color]="tag.color"
+              [disabled]="actionBusy()"
+              (click)="removeLabel(tag.label)"
+              title="Quitar etiqueta"
+            >
+              {{ tag.label }}
+              <mat-icon class="!text-[14px] !w-3.5 !h-3.5">close</mat-icon>
+            </button>
+          } @empty {
+            <p class="text-sm text-eas-muted">Sin etiquetas asignadas.</p>
+          }
+        </div>
+        <div class="flex gap-2">
+          <input
+            class="eas-input eas-input--plain flex-1 text-sm"
+            [ngModel]="newLabel()"
+            (ngModelChange)="newLabel.set($event)"
+            (keyup.enter)="addLabel()"
+            placeholder="Nueva etiqueta"
+          />
+          <button type="button" class="eas-btn-secondary text-sm" [disabled]="actionBusy() || !newLabel().trim()" (click)="addLabel()">
+            Añadir
+          </button>
+        </div>
+      </div>
+
+      <div class="eas-card p-5">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-eas-muted">Información del cliente</p>
+        <dl class="space-y-2.5 text-sm">
+          <div class="flex justify-between gap-3">
+            <dt class="text-eas-muted">Canal</dt>
+            <dd class="font-medium text-eas-ink">{{ convo.channel }}</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-eas-muted">Importancia</dt>
+            <dd class="font-medium text-eas-ink">{{ convo.importance }}/5</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-eas-muted">Mensajes sin leer</dt>
+            <dd class="font-medium text-eas-ink">{{ convo.unreadCount }}</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+} @else {
+  <div class="eas-card p-14 text-center text-eas-muted">Cargando conversación…</div>
+}

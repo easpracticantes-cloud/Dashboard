@@ -1,0 +1,183 @@
+<eas-page-header
+  eyebrow="Directorio Sheets"
+  title="Clientes"
+  subtitle="Contactos únicos proyectados desde seguimiento y toques B2B del workbook."
+>
+  <button type="button" class="eas-btn-secondary" (click)="exportCsv()" [disabled]="exporting()">
+    <mat-icon>download</mat-icon>
+    {{ exporting() ? 'Exportando…' : 'Exportar CSV' }}
+  </button>
+  <button type="button" class="eas-btn-primary" (click)="openCreate()">
+    <mat-icon>person_add</mat-icon>
+    Nuevo cliente
+  </button>
+</eas-page-header>
+
+<div class="clients-layout">
+  <section class="eas-card clients-list">
+    <div class="eas-chip-group clients-quality">
+      @for (tab of qualityTabs; track tab.key) {
+        <button type="button" class="eas-chip" [class.is-active]="quality() === tab.key" (click)="quality.set(tab.key)">
+          {{ tab.label }}
+        </button>
+      }
+    </div>
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Buscar cliente</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Nombre o número" />
+    </mat-form-field>
+
+    @if (loading()) {
+      <div class="eas-skeleton h-16 w-full mb-2"></div>
+      <div class="eas-skeleton h-16 w-full mb-2"></div>
+    } @else if (filtered().length === 0) {
+      <eas-empty-state
+        icon="diversity_3"
+        title="Sin clientes"
+        description="Los clientes aparecerán al sincronizar Sheets o al crearlos manualmente."
+      ></eas-empty-state>
+    } @else {
+      <div class="clients-scroll">
+        @for (row of filtered(); track row.client.id) {
+          <button type="button" class="client-row" [class.is-active]="selected()?.client?.id === row.client.id" (click)="select(row)">
+            <eas-avatar [name]="row.client.name" [imageUrl]="row.client.avatarUrl" [size]="40"></eas-avatar>
+            <span class="client-row__meta">
+              <strong>{{ row.client.name }}</strong>
+              <small>{{ row.client.phone || 'Sin número' }} · {{ row.count }} conversaciones</small>
+            </span>
+            <span class="pill">{{ priorityLabel(row.priority) }}</span>
+          </button>
+        }
+      </div>
+    }
+  </section>
+
+  <section class="eas-card clients-detail">
+    @if (selected(); as row) {
+      <header class="clients-detail__head">
+        <div>
+          <p class="eyebrow">Historial</p>
+          <h2>{{ row.client.name }}</h2>
+          <p>{{ row.client.phone }} · Última interacción {{ row.lastInteraction | date: "d MMM y, HH:mm" }}</p>
+        </div>
+        <div class="clients-detail__stats">
+          <div><span>Conversaciones</span><strong>{{ row.count }}</strong></div>
+          <div><span>Cotizaciones</span><strong>{{ commercialTotals().quotes }}</strong></div>
+          <div><span>Reservas</span><strong>{{ commercialTotals().reservations }}</strong></div>
+          <div><span>Ventas</span><strong>{{ commercialTotals().salesTotal | currency: 'COP':'symbol-narrow':'1.0-0' }}</strong></div>
+        </div>
+      </header>
+
+      <div class="clients-crm-actions mb-4">
+        <label class="clients-crm-actions__field">
+          <span>Asesor</span>
+          <select
+            class="eas-select"
+            [ngModel]="row.client.assignedUserId ?? ''"
+            (ngModelChange)="assignAdvisor($event)"
+            [disabled]="assigning()"
+          >
+            <option value="">Sin asignar</option>
+            @for (a of advisors(); track a.id) {
+              <option [value]="a.id">{{ a.fullName }}</option>
+            }
+          </select>
+        </label>
+        <button type="button" class="eas-btn-secondary text-sm" [disabled]="assigning()" (click)="markContacted()">
+          <mat-icon>touch_app</mat-icon>
+          Marcar contacto
+        </button>
+      </div>
+
+      <div class="eas-chip-group mb-4">
+        <button type="button" class="eas-chip" [class.is-active]="detailTab() === 'timeline'" (click)="detailTab.set('timeline')">
+          Conversaciones
+        </button>
+        <button type="button" class="eas-chip" [class.is-active]="detailTab() === 'commercial'" (click)="detailTab.set('commercial')">
+          Historial comercial
+        </button>
+      </div>
+
+      @if (detailTab() === 'timeline') {
+        <div class="timeline">
+          @for (c of row.conversations; track c.id) {
+            <a class="timeline__item" [routerLink]="['/app/conversations', c.id]">
+              <div class="timeline__dot"></div>
+              <div>
+                <strong>{{ c.lastMessageAt | date: "EEEE d MMM y · HH:mm" }}</strong>
+                <p>{{ c.lastMessage || 'Sin mensaje' }}</p>
+                <small>{{ statusLabel(c.status) }} · {{ priorityLabel(c.priority) }} · {{ c.tags[0]?.label || 'Sin categoría' }}</small>
+              </div>
+            </a>
+          } @empty {
+            <eas-empty-state icon="chat_bubble_outline" title="Sin historial" description="Este cliente aún no tiene conversaciones."></eas-empty-state>
+          }
+        </div>
+      } @else {
+        @if (loadingCommercial()) {
+          <div class="eas-skeleton h-16 w-full mb-2"></div>
+          <div class="eas-skeleton h-16 w-full mb-2"></div>
+        } @else if (!clientQuotes().length && !clientReservations().length && !clientSales().length) {
+          <eas-empty-state
+            icon="receipt_long"
+            title="Sin actividad comercial"
+            description="Este cliente aún no tiene cotizaciones, reservas ni ventas."
+          ></eas-empty-state>
+        } @else {
+          <div class="commercial-360">
+            @if (clientQuotes().length) {
+              <div class="commercial-360__group">
+                <h4><mat-icon>request_quote</mat-icon> Cotizaciones</h4>
+                @for (q of clientQuotes(); track q.id) {
+                  <div class="commercial-360__row">
+                    <div class="min-w-0">
+                      <strong class="truncate">{{ q.title || q.code }}</strong>
+                      <small>{{ q.createdAt | date: 'd MMM y' }} · {{ commercialStatusLabel(q.status) }}</small>
+                    </div>
+                    <span>{{ q.amount | currency: q.currency:'symbol-narrow':'1.0-0' }}</span>
+                  </div>
+                }
+              </div>
+            }
+            @if (clientReservations().length) {
+              <div class="commercial-360__group">
+                <h4><mat-icon>event_available</mat-icon> Reservas</h4>
+                @for (r of clientReservations(); track r.id) {
+                  <div class="commercial-360__row">
+                    <div class="min-w-0">
+                      <strong class="truncate">{{ r.experienceName || r.code }}</strong>
+                      <small>{{ r.reservationDate | date: 'd MMM y' }} · {{ r.partySize }} pax · {{ commercialStatusLabel(r.status) }}</small>
+                    </div>
+                    <span>{{ r.amount | currency: 'COP':'symbol-narrow':'1.0-0' }}</span>
+                  </div>
+                }
+              </div>
+            }
+            @if (clientSales().length) {
+              <div class="commercial-360__group">
+                <h4><mat-icon>payments</mat-icon> Ventas</h4>
+                @for (s of clientSales(); track s.id) {
+                  <div class="commercial-360__row">
+                    <div class="min-w-0">
+                      <strong class="truncate">{{ s.concept || s.code }}</strong>
+                      <small>{{ s.saleDate | date: 'd MMM y' }} · {{ commercialStatusLabel(s.status) }}</small>
+                    </div>
+                    <span>{{ s.amount | currency: s.currency:'symbol-narrow':'1.0-0' }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+      }
+    } @else {
+      <eas-empty-state
+        icon="history"
+        title="Selecciona un cliente"
+        description="Verás aquí el historial cronológico de conversaciones."
+      ></eas-empty-state>
+    }
+  </section>
+</div>

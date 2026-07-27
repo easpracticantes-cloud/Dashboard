@@ -1,0 +1,257 @@
+/**
+ * Dark mode overrides — se carga DESPUÉS del tema Material azure-blue
+ * para forzar tipografía legible en toda la app.
+ */
+
+html[data-theme='dark'] {
+  /* Material Design 3 system tokens */
+  --mat-sys-on-surface: #f5faf7;
+  --mat-sys-on-surface-variant: #c5d4cb;
+  --mat-sys-surface: #17221d;
+  --mat-sys-surface-dim: #0c1210;
+  --mat-sys-surface-bright: #1d2b25;
+  --mat-sys-surface-container: #1a2620;
+  --mat-sys-surface-container-low: #15201b;
+  --mat-sys-surface-container-lowest: #0c1210;
+  --mat-sys-surface-container-high: #22332c;
+  --mat-sys-surface-container-highest: #2a3d35;
+  --mat-sys-outline: #3a4c43;
+  --mat-sys-outline-variant: #2a3831;
+  --mat-sys-primary: #5ec993;
+  --mat-sys-on-primary: #06110c;
+  --mat-sys-primary-container: #1c3d2e;
+  --mat-sys-on-primary-container: #d8f5e6;
+  --mat-sys-secondary: #b8c9bf;
+  --mat-sys-on-secondary: #0c1210;
+  --mat-sys-error: #f0958c;
+  --mat-sys-on-error: #2a0d0a;
+  --mat-sys-inverse-surface: #eef4f0;
+  --mat-sys-inverse-on-surface: #121a17;
+  --mat-sys-scrim: rgba(0, 0, 0, 0.65);
+  --mat-sys-shadow: rgba(0, 0, 0, 0.5);
+
+  /* MDC legacy tokens */
+  --mdc-theme-on-surface: #f5faf7;
+  --mdc-theme-text-primary-on-background: #f5faf7;
+  --mdc-theme-text-secondary-on-background: #c5d4cb;
+  --mdc-theme-text-hint-on-background: #a8bdb2;
+  --mdc-theme-text-icon-on-background: #c5d4cb;
+  --mdc-theme-surface: #17221d;
+  --mdc-theme-background: #0c1210;
+
+  color: #f5faf7;
+}
+
+/* Tipografía base forzada */
+html[data-theme='dark'] body,
+html[data-theme='dark'] .mat-drawer-content,
+html[data-theme='dark'] .mat-sidenav-content,
+html[data-theme='dark'] .mat-mdc-card,
+html[data-theme='dark'] .eas-card,
+html[data-theme='dark'] .eas-panel {
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] h1,
+html[data-theme='dark'] h2,
+html[data-theme='dark'] h3,
+html[data-theme='dark'] h4,
+html[data-theme='dark'] .font-display,
+html[data-theme='dark'] strong,
+html[data-theme='dark'] b {
+  color: #f7fcf9 !important;
+}
+
+html[data-theme='dark'] .dash-hero h1,
+html[data-theme='dark'] .dash-hero p,
+html[data-theme='dark'] .dash-hero .dash-sync {
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .dash-hero__lead {
+  color: rgba(255, 255, 255, 0.82) !important;
+}
+
+html[data-theme='dark'] .eas-field-label,
+html[data-theme='dark'] .ph__sub,
+html[data-theme='dark'] .dash-chart__eyebrow,
+html[data-theme='dark'] .chart-title,
+html[data-theme='dark'] .kpi__label {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .text-eas-ink,
+html[data-theme='dark'] [class*='text-eas-ink'] {
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .text-eas-muted,
+html[data-theme='dark'] [class*='text-eas-muted'] {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .text-eas-forest,
+html[data-theme='dark'] .text-eas-pine,
+html[data-theme='dark'] [class*='text-eas-forest'],
+html[data-theme='dark'] [class*='text-eas-pine'] {
+  color: #e8f3ec !important;
+}
+
+html[data-theme='dark'] .text-eas-leaf,
+html[data-theme='dark'] [class*='text-eas-leaf'] {
+  color: #6fd5a1 !important;
+}
+
+/* Material form fields / selects / tables / paginator */
+html[data-theme='dark'] .mat-mdc-form-field,
+html[data-theme='dark'] .mat-mdc-form-field .mat-mdc-select-value,
+html[data-theme='dark'] .mat-mdc-form-field .mat-mdc-select-min-line,
+html[data-theme='dark'] .mat-mdc-form-field input,
+html[data-theme='dark'] .mat-mdc-form-field textarea,
+html[data-theme='dark'] .mat-mdc-form-field .mdc-floating-label,
+html[data-theme='dark'] .mat-mdc-form-field .mat-mdc-form-field-focus-overlay {
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .mat-mdc-form-field .mdc-floating-label,
+html[data-theme='dark'] .mat-mdc-form-field .mat-mdc-form-field-hint-wrapper,
+html[data-theme='dark'] .mat-mdc-form-field .mat-mdc-select-placeholder {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .mat-mdc-cell,
+html[data-theme='dark'] .mat-mdc-footer-cell {
+  color: #eef4f0 !important;
+}
+
+html[data-theme='dark'] .mat-mdc-header-cell,
+html[data-theme='dark'] .mat-sort-header-content {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .mat-mdc-paginator,
+html[data-theme='dark'] .mat-mdc-paginator-range-label,
+html[data-theme='dark'] .mat-mdc-paginator .mat-mdc-select-value,
+html[data-theme='dark'] .mat-mdc-paginator .mat-mdc-icon-button {
+  color: #eef4f0 !important;
+}
+
+html[data-theme='dark'] .mat-mdc-option,
+html[data-theme='dark'] .mat-mdc-option .mdc-list-item__primary-text {
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .cdk-overlay-container .mat-mdc-select-panel,
+html[data-theme='dark'] .cdk-overlay-container .mat-mdc-menu-panel,
+html[data-theme='dark'] .cdk-overlay-container .mat-datepicker-content,
+html[data-theme='dark'] .cdk-overlay-container .mat-mdc-autocomplete-panel {
+  background: #1d2b25 !important;
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .cdk-overlay-container .mat-mdc-menu-item,
+html[data-theme='dark'] .cdk-overlay-container .mat-mdc-menu-item span,
+html[data-theme='dark'] .cdk-overlay-container .mat-calendar-body-cell-content,
+html[data-theme='dark'] .cdk-overlay-container .mat-calendar-body-label,
+html[data-theme='dark'] .cdk-overlay-container .mat-calendar-period-button,
+html[data-theme='dark'] .cdk-overlay-container .mat-calendar-table-header th {
+  color: #f5faf7 !important;
+}
+
+/* Inputs nativos / selects propios */
+html[data-theme='dark'] input,
+html[data-theme='dark'] textarea,
+html[data-theme='dark'] select,
+html[data-theme='dark'] .eas-input,
+html[data-theme='dark'] .eas-select {
+  color: #f5faf7 !important;
+  background-color: #1a2620 !important;
+  border-color: #3a4c43 !important;
+}
+
+html[data-theme='dark'] input::placeholder,
+html[data-theme='dark'] textarea::placeholder {
+  color: #a8bdb2 !important;
+  opacity: 1;
+}
+
+/* Utilidades claras que rompen el contraste */
+html[data-theme='dark'] .bg-white,
+html[data-theme='dark'] .bg-slate-50,
+html[data-theme='dark'] .bg-slate-100,
+html[data-theme='dark'] .bg-gray-50,
+html[data-theme='dark'] .bg-gray-100,
+html[data-theme='dark'] .bg-red-50,
+html[data-theme='dark'] .focus\:bg-white:focus {
+  background-color: #1a2620 !important;
+}
+
+html[data-theme='dark'] .text-slate-400,
+html[data-theme='dark'] .text-slate-500,
+html[data-theme='dark'] .text-slate-600,
+html[data-theme='dark'] .text-slate-700,
+html[data-theme='dark'] .text-gray-400,
+html[data-theme='dark'] .text-gray-500,
+html[data-theme='dark'] .text-gray-600,
+html[data-theme='dark'] .text-gray-700,
+html[data-theme='dark'] .text-black {
+  color: #c5d4cb !important;
+}
+
+/* Tablas HTML comerciales */
+html[data-theme='dark'] table th {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] table td {
+  color: #eef4f0 !important;
+}
+
+/* KPI / chips / badges con fondos claros heredados */
+html[data-theme='dark'] .kpi__label,
+html[data-theme='dark'] .kpi__suffix,
+html[data-theme='dark'] .kpi__delta,
+html[data-theme='dark'] .dash-chart__eyebrow,
+html[data-theme='dark'] .chart-title,
+html[data-theme='dark'] .ph__sub,
+html[data-theme='dark'] .ph__eyebrow {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .kpi__value,
+html[data-theme='dark'] .ph h1 {
+  color: #f7fcf9 !important;
+}
+
+html[data-theme='dark'] .pill,
+html[data-theme='dark'] .eas-chip {
+  color: #e8f3ec !important;
+}
+
+html[data-theme='dark'] .eas-chip.is-active {
+  color: #06110c !important;
+}
+
+/* Iconos Material sin color explícito */
+html[data-theme='dark'] mat-icon:not([class*='text-']) {
+  color: #d5e2da;
+}
+
+html[data-theme='dark'] .eas-btn-primary mat-icon,
+html[data-theme='dark'] .eas-btn-accent mat-icon,
+html[data-theme='dark'] .eas-chip.is-active mat-icon {
+  color: inherit;
+}
+
+/* ApexCharts */
+html[data-theme='dark'] .apexcharts-yaxis text,
+html[data-theme='dark'] .apexcharts-xaxis text,
+html[data-theme='dark'] .apexcharts-legend-text,
+html[data-theme='dark'] .apexcharts-datalabel,
+html[data-theme='dark'] .apexcharts-datalabel-label,
+html[data-theme='dark'] .apexcharts-datalabel-value,
+html[data-theme='dark'] .apexcharts-pie-label,
+html[data-theme='dark'] .apexcharts-text tspan {
+  fill: #c5d4cb !important;
+  color: #c5d4cb !important;
+}

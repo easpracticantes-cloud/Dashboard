@@ -1,0 +1,33 @@
+<div class="dash dash--sheets eas-animate-rise">
+  <section class="dash-hero dash-hero--sheets">
+    <div class="dash-hero__copy">
+      <p class="dash-hero__date">{{ now() | date: "EEEE d 'de' MMMM" }}</p>
+      <h1>Centro de mando · SIG</h1>
+      <p class="dash-hero__lead">
+        {{ firstName() }}, pulso del negocio + workbook Sheets · {{ now() | date: 'HH:mm' }}.
+        Usa <strong>Ctrl/⌘ K</strong> para buscar clientes, chats o módulos al instante.
+      </p>
+      <div class="dash-hero__actions">
+        <a routerLink="/app/conversations" class="eas-btn-primary dash-hero__btn">
+          <mat-icon>forum</mat-icon>
+          Ver seguimiento
+        </a>
+        <a routerLink="/app/clients" class="eas-btn-ghost dash-hero__ghost">
+          Clientes Sheets
+          <mat-icon>north_east</mat-icon>
+        </a>
+      </div>
+    </div>
+    <div class="dash-hero__meta">
+      @if (syncing()) {
+        <span class="dash-sync is-live"><mat-icon>sync</mat-icon> Sincronizando Sheets…</span>
+      } @else {
+        <span class="dash-sync"><mat-icon>table_view</mat-icon> Workbook al día</span>
+      }
+    </div>
+  </section>
+
+  <eas-command-center></eas-command-center>
+
+  <eas-dashboard-sheets></eas-dashboard-sheets>
+</div>

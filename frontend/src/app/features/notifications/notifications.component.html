@@ -1,0 +1,89 @@
+<eas-page-header eyebrow="Centro de avisos" title="Notificaciones" subtitle="Avisos accionables: abre el chat, la cotización o la reserva en un clic.">
+  <button type="button" class="eas-btn-secondary" (click)="refresh()" [disabled]="refreshing()">
+    <mat-icon>refresh</mat-icon>
+    {{ refreshing() ? 'Actualizando…' : 'Actualizar' }}
+  </button>
+  <button type="button" class="eas-btn-secondary" (click)="notificationsService.markAllAsRead()">
+    <mat-icon>done_all</mat-icon>
+    Marcar todo leído
+  </button>
+</eas-page-header>
+
+<div class="notif-toolbar">
+  <div class="eas-chip-group">
+    <button type="button" class="eas-chip" [class.is-active]="filter() === 'ALL'" (click)="setFilter('ALL')">
+      Todas ({{ counts().total }})
+    </button>
+    <button type="button" class="eas-chip" [class.is-active]="filter() === 'UNREAD'" (click)="setFilter('UNREAD')">
+      Sin leer ({{ counts().unread }})
+    </button>
+  </div>
+
+  <label class="notif-search">
+    <mat-icon>search</mat-icon>
+    <input
+      type="search"
+      [ngModel]="search()"
+      (ngModelChange)="search.set($event)"
+      placeholder="Buscar por título o texto…"
+    />
+  </label>
+</div>
+
+<div class="eas-chip-group notif-types">
+  @for (tab of typeTabs; track tab.key) {
+    <button type="button" class="eas-chip" [class.is-active]="typeFilter() === tab.key" (click)="setType(tab.key)">
+      {{ tab.label }}
+    </button>
+  }
+</div>
+
+<div class="eas-card notif-card">
+  @if (loading()) {
+    @for (s of [1, 2, 3, 4]; track s) {
+      <div class="notif-skel">
+        <div class="eas-skeleton h-10 w-10 rounded-xl"></div>
+        <div class="flex-1">
+          <div class="eas-skeleton h-3 w-40"></div>
+          <div class="eas-skeleton mt-2 h-3 w-64"></div>
+        </div>
+      </div>
+    }
+  } @else if (filteredNotifications().length === 0) {
+    <eas-empty-state icon="notifications_none" title="Sin notificaciones" description="Te avisaremos aquí cuando algo importante suceda."></eas-empty-state>
+  } @else {
+    @for (n of filteredNotifications(); track n.id) {
+      <div class="notif-item" [class.is-unread]="!n.read">
+        <div class="notif-item__icon" [class]="typeVisual[n.type].toneClass">
+          <mat-icon [style.font-size.px]="20" [style.width.px]="20" [style.height.px]="20">{{ typeVisual[n.type].icon }}</mat-icon>
+        </div>
+        <div class="notif-item__body">
+          <p class="notif-item__title">
+            {{ n.title }}
+            <span class="notif-item__type">{{ typeVisual[n.type].label }}</span>
+          </p>
+          <p class="notif-item__text">{{ n.body }}</p>
+          <p class="notif-item__time">{{ n.createdAt | timeAgo }}</p>
+        </div>
+        <div class="notif-item__actions">
+          @if (!n.read) {
+            <button type="button" class="notif-item__mark" (click)="markAsRead(n.id)" title="Marcar leída">
+              <mat-icon>done</mat-icon>
+            </button>
+          }
+          <a
+            class="notif-item__action"
+            [routerLink]="n.link || '/app/notifications'"
+            (click)="markAsRead(n.id)"
+          >
+            {{ actionLabel(n) }}
+            <mat-icon>north_east</mat-icon>
+          </a>
+        </div>
+        @if (!n.read) {
+          <span class="notif-item__dot"></span>
+        }
+      </div>
+    }
+  }
+</div>

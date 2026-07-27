@@ -1,0 +1,259 @@
+<eas-page-header
+  eyebrow="Sistema"
+  title="Configuración"
+  subtitle="Conexiones, apariencia, salud del sistema, usuarios y parámetros del SIG."
+>
+  <button type="button" class="eas-btn-primary" (click)="save()" [disabled]="saving()">
+    <mat-icon>save</mat-icon>
+    {{ saving() ? 'Guardando…' : saved() ? 'Guardado' : 'Guardar cambios' }}
+  </button>
+</eas-page-header>
+
+<div class="settings-layout">
+  <aside class="eas-card settings-nav">
+    @for (item of sections; track item.key) {
+      <button type="button" class="settings-nav__item" [class.is-active]="section() === item.key" (click)="setSection(item.key)">
+        <mat-icon>{{ item.icon }}</mat-icon>
+        <span>{{ item.label }}</span>
+      </button>
+    }
+  </aside>
+
+  <section class="eas-card settings-panel">
+    @if (loading()) {
+      <div class="eas-skeleton h-24 w-full"></div>
+    } @else if (section() === 'USERS') {
+      <div class="users-hub">
+        <h3>Usuarios y permisos</h3>
+        <p>Administra cuentas, roles y acceso a módulos del CRM.</p>
+        <div class="users-hub__actions">
+          <a routerLink="/app/users" class="eas-btn-primary">
+            <mat-icon>group</mat-icon>
+            Gestionar usuarios
+          </a>
+          <a routerLink="/app/profile" class="eas-btn-secondary">
+            <mat-icon>person</mat-icon>
+            Mi perfil
+          </a>
+        </div>
+
+        <div class="settings-kpis">
+          <article>
+            <p>Usuarios activos</p>
+            <strong>{{ activeUsers().length }}</strong>
+          </article>
+          @for (r of roleCounts(); track r.role) {
+            <article>
+              <p>{{ r.role }}</p>
+              <strong>{{ r.count }}</strong>
+            </article>
+          }
+        </div>
+
+        @if (activeUsers().length) {
+          <div class="settings-table-wrap">
+            <table class="settings-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Usuario</th>
+                  <th>Rol</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (u of activeUsers().slice(0, 12); track u.id) {
+                  <tr>
+                    <td>{{ u.fullName || '—' }}</td>
+                    <td>{{ u.username || '—' }}</td>
+                    <td>{{ u.role || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    } @else if (section() === 'HEALTH') {
+      <div class="health-hub">
+        <div class="integration-banner">
+          <div>
+            <h3>Salud del sistema</h3>
+            <p>Integraciones, calidad de datos y auditoría reciente del SIG.</p>
+          </div>
+          <button type="button" class="eas-btn-secondary" (click)="loadHubData()">
+            <mat-icon>refresh</mat-icon>
+            Actualizar
+          </button>
+        </div>
+
+        <h4 class="settings-subtitle">Integraciones</h4>
+        <div class="health-grid">
+          @for (item of healthItems(); track item.code) {
+            <article class="health-card">
+              <strong>{{ item.code }}</strong>
+              <span class="status" [class.status--ok]="item.status === 'CONNECTED' || item.status === 'READY'"
+                [class.status--off]="item.status === 'DISABLED'"
+                [class.status--err]="item.status === 'ERROR'">{{ item.status }}</span>
+              <p>{{ item.description || 'Sin descripción' }}</p>
+            </article>
+          } @empty {
+            @for (integ of integrations(); track integ.code) {
+              <article class="health-card">
+                <strong>{{ integ.name || integ.code }}</strong>
+                <span [class]="statusVisual[integ.status].classes">{{ statusVisual[integ.status].label }}</span>
+                <p>{{ integ.description || integ.code }}</p>
+              </article>
+            }
+          }
+        </div>
+
+        @if (quality(); as q) {
+          <h4 class="settings-subtitle">Calidad de datos</h4>
+          <div class="settings-kpis">
+            <article>
+              <p>Clientes sin email</p>
+              <strong>{{ q.missingEmail }}</strong>
+            </article>
+            <article>
+              <p>Cotiz. sin asesor</p>
+              <strong>{{ q.missingAdvisor }}</strong>
+            </article>
+            <article>
+              <p>Teléfonos duplicados</p>
+              <strong>{{ q.duplicatePhones }}</strong>
+            </article>
+            <article>
+              <p>Chats sin clave Sheets</p>
+              <strong>{{ q.conversationsMissingKey }}</strong>
+            </article>
+          </div>
+        }
+
+        <h4 class="settings-subtitle">Auditoría reciente</h4>
+        @if (audit().length === 0) {
+          <eas-empty-state icon="history" title="Sin eventos" description="Aún no hay registros de auditoría."></eas-empty-state>
+        } @else {
+          <div class="settings-table-wrap">
+            <table class="settings-table">
+              <thead>
+                <tr>
+                  <th>Acción</th>
+                  <th>Entidad</th>
+                  <th>Detalle</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of audit(); track row.id) {
+                  <tr>
+                    <td><strong>{{ row.action }}</strong></td>
+                    <td>{{ row.entityType }}</td>
+                    <td class="muted">{{ row.details || row.entityId || '—' }}</td>
+                    <td>{{ row.createdAt | date: 'dd/MM HH:mm' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    } @else {
+      @if (section() === 'SHEETS') {
+        <div class="integration-banner">
+          <div>
+            <h3>Google Sheets</h3>
+            <p>Fuente de datos del dashboard. Al cambiar la hoja, el sistema sincroniza automáticamente.</p>
+          </div>
+          @if (sheetsIntegration(); as integ) {
+            <span [class]="statusVisual[integ.status].classes">{{ statusVisual[integ.status].label }}</span>
+          }
+        </div>
+        <div class="settings-inline-actions">
+          <button type="button" class="eas-btn-secondary" (click)="syncSheets()" [disabled]="syncing()">
+            <mat-icon>sync</mat-icon>
+            {{ syncing() ? 'Sincronizando…' : 'Sincronizar ahora' }}
+          </button>
+          <button type="button" class="eas-btn-secondary" (click)="exportAdvisorCsv()">
+            <mat-icon>download</mat-icon>
+            Exportar cotizaciones CSV
+          </button>
+        </div>
+        @if (syncMessage(); as msg) {
+          <p class="sync-msg">{{ msg }}</p>
+        }
+        @if (liveSync.lastSyncAt(); as at) {
+          <p class="sync-msg">Última sync UI: {{ at | date: 'dd/MM/yyyy HH:mm:ss' }}</p>
+        }
+      }
+
+      @if (section() === 'WHATSAPP') {
+        <div class="integration-banner">
+          <div>
+            <h3>WhatsApp</h3>
+            <p>Canal operativo para mensajes salientes. Preparado para Meta Business API.</p>
+          </div>
+          @if (whatsappIntegration(); as integ) {
+            <span [class]="statusVisual[integ.status].classes">{{ statusVisual[integ.status].label }}</span>
+          }
+        </div>
+      }
+
+      @if (section() === 'APPEARANCE') {
+        <div class="integration-banner">
+          <div>
+            <h3>Apariencia</h3>
+            <p>Tema visual del SIG. También puedes cambiarlo desde la barra superior.</p>
+          </div>
+        </div>
+        <div class="settings-inline-actions mb-4">
+          <button type="button" class="eas-chip" [class.is-active]="!theme.isDark()" (click)="setTheme('light')">
+            <mat-icon>light_mode</mat-icon> Claro
+          </button>
+          <button type="button" class="eas-chip" [class.is-active]="theme.isDark()" (click)="setTheme('dark')">
+            <mat-icon>dark_mode</mat-icon> Oscuro
+          </button>
+        </div>
+      }
+
+      @if (section() === 'NOTIFICATIONS') {
+        <div class="integration-banner">
+          <div>
+            <h3>Notificaciones</h3>
+            <p>Canales de aviso para el equipo comercial y operativo.</p>
+          </div>
+          <a routerLink="/app/notifications" class="eas-btn-secondary">Ver bandeja</a>
+        </div>
+      }
+
+      @if (visibleSettings().length === 0) {
+        <eas-empty-state icon="settings" title="Sin parámetros" description="No hay ajustes para esta sección."></eas-empty-state>
+      } @else {
+        <div class="settings-fields">
+          @for (item of visibleSettings(); track item.key) {
+            <label class="field">
+              <span class="eas-field-label">{{ friendlyLabel(item.key) }}</span>
+              @if (isBooleanSetting(item.key, item.value)) {
+                <div class="settings-bool">
+                  <input
+                    type="checkbox"
+                    [checked]="item.value === 'true'"
+                    (change)="toggleBoolean(item.key, $any($event.target).checked)"
+                  />
+                  <span>{{ item.value === 'true' ? 'Activado' : 'Desactivado' }}</span>
+                </div>
+              } @else {
+                <input
+                  class="eas-input eas-input--plain"
+                  type="text"
+                  [ngModel]="item.value"
+                  (ngModelChange)="updateValue(item.key, $event)"
+                />
+              }
+              <small>{{ item.key }}</small>
+            </label>
+          }
+        </div>
+      }
+    }
+  </section>
+</div>

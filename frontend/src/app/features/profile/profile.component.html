@@ -1,0 +1,301 @@
+<eas-page-header
+  eyebrow="Tu cuenta"
+  title="Mi perfil"
+  subtitle="Información personal, preferencias, apariencia y seguridad de acceso."
+></eas-page-header>
+
+@if (loading()) {
+  <div class="profile-grid">
+    <div class="eas-card profile-skel"></div>
+    <div class="eas-card profile-skel profile-skel--wide"></div>
+  </div>
+} @else {
+  <div class="profile-grid eas-animate-rise">
+    <aside class="profile-side">
+      <div class="profile-card">
+        <div class="profile-card__avatar">
+          <eas-avatar
+            [name]="form.controls.fullName.value || user()?.nombre || ''"
+            [imageUrl]="form.controls.avatarUrl.value || user()?.avatarUrl"
+            [size]="96"
+          ></eas-avatar>
+        </div>
+        <h2>{{ form.controls.fullName.value || user()?.nombre }}</h2>
+        <p class="profile-card__user">
+          @{{ user()?.username }}
+          <button type="button" class="profile-copy" (click)="copyUsername()" title="Copiar usuario">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+        </p>
+        <span class="profile-card__role">{{ user()?.rol ? roleLabels[user()!.rol] : '' }}</span>
+
+        <div class="profile-card__meta">
+          <div>
+            <mat-icon>mail</mat-icon>
+            <span>{{ form.controls.email.value || user()?.correo }}</span>
+          </div>
+          <div>
+            <mat-icon>badge</mat-icon>
+            <span>{{ user()?.activo === false ? 'Cuenta inactiva' : 'Cuenta activa' }}</span>
+          </div>
+          <div>
+            <mat-icon>login</mat-icon>
+            <span>
+              Último acceso:
+              {{
+                (profileDto()?.lastLoginAt || user()?.ultimoAcceso)
+                  ? ((profileDto()?.lastLoginAt || user()?.ultimoAcceso)! | date: 'dd/MM/yyyy HH:mm')
+                  : '—'
+              }}
+            </span>
+          </div>
+          <div>
+            <mat-icon>event</mat-icon>
+            <span>
+              Alta:
+              {{ profileDto()?.createdAt ? (profileDto()!.createdAt! | date: 'dd/MM/yyyy') : '—' }}
+            </span>
+          </div>
+          <div>
+            <mat-icon>notifications</mat-icon>
+            <span>{{ unread() }} notificaciones sin leer</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-card profile-card--links">
+        <p class="profile-form-card__eyebrow">Accesos rápidos</p>
+        <div class="profile-links">
+          @for (link of quickLinks; track link.route) {
+            <a [routerLink]="link.route" class="profile-links__item">
+              <mat-icon>{{ link.icon }}</mat-icon>
+              <span>
+                <strong>{{ link.label }}</strong>
+                <small>{{ link.hint }}</small>
+              </span>
+              <mat-icon>chevron_right</mat-icon>
+            </a>
+          }
+        </div>
+      </div>
+
+      <div class="profile-card profile-card--links">
+        <p class="profile-form-card__eyebrow">Atajos de teclado</p>
+        <ul class="profile-shortcuts">
+          @for (s of shortcuts; track s.keys) {
+            <li>
+              <kbd>{{ s.keys }}</kbd>
+              <span>{{ s.action }}</span>
+            </li>
+          }
+        </ul>
+      </div>
+    </aside>
+
+    <div class="profile-main">
+      <section class="profile-form-card">
+        <div class="profile-form-card__head">
+          <div>
+            <p class="profile-form-card__eyebrow">Configuración</p>
+            <h3>Información personal</h3>
+          </div>
+        </div>
+
+        @if (message(); as msg) {
+          <div [class]="msg.type === 'success' ? 'eas-alert-success' : 'eas-alert-error'" role="status">
+            <mat-icon>{{ msg.type === 'success' ? 'check_circle' : 'error' }}</mat-icon>
+            <span>{{ msg.text }}</span>
+          </div>
+        }
+
+        <form [formGroup]="form" (ngSubmit)="save()" class="profile-form" novalidate>
+          <div class="profile-form__row">
+            <label class="field">
+              <span class="eas-field-label">Nombre completo</span>
+              <input class="eas-input eas-input--plain" type="text" formControlName="fullName" placeholder="Tu nombre" />
+              @if (fullName.invalid && fullName.touched) {
+                <small>Ingresa un nombre válido (mín. 3 caracteres).</small>
+              }
+            </label>
+
+            <label class="field">
+              <span class="eas-field-label">Correo electrónico</span>
+              <input class="eas-input eas-input--plain" type="email" formControlName="email" placeholder="correo@empresa.com" />
+              @if (email.invalid && email.touched) {
+                <small>Ingresa un correo válido.</small>
+              }
+            </label>
+          </div>
+
+          <div class="field">
+            <span class="eas-field-label">Foto de perfil</span>
+            <div class="avatar-presets">
+              @for (preset of avatarPresets; track preset) {
+                <button
+                  type="button"
+                  class="avatar-presets__item"
+                  [class.is-active]="form.controls.avatarUrl.value === preset"
+                  (click)="selectPreset(preset)"
+                  [attr.aria-label]="'Usar avatar ' + $index"
+                >
+                  <img [src]="preset" alt="" />
+                </button>
+              }
+              <button type="button" class="avatar-presets__clear" (click)="clearAvatar()">
+                <mat-icon>person</mat-icon>
+                Iniciales
+              </button>
+            </div>
+            <input
+              class="eas-input eas-input--plain"
+              type="url"
+              formControlName="avatarUrl"
+              placeholder="O pega una URL de imagen (opcional)"
+            />
+          </div>
+
+          <div class="profile-form__security">
+            <p class="profile-form-card__eyebrow">Seguridad</p>
+            <h4>Cambiar contraseña</h4>
+            <p class="profile-form__hint">Déjalo en blanco si no quieres modificarla. Mínimo 8 caracteres.</p>
+
+            <div class="profile-form__row">
+              <label class="field">
+                <span class="eas-field-label">Nueva contraseña</span>
+                <div class="field__control">
+                  <input
+                    class="eas-input eas-input--plain eas-input--no-icon"
+                    [type]="hidePassword() ? 'password' : 'text'"
+                    formControlName="password"
+                    autocomplete="new-password"
+                    placeholder="Mínimo 8 caracteres"
+                  />
+                  <button type="button" class="field__eye" (click)="togglePassword()">
+                    <mat-icon>{{ hidePassword() ? 'visibility' : 'visibility_off' }}</mat-icon>
+                  </button>
+                </div>
+                @if (password.invalid && password.touched && password.value) {
+                  <small>La contraseña debe tener al menos 8 caracteres.</small>
+                }
+              </label>
+
+              <label class="field">
+                <span class="eas-field-label">Confirmar contraseña</span>
+                <input
+                  class="eas-input eas-input--plain eas-input--no-icon"
+                  [type]="hidePassword() ? 'password' : 'text'"
+                  formControlName="confirmPassword"
+                  autocomplete="new-password"
+                  placeholder="Repite la contraseña"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="profile-form__actions">
+            <button type="submit" class="eas-btn-primary" [disabled]="saving()">
+              @if (saving()) {
+                Guardando…
+              } @else {
+                <mat-icon>save</mat-icon>
+                Guardar cambios
+              }
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="profile-form-card">
+        <div class="profile-form-card__head">
+          <div>
+            <p class="profile-form-card__eyebrow">Preferencias</p>
+            <h3>Apariencia y experiencia</h3>
+          </div>
+        </div>
+
+        <div class="profile-prefs">
+          <div class="profile-prefs__block">
+            <span class="eas-field-label">Tema</span>
+            <div class="profile-prefs__chips">
+              <button type="button" class="eas-chip" [class.is-active]="!theme.isDark()" (click)="setTheme('light')">
+                <mat-icon>light_mode</mat-icon> Claro
+              </button>
+              <button type="button" class="eas-chip" [class.is-active]="theme.isDark()" (click)="setTheme('dark')">
+                <mat-icon>dark_mode</mat-icon> Oscuro
+              </button>
+            </div>
+          </div>
+
+          <div class="profile-prefs__block">
+            <span class="eas-field-label">Densidad de interfaz</span>
+            <div class="profile-prefs__chips">
+              <button
+                type="button"
+                class="eas-chip"
+                [class.is-active]="prefs().density === 'comfortable'"
+                (click)="patchPrefs({ density: 'comfortable' })"
+              >
+                Cómoda
+              </button>
+              <button
+                type="button"
+                class="eas-chip"
+                [class.is-active]="prefs().density === 'compact'"
+                (click)="patchPrefs({ density: 'compact' })"
+              >
+                Compacta
+              </button>
+            </div>
+          </div>
+
+          <div class="profile-prefs__block">
+            <span class="eas-field-label">Idioma de la interfaz</span>
+            <div class="profile-prefs__chips">
+              <button
+                type="button"
+                class="eas-chip"
+                [class.is-active]="prefs().language === 'es'"
+                (click)="patchPrefs({ language: 'es' })"
+              >
+                Español
+              </button>
+              <button
+                type="button"
+                class="eas-chip"
+                [class.is-active]="prefs().language === 'en'"
+                (click)="patchPrefs({ language: 'en' })"
+              >
+                English
+              </button>
+            </div>
+            <small class="profile-prefs__hint">Preferencia local; el SIG opera en español por defecto.</small>
+          </div>
+
+          <label class="profile-toggle">
+            <input
+              type="checkbox"
+              [checked]="prefs().emailDigest"
+              (change)="patchPrefs({ emailDigest: $any($event.target).checked })"
+            />
+            <span>
+              <strong>Resumen diario por correo</strong>
+              <small>Cuando el canal de notificaciones esté activo.</small>
+            </span>
+          </label>
+
+          <label class="profile-toggle">
+            <input
+              type="checkbox"
+              [checked]="prefs().soundAlerts"
+              (change)="patchPrefs({ soundAlerts: $any($event.target).checked })"
+            />
+            <span>
+              <strong>Sonido en alertas</strong>
+              <small>Aviso audible al llegar notificaciones nuevas.</small>
+            </span>
+          </label>
+        </div>
+      </section>
+    </div>
+  </div>
+}

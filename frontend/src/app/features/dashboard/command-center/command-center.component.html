@@ -1,0 +1,101 @@
+<section class="cc eas-animate-rise" aria-label="Centro de mando operativo">
+  <div class="cc__head">
+    <div>
+      <p class="cc__eyebrow">Centro de mando</p>
+      <h2>Pulso del negocio</h2>
+      <p class="cc__sub">Chats, ventas, agenda de hoy y conversión — en vivo.</p>
+    </div>
+    @if (loading()) {
+      <mat-spinner diameter="22" strokeWidth="2"></mat-spinner>
+    }
+  </div>
+
+  <div class="cc-pulse">
+    <article class="cc-kpi">
+      <span class="cc-kpi__icon cc-kpi__icon--leaf"><mat-icon>forum</mat-icon></span>
+      <div>
+        <p class="cc-kpi__label">Chats abiertos</p>
+        <p class="cc-kpi__value">{{ pulse()?.openConversations ?? '—' }}</p>
+      </div>
+      <a routerLink="/app/conversations" class="cc-kpi__go">Atender</a>
+    </article>
+    <article class="cc-kpi">
+      <span class="cc-kpi__icon cc-kpi__icon--forest"><mat-icon>payments</mat-icon></span>
+      <div>
+        <p class="cc-kpi__label">Ventas de hoy</p>
+        <p class="cc-kpi__value">{{ pulse()?.salesTodayCount ?? 0 }}</p>
+        <p class="cc-kpi__hint">{{ pulse()?.salesTodayAmount ?? 0 | currency: 'COP':'symbol-narrow':'1.0-0' }}</p>
+      </div>
+      <a routerLink="/app/sales" class="cc-kpi__go">Ver</a>
+    </article>
+    <article class="cc-kpi">
+      <span class="cc-kpi__icon cc-kpi__icon--amber"><mat-icon>trending_up</mat-icon></span>
+      <div>
+        <p class="cc-kpi__label">Conversión</p>
+        <p class="cc-kpi__value">{{ conversionPct() | number: '1.0-1' }}%</p>
+        <p class="cc-kpi__hint">Cotización → venta</p>
+      </div>
+      <a routerLink="/app/analytics" class="cc-kpi__go">Ver</a>
+    </article>
+    <article class="cc-kpi">
+      <span class="cc-kpi__icon cc-kpi__icon--sky"><mat-icon>schedule</mat-icon></span>
+      <div>
+        <p class="cc-kpi__label">Lag actividad</p>
+        <p class="cc-kpi__value">{{ responseLagHours() | number: '1.0-1' }}h</p>
+        <p class="cc-kpi__hint">Proxy de respuesta</p>
+      </div>
+      <a routerLink="/app/conversations" class="cc-kpi__go">Inbox</a>
+    </article>
+  </div>
+
+  <div class="cc-grid">
+    <section class="cc-panel">
+      <div class="cc-panel__head">
+        <h3>Embudo comercial</h3>
+        <span class="cc-panel__badge">
+          {{ funnel()?.quoteToSaleRate ?? 0 | number: '1.0-1' }}% cotiz. → venta
+        </span>
+      </div>
+      <div class="cc-funnel">
+        @for (step of funnelSteps(); track step.key) {
+          <a [routerLink]="step.route" class="cc-funnel__step">
+            <div class="cc-funnel__meta">
+              <strong>{{ step.key }}</strong>
+              <span>{{ step.value }}</span>
+            </div>
+            <div class="cc-funnel__bar">
+              <i [style.width.%]="step.pct"></i>
+            </div>
+          </a>
+        } @empty {
+          <p class="cc-empty">Sin datos de embudo todavía.</p>
+        }
+      </div>
+    </section>
+
+    <section class="cc-panel">
+      <div class="cc-panel__head">
+        <h3>Agenda de hoy</h3>
+        <a routerLink="/app/reservations" class="cc-panel__link">Reservas</a>
+      </div>
+      <div class="cc-agenda">
+        @for (r of agenda(); track r.id) {
+          <article class="cc-agenda__card">
+            <div class="cc-agenda__when">
+              <mat-icon>event</mat-icon>
+              <span>{{ r.reservationDate }}</span>
+            </div>
+            <h4>{{ r.experienceName }}</h4>
+            <p>{{ r.clientName }} · {{ r.partySize }} pers.</p>
+            <div class="cc-agenda__foot">
+              <span class="cc-status">{{ r.status }}</span>
+              <span>{{ r.advisorName || 'Sin asesor' }}</span>
+            </div>
+          </article>
+        } @empty {
+          <p class="cc-empty">No hay reservas confirmadas para hoy.</p>
+        }
+      </div>
+    </section>
+  </div>
+</section>

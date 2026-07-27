@@ -1,0 +1,3 @@
+Usa @documentos/ y @AGENTS.md.
+
+Construye el backend completo en /backend con Java 17, Spring Boot, Maven, PostgreSQL, JWT, Docker y arquitectura hexagonal. Primero muestra la estructura final y luego genera el código completo.

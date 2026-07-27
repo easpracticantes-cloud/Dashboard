@@ -1,0 +1,402 @@
+<eas-page-header
+  eyebrow="Centro de análisis"
+  title="Analítica"
+  subtitle="Indicadores recalculados desde los datos proyectados del workbook de Google Sheets."
+></eas-page-header>
+
+<section class="filters eas-card">
+  <div class="filters__head">
+    <div>
+      <p class="filters__eyebrow">Filtros avanzados</p>
+      <h3>Explorar datos</h3>
+    </div>
+    <button type="button" class="eas-btn-secondary" (click)="clearFilters()">
+      <mat-icon>filter_alt_off</mat-icon>
+      Limpiar filtros
+    </button>
+  </div>
+
+  <div class="filters__grid">
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Año</mat-label>
+      <mat-select [ngModel]="filter().year" (ngModelChange)="patchFilter({ year: $event })">
+        <mat-option [value]="null">Todos</mat-option>
+        @for (y of years; track y) {
+          <mat-option [value]="y">{{ y }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Mes</mat-label>
+      <mat-select [ngModel]="filter().month" (ngModelChange)="patchFilter({ month: $event })">
+        <mat-option [value]="null">Todos</mat-option>
+        @for (m of months; track m.value) {
+          <mat-option [value]="m.value">{{ m.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Importancia</mat-label>
+      <mat-select [ngModel]="filter().importance" (ngModelChange)="patchFilter({ importance: $event })">
+        <mat-option [value]="null">Todas</mat-option>
+        @for (opt of importanceOptions; track opt) {
+          <mat-option [value]="opt">{{ opt }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Estado</mat-label>
+      <mat-select [ngModel]="filter().status" (ngModelChange)="patchFilter({ status: $event })">
+        <mat-option [value]="null">Todos</mat-option>
+        @for (opt of statusOptions; track opt.value) {
+          <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Categoría</mat-label>
+      <input matInput [ngModel]="filter().category" (ngModelChange)="patchFilter({ category: $event })" placeholder="Ej. avistamiento" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Buscar por nombre</mat-label>
+      <input matInput [ngModel]="filter().name" (ngModelChange)="patchFilter({ name: $event })" placeholder="Nombre del cliente" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Buscar por número</mat-label>
+      <input matInput [ngModel]="filter().phone" (ngModelChange)="patchFilter({ phone: $event })" placeholder="WhatsApp" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Asesor</mat-label>
+      <mat-select [ngModel]="filter().advisorId" (ngModelChange)="patchFilter({ advisorId: $event })">
+        <mat-option [value]="null">Todos</mat-option>
+        @for (advisor of advisors(); track advisor.id) {
+          <mat-option [value]="advisor.id">{{ advisor.fullName }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Búsqueda libre</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput [ngModel]="filter().search" (ngModelChange)="patchFilter({ search: $event })" placeholder="Mensaje, nota o palabra clave" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Desde</mat-label>
+      <input matInput [matDatepicker]="fromPicker" [ngModel]="fromDate()" (ngModelChange)="onFromChange($event)" />
+      <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+      <mat-datepicker #fromPicker></mat-datepicker>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filters__field">
+      <mat-label>Hasta</mat-label>
+      <input matInput [matDatepicker]="toPicker" [ngModel]="toDate()" (ngModelChange)="onToChange($event)" />
+      <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+      <mat-datepicker #toPicker></mat-datepicker>
+    </mat-form-field>
+  </div>
+</section>
+
+@if (loading()) {
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-5">
+    @for (s of [1, 2, 3, 4]; track s) {
+      <div class="eas-card h-[118px] p-5">
+        <div class="eas-skeleton h-3 w-24"></div>
+        <div class="eas-skeleton mt-3 h-7 w-16"></div>
+      </div>
+    }
+  </div>
+} @else {
+  <section class="mt-5 mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    @for (kpi of summary(); track kpi.id) {
+      <eas-kpi-card [kpi]="kpi"></eas-kpi-card>
+    }
+  </section>
+
+  @if (!hasData()) {
+    <div class="eas-card">
+      <eas-empty-state
+        icon="query_stats"
+        title="Sin datos para estos filtros"
+        description="Prueba limpiar filtros o sincronizar Google Sheets desde Configuración."
+      ></eas-empty-state>
+    </div>
+  } @else {
+    <div class="charts">
+      <div class="eas-card p-5">
+        <p class="chart-title">Tendencia de conversaciones</p>
+        <apx-chart
+          [chart]="areaChart"
+          [series]="areaSeries()"
+          [xaxis]="areaXaxis()"
+          [yaxis]="areaYaxis()"
+          [dataLabels]="areaDataLabels"
+          [stroke]="areaStroke"
+          [fill]="areaFill"
+          [grid]="areaGrid()"
+          [legend]="areaLegend"
+          [tooltip]="areaTooltip()"
+          [colors]="colors()"
+        ></apx-chart>
+      </div>
+
+      <div class="eas-card p-5">
+        <p class="chart-title">Por estado</p>
+        <apx-chart
+          [chart]="donutChart"
+          [series]="statusSeries()"
+          [labels]="statusLabels()"
+          [legend]="donutLegend"
+          [plotOptions]="donutPlotOptions"
+          [colors]="colors()"
+        ></apx-chart>
+      </div>
+
+      <div class="eas-card p-5">
+        <p class="chart-title">Por importancia</p>
+        <apx-chart
+          [chart]="barChart"
+          [series]="importanceSeries()"
+          [xaxis]="importanceXaxis()"
+          [dataLabels]="areaDataLabels"
+          [colors]="colors()"
+        ></apx-chart>
+      </div>
+
+      <div class="eas-card p-5">
+        <p class="chart-title">Por categoría</p>
+        <apx-chart
+          [chart]="donutChart"
+          [series]="categorySeries()"
+          [labels]="categoryLabels()"
+          [legend]="donutLegend"
+          [plotOptions]="donutPlotOptions"
+          [colors]="colors()"
+        ></apx-chart>
+      </div>
+
+      @if (hasAdvisorData()) {
+        <div class="eas-card p-5 chart-span">
+          <p class="chart-title">Ranking de asesores</p>
+          <apx-chart
+            [chart]="rankingBarChart"
+            [series]="advisorSeries()"
+            [xaxis]="advisorXaxis()"
+            [plotOptions]="rankingPlotOptions"
+            [dataLabels]="areaDataLabels"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+    </div>
+  }
+}
+
+<section class="ops-insights mt-6">
+  <div class="ops-insights__head">
+    <div>
+      <p class="ops-insights__eyebrow">Operación en vivo</p>
+      <h3>Insights comerciales</h3>
+      <p class="ops-insights__sub">Conversión, actividad diaria, canales y carga por asesor.</p>
+    </div>
+    <button type="button" class="eas-btn-secondary" (click)="exportAdvisorCsv()">
+      <mat-icon>download</mat-icon>
+      Desempeño asesores CSV
+    </button>
+  </div>
+
+  @if (opsLoading()) {
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      @for (s of [1, 2, 3]; track s) {
+        <div class="eas-card h-[96px] p-5">
+          <div class="eas-skeleton h-3 w-24"></div>
+          <div class="eas-skeleton mt-3 h-7 w-16"></div>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="ops-kpis">
+      <article class="ops-kpi">
+        <mat-icon>trending_up</mat-icon>
+        <div>
+          <p>Conversión cotiz. → venta</p>
+          <strong>{{ conversionPct() | number: '1.0-1' }}%</strong>
+        </div>
+      </article>
+      <article class="ops-kpi">
+        <mat-icon>schedule</mat-icon>
+        <div>
+          <p>Lag de actividad (h)</p>
+          <strong>{{ responseLagHours() | number: '1.0-1' }}</strong>
+        </div>
+      </article>
+      <article class="ops-kpi">
+        <mat-icon>verified</mat-icon>
+        <div>
+          <p>Calidad de datos</p>
+          <strong>{{ qualityScore() | number: '1.0-0' }}</strong>
+        </div>
+      </article>
+    </div>
+
+    <div class="charts mt-4">
+      @if (hasVolume()) {
+        <div class="eas-card p-5 chart-span">
+          <p class="chart-title">Volumen diario (30 días)</p>
+          <apx-chart
+            [chart]="areaChart"
+            [series]="volumeSeries()"
+            [xaxis]="volumeXaxis()"
+            [yaxis]="areaYaxis()"
+            [dataLabels]="areaDataLabels"
+            [stroke]="areaStroke"
+            [fill]="areaFill"
+            [grid]="areaGrid()"
+            [legend]="areaLegend"
+            [tooltip]="areaTooltip()"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+
+      @if (hasChannels()) {
+        <div class="eas-card p-5">
+          <p class="chart-title">Por canal</p>
+          <apx-chart
+            [chart]="donutChart"
+            [series]="channelSeries()"
+            [labels]="channelLabels()"
+            [legend]="donutLegend"
+            [plotOptions]="donutPlotOptions"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+
+      @if (hasPriorities()) {
+        <div class="eas-card p-5">
+          <p class="chart-title">Por prioridad</p>
+          <apx-chart
+            [chart]="barChart"
+            [series]="prioritySeries()"
+            [xaxis]="priorityXaxis()"
+            [dataLabels]="areaDataLabels"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+
+      @if (hasWorkload()) {
+        <div class="eas-card p-5 chart-span">
+          <p class="chart-title">Carga por asesor</p>
+          <apx-chart
+            [chart]="stackedBarChart"
+            [series]="workloadSeries()"
+            [xaxis]="workloadXaxis()"
+            [legend]="stackedLegend"
+            [dataLabels]="areaDataLabels"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+
+      @if (hasMonthly()) {
+        <div class="eas-card p-5 chart-span">
+          <p class="chart-title">Tendencia mensual (ventas vs cotizaciones)</p>
+          <apx-chart
+            [chart]="areaChart"
+            [series]="monthlySeries()"
+            [xaxis]="monthlyXaxis()"
+            [stroke]="areaStroke"
+            [fill]="areaFill"
+            [dataLabels]="areaDataLabels"
+            [grid]="areaGrid()"
+            [yaxis]="areaYaxis()"
+            [tooltip]="areaTooltip()"
+            [legend]="stackedLegend"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+
+      @if (hasPayments()) {
+        <div class="eas-card p-5">
+          <p class="chart-title">Ingresos por método de pago</p>
+          <apx-chart
+            [chart]="donutChart"
+            [series]="paymentSeries()"
+            [labels]="paymentLabels()"
+            [legend]="donutLegend"
+            [plotOptions]="donutPlotOptions"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+
+      @if (hasQuoteAmounts()) {
+        <div class="eas-card p-5">
+          <p class="chart-title">Montos de cotización por estado</p>
+          <apx-chart
+            [chart]="barChart"
+            [series]="quoteAmountSeries()"
+            [xaxis]="quoteAmountXaxis()"
+            [dataLabels]="areaDataLabels"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+
+      @if (hasPipeline()) {
+        <div class="eas-card p-5 chart-span">
+          <p class="chart-title">Pipeline comercial</p>
+          <apx-chart
+            [chart]="barChart"
+            [series]="pipelineSeries()"
+            [xaxis]="pipelineXaxis()"
+            [dataLabels]="areaDataLabels"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+
+      @if (hasSources()) {
+        <div class="eas-card p-5">
+          <p class="chart-title">Clientes por origen</p>
+          <apx-chart
+            [chart]="donutChart"
+            [series]="sourceSeries()"
+            [labels]="sourceLabels()"
+            [legend]="donutLegend"
+            [plotOptions]="donutPlotOptions"
+            [colors]="colors()"
+          ></apx-chart>
+        </div>
+      }
+
+      @if (topClients().length) {
+        <div class="eas-card p-5 chart-span">
+          <p class="chart-title">Top clientes por ventas</p>
+          <div class="top-clients">
+            @for (c of topClients(); track c.clientId; let i = $index) {
+              <div class="top-clients__row">
+                <span class="top-clients__rank">{{ i + 1 }}</span>
+                <div class="min-w-0">
+                  <p class="truncate font-medium">{{ c.clientName }}</p>
+                  <p class="text-xs text-eas-muted">{{ c.sales }} venta(s)</p>
+                </div>
+                <strong>{{ c.total | currency: 'COP':'symbol-narrow':'1.0-0' }}</strong>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</section>

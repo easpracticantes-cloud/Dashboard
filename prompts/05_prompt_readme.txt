@@ -1,0 +1,1 @@
+Genera un README.md profesional para todo el proyecto, incluyendo descripción del negocio, arquitectura, estructura, ejecución, Docker, pruebas, variables de entorno y módulos funcionales.

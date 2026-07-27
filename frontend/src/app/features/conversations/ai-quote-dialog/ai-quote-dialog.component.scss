@@ -1,0 +1,243 @@
+.aiq {
+  width: min(560px, 92vw);
+  background: var(--eas-surface);
+  color: var(--eas-ink);
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+}
+
+.aiq__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: var(--eas-solid-brand);
+  color: var(--eas-on-solid-brand);
+}
+
+.aiq__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.aiq__badge mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.aiq__x {
+  border: 0;
+  background: rgba(127, 127, 127, 0.22);
+  color: inherit;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.aiq__body {
+  padding: 1.25rem;
+  overflow-y: auto;
+}
+
+.aiq__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.aiq__pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
+}
+
+.aiq__pill--soft {
+  background: var(--eas-tint-neutral);
+  color: var(--eas-on-tint-neutral);
+}
+
+.aiq__reason {
+  font-size: 0.9rem;
+  color: var(--eas-ink);
+  margin-bottom: 0.75rem;
+}
+
+.aiq__highlights {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: var(--eas-surface-sunken);
+  display: grid;
+  gap: 0.4rem;
+}
+
+.aiq__highlights li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--eas-ink);
+}
+
+.aiq__highlights mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--eas-on-tint-leaf);
+}
+
+.aiq__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.aiq__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.aiq__field--full {
+  grid-column: 1 / -1;
+}
+
+.aiq__field span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--eas-muted);
+}
+
+.aiq__field input,
+.aiq__field textarea {
+  border: 1px solid var(--eas-line);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--eas-surface);
+  color: var(--eas-ink);
+  resize: vertical;
+}
+
+.aiq__field input:focus,
+.aiq__field textarea:focus {
+  outline: none;
+  border-color: var(--eas-leaf);
+  box-shadow: 0 0 0 3px var(--eas-tint-leaf);
+}
+
+.aiq__error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+  color: var(--eas-danger);
+  font-size: 0.85rem;
+}
+
+.aiq__error mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.aiq__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--eas-line-soft);
+}
+
+.aiq__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  padding: 0.6rem 1.1rem;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.aiq__btn mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.aiq__btn--ghost {
+  background: var(--eas-surface);
+  border-color: var(--eas-line);
+  color: var(--eas-ink);
+}
+
+.aiq__btn--primary {
+  background: var(--eas-brand);
+  color: var(--eas-on-brand);
+}
+
+.aiq__btn--primary:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.aiq__body--done {
+  text-align: center;
+  padding: 2rem 1.5rem;
+}
+
+.aiq__done-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 0.85rem;
+}
+
+.aiq__done-icon mat-icon {
+  font-size: 34px;
+  width: 34px;
+  height: 34px;
+}
+
+.aiq__done-code {
+  font-weight: 800;
+  color: var(--eas-ink);
+  font-size: 1.05rem;
+  margin-top: 0.35rem;
+}
+
+.aiq__done-sub {
+  color: var(--eas-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 520px) {
+  .aiq__grid {
+    grid-template-columns: 1fr;
+  }
+}

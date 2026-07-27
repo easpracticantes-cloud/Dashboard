@@ -1,0 +1,805 @@
+<section class="sheets-dash">
+  <header class="sheets-dash__head">
+    <div>
+      <p class="sheets-dash__eyebrow">Google Sheets · workbook completo</p>
+      <h2>Dashboard operativo desde hojas</h2>
+      <p class="sheets-dash__meta">
+        @if (data()?.meta?.totalHojas) {
+          {{ data()!.meta.totalHojas }} hojas
+          ·
+        }
+        @if (data()?.meta?.ultimaActualizacion) {
+          Última actualización {{ data()!.meta.ultimaActualizacion | date: 'medium' }}
+        } @else if (data()?.meta?.cachedAt) {
+          Cache {{ data()!.meta.cachedAt | date: 'medium' }}
+        }
+        @if (data()?.meta?.fromCache) {
+          <span class="sheets-dash__cache"> · desde caché</span>
+        }
+        <span class="sheets-dash__cache"> · auto {{ countdownLabel() }}</span>
+      </p>
+    </div>
+    <div class="sheets-dash__actions">
+      <button type="button" class="eas-btn-ghost" (click)="exportSeguimientos('csv')" [disabled]="!filteredRows().length">
+        <mat-icon>download</mat-icon> CSV
+      </button>
+      <button type="button" class="eas-btn-ghost" (click)="exportSeguimientos('xls')" [disabled]="!filteredRows().length">
+        <mat-icon>grid_on</mat-icon> Excel
+      </button>
+      <button type="button" class="eas-btn-secondary" (click)="refresh()" [disabled]="refreshing()">
+        <mat-icon [class.spin]="refreshing()">sync</mat-icon>
+        Actualizar
+      </button>
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="sheets-dash__kpis">
+      @for (i of [1, 2, 3, 4, 5]; track i) {
+        <div class="kpi-skel">
+          <div class="eas-skeleton" style="height: 10px; width: 55%"></div>
+          <div class="eas-skeleton" style="height: 28px; width: 40%; margin-top: 12px"></div>
+        </div>
+      }
+    </div>
+  } @else if (error() && !data()?.seguimientoWhatsapp?.length && !data()?.rawSheets?.length) {
+    <eas-empty-state icon="cloud_off" title="Sin datos de Sheets" [description]="error()!">
+      <button type="button" class="eas-btn-primary" (click)="refresh()">Reintentar</button>
+    </eas-empty-state>
+  } @else {
+    @if (error()) {
+      <p class="sheets-dash__warn">{{ error() }}</p>
+    }
+
+    <div class="sheets-dash__kpis eas-stagger">
+      @for (kpi of kpiCards(); track kpi.id) {
+        <eas-kpi-card [kpi]="kpi"></eas-kpi-card>
+      }
+    </div>
+
+    @if (cobertura().length) {
+      <div class="sheets-chips">
+        @for (h of cobertura(); track h.nombre) {
+          <button
+            type="button"
+            class="sheets-chip"
+            [class.is-active]="selectedRawSheet() === h.nombre"
+            (click)="selectRawSheet(h.nombre); setSection('hojas')"
+          >
+            <strong>{{ h.nombre }}</strong>
+            <span>{{ h.rowCount | number }} · {{ h.estado }}</span>
+          </button>
+        }
+      </div>
+    }
+
+    <div class="sheets-filters">
+      <label>
+        <span>Año</span>
+        <select class="eas-select" [ngModel]="filters().year" (ngModelChange)="patchFilter('year', $event)">
+          <option value="">Todos</option>
+          @for (y of years(); track y) {
+            <option [value]="y">{{ y }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Mes</span>
+        <select class="eas-select" [ngModel]="filters().month" (ngModelChange)="patchFilter('month', $event)">
+          <option value="">Todos</option>
+          @for (m of months; track m.value) {
+            <option [value]="m.value">{{ m.label }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Canal</span>
+        <select class="eas-select" [ngModel]="filters().canal" (ngModelChange)="patchFilter('canal', $event)">
+          <option value="">Todos</option>
+          @for (c of canalOptions(); track c) {
+            <option [value]="c">{{ c }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Semáforo</span>
+        <select class="eas-select" [ngModel]="filters().semaforo" (ngModelChange)="patchFilter('semaforo', $event)">
+          <option value="">Todos</option>
+          @for (s of semaforoOptions(); track s) {
+            <option [value]="s">{{ s }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span>Hoja</span>
+        <select class="eas-select" [ngModel]="filters().hoja" (ngModelChange)="patchFilter('hoja', $event)">
+          <option value="">Todas</option>
+          @for (h of hojaOptions(); track h) {
+            <option [value]="h">{{ h }}</option>
+          }
+        </select>
+      </label>
+      <label class="sheets-filters__search">
+        <span>Cliente / celular</span>
+        <input
+          class="eas-input"
+          type="search"
+          placeholder="Buscar…"
+          [ngModel]="filters().cliente"
+          (ngModelChange)="patchFilter('cliente', $event)"
+        />
+      </label>
+      <button type="button" class="eas-btn-ghost" (click)="clearFilters()">Limpiar</button>
+    </div>
+
+    <nav class="sheets-tabs">
+      <button type="button" [class.is-active]="activeSection() === 'resumen'" (click)="setSection('resumen')">Resumen</button>
+      <button type="button" [class.is-active]="activeSection() === 'seguimientos'" (click)="setSection('seguimientos')">
+        Seguimientos ({{ filteredRows().length | number }})
+      </button>
+      <button type="button" [class.is-active]="activeSection() === 'ventas'" (click)="setSection('ventas')">
+        Ventas ({{ ventas().length | number }})
+      </button>
+      <button type="button" [class.is-active]="activeSection() === 'b2b'" (click)="setSection('b2b')">
+        B2B ({{ b2bAgencias().length || toques().length | number }})
+      </button>
+      <button type="button" [class.is-active]="activeSection() === 'paises'" (click)="setSection('paises')">
+        Países ({{ paises().length | number }})
+      </button>
+      <button type="button" [class.is-active]="activeSection() === 'piezas'" (click)="setSection('piezas')">
+        Piezas ({{ piezas().length | number }})
+      </button>
+      <button type="button" [class.is-active]="activeSection() === 'estadisticas'" (click)="setSection('estadisticas')">
+        Estadísticas
+      </button>
+      <button type="button" [class.is-active]="activeSection() === 'despliegue'" (click)="setSection('despliegue')">
+        Despliegue
+      </button>
+      <button type="button" [class.is-active]="activeSection() === 'plan'" (click)="setSection('plan')">
+        Plan comercial
+      </button>
+      <button type="button" [class.is-active]="activeSection() === 'hojas'" (click)="setSection('hojas')">
+        Raw ({{ rawSheets().length }})
+      </button>
+    </nav>
+
+    @if (activeSection() === 'resumen') {
+      <div class="sheets-section-enter">
+        <div class="sheets-dash__charts sheets-dash__charts--4">
+          <article class="eas-card dash-chart">
+            <header>
+              <div>
+                <p class="dash-chart__eyebrow">Semáforo</p>
+                <h3>Distribución por temperatura</h3>
+              </div>
+            </header>
+            @if (!hasPie()) {
+              <eas-empty-state icon="pie_chart" title="Sin semáforos" description="Ajusta filtros o sincroniza Sheets."></eas-empty-state>
+            } @else {
+              <apx-chart
+                [chart]="pieChart"
+                [series]="pieSeries()"
+                [labels]="pieLabels()"
+                [colors]="pieColors()"
+                [plotOptions]="piePlot"
+                [legend]="pieLegend"
+                [tooltip]="pieTooltip()"
+              ></apx-chart>
+            }
+          </article>
+
+          <article class="eas-card dash-chart">
+            <header>
+              <div>
+                <p class="dash-chart__eyebrow">Canal</p>
+                <h3>Contactos por canal</h3>
+              </div>
+            </header>
+            @if (!hasBarCanal()) {
+              <eas-empty-state icon="bar_chart" title="Sin canales" description="No hay datos para graficar."></eas-empty-state>
+            } @else {
+              <apx-chart
+                [chart]="barChart"
+                [series]="barCanalSeries()"
+                [xaxis]="barCanalXaxis()"
+                [colors]="barColors"
+                [plotOptions]="barPlot"
+                [dataLabels]="barDataLabels"
+                [legend]="barLegend"
+                [tooltip]="barTooltip()"
+              ></apx-chart>
+            }
+          </article>
+
+          <article class="eas-card dash-chart">
+            <header>
+              <div>
+                <p class="dash-chart__eyebrow">Mes</p>
+                <h3>Seguimientos por mes</h3>
+              </div>
+            </header>
+            @if (!hasBarMes()) {
+              <eas-empty-state icon="calendar_month" title="Sin meses" description="No hay fechas tipadas."></eas-empty-state>
+            } @else {
+              <apx-chart
+                [chart]="barChart"
+                [series]="barMesSeries()"
+                [xaxis]="barMesXaxis()"
+                [colors]="barColors"
+                [plotOptions]="barPlot"
+                [dataLabels]="barDataLabels"
+                [legend]="barLegend"
+                [tooltip]="barTooltip()"
+              ></apx-chart>
+            }
+          </article>
+
+          <article class="eas-card dash-chart">
+            <header>
+              <div>
+                <p class="dash-chart__eyebrow">Evolución</p>
+                <h3>Seguimientos vs ventas</h3>
+              </div>
+            </header>
+            @if (!hasLine()) {
+              <eas-empty-state icon="show_chart" title="Sin serie temporal" description="No hay evolución mensual."></eas-empty-state>
+            } @else {
+              <apx-chart
+                [chart]="lineChart"
+                [series]="lineSeries()"
+                [xaxis]="lineXaxis()"
+                [stroke]="lineStroke"
+                [dataLabels]="lineDataLabels"
+                [colors]="lineColors"
+                [legend]="lineLegend"
+                [tooltip]="lineTooltip()"
+              ></apx-chart>
+            }
+          </article>
+        </div>
+      </div>
+    }
+
+    @if (activeSection() === 'seguimientos') {
+      <div class="sheets-section-enter">
+        <article class="eas-card sheets-table-card">
+          <header class="sheets-table-card__head">
+            <div>
+              <p class="dash-chart__eyebrow">Tabla filtrable</p>
+              <h3>{{ filteredRows().length | number }} seguimientos</h3>
+            </div>
+            <div class="sheets-dash__actions">
+              <button type="button" class="eas-btn-ghost" (click)="exportSeguimientos('csv')">CSV</button>
+              <button type="button" class="eas-btn-ghost" (click)="exportSeguimientos('xls')">Excel</button>
+            </div>
+          </header>
+
+          <div class="sheets-table-wrap">
+            <table mat-table [dataSource]="table" matSort class="sheets-table mat-elevation-z0">
+              <ng-container matColumnDef="fecha">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
+                <td mat-cell *matCellDef="let row">{{ row.fecha | date: 'mediumDate' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="hojaOrigen">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Hoja</th>
+                <td mat-cell *matCellDef="let row">{{ row.hojaOrigen }}</td>
+              </ng-container>
+              <ng-container matColumnDef="cliente">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
+                <td mat-cell *matCellDef="let row">{{ row.cliente || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="celular">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Celular</th>
+                <td mat-cell *matCellDef="let row">{{ row.celular }}</td>
+              </ng-container>
+              <ng-container matColumnDef="canal">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Canal</th>
+                <td mat-cell *matCellDef="let row">{{ row.canal }}</td>
+              </ng-container>
+              <ng-container matColumnDef="tipo">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Tipo</th>
+                <td mat-cell *matCellDef="let row">{{ row.tipo }}</td>
+              </ng-container>
+              <ng-container matColumnDef="semaforo">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Semáforo</th>
+                <td mat-cell *matCellDef="let row">
+                  <span class="semaforo" [class]="'semaforo--' + (row.semaforo || 'sin').toLowerCase()">{{ row.semaforo }}</span>
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="solicitud">
+                <th mat-header-cell *matHeaderCellDef>Solicitud</th>
+                <td mat-cell *matCellDef="let row" class="sheets-cell-clip">{{ row.solicitud }}</td>
+              </ng-container>
+              <ng-container matColumnDef="respuesta">
+                <th mat-header-cell *matHeaderCellDef>Respuesta</th>
+                <td mat-cell *matCellDef="let row" class="sheets-cell-clip">{{ row.respuesta }}</td>
+              </ng-container>
+              <ng-container matColumnDef="cotizado">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Cotizado</th>
+                <td mat-cell *matCellDef="let row">{{ row.cotizado ? 'SI' : 'NO' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="encuesta">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Encuesta</th>
+                <td mat-cell *matCellDef="let row">{{ row.encuesta ? 'SI' : 'NO' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="asignado">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Asignado</th>
+                <td mat-cell *matCellDef="let row">{{ row.asignado || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="priorizar">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Priorizar</th>
+                <td mat-cell *matCellDef="let row">{{ row.priorizar || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="pendiente">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Pendiente</th>
+                <td mat-cell *matCellDef="let row">{{ row.pendiente || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="disc">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Disc</th>
+                <td mat-cell *matCellDef="let row">{{ row.disc || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="objecion">
+                <th mat-header-cell *matHeaderCellDef>Objeción</th>
+                <td mat-cell *matCellDef="let row" class="sheets-cell-clip">{{ row.objecion || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="fechaServicio">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>F. servicio</th>
+                <td mat-cell *matCellDef="let row">{{ row.fechaServicio || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="proximoSeguimiento">
+                <th mat-header-cell *matHeaderCellDef mat-sort-header>Próx. seg.</th>
+                <td mat-cell *matCellDef="let row">{{ row.proximoSeguimiento || '—' }}</td>
+              </ng-container>
+              <ng-container matColumnDef="notas">
+                <th mat-header-cell *matHeaderCellDef>Notas</th>
+                <td mat-cell *matCellDef="let row" class="sheets-cell-clip">{{ row.notas }}</td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+            </table>
+          </div>
+          <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" [pageSize]="25" showFirstLastButtons></mat-paginator>
+        </article>
+      </div>
+    }
+
+    @if (activeSection() === 'ventas') {
+      <div class="sheets-section-enter">
+        <article class="eas-card sheets-table-card">
+          <header class="sheets-table-card__head">
+            <div>
+              <p class="dash-chart__eyebrow">Hoja VENTAS</p>
+              <h3>{{ ventas().length | number }} ventas tipadas</h3>
+            </div>
+            <div class="sheets-dash__actions">
+              <button type="button" class="eas-btn-ghost" (click)="exportVentas('csv')">CSV</button>
+              <button type="button" class="eas-btn-ghost" (click)="exportVentas('xls')">Excel</button>
+            </div>
+          </header>
+          @if (!ventas().length) {
+            <eas-empty-state icon="payments" title="Sin ventas" description="La hoja VENTAS no trajo filas tipadas."></eas-empty-state>
+          } @else {
+            <div class="sheets-table-wrap">
+              <table mat-table [dataSource]="ventasTable" class="sheets-table mat-elevation-z0">
+                <ng-container matColumnDef="fechaCot">
+                  <th mat-header-cell *matHeaderCellDef>Fecha cot</th>
+                  <td mat-cell *matCellDef="let row">{{ row.fechaCot }}</td>
+                </ng-container>
+                <ng-container matColumnDef="tipoCliente">
+                  <th mat-header-cell *matHeaderCellDef>Tipo</th>
+                  <td mat-cell *matCellDef="let row">{{ row.tipoCliente }}</td>
+                </ng-container>
+                <ng-container matColumnDef="nombre">
+                  <th mat-header-cell *matHeaderCellDef>Nombre</th>
+                  <td mat-cell *matCellDef="let row">{{ row.nombre }}</td>
+                </ng-container>
+                <ng-container matColumnDef="celular">
+                  <th mat-header-cell *matHeaderCellDef>Celular</th>
+                  <td mat-cell *matCellDef="let row">{{ row.celular }}</td>
+                </ng-container>
+                <ng-container matColumnDef="servicio">
+                  <th mat-header-cell *matHeaderCellDef>Servicio</th>
+                  <td mat-cell *matCellDef="let row" class="sheets-cell-clip">{{ row.servicio }}</td>
+                </ng-container>
+                <ng-container matColumnDef="venta">
+                  <th mat-header-cell *matHeaderCellDef>Venta</th>
+                  <td mat-cell *matCellDef="let row"><span class="semaforo semaforo--venta">{{ row.venta }}</span></td>
+                </ng-container>
+                <ng-container matColumnDef="codigo">
+                  <th mat-header-cell *matHeaderCellDef>Código</th>
+                  <td mat-cell *matCellDef="let row">{{ row.codigo }}</td>
+                </ng-container>
+                <ng-container matColumnDef="fechaServicio">
+                  <th mat-header-cell *matHeaderCellDef>F. servicio</th>
+                  <td mat-cell *matCellDef="let row">{{ row.fechaServicio }}</td>
+                </ng-container>
+                <ng-container matColumnDef="realizado">
+                  <th mat-header-cell *matHeaderCellDef>Realizado</th>
+                  <td mat-cell *matCellDef="let row">{{ row.realizado }}</td>
+                </ng-container>
+                <ng-container matColumnDef="envioReserva">
+                  <th mat-header-cell *matHeaderCellDef>Envío</th>
+                  <td mat-cell *matCellDef="let row">{{ row.envioReserva }}</td>
+                </ng-container>
+                <ng-container matColumnDef="pagoAutobits">
+                  <th mat-header-cell *matHeaderCellDef>Pago</th>
+                  <td mat-cell *matCellDef="let row">{{ row.pagoAutobits }}</td>
+                </ng-container>
+                <ng-container matColumnDef="soporteDrive">
+                  <th mat-header-cell *matHeaderCellDef>Soporte</th>
+                  <td mat-cell *matCellDef="let row">{{ row.soporteDrive }}</td>
+                </ng-container>
+                <tr mat-header-row *matHeaderRowDef="ventasColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: ventasColumns"></tr>
+              </table>
+            </div>
+          }
+        </article>
+      </div>
+    }
+
+    @if (activeSection() === 'b2b') {
+      <div class="sheets-section-enter sheets-split">
+        <article class="eas-card">
+          <header class="sheets-table-card__head">
+            <div>
+              <p class="dash-chart__eyebrow">Parametrización B2B</p>
+              <h3>{{ b2bAgencias().length || toques().length }} agencias / contactos</h3>
+              @if (data()?.b2bMensaje) {
+                <p class="sheets-dash__meta">{{ data()!.b2bMensaje }}</p>
+              }
+            </div>
+            <div class="sheets-dash__actions">
+              <button type="button" class="eas-btn-ghost" (click)="exportB2b('csv')">CSV</button>
+              <button type="button" class="eas-btn-ghost" (click)="exportB2b('xls')">Excel</button>
+            </div>
+          </header>
+
+          @if (b2bAgencias().length) {
+            <ul class="b2b-list">
+              @for (a of b2bAgencias(); track a.agencia + (a.telefono || '') + $index) {
+                <li>
+                  <strong>{{ a.agencia }}</strong>
+                  <span class="pill">{{ a.tipologiaRentable || a.estado || 'B2B' }}</span>
+                  <p>
+                    Cotiz. {{ a.cotizacionesAnual || '—' }} · Reservas {{ a.reservasAnual || '—' }}
+                    · Ticket {{ a.ticketPromedio || '—' }} · Margen {{ a.margenNeto || '—' }}
+                  </p>
+                  <p>{{ a.contacto }} · {{ a.telefono }} · {{ a.correo }}</p>
+                  @if (a.notas) {
+                    <small>{{ a.notas }}</small>
+                  }
+                </li>
+              }
+            </ul>
+          } @else if (toques().length) {
+            <ul class="b2b-list">
+              @for (t of toques(); track t.agencia + t.telefono) {
+                <li>
+                  <strong>{{ t.agencia }}</strong>
+                  <span class="pill">{{ t.medio || 'TOQUE' }}</span>
+                  <p>{{ t.asesor }} · {{ t.telefono }} · {{ t.correo }}</p>
+                </li>
+              }
+            </ul>
+          } @else {
+            <eas-empty-state icon="handshake" title="Sin B2B" description="La hoja de parametrización o toques no trajo filas."></eas-empty-state>
+          }
+        </article>
+
+        @if (b2bTabla()?.rows?.length) {
+          <article class="eas-card sheets-table-card">
+            <header class="sheets-table-card__head">
+              <div>
+                <p class="dash-chart__eyebrow">Tabla completa B2B</p>
+                <h3>{{ b2bTabla()!.nombre }}</h3>
+              </div>
+              <div class="sheets-dash__actions">
+                <button type="button" class="eas-btn-ghost" (click)="exportSheetTable(b2bTabla(), 'b2b-tabla', 'csv')">CSV</button>
+                <button type="button" class="eas-btn-ghost" (click)="exportSheetTable(b2bTabla(), 'b2b-tabla', 'xls')">Excel</button>
+              </div>
+            </header>
+            <div class="sheets-table-wrap">
+              <table class="sheets-plain">
+                <thead>
+                  <tr>
+                    @for (h of b2bTabla()!.headers; track h) {
+                      <th>{{ h }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of b2bTabla()!.rows; track $index) {
+                    <tr>
+                      @for (cell of row; track $index) {
+                        <td>{{ cell }}</td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </article>
+        }
+
+        @if (toques().length && b2bAgencias().length) {
+          <article class="eas-card">
+            <header>
+              <p class="dash-chart__eyebrow">Toques</p>
+              <h3>{{ toques().length }} contactos</h3>
+            </header>
+            <ul class="b2b-list">
+              @for (t of toques(); track t.agencia + t.telefono + $index) {
+                <li>
+                  <strong>{{ t.agencia }}</strong>
+                  <span class="pill">{{ t.medio || 'TOQUE' }}</span>
+                  <p>{{ t.asesor }} · {{ t.telefono }} · {{ t.correo }}</p>
+                </li>
+              }
+            </ul>
+          </article>
+        }
+      </div>
+    }
+
+    @if (activeSection() === 'paises') {
+      <div class="sheets-section-enter sheets-split">
+        <article class="eas-card dash-chart">
+          <header class="sheets-table-card__head">
+            <div>
+              <p class="dash-chart__eyebrow">Países</p>
+              <h3>Ranking de contactos</h3>
+            </div>
+            <div class="sheets-dash__actions">
+              <button type="button" class="eas-btn-ghost" (click)="exportPaises('csv')">CSV</button>
+              <button type="button" class="eas-btn-ghost" (click)="exportPaises('xls')">Excel</button>
+            </div>
+          </header>
+          @if (!paises().length) {
+            <eas-empty-state icon="public" title="Sin países" description="No se pudo tipar la hoja PAÍSES."></eas-empty-state>
+          } @else {
+            <apx-chart
+              [chart]="paisBarChart"
+              [series]="paisBarSeries()"
+              [xaxis]="paisBarXaxis()"
+              [plotOptions]="paisBarPlot"
+              [colors]="['#1F7A4C']"
+              [dataLabels]="barDataLabels"
+              [tooltip]="barTooltip()"
+            ></apx-chart>
+          }
+        </article>
+
+        <article class="eas-card">
+          <h3>Lista completa</h3>
+          <ul class="sheets-paises">
+            @for (p of paises(); track p.pais) {
+              <li>
+                <div class="sheets-paises__row">
+                  <strong>{{ p.pais }}</strong>
+                  <span>{{ p.cantidad | number }}</span>
+                </div>
+                <div class="sheets-paises__bar">
+                  <span [style.width.%]="(p.cantidad / maxPais()) * 100"></span>
+                </div>
+                @if (p.codigo) {
+                  <small>Código {{ p.codigo }}</small>
+                }
+              </li>
+            }
+          </ul>
+        </article>
+      </div>
+    }
+
+    @if (activeSection() === 'piezas') {
+      <div class="sheets-section-enter">
+        <article class="eas-card">
+          <header class="sheets-table-card__head">
+            <div>
+              <p class="dash-chart__eyebrow">Piezas pub</p>
+              <h3>{{ piezas().length }} piezas</h3>
+            </div>
+          </header>
+          @if (!piezas().length) {
+            <eas-empty-state icon="image" title="Sin piezas" description="La hoja PIEZAS PUB no trajo filas tipadas."></eas-empty-state>
+          } @else {
+            <ul class="piezas-list">
+              @for (p of piezas(); track p.pieza + (p.fechaEnvio || '') + $index) {
+                <li>
+                  <strong>{{ p.pieza }}</strong>
+                  <span>Envío: {{ p.fechaEnvio || 'Sin fecha' }}</span>
+                  @if (p.numeroAgencias) {
+                    <span>· Agencias: {{ p.numeroAgencias }}</span>
+                  }
+                  @if (p.resultados) {
+                    <span>· Resultados: {{ p.resultados }}</span>
+                  }
+                  @if (p.agencias) {
+                    <small>{{ p.agencias }}</small>
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </article>
+      </div>
+    }
+
+    @if (activeSection() === 'estadisticas') {
+      <div class="sheets-section-enter">
+        <article class="eas-card sheets-table-card">
+          <header class="sheets-table-card__head">
+            <div>
+              <p class="dash-chart__eyebrow">ESTADISTICAS</p>
+              <h3>{{ estadisticas()?.rows?.length || 0 | number }} filas</h3>
+            </div>
+            <div class="sheets-dash__actions">
+              <button type="button" class="eas-btn-ghost" (click)="exportSheetTable(estadisticas(), 'estadisticas', 'csv')">CSV</button>
+              <button type="button" class="eas-btn-ghost" (click)="exportSheetTable(estadisticas(), 'estadisticas', 'xls')">Excel</button>
+            </div>
+          </header>
+          @if (!estadisticas()?.rows?.length) {
+            <eas-empty-state icon="insights" title="Sin estadísticas" description="Sin filas tipadas en ESTADISTICAS."></eas-empty-state>
+          } @else {
+            <div class="sheets-table-wrap">
+              <table class="sheets-plain">
+                <thead>
+                  <tr>
+                    @for (h of estadisticas()!.headers; track h) {
+                      <th>{{ h }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of estadisticas()!.rows; track $index) {
+                    <tr>
+                      @for (cell of row; track $index) {
+                        <td>{{ cell }}</td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </article>
+      </div>
+    }
+
+    @if (activeSection() === 'despliegue') {
+      <div class="sheets-section-enter">
+        <article class="eas-card sheets-table-card">
+          <header class="sheets-table-card__head">
+            <div>
+              <p class="dash-chart__eyebrow">DESPLIEGUE SEMANAL</p>
+              <h3>{{ despliegue()?.rows?.length || 0 | number }} filas</h3>
+            </div>
+            <div class="sheets-dash__actions">
+              <button type="button" class="eas-btn-ghost" (click)="exportSheetTable(despliegue(), 'despliegue-semanal', 'csv')">CSV</button>
+              <button type="button" class="eas-btn-ghost" (click)="exportSheetTable(despliegue(), 'despliegue-semanal', 'xls')">Excel</button>
+            </div>
+          </header>
+          @if (!despliegue()?.rows?.length) {
+            <eas-empty-state icon="calendar_view_week" title="Sin despliegue" description="Sin filas en DESPLIEGUE SEMANAL."></eas-empty-state>
+          } @else {
+            <div class="sheets-table-wrap">
+              <table class="sheets-plain">
+                <thead>
+                  <tr>
+                    @for (h of despliegue()!.headers; track h) {
+                      <th>{{ h }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of despliegue()!.rows; track $index) {
+                    <tr>
+                      @for (cell of row; track $index) {
+                        <td>{{ cell }}</td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </article>
+      </div>
+    }
+
+    @if (activeSection() === 'plan') {
+      <div class="sheets-section-enter">
+        <article class="eas-card sheets-table-card">
+          <header class="sheets-table-card__head">
+            <div>
+              <p class="dash-chart__eyebrow">PLAN COMERCIAL</p>
+              <h3>{{ planComercial()?.rows?.length || 0 | number }} filas</h3>
+            </div>
+            <div class="sheets-dash__actions">
+              <button type="button" class="eas-btn-ghost" (click)="exportSheetTable(planComercial(), 'plan-comercial', 'csv')">CSV</button>
+              <button type="button" class="eas-btn-ghost" (click)="exportSheetTable(planComercial(), 'plan-comercial', 'xls')">Excel</button>
+            </div>
+          </header>
+          @if (!planComercial()?.rows?.length) {
+            <eas-empty-state icon="flag" title="Sin plan" description="Sin filas en PLAN COMERCIAL."></eas-empty-state>
+          } @else {
+            <div class="sheets-table-wrap">
+              <table class="sheets-plain">
+                <thead>
+                  <tr>
+                    @for (h of planComercial()!.headers; track h) {
+                      <th>{{ h }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of planComercial()!.rows; track $index) {
+                    <tr>
+                      @for (cell of row; track $index) {
+                        <td>{{ cell }}</td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </article>
+      </div>
+    }
+
+    @if (activeSection() === 'hojas') {
+      <div class="sheets-section-enter">
+        <div class="sheets-hojas-grid">
+          @for (h of hojas(); track h.nombre) {
+            <button
+              type="button"
+              class="sheet-card"
+              [class.is-active]="selectedRawSheet() === h.nombre"
+              (click)="selectRawSheet(h.nombre); setSection('hojas')"
+            >
+              <strong>{{ h.nombre }}</strong>
+              <span class="sheet-card__count">{{ h.rowCount | number }} filas · {{ h.estado }}</span>
+              <p class="sheet-card__preview">{{ h.preview }}</p>
+            </button>
+          }
+        </div>
+
+        @if (rawSheets().length) {
+          <article class="eas-card sheets-table-card" style="margin-top: 1rem">
+            <header class="sheets-table-card__head">
+              <div>
+                <p class="dash-chart__eyebrow">Raw completo (sin pérdida)</p>
+                <h3>{{ activeRaw()!.nombre }}</h3>
+              </div>
+              <div class="sheets-dash__actions">
+                <select class="eas-select" [ngModel]="activeRaw()!.nombre" (ngModelChange)="selectRawSheet($event)">
+                  @for (s of rawSheets(); track s.nombre) {
+                    <option [value]="s.nombre">{{ s.nombre }} ({{ s.rawRowCount }})</option>
+                  }
+                </select>
+                <button type="button" class="eas-btn-ghost" (click)="exportRaw('csv')">CSV</button>
+                <button type="button" class="eas-btn-ghost" (click)="exportRaw('xls')">Excel</button>
+              </div>
+            </header>
+            <div class="sheets-table-wrap sheets-raw-wrap">
+              <table class="sheets-plain">
+                <tbody>
+                  @for (row of activeRaw()!.fullData ?? []; track $index) {
+                    <tr>
+                      @for (cell of row; track $index) {
+                        <td>{{ cell }}</td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  }
+</section>

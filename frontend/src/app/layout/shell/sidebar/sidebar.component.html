@@ -1,0 +1,42 @@
+<aside class="sb">
+  <div class="sb__brand">
+    <eas-brand-logo variant="lockup-light" [height]="36" subtitle="SIG · Gestión"></eas-brand-logo>
+  </div>
+
+  <p class="sb__section">Navegación</p>
+
+  <nav class="sb__nav">
+    @for (item of visibleItems(); track item.route) {
+      <a
+        [routerLink]="item.route"
+        routerLinkActive="is-active"
+        #rla="routerLinkActive"
+        [routerLinkActiveOptions]="{ exact: false }"
+        (click)="navigate.emit()"
+        class="sb__link"
+      >
+        <mat-icon>{{ item.icon }}</mat-icon>
+        <span>{{ item.label }}</span>
+        @if (item.badge) {
+          <span class="sb__badge">{{ item.badge }}</span>
+        }
+        @if (rla.isActive) {
+          <i class="sb__active-bar" aria-hidden="true"></i>
+        }
+      </a>
+    }
+  </nav>
+
+  <div class="sb__footer">
+    <button type="button" class="sb__user" (click)="goToProfile()">
+      <eas-avatar [name]="user()?.nombre ?? ''" [imageUrl]="user()?.avatarUrl" [size]="34"></eas-avatar>
+      <span class="sb__user-meta">
+        <span class="sb__user-name">{{ user()?.nombre }}</span>
+        <span class="sb__user-role">{{ roleLabel() }}</span>
+      </span>
+    </button>
+    <button type="button" class="sb__logout" (click)="logout()" aria-label="Cerrar sesión">
+      <mat-icon>logout</mat-icon>
+    </button>
+  </div>
+</aside>

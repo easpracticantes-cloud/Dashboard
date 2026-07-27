@@ -1,0 +1,103 @@
+<eas-page-header
+  eyebrow="Agenda Sheets"
+  title="Reservas"
+  subtitle="Fechas de servicio y experiencias proyectadas desde las hojas de cálculo."
+>
+  <button type="button" class="eas-btn-secondary" (click)="exportCsv()" [disabled]="exporting()">
+    <mat-icon>download</mat-icon>
+    {{ exporting() ? 'Exportando…' : 'Exportar CSV' }}
+  </button>
+  <button type="button" class="eas-btn-primary" (click)="showForm.set(!showForm())">
+    <mat-icon>add</mat-icon>
+    Nueva reserva
+  </button>
+</eas-page-header>
+
+@if (showForm()) {
+  <section class="eas-card commercial-form">
+    <h3>Nueva reserva</h3>
+    <div class="commercial-form__grid">
+      <label>
+        <span class="eas-field-label">Cliente</span>
+        <select class="eas-select" [(ngModel)]="form.clientId">
+          <option value="">Selecciona…</option>
+          @for (c of clients(); track c.id) {
+            <option [value]="c.id">{{ c.name }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span class="eas-field-label">Experiencia</span>
+        <input class="eas-input eas-input--plain" [(ngModel)]="form.experienceName" placeholder="Cocora + avistamiento" />
+      </label>
+      <label>
+        <span class="eas-field-label">Personas</span>
+        <input class="eas-input eas-input--plain" type="number" [(ngModel)]="form.partySize" />
+      </label>
+      <label>
+        <span class="eas-field-label">Fecha</span>
+        <input class="eas-input eas-input--plain" type="date" [(ngModel)]="form.reservationDate" />
+      </label>
+      <label>
+        <span class="eas-field-label">Monto</span>
+        <input class="eas-input eas-input--plain" type="number" [(ngModel)]="form.amount" />
+      </label>
+      <label class="full">
+        <span class="eas-field-label">Notas</span>
+        <textarea class="eas-input eas-input--plain" rows="2" [(ngModel)]="form.notes"></textarea>
+      </label>
+    </div>
+    <div class="commercial-form__actions">
+      <button type="button" class="eas-btn-secondary" (click)="showForm.set(false)">Cancelar</button>
+      <button type="button" class="eas-btn-primary" (click)="create()">Guardar</button>
+    </div>
+  </section>
+}
+
+<section class="eas-card commercial-table">
+  @if (loading()) {
+    <div class="eas-skeleton h-16 w-full"></div>
+  } @else if (items().length === 0) {
+    <eas-empty-state icon="event_available" title="Sin reservas" description="Las reservas confirmadas aparecerán aquí."></eas-empty-state>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Cliente</th>
+          <th>Experiencia</th>
+          <th>Fecha</th>
+          <th>Pax</th>
+          <th>Monto</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of items(); track r.id) {
+          <tr>
+            <td><strong>{{ r.code }}</strong></td>
+            <td>{{ r.clientName }}</td>
+            <td>{{ r.experienceName }}</td>
+            <td>{{ r.reservationDate | date: 'dd/MM/yyyy' }}</td>
+            <td>{{ r.partySize }}</td>
+            <td>{{ r.amount | currency: 'COP' : 'symbol-narrow' : '1.0-0' }}</td>
+            <td class="commercial-actions">
+              <button type="button" class="eas-btn-action" (click)="convertToSale(r)" title="Convertir a venta">
+                <mat-icon>payments</mat-icon>
+                <span>Venta</span>
+              </button>
+              <button type="button" class="eas-btn-action" (click)="cancel(r)" title="Cancelar reserva">
+                <mat-icon>event_busy</mat-icon>
+                <span>Cancelar</span>
+              </button>
+              <button type="button" class="eas-btn-action is-danger" (click)="remove(r.id)" title="Eliminar reserva">
+                <mat-icon>delete</mat-icon>
+                <span>Eliminar</span>
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

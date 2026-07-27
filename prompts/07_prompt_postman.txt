@@ -1,0 +1,1 @@
+Genera la colección Postman completa en /postman y el archivo README-POSTMAN.md con instrucciones de importación y orden de pruebas.

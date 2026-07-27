@@ -1,0 +1,123 @@
+.cp {
+  width: min(560px, 92vw);
+  max-height: min(70vh, 520px);
+  display: flex;
+  flex-direction: column;
+  background: var(--eas-surface);
+  color: var(--eas-ink);
+  border: 1px solid var(--eas-line-soft);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--eas-shadow-lg);
+}
+
+.cp__search {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.95rem 1rem;
+  border-bottom: 1px solid var(--eas-line-soft);
+}
+
+.cp__search mat-icon {
+  color: var(--eas-muted);
+}
+
+.cp__search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 1rem;
+  background: transparent;
+  color: var(--eas-ink);
+}
+
+.cp__search kbd {
+  font-size: 0.68rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--eas-line);
+  color: var(--eas-muted);
+}
+
+.cp__hint {
+  display: flex;
+  gap: 0.85rem;
+  padding: 0.45rem 1rem;
+  font-size: 0.7rem;
+  color: var(--eas-muted);
+  background: var(--eas-surface-sunken);
+}
+
+.cp__list {
+  list-style: none;
+  margin: 0;
+  padding: 0.35rem;
+  overflow: auto;
+}
+
+.cp__list li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.cp__list li.is-active,
+.cp__list li:hover {
+  background: var(--eas-tint-leaf);
+}
+
+.cp__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--eas-tint-neutral);
+  color: var(--eas-on-tint-leaf);
+}
+
+.cp__icon mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.cp__text {
+  display: grid;
+  min-width: 0;
+}
+
+.cp__text strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--eas-ink);
+}
+
+.cp__text small {
+  font-size: 0.75rem;
+  color: var(--eas-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp__kind {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--eas-muted);
+}
+
+.cp__empty {
+  padding: 1.25rem !important;
+  text-align: center;
+  color: var(--eas-muted);
+  cursor: default !important;
+}

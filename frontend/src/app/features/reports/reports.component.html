@@ -1,0 +1,161 @@
+<eas-page-header
+  eyebrow="Exportables"
+  title="Reportes"
+  subtitle="Resumen operativo, digest comercial y descargas CSV/PDF para el equipo."
+></eas-page-header>
+
+<div class="reports-layout">
+  <div class="eas-card reports-panel">
+    <p class="reports-panel__title">Resumen de conversaciones</p>
+    @if (loading()) {
+      <div class="reports-stats">
+        @for (s of [1, 2, 3, 4, 5]; track s) {
+          <div class="eas-skeleton reports-stat" style="height: 88px"></div>
+        }
+      </div>
+    } @else if (summary(); as s) {
+      <div class="reports-stats">
+        <div class="reports-stat">
+          <p class="reports-stat__label">Total</p>
+          <p class="reports-stat__value">{{ s.totalConversations }}</p>
+        </div>
+        <div class="reports-stat">
+          <p class="reports-stat__label">Abiertas</p>
+          <p class="reports-stat__value">{{ s.openConversations }}</p>
+        </div>
+        <div class="reports-stat">
+          <p class="reports-stat__label">Resueltas</p>
+          <p class="reports-stat__value">{{ s.resolvedConversations }}</p>
+        </div>
+        <div class="reports-stat">
+          <p class="reports-stat__label">Clientes</p>
+          <p class="reports-stat__value">{{ s.totalClients }}</p>
+        </div>
+        <div class="reports-stat">
+          <p class="reports-stat__label">Mensajes</p>
+          <p class="reports-stat__value">{{ s.totalMessages }}</p>
+        </div>
+      </div>
+      <p class="reports-generated">Generado {{ s.generatedAt | date: 'medium' }}</p>
+    } @else {
+      <p class="reports-empty">No fue posible cargar el resumen de reportes.</p>
+    }
+  </div>
+
+  <div class="eas-card reports-panel">
+    <p class="reports-panel__title">Digest comercial</p>
+    @if (loading()) {
+      <div class="reports-stats">
+        @for (s of [1, 2, 3, 4]; track s) {
+          <div class="eas-skeleton reports-stat" style="height: 88px"></div>
+        }
+      </div>
+    } @else if (digest()) {
+      <div class="reports-stats">
+        <div class="reports-stat">
+          <p class="reports-stat__label">Conversión</p>
+          <p class="reports-stat__value">{{ digestNumber('conversionQuoteSalePct') | number: '1.0-1' }}%</p>
+        </div>
+        <div class="reports-stat">
+          <p class="reports-stat__label">Ticket venta</p>
+          <p class="reports-stat__value reports-stat__value--sm">
+            {{ digestNumber('avgSale') | currency: 'COP':'symbol-narrow':'1.0-0' }}
+          </p>
+        </div>
+        <div class="reports-stat">
+          <p class="reports-stat__label">Ticket cotiz.</p>
+          <p class="reports-stat__value reports-stat__value--sm">
+            {{ digestNumber('avgQuote') | currency: 'COP':'symbol-narrow':'1.0-0' }}
+          </p>
+        </div>
+        <div class="reports-stat">
+          <p class="reports-stat__label">Reservas hoy</p>
+          <p class="reports-stat__value">{{ digestNumber('todayReservations') }}</p>
+        </div>
+        <div class="reports-stat">
+          <p class="reports-stat__label">Vencidas</p>
+          <p class="reports-stat__value">{{ digestNumber('overdueReservations') }}</p>
+        </div>
+        <div class="reports-stat">
+          <p class="reports-stat__label">Cotiz. $0</p>
+          <p class="reports-stat__value">{{ digestNumber('zeroAmountQuotes') }}</p>
+        </div>
+      </div>
+    } @else {
+      <p class="reports-empty">Digest comercial no disponible.</p>
+    }
+  </div>
+
+  <div class="eas-card reports-panel reports-panel--wide">
+    <p class="reports-panel__title">Exportar</p>
+    <div class="reports-exports">
+      <button type="button" class="reports-export" (click)="exportCsv()" [disabled]="exportingCsv()">
+        <div class="reports-export__icon"><mat-icon>table_view</mat-icon></div>
+        <div class="reports-export__copy">
+          <strong>Conversaciones CSV</strong>
+          <span>Detalle del inbox para Excel.</span>
+        </div>
+        <mat-icon>download</mat-icon>
+      </button>
+
+      <button type="button" class="reports-export" (click)="exportPdf()" [disabled]="exportingPdf()">
+        <div class="reports-export__icon"><mat-icon>picture_as_pdf</mat-icon></div>
+        <div class="reports-export__copy">
+          <strong>Reporte PDF</strong>
+          <span>Ideal para compartir con directivos.</span>
+        </div>
+        <mat-icon>download</mat-icon>
+      </button>
+
+      <button type="button" class="reports-export" (click)="exportQuotes()" [disabled]="exportingBusy() === 'quotes'">
+        <div class="reports-export__icon"><mat-icon>request_quote</mat-icon></div>
+        <div class="reports-export__copy">
+          <strong>Cotizaciones CSV</strong>
+          <span>Pipeline comercial completo.</span>
+        </div>
+        <mat-icon>download</mat-icon>
+      </button>
+
+      <button type="button" class="reports-export" (click)="exportSales()" [disabled]="exportingBusy() === 'sales'">
+        <div class="reports-export__icon"><mat-icon>payments</mat-icon></div>
+        <div class="reports-export__copy">
+          <strong>Ventas CSV</strong>
+          <span>Cierres y montos.</span>
+        </div>
+        <mat-icon>download</mat-icon>
+      </button>
+
+      <button
+        type="button"
+        class="reports-export"
+        (click)="exportReservations()"
+        [disabled]="exportingBusy() === 'reservations'"
+      >
+        <div class="reports-export__icon"><mat-icon>event_available</mat-icon></div>
+        <div class="reports-export__copy">
+          <strong>Reservas CSV</strong>
+          <span>Agenda y estados.</span>
+        </div>
+        <mat-icon>download</mat-icon>
+      </button>
+
+      <button type="button" class="reports-export" (click)="exportClients()" [disabled]="exportingBusy() === 'clients'">
+        <div class="reports-export__icon"><mat-icon>diversity_3</mat-icon></div>
+        <div class="reports-export__copy">
+          <strong>Clientes CSV</strong>
+          <span>Base CRM.</span>
+        </div>
+        <mat-icon>download</mat-icon>
+      </button>
+
+      <button type="button" class="reports-export" (click)="exportAdvisors()" [disabled]="exportingBusy() === 'advisors'">
+        <div class="reports-export__icon"><mat-icon>badge</mat-icon></div>
+        <div class="reports-export__copy">
+          <strong>Desempeño asesores</strong>
+          <span>Carga y resultados por persona.</span>
+        </div>
+        <mat-icon>download</mat-icon>
+      </button>
+    </div>
+  </div>
+</div>

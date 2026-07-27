@@ -1,0 +1,88 @@
+/**
+ * Soft motion — feedback quieto, sin saltos al pasar el cursor.
+ */
+
+:root {
+  --eas-ease-soft: cubic-bezier(0.33, 1, 0.32, 1);
+  --eas-dur-soft: 220ms;
+}
+
+.eas-card,
+.eas-panel,
+.kpi,
+.sheet-card,
+.sheets-chip,
+.crm-toolbar,
+.commercial-form,
+.ph,
+.sb__link,
+.sb__footer,
+.tb__icon-btn,
+.tb__theme,
+.tb__user,
+.eas-chip,
+.eas-btn-primary,
+.eas-btn-secondary,
+.eas-btn-ghost,
+.eas-btn-accent,
+.login-card,
+.dash-hero__btn,
+.mat-mdc-row,
+.crm-row {
+  transition:
+    background-color var(--eas-dur-soft) var(--eas-ease-soft),
+    border-color var(--eas-dur-soft) var(--eas-ease-soft),
+    box-shadow var(--eas-dur-soft) var(--eas-ease-soft),
+    color var(--eas-dur-soft) var(--eas-ease-soft) !important;
+}
+
+/* Sin desplazamientos ni escalas en hover (evita distraer) */
+.eas-card:hover,
+.eas-panel:hover,
+.kpi:hover,
+.sheet-card:hover,
+.sheets-chip:hover,
+.ph:hover,
+.sb__footer:hover,
+.login-card:hover,
+.commercial-form:hover,
+.sheets-dash__kpis > .eas-card:hover,
+.tb__icon-btn:hover,
+.tb__theme:hover,
+.tb__user:hover,
+.sb__link:hover,
+.eas-chip:hover,
+.eas-btn-primary:hover,
+.eas-btn-secondary:hover,
+.eas-btn-ghost:hover,
+.eas-btn-accent:hover,
+.dash-hero__btn:hover,
+.semaforo:hover,
+.avatar:hover,
+eas-avatar:hover {
+  transform: none !important;
+}
+
+.eas-card:hover,
+.kpi:hover,
+.sheet-card:hover {
+  border-color: color-mix(in srgb, var(--eas-leaf) 20%, var(--eas-line)) !important;
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 35%, transparent) inset,
+    0 6px 16px color-mix(in srgb, var(--eas-forest) 6%, transparent) !important;
+}
+
+.crm-row:hover,
+.mat-mdc-row:hover .mat-mdc-cell {
+  background: color-mix(in srgb, var(--eas-leaf) 4.5%, transparent) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

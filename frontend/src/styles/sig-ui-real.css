@@ -1,0 +1,143 @@
+/**
+ * SIG UI — refinamiento suave (sin saltos de hover).
+ */
+
+body {
+  background:
+    radial-gradient(ellipse 55% 40% at 100% -5%, color-mix(in srgb, var(--eas-amber) 8%, transparent), transparent 55%),
+    radial-gradient(ellipse 45% 35% at -5% 100%, color-mix(in srgb, var(--eas-leaf) 7%, transparent), transparent 50%),
+    var(--eas-canvas);
+}
+
+.eas-card {
+  border-radius: 16px !important;
+  border-color: color-mix(in srgb, var(--eas-line) 75%, transparent) !important;
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 50%, transparent) inset,
+    0 6px 18px color-mix(in srgb, var(--eas-forest) 5%, transparent) !important;
+}
+
+html[data-theme='dark'] .eas-card {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 10px 24px rgba(0, 0, 0, 0.32) !important;
+}
+
+.eas-btn-primary {
+  height: 42px !important;
+  border-radius: 11px !important;
+  background: linear-gradient(180deg, #1a3d2c 0%, #14261c 100%) !important;
+  box-shadow: 0 6px 14px rgba(20, 38, 28, 0.2) !important;
+}
+
+.eas-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #214a36 0%, #1a3d2c 100%) !important;
+  box-shadow: 0 8px 16px rgba(20, 38, 28, 0.24) !important;
+}
+
+html[data-theme='dark'] .eas-btn-primary {
+  background: linear-gradient(180deg, #6fd5a1 0%, #4db882 100%) !important;
+  color: #06110c !important;
+}
+
+html[data-theme='dark'] .eas-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #7fe0af 0%, #5ec993 100%) !important;
+}
+
+.eas-btn-secondary {
+  border-radius: 11px !important;
+}
+
+.eas-chip {
+  border-radius: 999px !important;
+  padding: 0.4rem 0.85rem !important;
+  font-weight: 600 !important;
+}
+
+.eas-chip.is-active {
+  background: var(--eas-brand) !important;
+  color: var(--eas-on-brand) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .eas-chip.is-active {
+  background: #3db87a !important;
+  color: #06110c !important;
+}
+
+.eas-input,
+.eas-select,
+.eas-input--plain {
+  border-radius: 11px !important;
+  border-color: var(--eas-line) !important;
+  background: var(--eas-surface) !important;
+  transition: border-color 0.22s ease, box-shadow 0.22s ease !important;
+}
+
+.eas-input:focus,
+.eas-select:focus,
+.eas-input--plain:focus {
+  border-color: color-mix(in srgb, var(--eas-leaf) 45%, var(--eas-line)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--eas-leaf) 12%, transparent) !important;
+  outline: none !important;
+}
+
+.kpi,
+.sheets-dash__kpis > .eas-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px !important;
+}
+
+.kpi::before,
+.sheets-dash__kpis > .eas-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--eas-amber), var(--eas-leaf));
+}
+
+.tb {
+  border-bottom-color: color-mix(in srgb, var(--eas-line) 80%, transparent) !important;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--eas-forest) 3%, transparent) !important;
+}
+
+.tb__search input {
+  border-radius: 12px !important;
+  height: 40px !important;
+  background: var(--eas-surface) !important;
+}
+
+.mat-mdc-header-row {
+  background: color-mix(in srgb, var(--eas-mist) 60%, var(--eas-surface)) !important;
+}
+
+.mat-mdc-row:hover .mat-mdc-cell {
+  background: color-mix(in srgb, var(--eas-leaf) 4%, transparent) !important;
+}
+
+.crm-table__scroll,
+.sheets-table-wrap,
+.commercial-table,
+.sheets-raw-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--eas-leaf) 40%, transparent) transparent;
+}
+
+html[data-theme='dark'] .ph__sub,
+html[data-theme='dark'] .sheets-dash__meta,
+html[data-theme='dark'] .kpi__label,
+html[data-theme='dark'] .crm-msg,
+html[data-theme='dark'] .muted {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .eas-chip:not(.is-active) {
+  background: #1d2b25 !important;
+  border-color: #3a4c43 !important;
+  color: #e8f0eb !important;
+}

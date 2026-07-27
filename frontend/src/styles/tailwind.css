@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/*
+ * Colores de utilidad (text-eas-ink, bg-eas-mist, etc.)
+ * deben apuntar a las variables del design system en styles.scss
+ * para que cambien automáticamente en dark/light mode.
+ */
+@theme {
+  --font-sans: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Montserrat", "Sora", sans-serif;
+
+  --color-eas-forest: var(--eas-forest);
+  --color-eas-pine: var(--eas-pine);
+  --color-eas-leaf: var(--eas-leaf);
+  --color-eas-mint: var(--eas-mint);
+  --color-eas-mist: var(--eas-mist);
+  --color-eas-snow: var(--eas-snow);
+  --color-eas-ink: var(--eas-ink);
+  --color-eas-muted: var(--eas-muted);
+  --color-eas-amber: var(--eas-amber);
+  --color-eas-danger: var(--eas-danger);
+  --color-eas-line: var(--eas-line);
+  --color-eas-surface: var(--eas-surface);
+  --color-eas-canvas: var(--eas-canvas);
+
+  /* Relleno de marca: en dark se aclara y el texto se oscurece,
+     así los botones sólidos nunca quedan "oscuro sobre oscuro". */
+  --color-eas-brand: var(--eas-brand);
+  --color-eas-brand-hover: var(--eas-brand-hover);
+  --color-eas-on-brand: var(--eas-on-brand);
+}

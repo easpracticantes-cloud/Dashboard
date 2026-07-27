@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 200" fill="none" role="img" aria-label="Escuela Aves Salento">
+  <!-- Abstract bird / wing mark (mustard gold) -->
+  <g transform="translate(92, 8)">
+    <path d="M48 18c-18 2-34 14-40 32 10-8 24-12 38-10 12 2 22 8 28 18-2-16-10-30-26-40z" fill="#E4A01A" opacity="0.95"/>
+    <path d="M52 34c-14 4-26 14-30 28 8-6 18-10 29-8 10 2 18 8 22 16-1-14-7-26-21-36z" fill="#E4A01A"/>
+    <path d="M56 52c-10 4-18 12-20 22 6-4 13-6 20-5 7 1 12 5 15 11 0-11-5-20-15-28z" fill="#D49212"/>
+    <path d="M22 55c8-14 22-22 38-22-12 8-20 20-22 34-6-2-12-6-16-12z" fill="#F0B12E" opacity="0.85"/>
+    <path d="M68 48c6 10 6 22 0 32 8-6 12-16 10-26-2-4-6-6-10-6z" fill="#C9840E"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="140" y="128" text-anchor="middle" font-family="Montserrat, Arial Black, Arial, sans-serif" font-size="34" font-weight="800" letter-spacing="-0.6">
+    <tspan fill="#14261C">escuela</tspan><tspan fill="#1F7A4C">aves</tspan>
+  </text>
+  <text x="140" y="158" text-anchor="middle" font-family="Montserrat, Arial, sans-serif" font-size="18" font-weight="300" fill="#4A5560" letter-spacing="1.2">Salento</text>
+</svg>

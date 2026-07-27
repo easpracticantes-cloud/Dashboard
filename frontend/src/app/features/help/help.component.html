@@ -1,0 +1,67 @@
+<eas-page-header
+  eyebrow="Centro de ayuda"
+  title="Ayuda"
+  subtitle="Guías, atajos y respuestas rápidas para operar el SIG de Escuela Aves Salento."
+></eas-page-header>
+
+<section class="help-search eas-card">
+  <mat-icon>search</mat-icon>
+  <input
+    type="search"
+    [ngModel]="search()"
+    (ngModelChange)="search.set($event)"
+    placeholder="Buscar tema: Sheets, cotizaciones, roles…"
+  />
+</section>
+
+<section class="help-grid">
+  @for (topic of filteredTopics(); track topic.title) {
+    <article class="eas-card help-card">
+      <span class="help-card__icon"><mat-icon>{{ topic.icon }}</mat-icon></span>
+      <h3>{{ topic.title }}</h3>
+      <p>{{ topic.body }}</p>
+      @if (topic.steps?.length) {
+        <ol class="help-card__steps">
+          @for (step of topic.steps; track step) {
+            <li>{{ step }}</li>
+          }
+        </ol>
+      }
+      @if (topic.route) {
+        <a [routerLink]="topic.route" class="help-card__link">
+          {{ topic.routeLabel || 'Abrir' }}
+          <mat-icon>north_east</mat-icon>
+        </a>
+      }
+    </article>
+  }
+</section>
+
+<section class="help-bottom">
+  <div class="eas-card help-faq">
+    <h3>Preguntas frecuentes</h3>
+    @for (faq of faqs; track faq.q; let i = $index) {
+      <button type="button" class="help-faq__item" [class.is-open]="openFaq() === i" (click)="toggleFaq(i)">
+        <span>
+          <strong>{{ faq.q }}</strong>
+          @if (openFaq() === i) {
+            <p>{{ faq.a }}</p>
+          }
+        </span>
+        <mat-icon>{{ openFaq() === i ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </button>
+    }
+  </div>
+
+  <div class="eas-card help-shortcuts">
+    <h3>Atajos útiles</h3>
+    <ul>
+      @for (s of shortcuts; track s.keys) {
+        <li>
+          <kbd>{{ s.keys }}</kbd>
+          <span>{{ s.action }}</span>
+        </li>
+      }
+    </ul>
+  </div>
+</section>

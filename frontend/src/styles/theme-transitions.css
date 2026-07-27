@@ -1,0 +1,484 @@
+/**
+ * Theme transitions + dark contrast.
+ * Fundido suave sin morph/salto de layout.
+ */
+
+/* ===== View Transitions: solo opacity (sin movimiento) ===== */
+::view-transition-group(root) {
+  animation: none !important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  mix-blend-mode: normal;
+  animation-duration: 380ms;
+  animation-timing-function: cubic-bezier(0.33, 1, 0.32, 1);
+  height: 100%;
+  width: 100%;
+}
+
+::view-transition-old(root) {
+  animation-name: eas-theme-out;
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  animation-name: eas-theme-in;
+  z-index: 2;
+}
+
+@keyframes eas-theme-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes eas-theme-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/*
+ * Durante el swap: congelar transform/filter/layout.
+ * NO matar opacity del view-transition (vive en pseudos del root).
+ */
+html.theme-switching,
+html.theme-switching body,
+html.theme-switching .shell,
+html.theme-switching .sb,
+html.theme-switching .tb,
+html.theme-switching .eas-card,
+html.theme-switching .eas-panel,
+html.theme-switching .kpi,
+html.theme-switching .mat-drawer-content {
+  transition: none !important;
+}
+
+html.theme-switching .tb__theme,
+html.theme-switching .tb__icon-btn,
+html.theme-switching .eas-btn-primary,
+html.theme-switching .eas-btn-secondary,
+html.theme-switching .eas-btn-ghost,
+html.theme-switching .sb__link {
+  transition: none !important;
+  transform: none !important;
+}
+
+/* Después del swap: solo color/superficie (nunca transform ni background shorthand) */
+html:not(.theme-switching) body,
+html:not(.theme-switching) .shell,
+html:not(.theme-switching) .sb,
+html:not(.theme-switching) .tb,
+html:not(.theme-switching) .eas-card,
+html:not(.theme-switching) .eas-panel,
+html:not(.theme-switching) .kpi,
+html:not(.theme-switching) .sheets-dash,
+html:not(.theme-switching) .crm-toolbar,
+html:not(.theme-switching) .crm-table,
+html:not(.theme-switching) .commercial-table,
+html:not(.theme-switching) .mat-drawer-content {
+  transition:
+    background-color 360ms cubic-bezier(0.33, 1, 0.32, 1),
+    color 360ms cubic-bezier(0.33, 1, 0.32, 1),
+    border-color 360ms cubic-bezier(0.33, 1, 0.32, 1),
+    box-shadow 360ms cubic-bezier(0.33, 1, 0.32, 1) !important;
+}
+
+/* ===== Contraste dark: textos e iconos siempre legibles ===== */
+
+html[data-theme='dark'] {
+  color: #f5faf7;
+}
+
+html[data-theme='dark'] body {
+  color: #f5faf7;
+}
+
+html[data-theme='dark'] .eas-btn-primary {
+  background: #5ec993 !important;
+  color: #06110c !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35) !important;
+}
+
+html[data-theme='dark'] .eas-btn-primary:hover:not(:disabled) {
+  background: #6fd5a1 !important;
+  color: #06110c !important;
+}
+
+html[data-theme='dark'] .eas-btn-primary mat-icon {
+  color: #06110c !important;
+}
+
+html[data-theme='dark'] .eas-btn-secondary,
+html[data-theme='dark'] .eas-btn-ghost,
+html[data-theme='dark'] .eas-btn-action {
+  background: #1d2b25 !important;
+  color: #f5faf7 !important;
+  border-color: #4a5f55 !important;
+}
+
+html[data-theme='dark'] .eas-btn-secondary:hover:not(:disabled),
+html[data-theme='dark'] .eas-btn-ghost:hover:not(:disabled),
+html[data-theme='dark'] .eas-btn-action:hover {
+  background: #2a3d35 !important;
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .eas-btn-secondary mat-icon,
+html[data-theme='dark'] .eas-btn-ghost mat-icon,
+html[data-theme='dark'] .eas-btn-action mat-icon {
+  color: #e8f3ec !important;
+}
+
+html[data-theme='dark'] .eas-btn-accent {
+  background: #f0bc48 !important;
+  color: #1a1408 !important;
+}
+
+html[data-theme='dark'] .dash-hero__btn {
+  background: #ffffff !important;
+  color: #0c1210 !important;
+}
+
+html[data-theme='dark'] .dash-hero__btn mat-icon {
+  color: #0c1210 !important;
+}
+
+html[data-theme='dark'] .dash-hero__ghost {
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+html[data-theme='dark'] .dash-hero__ghost mat-icon {
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .sb__link {
+  color: #d2e0d7 !important;
+}
+
+html[data-theme='dark'] .sb__link:hover,
+html[data-theme='dark'] .sb__link.is-active {
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .sb__link mat-icon {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+html[data-theme='dark'] .sb__section {
+  color: #a8bdb2 !important;
+}
+
+html[data-theme='dark'] .tb,
+html[data-theme='dark'] .tb__icon-btn,
+html[data-theme='dark'] .tb__theme,
+html[data-theme='dark'] .tb__theme-label,
+html[data-theme='dark'] .tb__user,
+html[data-theme='dark'] .tb__search input {
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .tb__theme {
+  background: #1d2b25 !important;
+  border-color: #4a5f55 !important;
+}
+
+html[data-theme='dark'] .tb__theme mat-icon {
+  color: #f0bc48 !important;
+}
+
+html[data-theme='dark'] .tb__search input {
+  background: #1a2620 !important;
+  border-color: #4a5f55 !important;
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .tb__search mat-icon {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .sheets-dash__eyebrow,
+html[data-theme='dark'] .sheets-dash__meta,
+html[data-theme='dark'] .dash-chart__eyebrow,
+html[data-theme='dark'] .kpi__label {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .sheets-dash__head h2,
+html[data-theme='dark'] .sheets-table-card h3,
+html[data-theme='dark'] .sheets-hojas h3,
+html[data-theme='dark'] .sheets-paises h3,
+html[data-theme='dark'] .dash-chart h2,
+html[data-theme='dark'] .dash-chart h3,
+html[data-theme='dark'] h1,
+html[data-theme='dark'] h2,
+html[data-theme='dark'] h3 {
+  color: #f7fcf9 !important;
+}
+
+html[data-theme='dark'] .sheets-tabs button {
+  background: #1a2620 !important;
+  color: #d2e0d7 !important;
+  border-color: #4a5f55 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme='dark'] .sheets-tabs button.is-active {
+  background: rgba(94, 201, 147, 0.22) !important;
+  color: #e8fff3 !important;
+  border-color: rgba(94, 201, 147, 0.5) !important;
+}
+
+html[data-theme='dark'] .sheets-chip,
+html[data-theme='dark'] .sheet-card,
+html[data-theme='dark'] .piezas-list li,
+html[data-theme='dark'] .sheets-paises li,
+html[data-theme='dark'] .b2b-list li {
+  background: #1c2923 !important;
+  color: #f5faf7 !important;
+  border-color: #4a5f55 !important;
+}
+
+html[data-theme='dark'] .sheet-card strong,
+html[data-theme='dark'] .piezas-list strong,
+html[data-theme='dark'] .sheets-paises strong,
+html[data-theme='dark'] .b2b-list strong {
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .sheet-card__count,
+html[data-theme='dark'] .sheet-card__preview,
+html[data-theme='dark'] .piezas-list span,
+html[data-theme='dark'] .sheets-filters label,
+html[data-theme='dark'] .b2b-list p,
+html[data-theme='dark'] .sheets-paises small {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .sheets-plain th,
+html[data-theme='dark'] .sheets-table .mat-mdc-header-cell {
+  color: #d2e0d7 !important;
+  background: #15201b !important;
+}
+
+html[data-theme='dark'] .sheets-plain td,
+html[data-theme='dark'] .sheets-table .mat-mdc-cell {
+  color: #f0f6f2 !important;
+}
+
+html[data-theme='dark'] .sheets-table-wrap,
+html[data-theme='dark'] .sheet-card,
+html[data-theme='dark'] .eas-card,
+html[data-theme='dark'] .kpi {
+  background: #17221d !important;
+  border-color: #4a5f55 !important;
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .kpi__value {
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .kpi__icon {
+  background: #243530 !important;
+  color: #6fd5a1 !important;
+}
+
+html[data-theme='dark'] .kpi__icon mat-icon {
+  color: #6fd5a1 !important;
+}
+
+html[data-theme='dark'] .semaforo--frio {
+  background: rgba(91, 141, 239, 0.32) !important;
+  color: #d4e4ff !important;
+}
+
+html[data-theme='dark'] .semaforo--tibio {
+  background: rgba(240, 188, 72, 0.32) !important;
+  color: #ffe7b0 !important;
+}
+
+html[data-theme='dark'] .semaforo--caliente {
+  background: rgba(240, 149, 140, 0.32) !important;
+  color: #ffcfc8 !important;
+}
+
+html[data-theme='dark'] .semaforo--venta {
+  background: rgba(94, 201, 147, 0.32) !important;
+  color: #d0f8e4 !important;
+}
+
+html[data-theme='dark'] .es h3,
+html[data-theme='dark'] .ph h1,
+html[data-theme='dark'] .ph__eyebrow {
+  color: #f7fcf9 !important;
+}
+
+html[data-theme='dark'] .es p,
+html[data-theme='dark'] .ph__sub,
+html[data-theme='dark'] .muted {
+  color: #c5d4cb !important;
+}
+
+html[data-theme='dark'] .es__icon {
+  background: #243530 !important;
+  color: #6fd5a1 !important;
+}
+
+html[data-theme='dark'] .es__icon mat-icon {
+  color: #6fd5a1 !important;
+}
+
+html[data-theme='dark'] .commercial-table,
+html[data-theme='dark'] .crm-table,
+html[data-theme='dark'] .crm-toolbar,
+html[data-theme='dark'] .filters,
+html[data-theme='dark'] .history-filters {
+  background: #17221d !important;
+  color: #f5faf7 !important;
+  border-color: #4a5f55 !important;
+}
+
+html[data-theme='dark'] .commercial-table th,
+html[data-theme='dark'] .crm-table th,
+html[data-theme='dark'] .mat-mdc-header-cell {
+  color: #d2e0d7 !important;
+  background: #15201b !important;
+}
+
+html[data-theme='dark'] .commercial-table td,
+html[data-theme='dark'] .crm-table td,
+html[data-theme='dark'] .mat-mdc-cell,
+html[data-theme='dark'] .crow,
+html[data-theme='dark'] .client-row {
+  color: #f0f6f2 !important;
+}
+
+html[data-theme='dark'] .crow:hover,
+html[data-theme='dark'] .client-row:hover,
+html[data-theme='dark'] .crm-row:hover {
+  background: #1c2923 !important;
+}
+
+/* Solo las pills neutras: las que tienen estado/prioridad conservan su tinte semántico. */
+html[data-theme='dark'] .pill:not([data-priority]):not([data-status]):not([data-quote]) {
+  background: #243530 !important;
+  color: #e8f3ec !important;
+}
+
+html[data-theme='dark'] .cd__bubble--in {
+  background: #243530 !important;
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .cd__bubble--out {
+  background: linear-gradient(135deg, #1f7a4c 0%, #3db87a 100%) !important;
+  color: #06110c !important;
+}
+
+html[data-theme='dark'] .login-card,
+html[data-theme='dark'] .fp__card {
+  background: #17221d !important;
+  color: #f5faf7 !important;
+  border-color: #4a5f55 !important;
+}
+
+html[data-theme='dark'] .login-card h1,
+html[data-theme='dark'] .login-card h2,
+html[data-theme='dark'] .fp__card h1,
+html[data-theme='dark'] .fp__card h2 {
+  color: #ffffff !important;
+}
+
+html[data-theme='dark'] .eas-input,
+html[data-theme='dark'] .eas-select,
+html[data-theme='dark'] .eas-input--plain,
+html[data-theme='dark'] input,
+html[data-theme='dark'] textarea,
+html[data-theme='dark'] select {
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .text-\[\#14261c\],
+html[data-theme='dark'] .text-\[\#1a3d2c\],
+html[data-theme='dark'] [style*='color: #14261c'],
+html[data-theme='dark'] [style*='color:#14261c'],
+html[data-theme='dark'] [style*='color: #1a3d2c'],
+html[data-theme='dark'] [style*='color:#1a3d2c'] {
+  color: #f5faf7 !important;
+}
+
+html[data-theme='dark'] .eas-skeleton,
+html[data-theme='dark'] .kpi-skel {
+  background: linear-gradient(90deg, #1c2923, #2a3d35, #1c2923) !important;
+}
+
+html[data-theme='dark'] .mat-mdc-select-value,
+html[data-theme='dark'] .mat-mdc-option .mdc-list-item__primary-text,
+html[data-theme='dark'] .mat-mdc-form-field-input-control,
+html[data-theme='dark'] .mdc-text-field__input {
+  color: #f5faf7 !important;
+}
+
+/* ===== Rescate dark: rellenos que eran oscuros en claro y quedaban invisibles ===== */
+
+html[data-theme='dark'] .bg-eas-forest,
+html[data-theme='dark'] .bg-eas-pine,
+html[data-theme='dark'] .bg-eas-ink {
+  background-color: var(--eas-brand) !important;
+  color: var(--eas-on-brand) !important;
+}
+
+html[data-theme='dark'] .bg-eas-forest mat-icon,
+html[data-theme='dark'] .bg-eas-pine mat-icon,
+html[data-theme='dark'] .bg-eas-ink mat-icon,
+html[data-theme='dark'] .bg-eas-brand mat-icon {
+  color: inherit !important;
+}
+
+html[data-theme='dark'] .hover\:bg-eas-pine:hover,
+html[data-theme='dark'] .hover\:bg-eas-forest:hover {
+  background-color: var(--eas-brand-hover) !important;
+}
+
+html[data-theme='dark'] .ring-eas-leaf\/30 {
+  --tw-ring-color: rgba(94, 201, 147, 0.35) !important;
+}
+
+/* Chips de estado hechos con utilidades slate (usuarios, calidad de clientes) */
+html[data-theme='dark'] .bg-slate-100,
+html[data-theme='dark'] .bg-slate-200 {
+  background-color: #243530 !important;
+}
+
+html[data-theme='dark'] .text-slate-500,
+html[data-theme='dark'] .text-slate-600 {
+  color: #c5d4cb !important;
+}
+
+/* Paneles y tarjetas con blanco fijo que sobrevivían al cambio de tema */
+html[data-theme='dark'] .cc-panel,
+html[data-theme='dark'] .cc-kpi,
+html[data-theme='dark'] .cp,
+html[data-theme='dark'] .aiq {
+  background: var(--eas-surface) !important;
+  border-color: var(--eas-line) !important;
+  color: var(--eas-ink) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+
+  html:not(.theme-switching) body,
+  html:not(.theme-switching) .shell,
+  html:not(.theme-switching) .sb,
+  html:not(.theme-switching) .tb,
+  html:not(.theme-switching) .eas-card {
+    transition: none !important;
+  }
+}

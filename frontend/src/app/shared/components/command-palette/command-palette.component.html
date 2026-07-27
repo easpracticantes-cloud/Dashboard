@@ -1,0 +1,42 @@
+<div class="cp" (keydown)="onKeydown($event)">
+  <div class="cp__search">
+    <mat-icon>search</mat-icon>
+    <input
+      #queryInput
+      type="search"
+      [ngModel]="query()"
+      (ngModelChange)="onQueryChange($event)"
+      placeholder="Buscar cliente, chat o ir a un módulo…"
+      autocomplete="off"
+    />
+    <kbd>esc</kbd>
+  </div>
+
+  <div class="cp__hint">
+    <span>↑↓ navegar</span>
+    <span>↵ abrir</span>
+    <span>Ctrl/⌘ K</span>
+  </div>
+
+  <ul class="cp__list" role="listbox">
+    @for (item of results(); track item.id; let i = $index) {
+      <li
+        role="option"
+        [class.is-active]="i === activeIndex()"
+        (click)="select(item)"
+        (mouseenter)="activeIndex.set(i)"
+      >
+        <span class="cp__icon"><mat-icon>{{ item.icon }}</mat-icon></span>
+        <span class="cp__text">
+          <strong>{{ item.title }}</strong>
+          @if (item.subtitle) {
+            <small>{{ item.subtitle }}</small>
+          }
+        </span>
+        <span class="cp__kind">{{ item.kind }}</span>
+      </li>
+    } @empty {
+      <li class="cp__empty">Sin resultados</li>
+    }
+  </ul>
+</div>

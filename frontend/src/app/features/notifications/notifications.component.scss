@@ -1,0 +1,196 @@
+:host {
+  display: block;
+}
+
+.notif-card {
+  border-radius: 18px;
+  overflow: hidden;
+  padding: 0.35rem 0;
+}
+
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 1rem 1.15rem;
+  text-decoration: none;
+  color: inherit;
+  border-top: 1px solid var(--eas-line-soft);
+  transition: background 0.18s ease, padding-left 0.18s ease;
+}
+
+.notif-item:first-child {
+  border-top: none;
+}
+
+.notif-item:hover {
+  background: color-mix(in srgb, var(--eas-mist) 75%, transparent);
+  padding-left: 1.35rem;
+}
+
+.notif-item.is-unread {
+  background: color-mix(in srgb, var(--eas-mist) 40%, transparent);
+}
+
+.notif-item__icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  flex: none;
+}
+
+.notif-item__icon.is-info { background: var(--eas-tint-info); color: var(--eas-on-tint-info); }
+.notif-item__icon.is-success { background: var(--eas-tint-leaf); color: var(--eas-on-tint-leaf); }
+.notif-item__icon.is-warning { background: var(--eas-tint-amber); color: var(--eas-on-tint-amber); }
+.notif-item__icon.is-error { background: var(--eas-tint-danger); color: var(--eas-on-tint-danger); }
+.notif-item__icon.is-message { background: var(--eas-tint-leaf); color: var(--eas-on-tint-leaf); }
+.notif-item__icon.is-system { background: var(--eas-mist); color: var(--eas-muted); }
+
+.notif-item__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.notif-item__title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--eas-ink);
+}
+
+.notif-item__text {
+  margin: 0.25rem 0 0;
+  font-size: 0.84rem;
+  color: var(--eas-muted);
+  line-height: 1.45;
+}
+
+.notif-item__time {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--eas-muted);
+}
+
+.notif-item__dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 0.45rem;
+  border-radius: 999px;
+  background: var(--eas-leaf);
+  flex: none;
+  box-shadow: 0 0 0 3px rgba(31, 122, 76, 0.18);
+  animation: eas-pulse-dot 1.8s ease-in-out infinite;
+}
+
+.notif-item__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  margin-top: 0.2rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
+  font-size: 0.75rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.notif-item__action mat-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.notif-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.notif-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: min(320px, 100%);
+  height: 40px;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--eas-line-soft);
+  background: var(--eas-surface);
+}
+
+.notif-search mat-icon {
+  font-size: 18px !important;
+  width: 18px !important;
+  height: 18px !important;
+  color: var(--eas-muted);
+}
+
+.notif-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.84rem;
+  outline: none;
+  color: var(--eas-ink);
+}
+
+.notif-types {
+  margin-bottom: 1rem;
+}
+
+.notif-item__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.notif-item__type {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: var(--eas-mist);
+  color: var(--eas-muted);
+}
+
+.notif-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+}
+
+.notif-item__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--eas-line-soft);
+  background: var(--eas-surface);
+  color: var(--eas-leaf);
+  cursor: pointer;
+}
+
+.notif-item__mark mat-icon {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.notif-skel {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.15rem;
+}

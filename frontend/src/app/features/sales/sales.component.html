@@ -1,0 +1,91 @@
+<eas-page-header
+  eyebrow="Cierres Sheets"
+  title="Ventas"
+  subtitle="Cierres con semáforo VENTA sincronizados desde el workbook."
+>
+  <button type="button" class="eas-btn-secondary" (click)="exportCsv()" [disabled]="exporting()">
+    <mat-icon>download</mat-icon>
+    {{ exporting() ? 'Exportando…' : 'Exportar CSV' }}
+  </button>
+  <button type="button" class="eas-btn-primary" (click)="showForm.set(!showForm())">
+    <mat-icon>add</mat-icon>
+    Registrar venta
+  </button>
+</eas-page-header>
+
+@if (showForm()) {
+  <section class="eas-card commercial-form">
+    <h3>Nueva venta</h3>
+    <div class="commercial-form__grid">
+      <label>
+        <span class="eas-field-label">Cliente</span>
+        <select class="eas-select" [(ngModel)]="form.clientId">
+          <option value="">Selecciona…</option>
+          @for (c of clients(); track c.id) {
+            <option [value]="c.id">{{ c.name }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span class="eas-field-label">Concepto</span>
+        <input class="eas-input eas-input--plain" [(ngModel)]="form.concept" />
+      </label>
+      <label>
+        <span class="eas-field-label">Monto</span>
+        <input class="eas-input eas-input--plain" type="number" [(ngModel)]="form.amount" />
+      </label>
+      <label>
+        <span class="eas-field-label">Fecha</span>
+        <input class="eas-input eas-input--plain" type="date" [(ngModel)]="form.saleDate" />
+      </label>
+      <label>
+        <span class="eas-field-label">Método de pago</span>
+        <input class="eas-input eas-input--plain" [(ngModel)]="form.paymentMethod" />
+      </label>
+    </div>
+    <div class="commercial-form__actions">
+      <button type="button" class="eas-btn-secondary" (click)="showForm.set(false)">Cancelar</button>
+      <button type="button" class="eas-btn-primary" (click)="create()">Guardar</button>
+    </div>
+  </section>
+}
+
+<section class="eas-card commercial-table">
+  @if (loading()) {
+    <div class="eas-skeleton h-16 w-full"></div>
+  } @else if (items().length === 0) {
+    <eas-empty-state icon="payments" title="Sin ventas" description="Cuando cierres una venta, se reflejará aquí y en el dashboard."></eas-empty-state>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Cliente</th>
+          <th>Concepto</th>
+          <th>Monto</th>
+          <th>Fecha</th>
+          <th>Pago</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of items(); track s.id) {
+          <tr>
+            <td><strong>{{ s.code }}</strong></td>
+            <td>{{ s.clientName }}</td>
+            <td>{{ s.concept }}</td>
+            <td>{{ s.amount | currency: s.currency : 'symbol-narrow' : '1.0-0' }}</td>
+            <td>{{ s.saleDate | date: 'dd/MM/yyyy' }}</td>
+            <td>{{ s.paymentMethod || '—' }}</td>
+            <td>
+              <button type="button" class="eas-btn-action is-danger" (click)="remove(s.id)" title="Eliminar venta">
+                <mat-icon>delete</mat-icon>
+                <span>Eliminar</span>
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

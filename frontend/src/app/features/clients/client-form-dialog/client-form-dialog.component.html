@@ -1,0 +1,63 @@
+<div class="w-[min(92vw,440px)] p-1">
+  <div class="mb-5 flex items-center justify-between">
+    <h2 class="font-display text-xl text-eas-ink">{{ isEdit ? 'Editar cliente' : 'Nuevo cliente' }}</h2>
+    <button type="button" (click)="cancel()" class="grid h-8 w-8 place-items-center rounded-full text-eas-muted hover:bg-eas-mist">
+      <mat-icon [style.font-size.px]="18" [style.width.px]="18" [style.height.px]="18">close</mat-icon>
+    </button>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="save()" class="space-y-4">
+    <div>
+      <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Nombre completo</label>
+      <input
+        type="text"
+        formControlName="name"
+        class="w-full rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:bg-white focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
+      />
+    </div>
+    <div>
+      <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Correo</label>
+      <input
+        type="email"
+        formControlName="email"
+        class="w-full rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:bg-white focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
+      />
+    </div>
+    <div>
+      <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Teléfono</label>
+      <input
+        type="text"
+        formControlName="phone"
+        class="w-full rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:bg-white focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
+      />
+    </div>
+    <div>
+      <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Notas</label>
+      <textarea
+        formControlName="notes"
+        rows="2"
+        class="w-full resize-none rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:bg-white focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
+      ></textarea>
+    </div>
+    <div>
+      <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Segmento</label>
+      <select
+        formControlName="segment"
+        class="w-full rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
+      >
+        @for (segment of segments; track segment) {
+          <option [value]="segment">{{ segment }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <button type="button" (click)="cancel()" class="rounded-full px-4 py-2.5 text-sm font-semibold text-eas-muted hover:bg-eas-mist">
+        Cancelar
+      </button>
+      <button type="submit" class="rounded-full bg-eas-brand px-5 py-2.5 text-sm font-semibold text-eas-on-brand hover:bg-eas-brand-hover">
+        Guardar
+      </button>
+    </div>
+  </form>
+</div>

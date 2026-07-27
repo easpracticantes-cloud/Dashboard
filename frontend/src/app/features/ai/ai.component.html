@@ -1,0 +1,25 @@
+<eas-page-header
+  eyebrow="Claude-ready"
+  title="Inteligencia Artificial"
+  subtitle="Arquitectura preparada para Claude API: resúmenes, prioridades, sentimiento y predicción comercial."
+></eas-page-header>
+
+<section class="ai-hero eas-card">
+  <div class="ai-hero__badge"><mat-icon>auto_awesome</mat-icon> En preparación · Claude API</div>
+  <h2>Copiloto operativo para el CRM</h2>
+  <p>
+    Este módulo está listo a nivel de producto y arquitectura hexagonal. Cuando se conecte Claude API,
+    cada capacidad se activará sin reescribir la interfaz.
+  </p>
+</section>
+
+<section class="ai-grid">
+  @for (feature of features; track feature.title) {
+    <article class="ai-card eas-card">
+      <span class="ai-card__icon"><mat-icon>{{ feature.icon }}</mat-icon></span>
+      <h3>{{ feature.title }}</h3>
+      <p>{{ feature.description }}</p>
+      <span class="ai-card__soon">Próximamente</span>
+    </article>
+  }
+</section>

@@ -1,0 +1,3 @@
+Revisa @documentos/, /backend y /frontend.
+
+Construye la etapa de pruebas: unitarias, integración y checklist manual. Genera también TESTING.md con instrucciones claras.

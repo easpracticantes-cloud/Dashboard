@@ -1,0 +1,149 @@
+Lee completamente @documentos/ y @AGENTS.md.
+
+Tu tarea es construir el proyecto completo de un sistema empresarial de inventario para una distribuidora de pollos asados y apanados, modelando todo el flujo del negocio de forma coherente, usable y profesional.
+
+FUENTE DE VERDAD OBLIGATORIA
+La carpeta /documentos contiene:
+- la tabla de requisitos funcionales
+- el SQL completo de la base de datos PostgreSQL
+
+Debes usar esos documentos como base principal y mantener consistencia total entre requisitos, modelo de datos, backend, frontend, documentación y pruebas.
+
+OBJETIVO GENERAL
+Construir el proyecto completo con:
+1. backend dockerizado
+2. frontend usable y conectado al backend
+3. documentación profesional
+4. colección Postman JSON
+5. estructura limpia y mantenible
+
+STACK OBLIGATORIO
+Backend:
+- Java 17
+- Spring Boot
+- Maven
+- PostgreSQL
+- Spring Security + JWT
+- arquitectura hexagonal
+- DTOs
+- validaciones
+- manejo global de errores
+- OpenAPI / Swagger
+- Docker
+- Docker Compose
+
+Frontend:
+- React
+- TypeScript
+- Vite
+- interfaz clara, intuitiva y orientada al negocio
+- consumo real del backend
+- formularios con validaciones
+- tablas, filtros, módulos y navegación lógica
+
+REQUISITOS FUNCIONALES DEL NEGOCIO
+Debes cubrir completamente el dominio del sistema, incluyendo como mínimo:
+- autenticación y autorización
+- usuarios, roles y permisos
+- auditoría
+- productos
+- categorías y subcategorías
+- presentaciones, empaques y embalajes
+- proveedores
+- clientes
+- bodegas
+- ubicaciones
+- vehículos y transportadores
+- rutas de traslado
+- lotes
+- vencimientos
+- temperaturas
+- estados de inventario
+- inventario por bodega, ubicación y lote
+- kardex
+- solicitudes de compra
+- órdenes de compra
+- recepción de mercancía
+- inspección de calidad
+- entradas de inventario
+- salidas de inventario
+- despacho
+- devoluciones a proveedor
+- devoluciones de cliente
+- reservas
+- ajustes
+- mermas
+- decomisos
+- inventario físico
+- conteos cíclicos
+- aprobación de diferencias
+- cuarentena
+- bloqueos
+- recall o retiro de mercado
+- reempaque y conversión de presentaciones
+- documentos soporte
+- registros sanitarios
+- validación de rotulado
+- alertas
+- reportes
+- dashboard
+- integraciones
+- soporte mínimo de IA del negocio:
+  - OCR documental asistido
+  - sugerencia de reabastecimiento
+  - pronóstico básico
+  - detección de anomalías
+
+INSTRUCCIONES IMPORTANTES DE IMPLEMENTACIÓN
+1. Primero analiza la carpeta /documentos y resume:
+   - módulos del sistema
+   - entidades principales
+   - relaciones
+   - flujos críticos
+   - endpoints esperados
+   - riesgos de implementación
+
+2. Después genera un plan técnico completo antes de escribir código.
+   No empieces a programar hasta presentar ese plan.
+
+3. El plan debe incluir:
+   - arquitectura del backend
+   - estructura de carpetas del backend
+   - estructura de carpetas del frontend
+   - módulos del sistema
+   - estrategia de seguridad JWT
+   - estrategia de persistencia
+   - mapeo entre requisitos y módulos
+   - lista de endpoints por módulo
+   - estrategia de pruebas
+   - estrategia de Docker
+   - estrategia de documentación
+
+4. Una vez aprobado el plan, construye el backend en /backend.
+5. Usa el SQL de /documentos como referencia obligatoria del esquema de base de datos.
+6. Después construye el frontend en /frontend.
+7. Solo después de backend y frontend, construye las pruebas.
+8. Debes crear:
+   - README.md profesional del proyecto
+   - README-ENDPOINTS.md con resumen y detalle de endpoints
+   - archivo JSON de colección Postman en /postman
+   - README de Postman explicando cómo importarlo y probarlo
+
+FORMA DE TRABAJO
+Trabaja en fases y no mezcles todo de golpe:
+Fase 1: análisis
+Fase 2: plan técnico
+Fase 3: backend
+Fase 4: frontend
+Fase 5: pruebas
+Fase 6: documentación
+Fase 7: colección Postman
+
+EMPIEZA AHORA CON:
+1. análisis de /documentos
+2. mapa de módulos
+3. mapa de entidades
+4. propuesta de arquitectura
+5. plan de implementación completo
+
+No escribas código todavía hasta mostrar primero el plan técnico completo.

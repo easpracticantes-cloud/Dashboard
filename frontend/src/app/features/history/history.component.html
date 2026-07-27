@@ -1,0 +1,54 @@
+<eas-page-header
+  eyebrow="Línea de tiempo"
+  title="Historial"
+  subtitle="Todas las conversaciones ordenadas cronológicamente. Filtra por rango de fechas."
+></eas-page-header>
+
+<section class="eas-card history-filters">
+  <mat-form-field appearance="outline">
+    <mat-label>Desde</mat-label>
+    <input matInput [matDatepicker]="fromPicker" [ngModel]="fromDate()" (ngModelChange)="fromDate.set($event)" />
+    <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+    <mat-datepicker #fromPicker></mat-datepicker>
+  </mat-form-field>
+
+  <mat-form-field appearance="outline">
+    <mat-label>Hasta</mat-label>
+    <input matInput [matDatepicker]="toPicker" [ngModel]="toDate()" (ngModelChange)="toDate.set($event)" />
+    <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+    <mat-datepicker #toPicker></mat-datepicker>
+  </mat-form-field>
+
+  <button type="button" class="eas-btn-secondary" (click)="clearDates()">
+    <mat-icon>event_busy</mat-icon>
+    Limpiar fechas
+  </button>
+</section>
+
+<section class="eas-card history-list">
+  @if (loading()) {
+    <div class="eas-skeleton h-16 w-full mb-3"></div>
+    <div class="eas-skeleton h-16 w-full"></div>
+  } @else if (filtered().length === 0) {
+    <eas-empty-state
+      icon="history"
+      title="Historial vacío"
+      description="Cuando existan conversaciones, aparecerán aquí en orden cronológico."
+    ></eas-empty-state>
+  } @else {
+    @for (c of filtered(); track c.id) {
+      <a class="history-item" [routerLink]="['/app/conversations', c.id]">
+        <div class="history-item__when">
+          <strong>{{ c.lastMessageAt | date: 'dd MMM y' }}</strong>
+          <span>{{ c.lastMessageAt | date: 'HH:mm' }}</span>
+        </div>
+        <div class="history-item__body">
+          <strong>{{ c.clientName }}</strong>
+          <p>{{ c.lastMessage || 'Sin mensaje' }}</p>
+          <small>{{ c.clientPhone }} · {{ c.tags[0]?.label || 'Sin categoría' }}</small>
+        </div>
+        <mat-icon>chevron_right</mat-icon>
+      </a>
+    }
+  }
+</section>

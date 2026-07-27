@@ -1,0 +1,131 @@
+<eas-page-header
+  eyebrow="Pipeline Sheets"
+  title="Cotizaciones"
+  subtitle="Propuestas derivadas de filas cotizadas en el workbook de Google Sheets."
+>
+  <button type="button" class="eas-btn-secondary" (click)="exportCsv()" [disabled]="exporting()">
+    <mat-icon>download</mat-icon>
+    {{ exporting() ? 'Exportando…' : 'Exportar CSV' }}
+  </button>
+  <button type="button" class="eas-btn-primary" (click)="showForm.set(!showForm())">
+    <mat-icon>add</mat-icon>
+    Nueva cotización
+  </button>
+</eas-page-header>
+
+@if (showForm()) {
+  <section class="eas-card commercial-form">
+    <h3>Nueva cotización</h3>
+    <div class="commercial-form__grid">
+      <label>
+        <span class="eas-field-label">Cliente</span>
+        <select class="eas-select" [(ngModel)]="form.clientId">
+          <option value="">Selecciona…</option>
+          @for (c of clients(); track c.id) {
+            <option [value]="c.id">{{ c.name }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        <span class="eas-field-label">Título</span>
+        <input class="eas-input eas-input--plain" [(ngModel)]="form.title" placeholder="Avistamiento VIP 4 pax" />
+      </label>
+      <label>
+        <span class="eas-field-label">Monto (COP)</span>
+        <input class="eas-input eas-input--plain" type="number" [(ngModel)]="form.amount" />
+      </label>
+      <label>
+        <span class="eas-field-label">Válida hasta</span>
+        <input class="eas-input eas-input--plain" type="date" [(ngModel)]="form.validUntil" />
+      </label>
+      <label class="full">
+        <span class="eas-field-label">Descripción</span>
+        <textarea class="eas-input eas-input--plain" rows="3" [(ngModel)]="form.description"></textarea>
+      </label>
+    </div>
+    <div class="commercial-form__actions">
+      <button type="button" class="eas-btn-secondary" (click)="showForm.set(false)">Cancelar</button>
+      <button type="button" class="eas-btn-primary" (click)="create()">Guardar</button>
+    </div>
+  </section>
+}
+
+<section class="eas-card commercial-table">
+  @if (loading()) {
+    <div class="eas-skeleton h-16 w-full"></div>
+  } @else if (items().length === 0) {
+    <eas-empty-state
+      icon="request_quote"
+      title="Sin cotizaciones"
+      description="Crea la primera cotización para comenzar el pipeline comercial."
+    ></eas-empty-state>
+  } @else {
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Cliente</th>
+          <th>Título</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th>Fecha</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (q of items(); track q.id) {
+          <tr>
+            <td><strong>{{ q.code }}</strong></td>
+            <td>{{ q.clientName }}</td>
+            <td>{{ q.title }}</td>
+            <td class="amount-cell">
+              @if (q.amount && q.amount > 0) {
+                <strong>{{ q.amount | currency: q.currency : 'symbol-narrow' : '1.0-0' }}</strong>
+              } @else {
+                <span class="muted">Sin monto en Sheets</span>
+              }
+            </td>
+            <td><span class="pill" [attr.data-quote]="q.status">{{ statusLabel(q.status) }}</span></td>
+            <td>{{ (q.issuedAt || q.createdAt) | date: 'dd/MM/yyyy' }}</td>
+            <td class="commercial-actions">
+              @if (q.status === 'DRAFT') {
+                <button type="button" class="eas-btn-action" (click)="setStatus(q, 'SENT')" title="Marcar como enviada">
+                  <mat-icon>send</mat-icon>
+                  <span>Enviar</span>
+                </button>
+              }
+              @if (q.status === 'SENT' || q.status === 'DRAFT') {
+                <button type="button" class="eas-btn-action" (click)="setStatus(q, 'ACCEPTED')" title="Marcar como aceptada">
+                  <mat-icon>check_circle</mat-icon>
+                  <span>Aceptar</span>
+                </button>
+                <button type="button" class="eas-btn-action is-danger" (click)="setStatus(q, 'REJECTED')" title="Rechazar">
+                  <mat-icon>cancel</mat-icon>
+                  <span>Rechazar</span>
+                </button>
+              }
+              <button type="button" class="eas-btn-action" (click)="clone(q)" title="Clonar">
+                <mat-icon>content_copy</mat-icon>
+                <span>Clonar</span>
+              </button>
+              <button type="button" class="eas-btn-action" (click)="extend(q)" title="Extender validez +15 días">
+                <mat-icon>event_repeat</mat-icon>
+                <span>Extender</span>
+              </button>
+              @if (q.status === 'ACCEPTED' || q.status === 'SENT') {
+                <button type="button" class="eas-btn-action" (click)="convertToReservation(q)" title="Convertir a reserva">
+                  <mat-icon>event_available</mat-icon>
+                  <span>Reservar</span>
+                </button>
+              }
+              <button type="button" class="eas-btn-action is-danger" (click)="remove(q.id)" title="Eliminar cotización">
+                <mat-icon>delete</mat-icon>
+                <span>Eliminar</span>
+              </button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

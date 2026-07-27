@@ -1,0 +1,1 @@
+Genera README-ENDPOINTS.md con todos los endpoints organizados por módulo. Incluye método, ruta, descripción, roles, request, response y errores comunes.

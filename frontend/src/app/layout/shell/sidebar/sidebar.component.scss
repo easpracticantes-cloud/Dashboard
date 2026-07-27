@@ -1,0 +1,194 @@
+.sb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: var(--eas-sidebar-ink);
+  background:
+    radial-gradient(ellipse 90% 50% at 0% -10%, rgba(228, 160, 26, 0.18), transparent 55%),
+    radial-gradient(ellipse 70% 40% at 100% 100%, rgba(61, 154, 106, 0.22), transparent 50%),
+    var(--eas-sidebar-bg);
+  border-right: 1px solid var(--eas-sidebar-line);
+  overflow: hidden;
+}
+
+.sb::after {
+  content: '';
+  position: absolute;
+  right: -18%;
+  bottom: 8%;
+  width: 180px;
+  height: 180px;
+  background: url('/assets/brand/mark-bird.svg') center / contain no-repeat;
+  opacity: 0.07;
+  pointer-events: none;
+  filter: invert(1);
+}
+
+.sb__brand {
+  display: flex;
+  align-items: center;
+  padding: 1.25rem 1rem 1.1rem;
+  border-bottom: 1px solid var(--eas-sidebar-line);
+}
+
+.sb__brand .brand-lockup {
+  width: 100%;
+}
+
+.sb__section {
+  margin: 1.15rem 1.15rem 0.55rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--eas-sidebar-muted);
+}
+
+.sb__nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0.7rem 1rem;
+  display: grid;
+  gap: 0.32rem;
+  align-content: start;
+}
+
+.sb__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.78rem 0.9rem;
+  border-radius: 12px;
+  color: var(--eas-sidebar-muted);
+  font-size: 0.84rem;
+  font-weight: 550;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sb__link mat-icon {
+  font-size: 20px !important;
+  width: 20px !important;
+  height: 20px !important;
+  opacity: 0.85;
+  color: inherit;
+}
+
+.sb__link:hover {
+  background: var(--eas-sidebar-hover);
+  color: var(--eas-sidebar-ink);
+}
+
+.sb__link:hover mat-icon {
+  opacity: 1;
+  color: #f0bc48;
+}
+
+.sb__link.is-active {
+  background: var(--eas-sidebar-active);
+  color: #fff;
+  font-weight: 700;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    0 10px 22px rgba(0, 0, 0, 0.22);
+}
+
+.sb__link.is-active mat-icon {
+  opacity: 1;
+  color: #f0bc48;
+}
+
+.sb__active-bar {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 24px;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, #f0bc48, #5ec993);
+  box-shadow: 0 0 14px rgba(240, 188, 72, 0.55);
+}
+
+.sb__badge {
+  margin-left: auto;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #1a1408;
+  background: #f0bc48;
+  border: none;
+}
+
+.sb__footer {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.55rem 0.75rem 1.05rem;
+  padding: 0.65rem;
+  border-radius: 14px;
+  border: 1px solid var(--eas-sidebar-line);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.sb__user {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sb__user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.sb__user-name {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--eas-sidebar-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sb__user-role {
+  font-size: 0.625rem;
+  color: var(--eas-sidebar-muted);
+}
+
+.sb__logout {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--eas-sidebar-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sb__logout:hover {
+  background: rgba(240, 149, 140, 0.18);
+  color: #f0958c;
+}
+
+.sb__logout mat-icon {
+  font-size: 18px !important;
+  width: 18px !important;
+  height: 18px !important;
+}

@@ -1,0 +1,15 @@
+.env
+.idea/
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+*.log
+*.tmp
+Thumbs.db
+desktop.ini
+
+# Build artifacts and local patching workdirs
+BOOT-INF/
+tmp_*/
+tmp_running_backend*.jar

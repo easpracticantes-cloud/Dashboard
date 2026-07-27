@@ -1,0 +1,202 @@
+{
+  "info": {
+    "name": "Inventario Pollos API",
+    "_postman_id": "f8f86f11-6df5-4f07-a8a8-442f769c43dc",
+    "description": "Coleccion actualizada segun endpoints reales del backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.environment.set('jwt', data.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh (no implementado)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }],
+            "url": { "raw": "{{baseUrl}}/api/auth/refresh", "host": ["{{baseUrl}}"], "path": ["api", "auth", "refresh"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Console",
+      "item": [
+        { "name": "Resumen comercio", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/admin/resumen-comercio", "host": ["{{baseUrl}}"], "path": ["api", "admin", "resumen-comercio"] } } },
+        { "name": "Usuarios sistema", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/admin/usuarios-sistema", "host": ["{{baseUrl}}"], "path": ["api", "admin", "usuarios-sistema"] } } },
+        {
+          "name": "Activar/Desactivar usuario",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"activo\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/api/admin/usuarios-sistema/{{idUsuarioSistema}}/activo", "host": ["{{baseUrl}}"], "path": ["api", "admin", "usuarios-sistema", "{{idUsuarioSistema}}", "activo"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Catalogos Basicos",
+      "item": [
+        { "name": "Categorias", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/categorias", "host": ["{{baseUrl}}"], "path": ["api", "categorias"] } } },
+        { "name": "Productos", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/productos", "host": ["{{baseUrl}}"], "path": ["api", "productos"] } } },
+        { "name": "Bodegas", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/bodegas", "host": ["{{baseUrl}}"], "path": ["api", "bodegas"] } } },
+        { "name": "Terceros Proveedores", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/terceros?tipo=proveedor", "host": ["{{baseUrl}}"], "path": ["api", "terceros"], "query": [{ "key": "tipo", "value": "proveedor" }] } } },
+        { "name": "Health Functional", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/health-functional", "host": ["{{baseUrl}}"], "path": ["api", "health-functional"] } } },
+        { "name": "Stock Disponible", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/inventario/stock", "host": ["{{baseUrl}}"], "path": ["api", "inventario", "stock"] } } }
+      ]
+    },
+    {
+      "name": "Catalogos Gestionables",
+      "item": [
+        { "name": "GET Categorias", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/catalogos/categorias", "host": ["{{baseUrl}}"], "path": ["api", "catalogos", "categorias"] } } },
+        { "name": "POST Categoria", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"idCategoriaPadre\": null,\n  \"codigo\": \"CAT-DEMO\",\n  \"nombre\": \"Categoria demo\",\n  \"descripcion\": \"Alta manual\",\n  \"activo\": true\n}" }, "url": { "raw": "{{baseUrl}}/api/catalogos/categorias", "host": ["{{baseUrl}}"], "path": ["api", "catalogos", "categorias"] } } },
+        { "name": "GET Productos", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/catalogos/productos", "host": ["{{baseUrl}}"], "path": ["api", "catalogos", "productos"] } } },
+        { "name": "PATCH Precio Catalogo", "request": { "method": "PATCH", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"precioCatalogoCentavos\": 2500000\n}" }, "url": { "raw": "{{baseUrl}}/api/catalogos/productos/{{idProducto}}/precio-catalogo", "host": ["{{baseUrl}}"], "path": ["api", "catalogos", "productos", "{{idProducto}}", "precio-catalogo"] } } },
+        { "name": "GET Bodegas", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/catalogos/bodegas", "host": ["{{baseUrl}}"], "path": ["api", "catalogos", "bodegas"] } } },
+        { "name": "GET Ubicaciones", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/catalogos/ubicaciones", "host": ["{{baseUrl}}"], "path": ["api", "catalogos", "ubicaciones"] } } },
+        { "name": "GET Presentaciones", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/catalogos/presentaciones", "host": ["{{baseUrl}}"], "path": ["api", "catalogos", "presentaciones"] } } },
+        { "name": "GET Unidades Medida", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/catalogos/unidades-medida", "host": ["{{baseUrl}}"], "path": ["api", "catalogos", "unidades-medida"] } } },
+        { "name": "GET Usuarios portal", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/catalogos/usuarios-portal", "host": ["{{baseUrl}}"], "path": ["api", "catalogos", "usuarios-portal"] } } }
+      ]
+    },
+    {
+      "name": "Compras",
+      "item": [
+        { "name": "GET Solicitudes", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/compras/solicitudes", "host": ["{{baseUrl}}"], "path": ["api", "compras", "solicitudes"] } } },
+        { "name": "POST Solicitud", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"idBodega\": \"{{idBodega}}\",\n  \"prioridad\": \"MEDIA\",\n  \"motivo\": \"Reposicion\",\n  \"observaciones\": \"Solicitud demo\",\n  \"detalle\": [\n    { \"idProducto\": \"{{idProducto}}\", \"cantidadSolicitada\": 10, \"justificacion\": \"Stock bajo\" }\n  ]\n}" }, "url": { "raw": "{{baseUrl}}/api/compras/solicitudes", "host": ["{{baseUrl}}"], "path": ["api", "compras", "solicitudes"] } } },
+        { "name": "GET Ordenes", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/compras/ordenes", "host": ["{{baseUrl}}"], "path": ["api", "compras", "ordenes"] } } },
+        { "name": "POST Orden", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"idProveedor\": \"{{idProveedor}}\",\n  \"idBodegaDestino\": \"{{idBodega}}\",\n  \"idSolicitudCompra\": null,\n  \"observaciones\": \"Orden demo\",\n  \"detalle\": [\n    { \"idProducto\": \"{{idProducto}}\", \"idPresentacion\": null, \"cantidadPedida\": 8, \"costoUnitario\": 12000 }\n  ]\n}" }, "url": { "raw": "{{baseUrl}}/api/compras/ordenes", "host": ["{{baseUrl}}"], "path": ["api", "compras", "ordenes"] } } }
+      ]
+    },
+    {
+      "name": "Recepciones",
+      "item": [
+        { "name": "GET Recepciones", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/recepciones", "host": ["{{baseUrl}}"], "path": ["api", "recepciones"] } } }
+      ]
+    },
+    {
+      "name": "Operaciones",
+      "item": [
+        { "name": "GET Salidas", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/salidas", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "salidas"] } } },
+        { "name": "GET Pedidos web", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/pedidos-web", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "pedidos-web"] } } },
+        { "name": "POST Anular pedido web", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/pedidos-web/{{idSalida}}/anular", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "pedidos-web", "{{idSalida}}", "anular"] } } },
+        { "name": "GET Ajustes", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/ajustes", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "ajustes"] } } },
+        { "name": "GET Bloqueos", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/bloqueos", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "bloqueos"] } } },
+        { "name": "GET Cuarentenas", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/cuarentenas", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "cuarentenas"] } } },
+        { "name": "GET Recalls", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/recalls", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "recalls"] } } },
+        { "name": "GET Conteos", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/conteos", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "conteos"] } } },
+        { "name": "GET Aprobaciones", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/aprobaciones", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "aprobaciones"] } } },
+        { "name": "GET Reservas", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/reservas", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "reservas"] } } },
+        { "name": "GET Traslados", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/traslados", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "traslados"] } } },
+        { "name": "GET Devoluciones proveedor", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/devoluciones-proveedor", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "devoluciones-proveedor"] } } },
+        { "name": "GET Devoluciones cliente", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/operaciones/devoluciones-cliente", "host": ["{{baseUrl}}"], "path": ["api", "operaciones", "devoluciones-cliente"] } } }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        { "name": "Resumen", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/dashboard/resumen", "host": ["{{baseUrl}}"], "path": ["api", "dashboard", "resumen"] } } },
+        { "name": "Stock por bodega", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/dashboard/stock-por-bodega", "host": ["{{baseUrl}}"], "path": ["api", "dashboard", "stock-por-bodega"] } } },
+        { "name": "Vencimientos", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/dashboard/vencimientos", "host": ["{{baseUrl}}"], "path": ["api", "dashboard", "vencimientos"] } } },
+        { "name": "Alertas", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/dashboard/alertas", "host": ["{{baseUrl}}"], "path": ["api", "dashboard", "alertas"] } } },
+        { "name": "IA Reabastecimiento", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/dashboard/ia/reabastecimiento", "host": ["{{baseUrl}}"], "path": ["api", "dashboard", "ia", "reabastecimiento"] } } },
+        { "name": "IA Anomalias", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/dashboard/ia/anomalias", "host": ["{{baseUrl}}"], "path": ["api", "dashboard", "ia", "anomalias"] } } }
+      ]
+    },
+    {
+      "name": "Reportes",
+      "item": [
+        { "name": "Kardex", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/kardex", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "kardex"] } } },
+        { "name": "Traslados", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/traslados", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "traslados"] } } },
+        { "name": "Reservas", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/reservas", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "reservas"] } } },
+        { "name": "Conteos", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/conteos", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "conteos"] } } },
+        { "name": "Recalls", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/recalls", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "recalls"] } } },
+        { "name": "Temperaturas", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/temperaturas", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "temperaturas"] } } },
+        { "name": "Documentos", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/documentos", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "documentos"] } } },
+        { "name": "Registros sanitarios", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/registros-sanitarios", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "registros-sanitarios"] } } },
+        { "name": "Rotulado", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/rotulado", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "rotulado"] } } },
+        { "name": "Integraciones", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{jwt}}" }], "url": { "raw": "{{baseUrl}}/api/reportes/integraciones", "host": ["{{baseUrl}}"], "path": ["api", "reportes", "integraciones"] } } }
+      ]
+    },
+    {
+      "name": "Publico - Catalogo",
+      "item": [
+        { "name": "Resumen", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/public/resumen", "host": ["{{baseUrl}}"], "path": ["api", "public", "resumen"] } } },
+        { "name": "Categorias", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/public/categorias", "host": ["{{baseUrl}}"], "path": ["api", "public", "categorias"] } } },
+        { "name": "Productos destacados", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/public/productos-destacados", "host": ["{{baseUrl}}"], "path": ["api", "public", "productos-destacados"] } } },
+        { "name": "Productos paginados", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/public/productos?page=0&size=30", "host": ["{{baseUrl}}"], "path": ["api", "public", "productos"], "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "30" }] } } }
+      ]
+    },
+    {
+      "name": "Publico - Comercio",
+      "item": [
+        {
+          "name": "Registro cliente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Cliente Demo\",\n  \"email\": \"cliente@demo.com\",\n  \"password\": \"demo123\",\n  \"phone\": \"3000000000\",\n  \"city\": \"Bogota\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/public/clientes/register", "host": ["{{baseUrl}}"], "path": ["api", "public", "clientes", "register"] }
+          }
+        },
+        {
+          "name": "Login cliente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"cliente@demo.com\",\n  \"password\": \"demo123\"\n}" },
+            "url": { "raw": "{{baseUrl}}/api/public/clientes/login", "host": ["{{baseUrl}}"], "path": ["api", "public", "clientes", "login"] }
+          }
+        },
+        { "name": "Pedidos por cliente", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/api/public/clientes/{{idCliente}}/pedidos", "host": ["{{baseUrl}}"], "path": ["api", "public", "clientes", "{{idCliente}}", "pedidos"] } } },
+        {
+          "name": "Crear pedido web",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": null,\n  \"buyerName\": \"Cliente Demo\",\n  \"email\": \"cliente@demo.com\",\n  \"phone\": \"3000000000\",\n  \"city\": \"Bogota\",\n  \"paymentMethod\": \"Efectivo\",\n  \"notes\": \"Pedido desde Postman\",\n  \"reference\": \"\",\n  \"items\": [\n    {\n      \"productId\": \"{{idProducto}}\",\n      \"productName\": \"Producto Demo\",\n      \"quantity\": 2,\n      \"unitPrice\": 15000\n    }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/public/pedidos", "host": ["{{baseUrl}}"], "path": ["api", "public", "pedidos"] }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081" },
+    { "key": "jwt", "value": "" },
+    { "key": "idBodega", "value": "" },
+    { "key": "idProducto", "value": "" },
+    { "key": "idProveedor", "value": "" },
+    { "key": "idCliente", "value": "" },
+    { "key": "idSalida", "value": "" },
+    { "key": "idUsuarioSistema", "value": "" }
+  ]
+}

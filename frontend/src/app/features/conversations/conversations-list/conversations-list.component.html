@@ -1,0 +1,235 @@
+<eas-page-header
+  eyebrow="Inbox Sheets"
+  title="Seguimiento"
+  subtitle="Tabla operativa proyectada desde Google Sheets. Busca, filtra y ordena en tiempo real."
+>
+  <button type="button" class="eas-btn-primary" (click)="openCreate()" [disabled]="creating()">
+    <mat-icon>add</mat-icon>
+    {{ creating() ? 'Creando…' : 'Nueva conversación' }}
+  </button>
+</eas-page-header>
+
+<section class="crm-toolbar eas-card">
+  <div class="crm-toolbar__head">
+    <div class="eas-chip-group">
+      @for (tab of statusTabs; track tab.key) {
+        <button type="button" class="eas-chip" [class.is-active]="activeStatus() === tab.key" (click)="setStatusTab(tab.key)">
+          {{ tab.label }}
+        </button>
+      }
+    </div>
+    <button type="button" class="eas-btn-secondary" (click)="clearFilters()">
+      <mat-icon>filter_alt_off</mat-icon>
+      Limpiar filtros
+    </button>
+  </div>
+
+  <div class="crm-smart">
+    @for (tab of smartTabs; track tab.key) {
+      <button type="button" class="crm-smart__btn" [class.is-active]="smartView() === tab.key" (click)="setSmartView(tab.key)">
+        <mat-icon>{{ tab.icon }}</mat-icon>
+        {{ tab.label }}
+      </button>
+    }
+  </div>
+
+  @if (selectedCount() > 0) {
+    <div class="crm-bulk">
+      <strong>{{ selectedCount() }} seleccionadas</strong>
+      <select class="eas-select" [ngModel]="bulkStatus()" (ngModelChange)="bulkStatus.set($event)">
+        <option value="OPEN">Abierta</option>
+        <option value="PENDING">Pendiente</option>
+        <option value="RESOLVED">Resuelta</option>
+        <option value="ARCHIVED">Archivada</option>
+      </select>
+      <button type="button" class="eas-btn-secondary" [disabled]="bulkBusy()" (click)="applyBulkStatus()">Cambiar estado</button>
+      <select class="eas-select" [ngModel]="bulkAssignee()" (ngModelChange)="bulkAssignee.set($event)">
+        <option value="">Asignar a…</option>
+        @for (a of advisors(); track a.id) {
+          <option [value]="a.id">{{ a.fullName }}</option>
+        }
+      </select>
+      <button type="button" class="eas-btn-secondary" [disabled]="bulkBusy() || !bulkAssignee()" (click)="applyBulkAssign()">Asignar</button>
+      <button type="button" class="eas-btn-secondary" [disabled]="bulkBusy()" (click)="markSelectedRead()">Marcar leídas</button>
+      <button type="button" class="eas-btn-secondary" (click)="clearSelection()">Cancelar</button>
+    </div>
+  }
+
+  <div class="crm-toolbar__filters">
+    <label class="crm-filter">
+      <span>Año</span>
+      <select class="eas-select" [ngModel]="filter().year" (ngModelChange)="patchFilter({ year: $event })">
+        <option [ngValue]="null">Todos</option>
+        @for (y of years; track y) {
+          <option [ngValue]="y">{{ y }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="crm-filter">
+      <span>Mes</span>
+      <select class="eas-select" [ngModel]="filter().month" (ngModelChange)="patchFilter({ month: $event })">
+        <option [ngValue]="null">Todos</option>
+        @for (m of months; track m.value) {
+          <option [ngValue]="m.value">{{ m.label }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="crm-filter">
+      <span>Importancia</span>
+      <select class="eas-select" [ngModel]="filter().importance" (ngModelChange)="patchFilter({ importance: $event })">
+        <option [ngValue]="null">Todas</option>
+        @for (opt of importanceOptions; track opt) {
+          <option [ngValue]="opt">{{ opt }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="crm-filter">
+      <span>Categoría</span>
+      <input class="eas-input eas-input--plain" [ngModel]="filter().category" (ngModelChange)="patchFilter({ category: $event })" placeholder="Ej. avistamiento" />
+    </label>
+
+    <label class="crm-filter">
+      <span>Asesor</span>
+      <select class="eas-select" [ngModel]="filter().advisorId" (ngModelChange)="patchFilter({ advisorId: $event })">
+        <option [ngValue]="null">Todos</option>
+        @for (advisor of advisors(); track advisor.id) {
+          <option [ngValue]="advisor.id">{{ advisor.fullName }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="crm-filter">
+      <span>Nombre del cliente</span>
+      <input class="eas-input eas-input--plain" [ngModel]="filter().name" (ngModelChange)="patchFilter({ name: $event })" placeholder="Nombre" />
+    </label>
+
+    <label class="crm-filter">
+      <span>Número</span>
+      <input class="eas-input eas-input--plain" [ngModel]="filter().phone" (ngModelChange)="patchFilter({ phone: $event })" placeholder="WhatsApp" />
+    </label>
+
+    <label class="crm-filter crm-filter--search">
+      <span>Búsqueda libre</span>
+      <input class="eas-input eas-input--plain" [ngModel]="filter().search" (ngModelChange)="patchFilter({ search: $event })" placeholder="Nombre, número, mensaje o nota" />
+    </label>
+  </div>
+</section>
+
+<section class="crm-table eas-card">
+  @if (loading()) {
+    <div class="p-6">
+      <div class="eas-skeleton h-10 w-full mb-3"></div>
+      <div class="eas-skeleton h-10 w-full mb-3"></div>
+      <div class="eas-skeleton h-10 w-full"></div>
+    </div>
+  } @else if (empty()) {
+    <eas-empty-state
+      icon="forum"
+      title="Sin conversaciones"
+      description="Conecta Google Sheets en Configuración, ajusta los filtros o crea la primera conversación."
+    ></eas-empty-state>
+  } @else {
+    <div class="crm-table__scroll">
+      <table mat-table [dataSource]="dataSource" matSort class="crm-mat-table">
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef>
+            <mat-checkbox
+              [checked]="allVisibleSelected()"
+              (change)="toggleAllVisible($event.checked)"
+              (click)="$event.stopPropagation()"
+            ></mat-checkbox>
+          </th>
+          <td mat-cell *matCellDef="let row" (click)="$event.stopPropagation()">
+            <mat-checkbox
+              [checked]="isSelected(row.id)"
+              (change)="toggleRow(row.id, $event.checked)"
+            ></mat-checkbox>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="phone">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Número</th>
+          <td mat-cell *matCellDef="let row">{{ row.clientPhone || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Nombre</th>
+          <td mat-cell *matCellDef="let row"><strong>{{ row.clientName }}</strong></td>
+        </ng-container>
+
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
+          <td mat-cell *matCellDef="let row">{{ row.lastMessageAt | date: 'dd/MM/yyyy' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="time">
+          <th mat-header-cell *matHeaderCellDef>Hora</th>
+          <td mat-cell *matCellDef="let row">{{ row.lastMessageAt | date: 'HH:mm' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="lastMessage">
+          <th mat-header-cell *matHeaderCellDef>Último mensaje</th>
+          <td mat-cell *matCellDef="let row" class="crm-msg">{{ row.lastMessage || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="importance">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Importancia</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="pill" [attr.data-priority]="row.priority">{{ priorityLabel(row.priority) }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
+          <td mat-cell *matCellDef="let row">
+            <span class="pill" [attr.data-status]="row.status">{{ statusLabel(row.status) }}</span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef>Categoría</th>
+          <td mat-cell *matCellDef="let row">{{ row.category || row.tags[0]?.label || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="assignee">
+          <th mat-header-cell *matHeaderCellDef>Asesor</th>
+          <td mat-cell *matCellDef="let row">{{ row.assigneeName || 'Sin asignar' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="notes">
+          <th mat-header-cell *matHeaderCellDef>Observaciones</th>
+          <td mat-cell *matCellDef="let row" class="crm-msg">{{ row.notes || '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Acciones</th>
+          <td mat-cell *matCellDef="let row" class="crm-actions" (click)="$event.stopPropagation()">
+            <button type="button" class="eas-btn-action" title="Ver conversación" (click)="openRow(row)">
+              <mat-icon>visibility</mat-icon>
+              <span>Ver</span>
+            </button>
+            <button type="button" class="eas-btn-action" title="Editar conversación" (click)="openEdit(row, $event)">
+              <mat-icon>edit</mat-icon>
+              <span>Editar</span>
+            </button>
+            <button type="button" class="eas-btn-action" title="Ver historial" (click)="openHistory(row, $event)">
+              <mat-icon>history</mat-icon>
+              <span>Historial</span>
+            </button>
+            <button type="button" class="eas-btn-action is-danger" title="Eliminar conversación" (click)="removeRow(row, $event)">
+              <mat-icon>delete</mat-icon>
+              <span>Eliminar</span>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns" (click)="openRow(row)" class="crm-row"></tr>
+      </table>
+    </div>
+    <mat-paginator [pageSizeOptions]="[10, 25, 50]" [pageSize]="10" showFirstLastButtons></mat-paginator>
+  }
+</section>

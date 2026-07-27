@@ -1,0 +1,317 @@
+:host {
+  display: block;
+}
+
+.cd {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 1100px) {
+  .cd {
+    grid-template-columns: minmax(0, 1.4fr) 320px;
+    align-items: start;
+  }
+}
+
+.cd__back {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--eas-line-soft);
+  background: var(--eas-surface);
+  color: var(--eas-ink);
+  box-shadow: var(--eas-shadow-sm);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.cd__back:hover {
+  transform: translateX(-2px);
+  background: var(--eas-mist);
+}
+
+.cd__main,
+.cd__side {
+  border-radius: 18px;
+}
+
+.cd__ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--eas-tint-leaf-strong);
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cd__ai-btn:hover {
+  background: var(--eas-tint-leaf-strong);
+  box-shadow: var(--eas-shadow-sm);
+}
+
+.cd__ai-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  background: var(--eas-tint-leaf);
+  border: 1px solid var(--eas-tint-leaf-strong);
+}
+
+.cd__ai-banner__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--eas-solid-brand);
+  color: var(--eas-on-solid-brand);
+}
+
+.cd__ai-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cd__ai-banner__q {
+  font-weight: 700;
+  color: var(--eas-ink);
+  font-size: 0.9rem;
+}
+
+.cd__ai-banner__r {
+  font-size: 0.78rem;
+  color: var(--eas-muted);
+  margin-top: 0.1rem;
+}
+
+.cd__ai-banner__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  border: 0;
+  background: var(--eas-brand);
+  color: var(--eas-on-brand);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cd__ai-banner__cta:hover {
+  background: var(--eas-brand-hover);
+}
+
+.cd__sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.cd__sent--pos {
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
+}
+
+.cd__sent--neu {
+  background: var(--eas-tint-neutral);
+  color: var(--eas-on-tint-neutral);
+}
+
+.cd__sent--risk {
+  background: var(--eas-tint-danger);
+  color: var(--eas-on-tint-danger);
+}
+
+.cd__suggest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--eas-tint-leaf-strong);
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.cd__suggest-btn:hover:not(:disabled) {
+  background: var(--eas-tint-leaf-strong);
+}
+
+.cd__suggest-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.cd__mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--eas-tint-leaf-strong);
+  background: var(--eas-surface);
+  color: var(--eas-on-tint-leaf);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cd__mini-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.cd__keypoints {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.cd__keypoints li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--eas-ink);
+}
+
+.cd__keypoints mat-icon {
+  color: var(--eas-on-tint-leaf);
+  flex: none;
+}
+
+.cd__nextstep {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.85rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  background: var(--eas-tint-leaf);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--eas-ink);
+}
+
+.cd__nextstep mat-icon {
+  flex: none;
+  color: var(--eas-on-tint-leaf);
+}
+
+.cd__chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+}
+
+.cd__messages {
+  flex: 1;
+  overflow: auto;
+  padding: 1.1rem;
+  display: grid;
+  gap: 0.75rem;
+  max-height: 52vh;
+  background:
+    radial-gradient(ellipse 60% 40% at 100% 0%, var(--eas-tint-leaf), transparent 50%),
+    var(--eas-surface-sunken);
+}
+
+.cd__bubble {
+  max-width: min(78%, 420px);
+  padding: 0.75rem 0.95rem;
+  border-radius: 16px;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  box-shadow: var(--eas-shadow-sm);
+  animation: eas-rise-in 0.25s ease both;
+}
+
+.cd__bubble--in {
+  background: var(--eas-mist);
+  color: var(--eas-ink);
+  border-bottom-left-radius: 6px;
+  justify-self: start;
+}
+
+.cd__bubble--out {
+  background: var(--eas-solid-brand);
+  color: var(--eas-on-solid-brand);
+  border-bottom-right-radius: 6px;
+  justify-self: end;
+}
+
+.cd__bubble--note {
+  background: var(--eas-tint-neutral);
+  color: var(--eas-muted);
+  justify-self: end;
+  border-bottom-right-radius: 6px;
+}
+
+.cd__composer {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.9rem 1rem;
+  border-top: 1px solid var(--eas-line-soft);
+  background: var(--eas-surface);
+}
+
+.cd__composer textarea {
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.cd__side-section {
+  padding: 1.1rem 1.15rem;
+  border-bottom: 1px solid var(--eas-line-soft);
+}
+
+.cd__side-section:last-child {
+  border-bottom: none;
+}
+
+.cd__side-label {
+  margin: 0 0 0.65rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--eas-muted);
+}
+
+.cd__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.cd__chips button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cd__chips button:hover {
+  transform: translateY(-1px);
+}

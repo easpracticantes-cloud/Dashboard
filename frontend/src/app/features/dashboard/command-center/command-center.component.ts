@@ -1,0 +1,68 @@
+import { Component, computed, inject, signal, ViewEncapsulation, effect } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { forkJoin } from 'rxjs';
+import { BusinessPulse, FunnelMetrics, OpsService } from '../../../core/services/ops.service';
+import { ReservationDto } from '../../../core/services/commercial.service';
+import { LiveSyncService } from '../../../core/services/live-sync.service';
+
+@Component({
+  selector: 'eas-command-center',
+  standalone: true,
+  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, CurrencyPipe, DecimalPipe],
+  templateUrl: './command-center.component.html',
+  styleUrl: './command-center.component.scss',
+  encapsulation: ViewEncapsulation.None
+})
+export class CommandCenterComponent {
+  private readonly ops = inject(OpsService);
+  private readonly liveSync = inject(LiveSyncService);
+
+  readonly loading = signal(true);
+  readonly pulse = signal<BusinessPulse | null>(null);
+  readonly funnel = signal<FunnelMetrics | null>(null);
+  readonly agenda = signal<ReservationDto[]>([]);
+  readonly conversionPct = signal(0);
+  readonly responseLagHours = signal(0);
+
+  readonly funnelSteps = computed(() => {
+    const f = this.funnel();
+    if (!f) {
+      return [];
+    }
+    const max = Math.max(f.quotes, f.reservations, f.sales, 1);
+    return [
+      { key: 'Cotizaciones', value: f.quotes, pct: (f.quotes / max) * 100, route: '/app/quotes' },
+      { key: 'Reservas', value: f.reservations, pct: (f.reservations / max) * 100, route: '/app/reservations' },
+      { key: 'Ventas', value: f.sales, pct: (f.sales / max) * 100, route: '/app/sales' }
+    ];
+  });
+
+  constructor() {
+    effect(() => {
+      this.liveSync.tick();
+      this.reload();
+    });
+  }
+
+  reload(): void {
+    this.loading.set(true);
+    forkJoin({
+      center: this.ops.loadCommandCenter(),
+      conversion: this.ops.getConversionQuoteSale(),
+      lag: this.ops.getResponseLag()
+    }).subscribe({
+      next: ({ center, conversion, lag }) => {
+        this.pulse.set(center.pulse);
+        this.funnel.set(center.funnel);
+        this.agenda.set(center.agenda);
+        this.conversionPct.set(Number(conversion?.ratePct ?? center.funnel?.quoteToSaleRate ?? 0));
+        this.responseLagHours.set(Number(lag?.avgHoursBetweenCreateAndLastMessage ?? 0));
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
+    });
+  }
+}

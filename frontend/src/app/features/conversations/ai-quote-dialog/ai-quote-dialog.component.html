@@ -1,0 +1,94 @@
+<div class="aiq">
+  <div class="aiq__head">
+    <div class="aiq__badge"><mat-icon>auto_awesome</mat-icon> Asistente de cotización</div>
+    <button type="button" class="aiq__x" (click)="close()" aria-label="Cerrar">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  @if (!createdQuote()) {
+    <div class="aiq__body">
+      <div class="aiq__meta">
+        <span class="aiq__pill">Cliente: {{ data.suggestion.clientName }}</span>
+        <span class="aiq__pill aiq__pill--soft">Confianza IA: {{ confidence() }}%</span>
+        <span class="aiq__pill aiq__pill--soft">{{ analyzer() === 'CLAUDE_AI' ? 'Claude AI' : 'Análisis local' }}</span>
+      </div>
+
+      <p class="aiq__reason">{{ data.suggestion.reason }}</p>
+
+      @if (highlights().length) {
+        <ul class="aiq__highlights">
+          @for (h of highlights(); track h) {
+            <li><mat-icon>check_circle</mat-icon>{{ h }}</li>
+          }
+        </ul>
+      }
+
+      <div class="aiq__grid">
+        <label class="aiq__field aiq__field--full">
+          <span>Título</span>
+          <input type="text" [ngModel]="title()" (ngModelChange)="title.set($event)" />
+        </label>
+        <label class="aiq__field">
+          <span>Experiencia</span>
+          <input type="text" [ngModel]="experience()" (ngModelChange)="experience.set($event)" />
+        </label>
+        <label class="aiq__field">
+          <span>Personas</span>
+          <input type="number" min="1" [ngModel]="partySize()" (ngModelChange)="partySize.set($event)" />
+        </label>
+        <label class="aiq__field">
+          <span>Monto ({{ amount() | currency: 'COP':'symbol-narrow':'1.0-0' }})</span>
+          <input type="number" min="0" step="1000" [ngModel]="amount()" (ngModelChange)="amount.set($event)" />
+        </label>
+        <label class="aiq__field">
+          <span>Fecha del servicio</span>
+          <input type="date" [ngModel]="serviceDate()" (ngModelChange)="serviceDate.set($event)" />
+        </label>
+        <label class="aiq__field aiq__field--full">
+          <span>Descripción</span>
+          <textarea rows="5" [ngModel]="description()" (ngModelChange)="description.set($event)"></textarea>
+        </label>
+      </div>
+
+      @if (errorMessage()) {
+        <p class="aiq__error"><mat-icon>error</mat-icon>{{ errorMessage() }}</p>
+      }
+    </div>
+
+    <div class="aiq__foot">
+      <button type="button" class="aiq__btn aiq__btn--ghost" (click)="close()">Cancelar</button>
+      <button type="button" class="aiq__btn aiq__btn--primary" [disabled]="generating()" (click)="generate()">
+        @if (generating()) {
+          <mat-spinner diameter="18" strokeWidth="2"></mat-spinner> Generando…
+        } @else {
+          <mat-icon>bolt</mat-icon> Generar cotización
+        }
+      </button>
+    </div>
+  } @else {
+    <div class="aiq__body aiq__body--done">
+      <div class="aiq__done-icon"><mat-icon>task_alt</mat-icon></div>
+      <h3>Cotización creada</h3>
+      <p class="aiq__done-code">{{ createdQuote()?.code }}</p>
+      <p class="aiq__done-sub">
+        {{ createdQuote()?.title }} · {{ createdQuote()?.amount | currency: 'COP':'symbol-narrow':'1.0-0' }}
+      </p>
+
+      @if (errorMessage()) {
+        <p class="aiq__error"><mat-icon>error</mat-icon>{{ errorMessage() }}</p>
+      }
+    </div>
+
+    <div class="aiq__foot">
+      <button type="button" class="aiq__btn aiq__btn--ghost" (click)="close()">Cerrar</button>
+      <button type="button" class="aiq__btn aiq__btn--primary" [disabled]="downloading()" (click)="downloadPdf()">
+        @if (downloading()) {
+          <mat-spinner diameter="18" strokeWidth="2"></mat-spinner> Descargando…
+        } @else {
+          <mat-icon>picture_as_pdf</mat-icon> Descargar PDF
+        }
+      </button>
+    </div>
+  }
+</div>
