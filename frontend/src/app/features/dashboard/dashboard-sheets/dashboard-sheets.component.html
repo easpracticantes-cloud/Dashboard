@@ -787,7 +787,7 @@
             <div class="sheets-table-wrap sheets-raw-wrap">
               <table class="sheets-plain">
                 <tbody>
-                  @for (row of activeRaw()?.fullData ?? []; track $index) {
+                  @for (row of activeRawRows(); track $index) {
                     <tr>
                       @for (cell of row; track $index) {
                         <td>{{ cell }}</td>

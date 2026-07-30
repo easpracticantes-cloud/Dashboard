@@ -314,6 +314,7 @@ export class DashboardSheetsComponent implements AfterViewInit {
     const name = this.selectedRawSheet();
     return list.find((s) => s.nombre === name) ?? list[0] ?? null;
   });
+  readonly activeRawRows = computed(() => this.activeRaw()?.fullData ?? []);
   readonly countdownLabel = computed(() => {
     const ms = Math.max(0, this.nextRefreshAt() - this.nowTick());
     const m = Math.floor(ms / 60000);

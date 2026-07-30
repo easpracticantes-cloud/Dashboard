@@ -72,8 +72,10 @@ El sistema arranca vacío (sin clientes, conversaciones ni notificaciones). Pued
 
 ## Cómo ejecutar (Docker — recomendado)
 
-> **Importante:** este proyecto **no se despliega en Vercel**. Es un monorepio con
-> Angular + Spring Boot + PostgreSQL. Usa **Docker Compose** (o backend/frontend por separado).
+> **Importante:** el **backend + PostgreSQL** se ejecutan con **Docker Compose**.
+> El **frontend** también puede publicarse en **GitHub Pages** (estático):
+> https://easpracticantes-cloud.github.io/Dashboard/  
+> Guía: [documentos/GITHUB_PAGES.md](./documentos/GITHUB_PAGES.md)
 
 Requisitos: Docker Desktop.
 
@@ -100,6 +102,11 @@ npm start
 ```
 
 Abre http://localhost:5173 (API en `http://localhost:8081/api/v1`).
+
+### Frontend en GitHub Pages
+
+Tras el push a `main`, el workflow publica Angular en la rama `gh-pages`.
+Configura **Settings → Pages → Deploy from a branch → `gh-pages` / (root)**.
 
 ---
 
