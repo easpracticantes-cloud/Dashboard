@@ -9,8 +9,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Hibernate crea CHECK constraints sobre enums que no se actualizan con ddl-auto=update.
- * Este runner elimina esos checks para permitir nuevos roles/modulos.
+ * Compatibilidad con BD legacy: elimina CHECK de enums si existieran
+ * (Flyway actual no los crea; es no-op en deploys nuevos).
  */
 @Slf4j
 @Component
@@ -35,7 +35,7 @@ public class EnumConstraintFixRunner implements ApplicationRunner {
     private void dropIfExists(String table, String constraint) {
         try {
             jdbcTemplate.execute("ALTER TABLE " + table + " DROP CONSTRAINT IF EXISTS " + constraint);
-            log.info("Constraint {} removido de {}", constraint, table);
+            log.debug("Constraint {} removido de {} (si existia)", constraint, table);
         } catch (Exception ex) {
             log.debug("No se pudo remover {}: {}", constraint, ex.getMessage());
         }

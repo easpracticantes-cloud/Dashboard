@@ -1,15 +1,13 @@
 -- =====================================================================
 -- SIG - Sistema Inteligente de Gestion - Escuela Aves Salento
--- Script de inicializacion de base de datos PostgreSQL
--- Esquema: sig
+-- Referencia documental del esquema PostgreSQL (schema: sig)
 -- =====================================================================
--- Este script crea el esquema y las tablas utilizadas por el backend
--- (Spring Boot + JPA/Hibernate, spring.jpa.hibernate.ddl-auto=update).
--- Se ejecuta automaticamente al iniciar el contenedor de PostgreSQL via
--- docker-entrypoint-initdb.d. Los datos de demostracion (roles, usuarios,
--- clientes, conversaciones, etc.) son poblados por la aplicacion en el
--- primer arranque (SeedDataRunner), por lo que este script solo define
--- la estructura.
+-- Fuente de verdad en runtime: migraciones Flyway en
+--   backend/src/main/resources/db/migration/
+-- Este archivo es documentación / referencia. En Docker y Render el
+-- backend aplica Flyway al arrancar sobre una BD vacía (schema, tablas,
+-- índices) y SeedDataRunner inserta roles/admin/settings.
+-- No montar este script en docker-entrypoint-initdb.d.
 -- =====================================================================
 
 CREATE SCHEMA IF NOT EXISTS sig;

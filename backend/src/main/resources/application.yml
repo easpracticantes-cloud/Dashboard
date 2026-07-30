@@ -1,21 +1,32 @@
 server:
-  port: ${BACKEND_PORT:8080}
+  # Render inyecta PORT; localmente se usa BACKEND_PORT o 8080
+  port: ${PORT:${BACKEND_PORT:8080}}
 
 spring:
   application:
     name: sig-backend
   datasource:
+    # Render: DB_URL=jdbc:postgresql://HOST:5432/DB?sslmode=require
     url: ${DB_URL:jdbc:postgresql://localhost:5433/sig_db}
     username: ${DB_USER:sig}
     password: ${DB_PASSWORD:sig}
   jpa:
     hibernate:
-      ddl-auto: ${DDL_AUTO:update}
+      # Flyway es la unica fuente de esquema; nunca update/create
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true
         default_schema: sig
     open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: sig
+    default-schema: sig
+    create-schemas: true
+    baseline-on-migrate: true
+    baseline-version: 0
   sql:
     init:
       mode: never
@@ -38,21 +49,15 @@ app:
   seed:
     enabled: ${SEED_ENABLED:true}
   google:
-    # OAuth 2.0 Client ID (tipo "Aplicación web") de Google Cloud Console.
     client-id: ${GOOGLE_CLIENT_ID:}
-    # Correos y/o dominios autorizados, separados por coma.
-    # Ej: jefa@gmail.com,coordinacion@gmail.com,@escuelaavessalento.com
     allowed-emails: ${GOOGLE_ALLOWED_EMAILS:}
-    # Rol asignado a un usuario nuevo la primera vez que entra por Google.
     default-role: ${GOOGLE_DEFAULT_ROLE:GERENCIA}
   sheets:
     webapp-url: ${GOOGLE_SHEETS_WEBAPP_URL:https://script.google.com/macros/s/AKfycbzMkCg7PfddRA048GAZBc5jz_2lKpmtJg13589XteWmONKBiQBQLKZxw-eBeEwa0uDslw/exec}
     sync-interval-ms: ${SHEETS_SYNC_INTERVAL_MS:300000}
   ai:
     quote:
-      # Precio base por persona (COP) cuando el chat no menciona un monto.
       base-price-per-person: ${AI_QUOTE_BASE_PRICE:75000}
-      # Confianza minima (0-100) para ofrecer generar la cotizacion automaticamente.
       min-confidence: ${AI_QUOTE_MIN_CONFIDENCE:25}
 
 management:
@@ -60,3 +65,12 @@ management:
     web:
       exposure:
         include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true

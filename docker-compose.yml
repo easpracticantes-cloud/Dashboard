@@ -9,8 +9,8 @@ services:
     ports:
       - "${POSTGRES_PORT}:5432"
     volumes:
+      # Flyway (backend) crea schema + tablas al arrancar; no montar SQL aquí.
       - sig_postgres_data:/var/lib/postgresql/data
-      - ./documentos/base_datos_postgresql.sql:/docker-entrypoint-initdb.d/01_base_datos.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -28,7 +28,6 @@ services:
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
       DB_USER: ${POSTGRES_USER}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DDL_AUTO: ${DDL_AUTO:-update}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MINUTES: ${JWT_EXPIRATION_MINUTES}
       JWT_REMEMBER_ME_EXPIRATION_MINUTES: ${JWT_REMEMBER_ME_EXPIRATION_MINUTES:-10080}

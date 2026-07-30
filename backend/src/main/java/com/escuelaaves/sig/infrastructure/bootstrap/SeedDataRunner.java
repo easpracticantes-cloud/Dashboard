@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +31,7 @@ import java.util.Set;
 
 /**
  * Seed minimo: roles, permisos, configuracion base y un unico usuario administrador.
- * Sin clientes, conversaciones, mensajes ni notificaciones de demostracion.
+ * Solo corre con SEED_ENABLED=true y despues de que Flyway haya creado las tablas.
  */
 @Slf4j
 @Component
@@ -41,12 +42,22 @@ public class SeedDataRunner implements ApplicationRunner {
     private static final String SHEETS_WEBAPP_URL =
             "https://script.google.com/macros/s/AKfycbzMkCg7PfddRA048GAZBc5jz_2lKpmtJg13589XteWmONKBiQBQLKZxw-eBeEwa0uDslw/exec";
 
+    private static final String ADMIN_USERNAME = "admin";
+
+    /** Tablas minimas exigidas por el checklist de despliegue. */
+    private static final List<String> REQUIRED_TABLES = List.of(
+            "roles",
+            "users",
+            "system_settings"
+    );
+
     private final RoleJpaRepository roleJpaRepository;
     private final PermissionJpaRepository permissionJpaRepository;
     private final RolePermissionJpaRepository rolePermissionJpaRepository;
     private final UserJpaRepository userJpaRepository;
     private final SystemSettingJpaRepository systemSettingJpaRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
 
     @Value("${app.seed.enabled:true}")
     private boolean seedEnabled;
@@ -55,12 +66,23 @@ public class SeedDataRunner implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         if (!seedEnabled) {
-            log.info("Seed de datos desactivado (app.seed.enabled=false)");
+            log.info("Seed de datos desactivado (SEED_ENABLED=false)");
             return;
         }
-        if (roleJpaRepository.count() > 0) {
-            log.info("Ya existen datos en la base de datos, se omite el seed inicial");
+
+        assertRequiredTablesExist();
+
+        boolean rolesPresent = roleJpaRepository.count() > 0;
+        boolean usersPresent = userJpaRepository.count() > 0;
+        boolean settingsPresent = systemSettingJpaRepository.count() > 0;
+
+        if (rolesPresent || usersPresent || settingsPresent) {
+            log.info(
+                    "Seed inicial omitido (ya hay datos: roles={}, users={}, settings={})",
+                    rolesPresent, usersPresent, settingsPresent
+            );
             ensureSheetSettings();
+            ensureAdminExistsIfRolesReady();
             return;
         }
 
@@ -70,7 +92,51 @@ public class SeedDataRunner implements ApplicationRunner {
         seedAdmin(roles);
         seedSettings();
 
-        log.info("Seed completado: roles listos y usuario admin creado");
+        log.info("Seed completado");
+    }
+
+    private void assertRequiredTablesExist() {
+        for (String table : REQUIRED_TABLES) {
+            if (!tableExists(table)) {
+                throw new IllegalStateException(
+                        "Tabla requerida ausente: sig." + table
+                                + ". Flyway debe crear el schema antes del seed "
+                                + "(spring.flyway.enabled=true, classpath:db/migration)."
+                );
+            }
+        }
+    }
+
+    private boolean tableExists(String table) {
+        Boolean exists = jdbcTemplate.queryForObject(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.tables
+                    WHERE table_schema = 'sig'
+                      AND table_name = ?
+                )
+                """,
+                Boolean.class,
+                table
+        );
+        return Boolean.TRUE.equals(exists);
+    }
+
+    /**
+     * Si hay roles pero falta el admin (seed interrumpido), lo recrea sin duplicar roles.
+     */
+    private void ensureAdminExistsIfRolesReady() {
+        if (userJpaRepository.existsByUsername(ADMIN_USERNAME)) {
+            return;
+        }
+        roleJpaRepository.findAll().stream()
+                .filter(r -> r.getName() == RoleName.ADMINISTRADOR)
+                .findFirst()
+                .ifPresentOrElse(adminRole -> {
+                    seedAdmin(Map.of(RoleName.ADMINISTRADOR, adminRole));
+                    log.info("Usuario admin recreado (faltaba tras seed parcial)");
+                }, () -> log.warn("No hay rol ADMINISTRADOR; no se puede recrear admin"));
     }
 
     private Map<RoleName, RoleEntity> seedRolesAndPermissions() {
@@ -142,13 +208,20 @@ public class SeedDataRunner implements ApplicationRunner {
     }
 
     private void seedAdmin(Map<RoleName, RoleEntity> roles) {
+        if (userJpaRepository.existsByUsername(ADMIN_USERNAME)) {
+            return;
+        }
+        RoleEntity adminRole = roles.get(RoleName.ADMINISTRADOR);
+        if (adminRole == null) {
+            throw new IllegalStateException("Rol ADMINISTRADOR no disponible para seed de admin");
+        }
         userJpaRepository.save(UserEntity.builder()
-                .username("admin")
+                .username(ADMIN_USERNAME)
                 .email("admin@escuelaavessalento.com")
                 .passwordHash(passwordEncoder.encode("Admin123!"))
                 .fullName("Samuel Gomez")
                 .avatarUrl("https://api.dicebear.com/7.x/initials/svg?seed=Samuel+Gomez")
-                .role(roles.get(RoleName.ADMINISTRADOR))
+                .role(adminRole)
                 .active(true)
                 .build());
     }
@@ -180,6 +253,9 @@ public class SeedDataRunner implements ApplicationRunner {
         );
 
         for (SeedSetting setting : settings) {
+            if (systemSettingJpaRepository.findBySettingKey(setting.key()).isPresent()) {
+                continue;
+            }
             systemSettingJpaRepository.save(SystemSettingEntity.builder()
                     .settingKey(setting.key())
                     .settingValue(setting.value())
