@@ -31,8 +31,9 @@ public class IntegrationController {
     }
 
     @PostMapping("/sheets/sync")
-    @Operation(summary = "Sincroniza conversaciones y clientes desde Google Sheets")
+    @Operation(summary = "Sincroniza conversaciones y clientes desde Google Sheets (CRM en background)")
     public ResponseEntity<SheetsSyncResultDto> syncSheets() {
-        return ResponseEntity.ok(sheetsSyncService.syncNow());
+        // Async: Render corta HTTP ~30s; el payload Sheets + ~1000 filas CRM supera ese limite.
+        return ResponseEntity.accepted().body(sheetsSyncService.syncNowAsync());
     }
 }

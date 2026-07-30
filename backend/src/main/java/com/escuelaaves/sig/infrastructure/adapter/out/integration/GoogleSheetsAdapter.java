@@ -82,7 +82,20 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
             }
 
             JsonNode node = objectMapper.readTree(body);
-            log.info("[GoogleSheets] Dashboard payload OK (keys={})", node.fieldNames().hasNext() ? "present" : "empty");
+            int rootKeys = 0;
+            var names = node.fieldNames();
+            while (names.hasNext()) {
+                names.next();
+                rootKeys++;
+            }
+            JsonNode data = node.path("data");
+            int dataKeys = data.isObject() ? data.size() : 0;
+            log.info(
+                    "[GoogleSheets] Dashboard payload OK (rootKeys={}, dataKeys={}, bytes={})",
+                    rootKeys,
+                    dataKeys,
+                    body.length()
+            );
             return Optional.of(node);
         } catch (RestClientException ex) {
             log.error("[GoogleSheets] Error HTTP al llamar Web App: {}", ex.getMessage());

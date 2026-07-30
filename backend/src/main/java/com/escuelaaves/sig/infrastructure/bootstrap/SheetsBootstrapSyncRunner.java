@@ -9,8 +9,8 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
- * Tras el seed, proyecta Google Sheets al CRM para que todos los módulos
- * (clientes, conversaciones, comercial, analytics) tengan datos reales.
+ * Tras el seed, proyecta Google Sheets al CRM en segundo plano
+ * para no bloquear el arranque / health check de Render.
  */
 @Slf4j
 @Component
@@ -23,9 +23,13 @@ public class SheetsBootstrapSyncRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         try {
-            var result = sheetsSyncService.syncNow();
-            log.info("Bootstrap Sheets sync: success={} rows={} clients={} conversations={} msg={}",
-                    result.success(), result.rowsRead(), result.clientsUpserted(), result.conversationsUpserted(), result.message());
+            var result = sheetsSyncService.syncNowAsync();
+            log.info(
+                    "Bootstrap Sheets sync lanzado: success={} rows={} msg={}",
+                    result.success(),
+                    result.rowsRead(),
+                    result.message()
+            );
         } catch (Exception ex) {
             log.warn("Bootstrap Sheets sync omitido/fallido: {}", ex.getMessage());
         }
