@@ -72,6 +72,9 @@ El sistema arranca vacío (sin clientes, conversaciones ni notificaciones). Pued
 
 ## Cómo ejecutar (Docker — recomendado)
 
+> **Importante:** este proyecto **no se despliega en Vercel**. Es un monorepio con
+> Angular + Spring Boot + PostgreSQL. Usa **Docker Compose** (o backend/frontend por separado).
+
 Requisitos: Docker Desktop.
 
 ```bash

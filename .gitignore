@@ -13,3 +13,9 @@ desktop.ini
 BOOT-INF/
 tmp_*/
 tmp_running_backend*.jar
+
+# Vercel / hosting SPA (este proyecto se despliega con Docker Compose, no Vercel)
+.vercel/
+frontend/.vercel/
+vercel.json
+frontend/vercel.json
