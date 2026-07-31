@@ -57,10 +57,11 @@ public class DashboardService implements DashboardUseCase {
     }
 
     public DashboardOverviewDto getOverview(AnalyticsFilter filter) {
+        boolean noFilter = filter == null || filter.isEmpty();
         List<ConversationEntity> filtered = applyFilter(conversationRepositoryPort.findAll(), filter);
         LocalDate today = LocalDate.now(ZONE);
 
-        long total = filtered.size();
+        long total = noFilter ? conversationRepositoryPort.count() : filtered.size();
         long todayCount = filtered.stream().filter(c -> sameDay(resolveInstant(c), today)).count();
         long pending = filtered.stream()
                 .filter(c -> c.getStatus() == ConversationStatus.PENDING || c.getStatus() == ConversationStatus.OPEN)

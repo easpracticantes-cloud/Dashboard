@@ -15,6 +15,7 @@ import com.escuelaaves.sig.application.dto.dashboard.sheets.SheetsMetaDto;
 import com.escuelaaves.sig.application.dto.dashboard.sheets.ToqueDto;
 import com.escuelaaves.sig.application.dto.dashboard.sheets.VentaDto;
 import com.fasterxml.jackson.databind.JsonNode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -41,6 +42,7 @@ import java.util.regex.Pattern;
  * Formato: {@code data[hoja] = { rawRowCount, firstFewRows, fullData }}.
  * También soporta el formato tipado legacy ({@code seguimientoWhatsapp}, etc.).
  */
+@Slf4j
 @Component
 public class SheetsPayloadMapper {
 
@@ -67,8 +69,10 @@ public class SheetsPayloadMapper {
         List<RawSheetDto> rawSheets = collectRawSheets(data, hojasProcesadas);
 
         List<SeguimientoWhatsappDto> seguimiento = new ArrayList<>();
-        seguimiento.addAll(collectSeguimientoFromTyped(data));
-        seguimiento.addAll(collectSeguimientoFromMatrices(rawSheets));
+        List<SeguimientoWhatsappDto> fromTyped = collectSeguimientoFromTyped(data);
+        List<SeguimientoWhatsappDto> fromMatrices = collectSeguimientoFromMatrices(rawSheets);
+        seguimiento.addAll(fromTyped);
+        seguimiento.addAll(fromMatrices);
 
         RawSheetDto ventasSheet = findRaw(rawSheets, "VENTAS");
         List<VentaDto> ventas = parseVentas(ventasSheet);
@@ -78,6 +82,18 @@ public class SheetsPayloadMapper {
         for (VentaDto venta : ventas) {
             seguimiento.add(ventaToSeguimiento(venta));
         }
+
+        int beforeDedupe = seguimiento.size();
+        seguimiento = dedupeSeguimiento(seguimiento);
+        log.info(
+                "[SHEETS-MAP] typed={} matrices={} ventas={} antesDedupe={} despuesDedupe={} hojasRaw={}",
+                fromTyped.size(),
+                fromMatrices.size(),
+                ventas.size(),
+                beforeDedupe,
+                seguimiento.size(),
+                rawSheets.size()
+        );
 
         List<NamedCountDto> porSemaforo = aggregate(seguimiento, SeguimientoWhatsappDto::semaforo);
         List<NamedCountDto> porCanal = aggregate(seguimiento, SeguimientoWhatsappDto::canal);
@@ -265,7 +281,9 @@ public class SheetsPayloadMapper {
     }
 
     private RawSheetDto toRawSheet(String nombre, JsonNode node) {
-        List<List<Object>> full = matrix(node.has("fullData") ? node.get("fullData") : node.path("firstFewRows"));
+        boolean hasFull = node.has("fullData") && node.get("fullData").isArray();
+        boolean hasPreview = node.has("firstFewRows") && node.get("firstFewRows").isArray();
+        List<List<Object>> full = matrix(hasFull ? node.get("fullData") : node.path("firstFewRows"));
         long rawCount = node.path("rawRowCount").asLong(0);
         if (rawCount <= 0) {
             rawCount = node.path("rowCount").asLong(full.size());
@@ -273,7 +291,58 @@ public class SheetsPayloadMapper {
         if (rawCount <= 0) {
             rawCount = full.size();
         }
+        if (!hasFull && hasPreview) {
+            log.warn(
+                    "[SHEETS-MAP] Hoja '{}' SIN fullData: usando firstFewRows={} (rawRowCount={}). "
+                            + "Posible truncado del Web App / timeout Apps Script.",
+                    nombre,
+                    full.size(),
+                    rawCount
+            );
+        } else if (hasFull && rawCount > full.size() + 5) {
+            log.warn(
+                    "[SHEETS-MAP] Hoja '{}': rawRowCount={} > fullData.size={} — faltan filas en el payload.",
+                    nombre,
+                    rawCount,
+                    full.size()
+            );
+        } else {
+            log.info("[SHEETS-MAP] Hoja '{}': filasLeidas={} rawRowCount={} fullData={}",
+                    nombre, full.size(), rawCount, hasFull);
+        }
         return new RawSheetDto(nombre, rawCount, full);
+    }
+
+    /**
+     * Elimina duplicados tipado+matriz (misma identidad de chat).
+     * Conserva la primera aparición (matrices suelen ir después y sobrescriben si usamos LinkedHashMap put).
+     * Preferimos la última (matrices) porque suelen traer más columnas.
+     */
+    private List<SeguimientoWhatsappDto> dedupeSeguimiento(List<SeguimientoWhatsappDto> rows) {
+        Map<String, SeguimientoWhatsappDto> unique = new LinkedHashMap<>();
+        for (SeguimientoWhatsappDto row : rows) {
+            if (row == null) {
+                continue;
+            }
+            unique.put(seguimientoIdentity(row), row);
+        }
+        return new ArrayList<>(unique.values());
+    }
+
+    private static String seguimientoIdentity(SeguimientoWhatsappDto row) {
+        return String.join("|",
+                normId(row.celular()),
+                normId(row.fecha()),
+                normId(row.solicitud()),
+                normId(row.canal()),
+                normId(row.hojaOrigen()),
+                normId(row.respuesta()),
+                normId(row.registrado())
+        );
+    }
+
+    private static String normId(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private List<List<Object>> matrix(JsonNode array) {

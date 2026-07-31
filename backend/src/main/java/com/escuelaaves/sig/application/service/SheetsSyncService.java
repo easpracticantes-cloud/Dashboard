@@ -78,8 +78,8 @@ public class SheetsSyncService {
             "https://script.google.com/macros/s/AKfycbzMkCg7PfddRA048GAZBc5jz_2lKpmtJg13589XteWmONKBiQBQLKZxw-eBeEwa0uDslw/exec";
     private static final int MAX_HOT_NOTIFICATIONS = 20;
     private static final int MAX_QUOTE_SUGGESTIONS = 15;
-    /** Lotes pequenos: en Render un unico TX de ~1000 filas suele superar el timeout HTTP (~30s). */
-    private static final int CRM_BATCH_SIZE = 40;
+    /** Lotes CRM: balance entre velocidad y presión de memoria/TX en Render. */
+    private static final int CRM_BATCH_SIZE = 80;
 
     private final GoogleSheetsPort googleSheetsPort;
     private final SystemSettingRepositoryPort systemSettingRepositoryPort;
@@ -131,10 +131,43 @@ public class SheetsSyncService {
         this.sheetsSyncExecutor = sheetsSyncExecutor;
     }
 
+    /**
+     * Endpoint de dashboard: sirve ÚNICAMENTE la última proyección en caché (PostgreSQL/sync).
+     * Nunca consulta Google Sheets en el request HTTP.
+     * {@code refresh=true} dispara sincronización en background.
+     */
     public SheetsDashboardDto getDashboardSheets(boolean forceRefresh) {
-        SheetsDashboardDto dto = loadAndCache(forceRefresh);
-        maybeHealEmptyCrm(dto);
-        return dto;
+        if (forceRefresh) {
+            log.info("[SHEETS-SYNC] Dashboard pidió refresh → sync async (sin bloquear HTTP)");
+            sheetsSyncExecutor.execute(() -> {
+                try {
+                    syncNow();
+                } catch (Exception ex) {
+                    log.warn("[SHEETS-SYNC] Refresh async falló: {}", ex.getMessage());
+                }
+            });
+        }
+
+        CacheEntry cached = dashboardCache.get();
+        if (cached != null) {
+            maybeHealLaggingCrm(cached.dto());
+            return sheetsPayloadMapper.withCacheFlag(cached.dto(), true);
+        }
+
+        // Sin caché aún: no llamar a Sheets desde el request; el bootstrap/cron lo llenará.
+        log.info("[SHEETS-SYNC] Dashboard sin caché → disparando syncNowAsync()");
+        sheetsSyncExecutor.execute(() -> {
+            try {
+                syncNow();
+            } catch (Exception ex) {
+                log.warn("[SHEETS-SYNC] Carga inicial async falló: {}", ex.getMessage());
+            }
+        });
+
+        return sheetsPayloadMapper.empty(
+                false,
+                "Sincronizacion Sheets en curso. El panel se actualizara automaticamente al finalizar."
+        );
     }
 
     /**
@@ -180,12 +213,18 @@ public class SheetsSyncService {
         }
 
         SheetsDashboardDto mapped = sheetsPayloadMapper.map(raw.get(), Instant.now(), false);
+        long rawDeclared = mapped.rawSheets() == null ? 0
+                : mapped.rawSheets().stream().mapToLong(s -> s.rawRowCount()).sum();
+        long rawMatrix = mapped.rawSheets() == null ? 0
+                : mapped.rawSheets().stream().mapToLong(s -> s.fullData() != null ? s.fullData().size() : 0).sum();
         log.info(
-                "Sheets mapped: seguimiento={} ventas={} toques={} hojas={} success={}",
+                "[SHEETS-SYNC] Mapped: seguimiento={} ventas={} toques={} hojas={} rawRowCountSum={} matrixRowsSum={} success={}",
                 mapped.seguimientoWhatsapp().size(),
                 mapped.ventas() != null ? mapped.ventas().size() : 0,
                 mapped.toques() != null ? mapped.toques().size() : 0,
                 mapped.meta() != null ? mapped.meta().totalHojas() : 0,
+                rawDeclared,
+                rawMatrix,
                 mapped.success()
         );
         dashboardCache.set(new CacheEntry(mapped, Instant.now()));
@@ -277,30 +316,43 @@ public class SheetsSyncService {
     }
 
     /**
-     * Si Sheets tiene filas pero PostgreSQL esta vacio (fallo previo / timeout Render),
-     * dispara proyeccion CRM en background.
+     * Si Sheets tiene filas en caché pero PostgreSQL está vacío o claramente atrasado,
+     * dispara proyección CRM en background.
      */
     private void maybeHealEmptyCrm(SheetsDashboardDto dto) {
+        maybeHealLaggingCrm(dto);
+    }
+
+    private void maybeHealLaggingCrm(SheetsDashboardDto dto) {
         if (dto == null || dto.seguimientoWhatsapp() == null || dto.seguimientoWhatsapp().isEmpty()) {
             return;
         }
-        if (clientRepositoryPort.count() > 0) {
+        long sheetRows = dto.seguimientoWhatsapp().size();
+        long dbConversations = conversationRepositoryPort.count();
+        long dbClients = clientRepositoryPort.count();
+        boolean empty = dbClients == 0;
+        // Si hay mucho menos en DB que en Sheets (p.ej. sync cortada en Render), reintentar.
+        boolean lagging = sheetRows >= 50 && dbConversations < Math.max(40, (long) (sheetRows * 0.55));
+        if (!empty && !lagging) {
             return;
         }
         if (!syncRunning.compareAndSet(false, true)) {
             return;
         }
-        log.warn("CRM vacio con {} filas Sheets en cache; iniciando heal async", dto.seguimientoWhatsapp().size());
+        log.warn(
+                "[SHEETS-SYNC] Heal CRM: sheetRows={} dbClients={} dbConversations={} empty={} lagging={}",
+                sheetRows, dbClients, dbConversations, empty, lagging
+        );
         sheetsSyncExecutor.execute(() -> {
             try {
                 persistCrmBatched(dto);
                 log.info(
-                        "Sheets heal CRM OK: clientes={}, conversaciones={}",
+                        "[SHEETS-SYNC] Heal CRM OK: clientes={}, conversaciones={}",
                         clientRepositoryPort.count(),
                         conversationRepositoryPort.count()
                 );
             } catch (Exception ex) {
-                log.warn("Sheets heal CRM fallo: {}", ex.getMessage());
+                log.warn("[SHEETS-SYNC] Heal CRM fallo: {}", ex.getMessage());
             } finally {
                 syncRunning.set(false);
             }
@@ -327,25 +379,52 @@ public class SheetsSyncService {
         UserEntity admin = userRepositoryPort.findByUsername("admin").orElse(null);
         AtomicInteger hotNotified = new AtomicInteger();
         AtomicInteger quoteAsks = new AtomicInteger();
+        AtomicInteger skippedNoPhone = new AtomicInteger();
+        AtomicInteger errors = new AtomicInteger();
+        long t0 = System.nanoTime();
+
+        log.info("[SHEETS-SYNC] ========== SHEETS SYNC CRM BEGIN ==========");
+        log.info("[SHEETS-SYNC] Filas seguimiento a persistir: {}", rows.size());
+        if (dashboard.rawSheets() != null) {
+            for (var sheet : dashboard.rawSheets()) {
+                int matrixRows = sheet.fullData() != null ? sheet.fullData().size() : 0;
+                log.info(
+                        "[SHEETS-SYNC] Hoja '{}' rawRowCount={} matrixRows={}",
+                        sheet.nombre(),
+                        sheet.rawRowCount(),
+                        matrixRows
+                );
+            }
+        }
 
         for (int from = 0; from < rows.size(); from += CRM_BATCH_SIZE) {
             int to = Math.min(from + CRM_BATCH_SIZE, rows.size());
             List<SeguimientoWhatsappDto> batch = List.copyOf(rows.subList(from, to));
+            long batchStart = System.nanoTime();
             try {
                 transactionTemplate.executeWithoutResult(status ->
-                        persistSeguimientoBatch(batch, counters, admin, hotNotified, quoteAsks)
+                        persistSeguimientoBatch(batch, counters, admin, hotNotified, quoteAsks, skippedNoPhone)
+                );
+                log.info(
+                        "[SHEETS-SYNC] Batch {}-{} OK ({} filas, {} ms)",
+                        from,
+                        to,
+                        batch.size(),
+                        (System.nanoTime() - batchStart) / 1_000_000
                 );
             } catch (Exception batchEx) {
-                log.warn("Sheets CRM batch {}-{} fallo (reintento fila a fila): {}", from, to, batchEx.getMessage());
+                log.warn("[SHEETS-SYNC] Batch {}-{} fallo (reintento fila a fila): {}", from, to, batchEx.getMessage());
                 for (SeguimientoWhatsappDto row : batch) {
                     try {
                         transactionTemplate.executeWithoutResult(status ->
-                                persistSeguimientoBatch(List.of(row), counters, admin, hotNotified, quoteAsks)
+                                persistSeguimientoBatch(List.of(row), counters, admin, hotNotified, quoteAsks, skippedNoPhone)
                         );
                     } catch (Exception rowEx) {
+                        errors.incrementAndGet();
                         log.warn(
-                                "Sheets fila omitida celular={}: {}",
+                                "[SHEETS-SYNC] Fila omitida celular={} hoja={}: {}",
                                 row.celular(),
+                                row.hojaOrigen(),
                                 rowEx.getMessage()
                         );
                     }
@@ -362,8 +441,23 @@ public class SheetsSyncService {
                 }
             });
         } catch (Exception ex) {
-            log.warn("Sheets post-CRM (toques/prune/notificacion) fallo: {}", ex.getMessage());
+            log.warn("[SHEETS-SYNC] post-CRM (toques/prune/notificacion) fallo: {}", ex.getMessage());
         }
+
+        long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
+        long clientsDb = clientRepositoryPort.count();
+        long conversationsDb = conversationRepositoryPort.count();
+        int sheetsProcessed = dashboard.rawSheets() != null ? dashboard.rawSheets().size() : 0;
+        log.info("[SHEETS-SYNC] ========== SHEETS SYNC ==========");
+        log.info("[SHEETS-SYNC] Sheets procesadas: {}", sheetsProcessed);
+        log.info("[SHEETS-SYNC] Filas leídas (seguimiento): {}", rows.size());
+        log.info("[SHEETS-SYNC] Insertadas/actualizadas (conteo upsert ops): clientes≈{} conversaciones≈{} cotizaciones≈{} ventas≈{}",
+                counters.clients, counters.conversations, counters.quotes, counters.sales);
+        log.info("[SHEETS-SYNC] Filas sin celular (persistidas con teléfono sintético): {}", skippedNoPhone.get());
+        log.info("[SHEETS-SYNC] Errores de fila: {}", errors.get());
+        log.info("[SHEETS-SYNC] Totales PostgreSQL: clientes={} conversaciones={}", clientsDb, conversationsDb);
+        log.info("[SHEETS-SYNC] Tiempo total: {} ms ({} s)", elapsedMs, String.format(Locale.ROOT, "%.1f", elapsedMs / 1000.0));
+        log.info("[SHEETS-SYNC] =================================");
     }
 
     private void persistSeguimientoBatch(
@@ -371,14 +465,17 @@ public class SheetsSyncService {
             SyncCounters counters,
             UserEntity admin,
             AtomicInteger hotNotified,
-            AtomicInteger quoteAsks
+            AtomicInteger quoteAsks,
+            AtomicInteger skippedNoPhone
     ) {
         for (SeguimientoWhatsappDto row : rows) {
-            if (row.celular() == null || row.celular().isBlank()) {
-                continue;
+            String phone = resolvePersistPhone(row);
+            if (phone.startsWith("sintel-")) {
+                // Contabilizar; aún así se persiste con teléfono sintético para no perder el chat.
+                skippedNoPhone.incrementAndGet();
             }
 
-            ClientEntity client = upsertClient(row);
+            ClientEntity client = upsertClient(row, phone);
             counters.clients++;
 
             ConversationEntity conversation = upsertConversation(client, row);
@@ -454,8 +551,7 @@ public class SheetsSyncService {
         }
     }
 
-    private ClientEntity upsertClient(SeguimientoWhatsappDto row) {
-        String phone = normalizePhone(row.celular());
+    private ClientEntity upsertClient(SeguimientoWhatsappDto row, String phone) {
         String resolvedName = blankToEmpty(row.cliente());
         if (resolvedName.isBlank()) {
             resolvedName = phone;
@@ -742,9 +838,25 @@ public class SheetsSyncService {
         return DEFAULT_WEBAPP_URL;
     }
 
+    private String resolvePersistPhone(SeguimientoWhatsappDto row) {
+        String phone = normalizePhone(row.celular());
+        if (!phone.isBlank()) {
+            return phone;
+        }
+        // Conserva el chat aunque Sheets no traiga celular (antes se descartaba en silencio).
+        String seed = String.join("|",
+                blankToEmpty(row.cliente()),
+                blankToEmpty(row.fecha()),
+                blankToEmpty(row.solicitud()),
+                blankToEmpty(row.hojaOrigen())
+        );
+        return "sintel-" + Integer.toHexString(seed.hashCode());
+    }
+
     private String externalKey(SeguimientoWhatsappDto row) {
+        // Misma fórmula histórica (compatibilidad con filas ya UPSERTeadas en PostgreSQL).
         String raw = String.join("|",
-                normalizePhone(row.celular()),
+                resolvePersistPhone(row),
                 blankToEmpty(row.fecha()),
                 blankToEmpty(row.solicitud()),
                 blankToEmpty(row.canal()),

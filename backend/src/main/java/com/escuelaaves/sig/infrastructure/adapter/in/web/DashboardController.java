@@ -62,7 +62,7 @@ public class DashboardController {
     }
 
     @GetMapping("/sheets")
-    @Operation(summary = "Dashboard completo desde Google Sheets (matrices fullData + tipados). Cache 8 min; ?refresh=true fuerza recarga.")
+    @Operation(summary = "Dashboard Sheets desde la última sincronización (caché/PostgreSQL). No consulta Google en el request; ?refresh=true dispara sync en background.")
     public ResponseEntity<SheetsDashboardDto> sheets(
             @RequestParam(defaultValue = "false") boolean refresh
     ) {

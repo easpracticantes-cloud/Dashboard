@@ -14,9 +14,11 @@ public class AsyncConfig {
     @Bean(name = "sheetsSyncExecutor")
     public Executor sheetsSyncExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(1);
-        executor.setMaxPoolSize(1);
-        executor.setQueueCapacity(2);
+        // Un worker de persistencia a la vez (evita conflictos de UPSERT), cola amplia
+        // para heal/refresh/manual sin descartar tareas.
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(32);
         executor.setThreadNamePrefix("sheets-sync-");
         executor.initialize();
         return executor;

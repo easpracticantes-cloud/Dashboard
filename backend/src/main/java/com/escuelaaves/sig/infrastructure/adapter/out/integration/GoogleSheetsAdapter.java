@@ -90,6 +90,21 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
             }
             JsonNode data = node.path("data");
             int dataKeys = data.isObject() ? data.size() : 0;
+            if (data.isObject()) {
+                data.fields().forEachRemaining(entry -> {
+                    JsonNode sheet = entry.getValue();
+                    if (sheet != null && sheet.isObject()) {
+                        boolean hasFull = sheet.has("fullData") && sheet.get("fullData").isArray();
+                        int fullSize = hasFull ? sheet.get("fullData").size() : 0;
+                        int previewSize = sheet.path("firstFewRows").isArray() ? sheet.get("firstFewRows").size() : 0;
+                        long rawCount = sheet.path("rawRowCount").asLong(sheet.path("rowCount").asLong(0));
+                        log.info(
+                                "[GoogleSheets] Hoja '{}' fullData={} firstFewRows={} rawRowCount={} hasFullData={}",
+                                entry.getKey(), fullSize, previewSize, rawCount, hasFull
+                        );
+                    }
+                });
+            }
             log.info(
                     "[GoogleSheets] Dashboard payload OK (rootKeys={}, dataKeys={}, bytes={})",
                     rootKeys,
