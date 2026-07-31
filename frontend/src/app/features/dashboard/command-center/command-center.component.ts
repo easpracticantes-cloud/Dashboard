@@ -1,8 +1,10 @@
-import { Component, computed, inject, signal, ViewEncapsulation, effect } from '@angular/core';
+import { Component, computed, inject, signal, ViewEncapsulation, OnInit, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
+import { interval } from 'rxjs';
 import { BusinessPulse, FunnelMetrics, OpsService } from '../../../core/services/ops.service';
 import { ReservationDto } from '../../../core/services/commercial.service';
 import { LiveSyncService } from '../../../core/services/live-sync.service';
@@ -15,9 +17,11 @@ import { LiveSyncService } from '../../../core/services/live-sync.service';
   styleUrl: './command-center.component.scss',
   encapsulation: ViewEncapsulation.None
 })
-export class CommandCenterComponent {
+export class CommandCenterComponent implements OnInit {
   private readonly ops = inject(OpsService);
   private readonly liveSync = inject(LiveSyncService);
+  private readonly destroyRef = inject(DestroyRef);
+  private lastTick = -1;
 
   readonly loading = signal(true);
   readonly pulse = signal<BusinessPulse | null>(null);
@@ -39,11 +43,19 @@ export class CommandCenterComponent {
     ];
   });
 
-  constructor() {
-    effect(() => {
-      this.liveSync.tick();
-      this.reload();
-    });
+  ngOnInit(): void {
+    this.reload();
+    this.lastTick = this.liveSync.tick();
+    interval(2000)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        const t = this.liveSync.tick();
+        if (t !== this.lastTick) {
+          this.lastTick = t;
+          this.ops.invalidateCommandCenter();
+          this.reload();
+        }
+      });
   }
 
   reload(): void {

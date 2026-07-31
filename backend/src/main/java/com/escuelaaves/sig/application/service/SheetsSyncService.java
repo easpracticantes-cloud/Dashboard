@@ -143,10 +143,14 @@ public class SheetsSyncService {
      * {@code refresh} se ignora para no disparar Google desde navegación; use POST /integrations/sheets/sync.
      */
     public SheetsDashboardDto getDashboardSheets(boolean forceRefresh) {
-        return getDashboardSheets(forceRefresh, false);
+        return getDashboardSheets(forceRefresh, false, false);
     }
 
     public SheetsDashboardDto getDashboardSheets(boolean forceRefresh, boolean includeRaw) {
+        return getDashboardSheets(forceRefresh, includeRaw, false);
+    }
+
+    public SheetsDashboardDto getDashboardSheets(boolean forceRefresh, boolean includeRaw, boolean summary) {
         if (forceRefresh) {
             log.info("[SHEETS-SYNC] Dashboard ?refresh=true ignorado en HTTP (sync solo bootstrap/cron/manual)");
         }
@@ -155,6 +159,9 @@ public class SheetsSyncService {
         if (cached != null) {
             maybeHealLaggingCrm(cached.dto());
             SheetsDashboardDto dto = sheetsPayloadMapper.withCacheFlag(cached.dto(), true);
+            if (summary) {
+                return sheetsPayloadMapper.summaryOnly(dto);
+            }
             return includeRaw ? dto : sheetsPayloadMapper.withoutRawMatrices(dto);
         }
 

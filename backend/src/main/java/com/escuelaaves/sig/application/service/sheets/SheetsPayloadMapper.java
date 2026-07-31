@@ -225,6 +225,43 @@ public class SheetsPayloadMapper {
         return copy(dto, dto.meta(), slim);
     }
 
+    /**
+     * Payload mínimo para first paint (&lt;1s): KPIs + agregados de gráficas.
+     * Sin seguimientos, ventas, tablas ni matrices crudas.
+     */
+    public SheetsDashboardDto summaryOnly(SheetsDashboardDto dto) {
+        if (dto == null) {
+            return empty(false, "Sin datos");
+        }
+        SheetTableDto blank = emptyTable("");
+        return new SheetsDashboardDto(
+                dto.meta(),
+                dto.kpis(),
+                dto.porSemaforo() != null ? dto.porSemaforo() : List.of(),
+                dto.porCanal() != null ? dto.porCanal() : List.of(),
+                dto.porHoja() != null ? dto.porHoja() : List.of(),
+                dto.porMes() != null ? dto.porMes() : List.of(),
+                dto.evolucionMensual() != null ? dto.evolucionMensual() : List.of(),
+                List.of(),
+                List.of(),
+                dto.resumenPaises() != null ? dto.resumenPaises() : List.of(),
+                List.of(),
+                dto.hojas() != null ? dto.hojas() : List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                blank,
+                blank,
+                blank,
+                blank,
+                List.of(),
+                dto.b2bStatus(),
+                dto.b2bMensaje(),
+                dto.success(),
+                dto.message()
+        );
+    }
+
     private SheetsDashboardDto copy(SheetsDashboardDto dto, SheetsMetaDto meta, List<RawSheetDto> rawSheets) {
         return new SheetsDashboardDto(
                 meta,

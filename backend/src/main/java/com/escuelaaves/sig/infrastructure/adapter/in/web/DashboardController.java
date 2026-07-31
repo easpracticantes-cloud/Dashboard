@@ -62,11 +62,12 @@ public class DashboardController {
     }
 
     @GetMapping("/sheets")
-    @Operation(summary = "Dashboard Sheets desde la última sincronización (caché/PostgreSQL). No consulta Google en el request.")
+    @Operation(summary = "Dashboard Sheets desde caché/PostgreSQL. mode=summary → KPIs/agregados (first paint); includeRaw → matrices.")
     public ResponseEntity<SheetsDashboardDto> sheets(
             @RequestParam(defaultValue = "false") boolean refresh,
-            @RequestParam(defaultValue = "false") boolean includeRaw
+            @RequestParam(defaultValue = "false") boolean includeRaw,
+            @RequestParam(defaultValue = "false") boolean summary
     ) {
-        return ResponseEntity.ok(sheetsSyncService.getDashboardSheets(refresh, includeRaw));
+        return ResponseEntity.ok(sheetsSyncService.getDashboardSheets(refresh, includeRaw, summary));
     }
 }

@@ -20,6 +20,9 @@ public class TtlCacheService {
 
     private final Map<String, CacheEntry<?>> store = new ConcurrentHashMap<>();
 
+    /** TTL corto (15s) para hot path del dashboard cuando se pide frescura sin castigar Render. */
+    public static final Duration HOT_TTL = Duration.ofSeconds(15);
+
     @SuppressWarnings("unchecked")
     public <T> T getOrLoad(String key, Supplier<T> loader) {
         return getOrLoad(key, DEFAULT_TTL, loader);

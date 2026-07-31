@@ -29,5 +29,16 @@
 
   <eas-command-center></eas-command-center>
 
-  <eas-dashboard-sheets></eas-dashboard-sheets>
+  @defer (on timer(80ms)) {
+    <eas-dashboard-sheets></eas-dashboard-sheets>
+  } @placeholder {
+    <section class="dash-sheets-placeholder" aria-hidden="true">
+      <div class="eas-skeleton" style="height: 28px; width: 40%; margin-bottom: 16px"></div>
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px">
+        @for (i of [1, 2, 3, 4, 5]; track i) {
+          <div class="eas-skeleton" style="height: 88px; border-radius: 12px"></div>
+        }
+      </div>
+    </section>
+  }
 </div>

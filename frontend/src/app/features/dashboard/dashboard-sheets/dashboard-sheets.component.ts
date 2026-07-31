@@ -353,16 +353,22 @@ export class DashboardSheetsComponent implements AfterViewInit {
       this.ventasTable.data = this.ventas();
     });
 
-    this.load(false);
+    // Instant paint desde sessionStorage (stale-while-revalidate)
+    const cached = this.dashboardService.peekCachedSummary();
+    if (cached?.success) {
+      this.data.set(cached);
+      this.loading.set(false);
+    }
+
+    this.loadProgressive(false);
 
     interval(1000)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.nowTick.set(Date.now()));
 
-    // Poll solo desde caché/PostgreSQL (nunca forceRefresh → Google)
     interval(REFRESH_MS)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.load(false, true));
+      .subscribe(() => this.loadProgressive(true));
   }
 
   ngAfterViewInit(): void {
@@ -371,11 +377,14 @@ export class DashboardSheetsComponent implements AfterViewInit {
 
   setSection(section: Section): void {
     this.activeSection.set(section);
-    if (section === 'seguimientos') {
+    if (section === 'seguimientos' || section === 'ventas' || section === 'b2b' || section === 'piezas') {
+      this.ensureFullPayload();
       queueMicrotask(() => this.bindTableControls());
     }
     if (section === 'hojas') {
-      this.load(false, true);
+      this.dashboardService.getSheets(false, true).subscribe((payload) => {
+        if (payload) this.data.set(payload);
+      });
     }
   }
 
@@ -395,7 +404,7 @@ export class DashboardSheetsComponent implements AfterViewInit {
   }
 
   refresh(): void {
-    this.load(true, false);
+    this.loadProgressive(true);
   }
 
   selectRawSheet(nombre: string): void {
@@ -477,38 +486,88 @@ export class DashboardSheetsComponent implements AfterViewInit {
   }
 
   private load(forceRefresh: boolean, fromAuto = false): void {
-    if (forceRefresh) this.refreshing.set(true);
-    else this.loading.set(true);
-    this.error.set(null);
+    this.loadProgressive(forceRefresh || fromAuto);
+  }
 
-    // forceRefresh solo limpia caché Angular; el backend NO consulta Google en GET /dashboard/sheets
-    if (forceRefresh) {
+  /**
+   * 1) Summary (KPIs/gráficas) → pinta en &lt;1s
+   * 2) Full en background para tablas
+   */
+  private loadProgressive(force: boolean): void {
+    if (!this.data() && !force) {
+      this.loading.set(true);
+    }
+    if (force) {
+      this.refreshing.set(true);
       this.dashboardService.invalidateCache();
     }
-    const includeRaw = this.activeSection() === 'hojas';
-    this.dashboardService.getSheets(false, includeRaw).subscribe({
+    this.error.set(null);
+
+    this.dashboardService.getSheetsSummary(force).subscribe({
       next: (payload) => {
         this.loading.set(false);
         this.refreshing.set(false);
         this.nextRefreshAt.set(Date.now() + REFRESH_MS);
         if (!payload) {
-          this.error.set('No se pudo obtener el dashboard de Sheets.');
+          if (!this.data()) {
+            this.error.set('No se pudo obtener el dashboard.');
+          }
           return;
         }
-        this.data.set(payload);
-        if (!this.selectedRawSheet() && payload.rawSheets?.length) {
-          this.selectedRawSheet.set(payload.rawSheets[0].nombre);
+        // Si ya hay full en memoria, solo refrescar agregados/meta/kpis
+        const current = this.data();
+        if (current?.seguimientoWhatsapp?.length) {
+          this.data.set({
+            ...current,
+            ...payload,
+            seguimientoWhatsapp: current.seguimientoWhatsapp,
+            ventas: current.ventas,
+            toques: current.toques,
+            piezasPub: current.piezasPub,
+            b2bAgencias: current.b2bAgencias,
+            b2bTabla: current.b2bTabla,
+            estadisticas: current.estadisticas,
+            despliegueSemanal: current.despliegueSemanal,
+            planComercial: current.planComercial,
+            paisesDetalle: current.paisesDetalle,
+            rawSheets: current.rawSheets
+          });
+        } else {
+          this.data.set(payload);
         }
         if (!payload.success) {
-          this.error.set(payload.message || 'Sheets respondió con error.');
-        } else if (!payload.seguimientoWhatsapp?.length && !fromAuto) {
-          this.error.set('Sheets conectado, pero no hay seguimientos tipados aún.');
+          this.error.set(payload.message || 'Dashboard aún sincronizando.');
+        }
+        // Hidratar tablas cuando el navegador esté idle (no pelear con first paint)
+        const hydrate = () => this.ensureFullPayload();
+        if (typeof requestIdleCallback !== 'undefined') {
+          requestIdleCallback(() => hydrate(), { timeout: 2000 });
+        } else {
+          setTimeout(hydrate, 400);
         }
       },
       error: () => {
         this.loading.set(false);
         this.refreshing.set(false);
-        this.error.set('Error de red al consultar el dashboard (PostgreSQL).');
+        if (!this.data()) {
+          this.error.set('Error de red al consultar el dashboard (PostgreSQL).');
+        }
+      }
+    });
+  }
+
+  private ensureFullPayload(): void {
+    const current = this.data();
+    if (current?.seguimientoWhatsapp?.length) {
+      return;
+    }
+    this.dashboardService.getSheetsFull(false).subscribe({
+      next: (full) => {
+        if (!full) return;
+        this.data.set(full);
+        if (!this.selectedRawSheet() && full.rawSheets?.length) {
+          this.selectedRawSheet.set(full.rawSheets[0].nombre);
+        }
       }
     });
   }

@@ -48,7 +48,13 @@ export class TopbarComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.notifications.load().subscribe();
+    // Diferir notificaciones: no competir con command-center / sheets summary
+    const run = () => this.notifications.load().subscribe();
+    if (typeof requestIdleCallback !== 'undefined') {
+      requestIdleCallback(() => run(), { timeout: 2500 });
+    } else {
+      setTimeout(run, 1200);
+    }
   }
 
   syncNow(): void {

@@ -170,9 +170,12 @@ export class ConversationsListComponent implements AfterViewInit {
       this.applyFilters();
     });
 
-    this.clientsService.list().subscribe((res) => this.clients.set(res.items));
-    this.usersService.list().subscribe((users) => this.advisors.set(users));
-    this.ops.listStaleConversationIds(7).subscribe((ids) => this.staleIds.set(new Set(ids)));
+    // Clientes/asesores/stale en background — no bloquean la tabla
+    queueMicrotask(() => {
+      this.clientsService.list().subscribe((res) => this.clients.set(res.items));
+      this.usersService.list().subscribe((users) => this.advisors.set(users));
+      this.ops.listStaleConversationIds(7).subscribe((ids) => this.staleIds.set(new Set(ids)));
+    });
 
     const quickSearch = this.route.snapshot.queryParamMap.get('q');
     if (quickSearch) {
@@ -186,12 +189,19 @@ export class ConversationsListComponent implements AfterViewInit {
   }
 
   reload(): void {
-    this.conversationsService.listAll().subscribe((res) => {
+    this.loading.set(true);
+    // First paint: primera página. Luego hidrata el resto sin bloquear la UI.
+    this.conversationsService.list(0, 100).subscribe((res) => {
       this.all = res.items;
       this.applyFilters();
       this.loading.set(false);
+      if ((res.totalPages || 1) > 1) {
+        this.conversationsService.listAll(500).subscribe((full) => {
+          this.all = full.items;
+          this.applyFilters();
+        });
+      }
     });
-    this.ops.listStaleConversationIds(7).subscribe((ids) => this.staleIds.set(new Set(ids)));
   }
 
   patchFilter(partial: Partial<AnalyticsFilter>): void {
