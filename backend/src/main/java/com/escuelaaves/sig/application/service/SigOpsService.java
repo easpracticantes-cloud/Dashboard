@@ -14,9 +14,11 @@ import com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity.*;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.QuoteJpaRepository;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.ReservationJpaRepository;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.SaleJpaRepository;
+import com.escuelaaves.sig.infrastructure.cache.TtlCacheService;
 import com.escuelaaves.sig.shared.exception.BadRequestException;
 import com.escuelaaves.sig.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,7 @@ import java.util.stream.Collectors;
 /**
  * 50 operaciones de negocio para optimizar CRM, inbox, comercial, insights y auditoría del SIG.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -53,6 +56,7 @@ public class SigOpsService {
     private final ClientMapper clientMapper;
     private final NotificationMapper notificationMapper;
     private final CurrentUserService currentUserService;
+    private final TtlCacheService ttlCacheService;
 
     // ——— 1–10 CRM ———
 
@@ -438,25 +442,75 @@ public class SigOpsService {
     // ——— 33–42 Insights ———
 
     /** 33 */ public OpsDtos.OperationalHealth getOperationalHealth() {
+        return ttlCacheService.getOrLoad("ops:health", this::buildOperationalHealth);
+    }
+
+    private OpsDtos.OperationalHealth buildOperationalHealth() {
+        long t0 = System.nanoTime();
         long open = conversationRepositoryPort.countByStatus(ConversationStatus.OPEN);
         long pending = conversationRepositoryPort.countByStatus(ConversationStatus.PENDING);
         long unreadNotif = notificationRepositoryPort.countByUserIdAndReadFalse(currentUserService.getCurrentUser().getId());
         long expiring = listExpiringQuotes(7).size();
         long upcoming = listReservationsUpcoming(14).size();
         OpsDtos.DataQualityReport dq = getDataQualityScore();
+        log.info("[SQL-TIMING] ops.health totalMs={}", (System.nanoTime() - t0) / 1_000_000);
         return new OpsDtos.OperationalHealth(
                 clientRepositoryPort.count(), open, pending, unreadNotif, expiring, upcoming, dq.score());
     }
 
     /** 34 */ public OpsDtos.FunnelMetrics getFunnelMetrics() {
-        long clients = clientRepositoryPort.count();
-        long conversations = conversationRepositoryPort.count();
-        long quotes = quoteJpaRepository.count();
-        long reservations = reservationJpaRepository.count();
-        long sales = saleJpaRepository.count();
-        double rate = quotes == 0 ? 0 : (sales * 100.0) / quotes;
-        return new OpsDtos.FunnelMetrics(clients, conversations, quotes, reservations, sales,
-                BigDecimal.valueOf(rate).setScale(2, RoundingMode.HALF_UP).doubleValue());
+        return ttlCacheService.getOrLoad("ops:funnel", () -> {
+            long clients = clientRepositoryPort.count();
+            long conversations = conversationRepositoryPort.count();
+            long quotes = quoteJpaRepository.count();
+            long reservations = reservationJpaRepository.count();
+            long sales = saleJpaRepository.count();
+            double rate = quotes == 0 ? 0 : (sales * 100.0) / quotes;
+            return new OpsDtos.FunnelMetrics(clients, conversations, quotes, reservations, sales,
+                    BigDecimal.valueOf(rate).setScale(2, RoundingMode.HALF_UP).doubleValue());
+        });
+    }
+
+    /**
+     * Command center agregado: una sola respuesta con salud, embudo, agenda y ventas del día.
+     */
+    public OpsDtos.CommandCenterSnapshot getCommandCenter() {
+        return ttlCacheService.getOrLoad("ops:command-center", this::buildCommandCenter);
+    }
+
+    private OpsDtos.CommandCenterSnapshot buildCommandCenter() {
+        long t0 = System.nanoTime();
+        LocalDate today = LocalDate.now(BOGOTA);
+
+        // Secuencial: health usa SecurityContext del request (no CompletableFuture).
+        OpsDtos.FunnelMetrics funnel = getFunnelMetrics();
+        OpsDtos.OperationalHealth health = getOperationalHealth();
+        List<ReservationDto> agenda = reservationJpaRepository.findAll().stream()
+                .filter(r -> today.equals(r.getReservationDate()))
+                .filter(r -> r.getStatus() == CommercialStatus.CONFIRMED || r.getStatus() == CommercialStatus.ACCEPTED)
+                .map(this::toReservationDto)
+                .toList();
+        List<QuoteDto> expiring = listExpiringQuotes(7);
+        List<SaleEntity> salesToday = saleJpaRepository.findAll().stream()
+                .filter(s -> today.equals(s.getSaleDate()))
+                .toList();
+        BigDecimal salesAmount = salesToday.stream()
+                .map(SaleEntity::getAmount)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Map<String, Object> lag = getAverageResponseLagHint();
+
+        log.info("[SQL-TIMING] ops.command-center totalMs={}", (System.nanoTime() - t0) / 1_000_000);
+        return new OpsDtos.CommandCenterSnapshot(
+                health,
+                funnel,
+                agenda,
+                expiring,
+                salesToday.size(),
+                salesAmount,
+                funnel.quoteToSaleRate(),
+                lag
+        );
     }
 
     /** 35 */ public List<OpsDtos.AdvisorWorkload> getAdvisorWorkload() {

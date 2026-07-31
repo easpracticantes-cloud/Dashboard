@@ -32,6 +32,7 @@ import com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity.UserEnt
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.QuoteJpaRepository;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.ReservationJpaRepository;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.SaleJpaRepository;
+import com.escuelaaves.sig.infrastructure.cache.TtlCacheService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -53,10 +54,12 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -94,6 +97,7 @@ public class SheetsSyncService {
     private final SheetsPayloadMapper sheetsPayloadMapper;
     private final TransactionTemplate transactionTemplate;
     private final Executor sheetsSyncExecutor;
+    private final TtlCacheService ttlCacheService;
 
     @Value("${app.sheets.webapp-url:}")
     private String configuredWebAppUrl;
@@ -114,7 +118,8 @@ public class SheetsSyncService {
             SaleJpaRepository saleJpaRepository,
             SheetsPayloadMapper sheetsPayloadMapper,
             PlatformTransactionManager transactionManager,
-            @Qualifier("sheetsSyncExecutor") Executor sheetsSyncExecutor
+            @Qualifier("sheetsSyncExecutor") Executor sheetsSyncExecutor,
+            TtlCacheService ttlCacheService
     ) {
         this.googleSheetsPort = googleSheetsPort;
         this.systemSettingRepositoryPort = systemSettingRepositoryPort;
@@ -129,33 +134,31 @@ public class SheetsSyncService {
         this.sheetsPayloadMapper = sheetsPayloadMapper;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.sheetsSyncExecutor = sheetsSyncExecutor;
+        this.ttlCacheService = ttlCacheService;
     }
 
     /**
      * Endpoint de dashboard: sirve ÚNICAMENTE la última proyección en caché (PostgreSQL/sync).
      * Nunca consulta Google Sheets en el request HTTP.
-     * {@code refresh=true} dispara sincronización en background.
+     * {@code refresh} se ignora para no disparar Google desde navegación; use POST /integrations/sheets/sync.
      */
     public SheetsDashboardDto getDashboardSheets(boolean forceRefresh) {
+        return getDashboardSheets(forceRefresh, false);
+    }
+
+    public SheetsDashboardDto getDashboardSheets(boolean forceRefresh, boolean includeRaw) {
         if (forceRefresh) {
-            log.info("[SHEETS-SYNC] Dashboard pidió refresh → sync async (sin bloquear HTTP)");
-            sheetsSyncExecutor.execute(() -> {
-                try {
-                    syncNow();
-                } catch (Exception ex) {
-                    log.warn("[SHEETS-SYNC] Refresh async falló: {}", ex.getMessage());
-                }
-            });
+            log.info("[SHEETS-SYNC] Dashboard ?refresh=true ignorado en HTTP (sync solo bootstrap/cron/manual)");
         }
 
         CacheEntry cached = dashboardCache.get();
         if (cached != null) {
             maybeHealLaggingCrm(cached.dto());
-            return sheetsPayloadMapper.withCacheFlag(cached.dto(), true);
+            SheetsDashboardDto dto = sheetsPayloadMapper.withCacheFlag(cached.dto(), true);
+            return includeRaw ? dto : sheetsPayloadMapper.withoutRawMatrices(dto);
         }
 
-        // Sin caché aún: no llamar a Sheets desde el request; el bootstrap/cron lo llenará.
-        log.info("[SHEETS-SYNC] Dashboard sin caché → disparando syncNowAsync()");
+        log.info("[SHEETS-SYNC] Dashboard sin caché → sync async (sin bloquear HTTP / sin Google en request)");
         sheetsSyncExecutor.execute(() -> {
             try {
                 syncNow();
@@ -202,7 +205,10 @@ public class SheetsSyncService {
             }
         }
 
+        long fetchStart = System.nanoTime();
         Optional<JsonNode> raw = googleSheetsPort.fetchDashboardRaw(webAppUrl);
+        long fetchMs = (System.nanoTime() - fetchStart) / 1_000_000;
+        log.info("[SHEETS-SYNC] HTTP Google Sheets fetchMs={} ok={}", fetchMs, raw.isPresent());
         if (raw.isEmpty()) {
             CacheEntry stale = dashboardCache.get();
             if (stale != null) {
@@ -212,19 +218,22 @@ public class SheetsSyncService {
             return sheetsPayloadMapper.empty(false, "No se pudo obtener datos del Web App de Google Sheets.");
         }
 
+        long mapStart = System.nanoTime();
         SheetsDashboardDto mapped = sheetsPayloadMapper.map(raw.get(), Instant.now(), false);
+        long mapMs = (System.nanoTime() - mapStart) / 1_000_000;
         long rawDeclared = mapped.rawSheets() == null ? 0
                 : mapped.rawSheets().stream().mapToLong(s -> s.rawRowCount()).sum();
         long rawMatrix = mapped.rawSheets() == null ? 0
                 : mapped.rawSheets().stream().mapToLong(s -> s.fullData() != null ? s.fullData().size() : 0).sum();
         log.info(
-                "[SHEETS-SYNC] Mapped: seguimiento={} ventas={} toques={} hojas={} rawRowCountSum={} matrixRowsSum={} success={}",
+                "[SHEETS-SYNC] Mapped: seguimiento={} ventas={} toques={} hojas={} rawRowCountSum={} matrixRowsSum={} mapMs={} success={}",
                 mapped.seguimientoWhatsapp().size(),
                 mapped.ventas() != null ? mapped.ventas().size() : 0,
                 mapped.toques() != null ? mapped.toques().size() : 0,
                 mapped.meta() != null ? mapped.meta().totalHojas() : 0,
                 rawDeclared,
                 rawMatrix,
+                mapMs,
                 mapped.success()
         );
         dashboardCache.set(new CacheEntry(mapped, Instant.now()));
@@ -332,7 +341,7 @@ public class SheetsSyncService {
         long dbClients = clientRepositoryPort.count();
         boolean empty = dbClients == 0;
         // Si hay mucho menos en DB que en Sheets (p.ej. sync cortada en Render), reintentar.
-        boolean lagging = sheetRows >= 50 && dbConversations < Math.max(40, (long) (sheetRows * 0.55));
+        boolean lagging = sheetRows >= 20 && dbConversations < Math.max(15, (long) (sheetRows * 0.85));
         if (!empty && !lagging) {
             return;
         }
@@ -457,7 +466,59 @@ public class SheetsSyncService {
         log.info("[SHEETS-SYNC] Errores de fila: {}", errors.get());
         log.info("[SHEETS-SYNC] Totales PostgreSQL: clientes={} conversaciones={}", clientsDb, conversationsDb);
         log.info("[SHEETS-SYNC] Tiempo total: {} ms ({} s)", elapsedMs, String.format(Locale.ROOT, "%.1f", elapsedMs / 1000.0));
+        logSheetVsPostgresVerification(dashboard, rows);
         log.info("[SHEETS-SYNC] =================================");
+        ttlCacheService.invalidateAll();
+    }
+
+    /**
+     * Compara filas de Google Sheets vs PostgreSQL por hoja y en total.
+     */
+    private void logSheetVsPostgresVerification(SheetsDashboardDto dashboard, List<SeguimientoWhatsappDto> rows) {
+        log.info("[SHEETS-SYNC] ----- VERIFICACIÓN Google vs PostgreSQL -----");
+        Map<String, Long> typedByHoja = new HashMap<>();
+        for (SeguimientoWhatsappDto row : rows) {
+            String hoja = blankToEmpty(row.hojaOrigen());
+            if (hoja.isBlank()) {
+                hoja = "(sin-hoja)";
+            }
+            typedByHoja.merge(hoja, 1L, Long::sum);
+        }
+
+        boolean allOk = true;
+        if (dashboard.rawSheets() != null) {
+            for (var sheet : dashboard.rawSheets()) {
+                String name = sheet.nombre();
+                long googleRows = sheet.rawRowCount();
+                long matrixRows = sheet.fullData() != null ? sheet.fullData().size() : 0;
+                long effectiveGoogle = googleRows > 0 ? googleRows : matrixRows;
+                long typed = typedByHoja.getOrDefault(name, 0L);
+                long pgByCategory = conversationRepositoryPort.countByCategory(name);
+                // Tolerancia: tipado/dedupe puede ser menor que raw (headers, vacíos, dupes).
+                boolean ok = pgByCategory >= typed
+                        && (typed == 0 || effectiveGoogle == 0 || typed <= effectiveGoogle + 5);
+                if (!ok) {
+                    allOk = false;
+                }
+                log.info("[SHEETS-SYNC] Hoja: {}", name);
+                log.info("[SHEETS-SYNC] Filas en Google: {} (matrix={})", effectiveGoogle, matrixRows);
+                log.info("[SHEETS-SYNC] Filas tipadas (mapper): {}", typed);
+                log.info("[SHEETS-SYNC] Filas en PostgreSQL (category): {}", pgByCategory);
+                log.info("[SHEETS-SYNC] Estado: {}", ok ? "OK" : "ERROR");
+            }
+        }
+
+        long googleSeguimiento = rows.size();
+        long pgSheetsConv = conversationRepositoryPort.countByExternalKeyStartingWith("sheets-");
+        boolean totalOk = googleSeguimiento == 0 || Math.abs(pgSheetsConv - googleSeguimiento) <= Math.max(5, googleSeguimiento / 20);
+        if (!totalOk) {
+            allOk = false;
+        }
+        log.info("[SHEETS-SYNC] Hoja: __TOTAL_SEGUIMIENTO__");
+        log.info("[SHEETS-SYNC] Filas en Google: {}", googleSeguimiento);
+        log.info("[SHEETS-SYNC] Filas en PostgreSQL: {}", pgSheetsConv);
+        log.info("[SHEETS-SYNC] Estado: {}", totalOk ? "OK" : "ERROR");
+        log.info("[SHEETS-SYNC] Verificación global: {}", allOk ? "OK" : "ERROR");
     }
 
     private void persistSeguimientoBatch(

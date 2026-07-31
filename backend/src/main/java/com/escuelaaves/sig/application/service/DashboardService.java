@@ -15,7 +15,9 @@ import com.escuelaaves.sig.domain.port.out.ClientRepositoryPort;
 import com.escuelaaves.sig.domain.port.out.ConversationRepositoryPort;
 import com.escuelaaves.sig.domain.port.out.MessageRepositoryPort;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity.ConversationEntity;
+import com.escuelaaves.sig.infrastructure.cache.TtlCacheService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,8 +33,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -45,6 +49,7 @@ public class DashboardService implements DashboardUseCase {
     private final MessageRepositoryPort messageRepositoryPort;
     private final ConversationMapper conversationMapper;
     private final CommercialService commercialService;
+    private final TtlCacheService ttlCacheService;
 
     @Override
     public DashboardOverviewDto getOverview() {
@@ -57,20 +62,89 @@ public class DashboardService implements DashboardUseCase {
     }
 
     public DashboardOverviewDto getOverview(AnalyticsFilter filter) {
+        String cacheKey = "dashboard:overview:" + cacheKeyOf(filter);
+        return ttlCacheService.getOrLoad(cacheKey, () -> buildOverview(filter));
+    }
+
+    public AnalyticsDto getAnalytics(AnalyticsFilter filter) {
+        String cacheKey = "dashboard:analytics:" + cacheKeyOf(filter);
+        return ttlCacheService.getOrLoad(cacheKey, () -> buildAnalytics(filter));
+    }
+
+    private DashboardOverviewDto buildOverview(AnalyticsFilter filter) {
+        long t0 = System.nanoTime();
         boolean noFilter = filter == null || filter.isEmpty();
+
+        if (noFilter) {
+            CompletableFuture<List<ConversationEntity>> allConvF = CompletableFuture.supplyAsync(conversationRepositoryPort::findAll);
+            CompletableFuture<Long> quotesF = CompletableFuture.supplyAsync(commercialService::countQuotes);
+            CompletableFuture<Long> reservationsF = CompletableFuture.supplyAsync(commercialService::countReservations);
+            CompletableFuture<Long> salesF = CompletableFuture.supplyAsync(commercialService::countSales);
+            CompletableFuture<Long> inboundF = CompletableFuture.supplyAsync(
+                    () -> messageRepositoryPort.countByDirection(MessageDirection.INBOUND));
+            CompletableFuture<Long> outboundF = CompletableFuture.supplyAsync(
+                    () -> messageRepositoryPort.countByDirection(MessageDirection.OUTBOUND));
+            CompletableFuture<Long> newClientsF = CompletableFuture.supplyAsync(() ->
+                    clientRepositoryPort.findAll().stream()
+                            .filter(c -> c.getSegment() == ClientSegment.NUEVO)
+                            .count());
+
+            CompletableFuture.allOf(allConvF, quotesF, reservationsF, salesF, inboundF, outboundF, newClientsF).join();
+
+            List<ConversationEntity> all = allConvF.join();
+            LocalDate today = LocalDate.now(ZONE);
+            long total = all.size();
+            long todayCount = all.stream().filter(c -> sameDay(resolveInstant(c), today)).count();
+            long pending = all.stream()
+                    .filter(c -> c.getStatus() == ConversationStatus.PENDING || c.getStatus() == ConversationStatus.OPEN)
+                    .count();
+            long responded = all.stream().filter(c -> c.getStatus() == ConversationStatus.RESOLVED).count();
+            long highPriority = all.stream().filter(this::isHighPriority).count();
+            long active = pending;
+            long inbound = inboundF.join();
+            long outbound = outboundF.join();
+            long avgResponseSeconds = outbound == 0 ? 0 : Math.max(60, Math.min(900, (inbound * 45L) / Math.max(1, outbound)));
+            if (total == 0) {
+                avgResponseSeconds = 0;
+            }
+
+            List<KpiDto> kpis = List.of(
+                    new KpiDto("TOTAL_CONVERSATIONS", "Conversaciones totales", total, 0.0),
+                    new KpiDto("CONVERSATIONS_TODAY", "Conversaciones del dia", todayCount, 0.0),
+                    new KpiDto("PENDING_MESSAGES", "Pendientes", pending, 0.0),
+                    new KpiDto("RESPONDED_MESSAGES", "Respondidas", responded, 0.0),
+                    new KpiDto("NEW_CLIENTS", "Clientes nuevos", newClientsF.join(), 0.0),
+                    new KpiDto("QUOTES", "Cotizaciones", quotesF.join(), 0.0),
+                    new KpiDto("RESERVATIONS", "Reservas", reservationsF.join(), 0.0),
+                    new KpiDto("SALES", "Ventas", salesF.join(), 0.0),
+                    new KpiDto("HIGH_PRIORITY", "Conversaciones importantes", highPriority, 0.0),
+                    new KpiDto("AVG_RESPONSE_SECONDS", "Tiempo promedio de respuesta (seg)", avgResponseSeconds, 0.0),
+                    new KpiDto("ACTIVE_CONVERSATIONS", "Conversaciones activas", active, 0.0)
+            );
+            var recent = all.stream()
+                    .sorted(Comparator.comparing(this::resolveInstant, Comparator.nullsLast(Comparator.reverseOrder())))
+                    .limit(5)
+                    .map(conversationMapper::toDto)
+                    .toList();
+            log.info("[SQL-TIMING] dashboard.overview(noFilter) totalMs={} conversations={}",
+                    (System.nanoTime() - t0) / 1_000_000, total);
+            return new DashboardOverviewDto(kpis, recent);
+        }
+
+        long sqlStart = System.nanoTime();
         List<ConversationEntity> filtered = applyFilter(conversationRepositoryPort.findAll(), filter);
+        log.info("[SQL-TIMING] dashboard.overview.findAll+filter ms={} rows={}",
+                (System.nanoTime() - sqlStart) / 1_000_000, filtered.size());
         LocalDate today = LocalDate.now(ZONE);
 
-        long total = noFilter ? conversationRepositoryPort.count() : filtered.size();
+        long total = filtered.size();
         long todayCount = filtered.stream().filter(c -> sameDay(resolveInstant(c), today)).count();
         long pending = filtered.stream()
                 .filter(c -> c.getStatus() == ConversationStatus.PENDING || c.getStatus() == ConversationStatus.OPEN)
                 .count();
         long responded = filtered.stream().filter(c -> c.getStatus() == ConversationStatus.RESOLVED).count();
         long highPriority = filtered.stream().filter(this::isHighPriority).count();
-        long active = filtered.stream()
-                .filter(c -> c.getStatus() == ConversationStatus.OPEN || c.getStatus() == ConversationStatus.PENDING)
-                .count();
+        long active = pending;
 
         var clients = clientRepositoryPort.findAll();
         long newClients = clients.stream().filter(c -> c.getSegment() == ClientSegment.NUEVO).count();
@@ -102,11 +176,16 @@ public class DashboardService implements DashboardUseCase {
                 .map(conversationMapper::toDto)
                 .toList();
 
+        log.info("[SQL-TIMING] dashboard.overview totalMs={}", (System.nanoTime() - t0) / 1_000_000);
         return new DashboardOverviewDto(kpis, recent);
     }
 
-    public AnalyticsDto getAnalytics(AnalyticsFilter filter) {
+    private AnalyticsDto buildAnalytics(AnalyticsFilter filter) {
+        long t0 = System.nanoTime();
+        long sqlStart = System.nanoTime();
         List<ConversationEntity> filtered = applyFilter(conversationRepositoryPort.findAll(), filter);
+        log.info("[SQL-TIMING] dashboard.analytics.findAll+filter ms={} rows={}",
+                (System.nanoTime() - sqlStart) / 1_000_000, filtered.size());
 
         List<String> statusLabels = List.of("Abiertas", "Pendientes", "Resueltas", "Archivadas");
         List<Long> statusValues = Arrays.stream(ConversationStatus.values())
@@ -118,15 +197,26 @@ public class DashboardService implements DashboardUseCase {
         Map<String, Long> byCategory = buildByCategory(filtered);
         Map<String, Long> byImportance = buildByImportance(filtered);
 
-        long newClients = clientRepositoryPort.findAll().stream()
-                .filter(c -> c.getSegment() == ClientSegment.NUEVO)
-                .count();
-        long recurringClients = clientRepositoryPort.findAll().stream()
-                .filter(c -> c.getSegment() == ClientSegment.FRECUENTE || c.getSegment() == ClientSegment.VIP)
-                .count();
+        CompletableFuture<Long> newClientsF = CompletableFuture.supplyAsync(() ->
+                clientRepositoryPort.findAll().stream()
+                        .filter(c -> c.getSegment() == ClientSegment.NUEVO)
+                        .count());
+        CompletableFuture<Long> recurringF = CompletableFuture.supplyAsync(() ->
+                clientRepositoryPort.findAll().stream()
+                        .filter(c -> c.getSegment() == ClientSegment.FRECUENTE || c.getSegment() == ClientSegment.VIP)
+                        .count());
+        CompletableFuture<Long> inboundF = CompletableFuture.supplyAsync(
+                () -> messageRepositoryPort.countByDirection(MessageDirection.INBOUND));
+        CompletableFuture<Long> outboundF = CompletableFuture.supplyAsync(
+                () -> messageRepositoryPort.countByDirection(MessageDirection.OUTBOUND));
+        CompletableFuture<Long> clientsCountF = CompletableFuture.supplyAsync(clientRepositoryPort::count);
+        CompletableFuture<Long> messagesCountF = CompletableFuture.supplyAsync(messageRepositoryPort::count);
+        CompletableFuture.allOf(newClientsF, recurringF, inboundF, outboundF, clientsCountF, messagesCountF).join();
 
-        long inbound = messageRepositoryPort.countByDirection(MessageDirection.INBOUND);
-        long outbound = messageRepositoryPort.countByDirection(MessageDirection.OUTBOUND);
+        long newClients = newClientsF.join();
+        long recurringClients = recurringF.join();
+        long inbound = inboundF.join();
+        long outbound = outboundF.join();
 
         Map<String, Long> byAdvisor = filtered.stream()
                 .collect(Collectors.groupingBy(
@@ -159,11 +249,27 @@ public class DashboardService implements DashboardUseCase {
                 new KpiDto("TOTAL_CONVERSATIONS", "Conversaciones filtradas", filtered.size(), null),
                 new KpiDto("PENDING_MESSAGES", "Pendientes", pending, null),
                 new KpiDto("HIGH_PRIORITY", "Alta prioridad", high, null),
-                new KpiDto("TOTAL_CLIENTS", "Clientes totales", clientRepositoryPort.count(), null),
-                new KpiDto("TOTAL_MESSAGES", "Mensajes totales", messageRepositoryPort.count(), null)
+                new KpiDto("TOTAL_CLIENTS", "Clientes totales", clientsCountF.join(), null),
+                new KpiDto("TOTAL_MESSAGES", "Mensajes totales", messagesCountF.join(), null)
         );
 
+        log.info("[SQL-TIMING] dashboard.analytics totalMs={}", (System.nanoTime() - t0) / 1_000_000);
         return new AnalyticsDto(series, summary);
+    }
+
+    private String cacheKeyOf(AnalyticsFilter filter) {
+        if (filter == null || filter.isEmpty()) {
+            return "default";
+        }
+        return Objects.toString(filter.year(), "") + "|"
+                + Objects.toString(filter.month(), "") + "|"
+                + Objects.toString(filter.importance(), "") + "|"
+                + Objects.toString(filter.status(), "") + "|"
+                + Objects.toString(filter.category(), "") + "|"
+                + Objects.toString(filter.name(), "") + "|"
+                + Objects.toString(filter.phone(), "") + "|"
+                + Objects.toString(filter.from(), "") + "|"
+                + Objects.toString(filter.to(), "");
     }
 
     private List<ConversationEntity> applyFilter(List<ConversationEntity> source, AnalyticsFilter filter) {

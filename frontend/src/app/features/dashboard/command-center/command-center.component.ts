@@ -3,7 +3,6 @@ import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CurrencyPipe, DecimalPipe } from '@angular/common';
-import { forkJoin } from 'rxjs';
 import { BusinessPulse, FunnelMetrics, OpsService } from '../../../core/services/ops.service';
 import { ReservationDto } from '../../../core/services/commercial.service';
 import { LiveSyncService } from '../../../core/services/live-sync.service';
@@ -49,17 +48,13 @@ export class CommandCenterComponent {
 
   reload(): void {
     this.loading.set(true);
-    forkJoin({
-      center: this.ops.loadCommandCenter(),
-      conversion: this.ops.getConversionQuoteSale(),
-      lag: this.ops.getResponseLag()
-    }).subscribe({
-      next: ({ center, conversion, lag }) => {
+    this.ops.loadCommandCenter().subscribe({
+      next: (center) => {
         this.pulse.set(center.pulse);
         this.funnel.set(center.funnel);
         this.agenda.set(center.agenda);
-        this.conversionPct.set(Number(conversion?.ratePct ?? center.funnel?.quoteToSaleRate ?? 0));
-        this.responseLagHours.set(Number(lag?.avgHoursBetweenCreateAndLastMessage ?? 0));
+        this.conversionPct.set(center.conversionPct);
+        this.responseLagHours.set(center.responseLagHours);
         this.loading.set(false);
       },
       error: () => this.loading.set(false)

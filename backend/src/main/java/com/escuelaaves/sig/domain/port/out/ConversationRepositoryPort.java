@@ -29,4 +29,8 @@ public interface ConversationRepositoryPort {
     long count();
 
     long countByStatus(com.escuelaaves.sig.domain.model.ConversationStatus status);
+
+    long countByCategory(String category);
+
+    long countByExternalKeyStartingWith(String prefix);
 }

@@ -69,15 +69,17 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
             return Optional.empty();
         }
         try {
+            long t0 = System.nanoTime();
             String body = restClientBuilder.build()
                     .get()
                     .uri(webAppUrl.trim())
                     .accept(MediaType.APPLICATION_JSON, MediaType.TEXT_PLAIN, MediaType.ALL)
                     .retrieve()
                     .body(String.class);
+            long httpMs = (System.nanoTime() - t0) / 1_000_000;
 
             if (body == null || body.isBlank()) {
-                log.warn("[GoogleSheets] Respuesta vacia del Web App");
+                log.warn("[GoogleSheets] Respuesta vacia del Web App (httpMs={})", httpMs);
                 return Optional.empty();
             }
 
@@ -106,10 +108,11 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
                 });
             }
             log.info(
-                    "[GoogleSheets] Dashboard payload OK (rootKeys={}, dataKeys={}, bytes={})",
+                    "[GoogleSheets] Dashboard payload OK (rootKeys={}, dataKeys={}, bytes={}, httpMs={})",
                     rootKeys,
                     dataKeys,
-                    body.length()
+                    body.length(),
+                    httpMs
             );
             return Optional.of(node);
         } catch (RestClientException ex) {

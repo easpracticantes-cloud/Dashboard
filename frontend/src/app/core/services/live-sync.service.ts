@@ -3,15 +3,22 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription, timer } from 'rxjs';
 import { IntegrationsService } from './integrations.service';
 import { SettingsService } from './settings.service';
+import { DashboardService } from './dashboard.service';
+import { OpsService } from './ops.service';
+import { AnalyticsService } from './analytics.service';
 
 /**
- * Dispara refrescos periodicos del CRM (Sheets → backend → UI)
- * sin recargar la pagina.
+ * Refresco de UI desde PostgreSQL (vía API).
+ * NO dispara sync de Google Sheets en la navegación: eso lo hace el backend (bootstrap + cron 5 min).
+ * Solo el botón manual llama a POST /integrations/sheets/sync.
  */
 @Injectable({ providedIn: 'root' })
 export class LiveSyncService {
   private readonly integrations = inject(IntegrationsService);
   private readonly settings = inject(SettingsService);
+  private readonly dashboard = inject(DashboardService);
+  private readonly ops = inject(OpsService);
+  private readonly analytics = inject(AnalyticsService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly tick = signal(0);
@@ -39,7 +46,7 @@ export class LiveSyncService {
     this.restartPolling();
   }
 
-  /** Dispara sync manual (botón del topbar). */
+  /** Dispara sync manual (botón del topbar) → Google Sheets solo aquí. */
   syncNow(): void {
     this.refresh(true);
   }
@@ -47,6 +54,10 @@ export class LiveSyncService {
   refresh(forceSync = false): void {
     this.syncing.set(true);
     const finish = () => {
+      this.dashboard.invalidateCache();
+      this.settings.invalidateCache();
+      this.ops.invalidateCommandCenter();
+      this.analytics.invalidateCache();
       this.syncing.set(false);
       this.lastSyncAt.set(new Date().toISOString());
       this.tick.update((n) => n + 1);
@@ -62,8 +73,9 @@ export class LiveSyncService {
   private restartPolling(): void {
     this.pollSub?.unsubscribe();
     const ms = Math.max(10, this.pollSeconds()) * 1000;
-    this.pollSub = timer(0, ms)
+    // timer(ms, ms): sin tick inmediato con sync; solo refresco de UI desde DB.
+    this.pollSub = timer(ms, ms)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.refresh(true));
+      .subscribe(() => this.refresh(false));
   }
 }

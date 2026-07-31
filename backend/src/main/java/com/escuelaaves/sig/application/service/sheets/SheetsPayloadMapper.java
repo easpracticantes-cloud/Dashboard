@@ -211,6 +211,21 @@ public class SheetsPayloadMapper {
                 dto.meta().hojasProcesadas() != null ? dto.meta().hojasProcesadas() : List.of(),
                 dto.meta().totalHojas()
         );
+        return copy(dto, meta, dto.rawSheets());
+    }
+
+    /** Quita matrices fullData del payload HTTP (sigue el resumen por hoja). */
+    public SheetsDashboardDto withoutRawMatrices(SheetsDashboardDto dto) {
+        if (dto == null || dto.rawSheets() == null || dto.rawSheets().isEmpty()) {
+            return dto;
+        }
+        List<RawSheetDto> slim = dto.rawSheets().stream()
+                .map(s -> new RawSheetDto(s.nombre(), s.rawRowCount(), List.of()))
+                .toList();
+        return copy(dto, dto.meta(), slim);
+    }
+
+    private SheetsDashboardDto copy(SheetsDashboardDto dto, SheetsMetaDto meta, List<RawSheetDto> rawSheets) {
         return new SheetsDashboardDto(
                 meta,
                 dto.kpis(),
@@ -231,7 +246,7 @@ public class SheetsPayloadMapper {
                 dto.estadisticas(),
                 dto.despliegueSemanal(),
                 dto.planComercial(),
-                dto.rawSheets(),
+                rawSheets,
                 dto.b2bStatus(),
                 dto.b2bMensaje(),
                 dto.success(),

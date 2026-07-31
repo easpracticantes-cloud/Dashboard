@@ -359,9 +359,10 @@ export class DashboardSheetsComponent implements AfterViewInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.nowTick.set(Date.now()));
 
+    // Poll solo desde caché/PostgreSQL (nunca forceRefresh → Google)
     interval(REFRESH_MS)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.load(true, true));
+      .subscribe(() => this.load(false, true));
   }
 
   ngAfterViewInit(): void {
@@ -372,6 +373,9 @@ export class DashboardSheetsComponent implements AfterViewInit {
     this.activeSection.set(section);
     if (section === 'seguimientos') {
       queueMicrotask(() => this.bindTableControls());
+    }
+    if (section === 'hojas') {
+      this.load(false, true);
     }
   }
 
@@ -477,7 +481,12 @@ export class DashboardSheetsComponent implements AfterViewInit {
     else this.loading.set(true);
     this.error.set(null);
 
-    this.dashboardService.getSheets(forceRefresh).subscribe({
+    // forceRefresh solo limpia caché Angular; el backend NO consulta Google en GET /dashboard/sheets
+    if (forceRefresh) {
+      this.dashboardService.invalidateCache();
+    }
+    const includeRaw = this.activeSection() === 'hojas';
+    this.dashboardService.getSheets(false, includeRaw).subscribe({
       next: (payload) => {
         this.loading.set(false);
         this.refreshing.set(false);
@@ -499,7 +508,7 @@ export class DashboardSheetsComponent implements AfterViewInit {
       error: () => {
         this.loading.set(false);
         this.refreshing.set(false);
-        this.error.set('Error de red al consultar Sheets.');
+        this.error.set('Error de red al consultar el dashboard (PostgreSQL).');
       }
     });
   }

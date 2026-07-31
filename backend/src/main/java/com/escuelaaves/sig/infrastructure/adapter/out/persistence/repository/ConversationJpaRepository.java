@@ -16,6 +16,12 @@ public interface ConversationJpaRepository extends JpaRepository<ConversationEnt
     long countByStatus(ConversationStatus status);
 
     @Override
+    long countByCategory(String category);
+
+    @Override
+    long countByExternalKeyStartingWith(String prefix);
+
+    @Override
     ConversationEntity save(ConversationEntity conversation);
 
     @Override

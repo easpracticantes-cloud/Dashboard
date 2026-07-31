@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, forkJoin, map, of } from 'rxjs';
+import { Observable, catchError, forkJoin, map, of, shareReplay } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiService } from './api.service';
 import { CommercialStatus, QuoteDto, ReservationDto, SaleDto } from './commercial.service';
@@ -74,6 +74,18 @@ export class OpsService {
   private readonly api = inject(ApiService);
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.apiBaseUrl;
+  private commandCenter$?: Observable<{
+    pulse: BusinessPulse;
+    funnel: FunnelMetrics | null;
+    agenda: ReservationDto[];
+    expiring: QuoteDto[];
+    conversionPct: number;
+    responseLagHours: number;
+  }>;
+
+  invalidateCommandCenter(): void {
+    this.commandCenter$ = undefined;
+  }
 
   getHealth(): Observable<OperationalHealth | null> {
     return this.api.get<OperationalHealth>('/ops/insights/health').pipe(catchError(() => of(null)));
@@ -115,32 +127,63 @@ export class OpsService {
     funnel: FunnelMetrics | null;
     agenda: ReservationDto[];
     expiring: QuoteDto[];
+    conversionPct: number;
+    responseLagHours: number;
   }> {
-    return forkJoin({
-      health: this.getHealth(),
-      funnel: this.getFunnel(),
-      agenda: this.getConfirmedToday(),
-      expiring: this.getExpiringQuotes(7),
-      sales: this.getSalesSumToday()
-    }).pipe(
-      map(({ health, funnel, agenda, expiring, sales }) => {
-        const party = agenda.reduce((acc, r) => acc + (r.partySize || 0), 0);
-        return {
-          funnel,
-          agenda,
-          expiring,
-          pulse: {
-            openConversations: health?.openConversations ?? 0,
-            expiringQuotes: expiring.length || health?.expiringQuotes || 0,
-            salesTodayCount: sales.count,
-            salesTodayAmount: sales.amount,
-            todayReservations: agenda.length,
-            todayPartySize: party,
-            quoteToSaleRate: funnel?.quoteToSaleRate ?? 0
-          }
-        };
-      })
-    );
+    if (!this.commandCenter$) {
+      this.commandCenter$ = this.api.get<{
+        health?: OperationalHealth;
+        funnel?: FunnelMetrics;
+        agenda?: ReservationDto[];
+        expiringQuotes?: QuoteDto[];
+        salesTodayCount?: number;
+        salesTodayAmount?: number;
+        conversionPct?: number;
+        responseLag?: { avgHoursBetweenCreateAndLastMessage?: number };
+      }>('/ops/command-center').pipe(
+        map((snap) => {
+          const agenda = snap.agenda ?? [];
+          const party = agenda.reduce((acc, r) => acc + (r.partySize || 0), 0);
+          const funnel = snap.funnel ?? null;
+          return {
+            funnel,
+            agenda,
+            expiring: snap.expiringQuotes ?? [],
+            conversionPct: Number(snap.conversionPct ?? funnel?.quoteToSaleRate ?? 0),
+            responseLagHours: Number(snap.responseLag?.avgHoursBetweenCreateAndLastMessage ?? 0),
+            pulse: {
+              openConversations: snap.health?.openConversations ?? 0,
+              expiringQuotes: (snap.expiringQuotes?.length || snap.health?.expiringQuotes) ?? 0,
+              salesTodayCount: snap.salesTodayCount ?? 0,
+              salesTodayAmount: Number(snap.salesTodayAmount ?? 0),
+              todayReservations: agenda.length,
+              todayPartySize: party,
+              quoteToSaleRate: funnel?.quoteToSaleRate ?? 0
+            }
+          };
+        }),
+        catchError(() =>
+          of({
+            pulse: {
+              openConversations: 0,
+              expiringQuotes: 0,
+              salesTodayCount: 0,
+              salesTodayAmount: 0,
+              todayReservations: 0,
+              todayPartySize: 0,
+              quoteToSaleRate: 0
+            },
+            funnel: null,
+            agenda: [],
+            expiring: [],
+            conversionPct: 0,
+            responseLagHours: 0
+          })
+        ),
+        shareReplay({ bufferSize: 1, refCount: true })
+      );
+    }
+    return this.commandCenter$;
   }
 
   searchClients(q: string): Observable<ClientSearchHit[]> {

@@ -243,6 +243,12 @@ public class OpsController {
     }
 
     // —— Insights ——
+    @GetMapping("/command-center")
+    @Operation(summary = "Snapshot agregado del command center (una sola petición)")
+    public OpsDtos.CommandCenterSnapshot commandCenter() {
+        return ops.getCommandCenter();
+    }
+
     @GetMapping("/insights/health")
     @Operation(summary = "33. Salud operativa")
     public OpsDtos.OperationalHealth health() {

@@ -80,4 +80,17 @@ public final class OpsDtos {
     public record DataQualityReport(double score, long clientsTotal, long clientsWithPhone, long quotesWithAmount,
                                     long conversationsWithAssignee, Map<String, Object> details) {
     }
+
+    /** Snapshot agregado del command center (una sola respuesta HTTP). */
+    public record CommandCenterSnapshot(
+            OperationalHealth health,
+            FunnelMetrics funnel,
+            List<com.escuelaaves.sig.application.dto.commercial.ReservationDto> agenda,
+            List<com.escuelaaves.sig.application.dto.commercial.QuoteDto> expiringQuotes,
+            long salesTodayCount,
+            BigDecimal salesTodayAmount,
+            double conversionPct,
+            Map<String, Object> responseLag
+    ) {
+    }
 }
