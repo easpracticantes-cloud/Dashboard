@@ -50,6 +50,12 @@ public class GoogleAuthAdapter implements GoogleTokenVerifierPort {
                         ? Collections.emptyList()
                         : Collections.singletonList(clientId))
                 .build();
+        log.info("[GOOGLE-AUTH-AUDIT] GoogleAuthAdapter init: clientIdPresent={}, clientId=[{}], "
+                        + "GOOGLE_CLIENT_ID getenvPresent={}, audienceSize={}",
+                clientId != null && !clientId.isBlank(),
+                clientId,
+                System.getenv("GOOGLE_CLIENT_ID") != null,
+                clientId == null || clientId.isBlank() ? 0 : 1);
     }
 
     @Override
@@ -60,16 +66,21 @@ public class GoogleAuthAdapter implements GoogleTokenVerifierPort {
         }
 
         try {
+            log.info("[GOOGLE-AUTH-AUDIT] verifyIdToken: usando Client ID (audience) = [{}]", clientId);
             GoogleIdToken token = verifier.verify(idToken);
             if (token == null) {
                 throw new UnauthorizedException("Token de Google inválido o expirado");
             }
             Payload payload = token.getPayload();
+            String email = payload.getEmail();
+            String name = (String) payload.get("name");
+            log.info("[GOOGLE-AUTH-AUDIT] verifyIdToken OK: email=[{}], name=[{}], emailVerified={}, aud={}",
+                    email, name, payload.getEmailVerified(), payload.getAudience());
             return new GoogleUserInfo(
                     payload.getSubject(),
-                    payload.getEmail(),
+                    email,
                     Boolean.TRUE.equals(payload.getEmailVerified()),
-                    (String) payload.get("name"),
+                    name,
                     (String) payload.get("picture")
             );
         } catch (UnauthorizedException ex) {
@@ -88,6 +99,9 @@ public class GoogleAuthAdapter implements GoogleTokenVerifierPort {
         }
 
         try {
+            log.info("[GOOGLE-AUTH-AUDIT] verifyAccessToken: Client ID configurado en adapter = [{}] "
+                            + "(userinfo no usa audience; se registra para correlación)",
+                    clientId);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(USERINFO_URL))
                     .timeout(Duration.ofSeconds(10))
@@ -108,12 +122,15 @@ public class GoogleAuthAdapter implements GoogleTokenVerifierPort {
             }
             boolean verified = json.path("email_verified").asBoolean(false)
                     || "true".equalsIgnoreCase(text(json, "email_verified"));
+            String name = text(json, "name");
+            log.info("[GOOGLE-AUTH-AUDIT] verifyAccessToken OK: email=[{}], name=[{}], emailVerified={}",
+                    email, name, verified);
 
             return new GoogleUserInfo(
                     text(json, "sub"),
                     email,
                     verified,
-                    text(json, "name"),
+                    name,
                     text(json, "picture")
             );
         } catch (UnauthorizedException ex) {
@@ -127,6 +144,10 @@ public class GoogleAuthAdapter implements GoogleTokenVerifierPort {
     private void ensureConfigured() {
         if (clientId == null || clientId.isBlank()) {
             log.error("app.google.client-id no está configurado; no se puede validar el login con Google");
+            log.error("[GOOGLE-AUTH-AUDIT] ensureConfigured FAIL: GOOGLE_CLIENT_ID getenv=[{}] "
+                            + "app.google.client-id resuelto blank. Origen probable: variable no definida en Render "
+                            + "ni en application.yml (default vacío).",
+                    System.getenv("GOOGLE_CLIENT_ID"));
             throw new UnauthorizedException("Login con Google no está configurado en el servidor");
         }
     }

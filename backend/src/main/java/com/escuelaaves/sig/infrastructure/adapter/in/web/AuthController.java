@@ -14,9 +14,11 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
@@ -35,6 +37,9 @@ public class AuthController {
     @PostMapping("/google-login")
     @Operation(summary = "Login con Google (Gmail): valida el ID Token, verifica la lista blanca y emite el JWT propio")
     public ResponseEntity<LoginResponse> googleLogin(@Valid @RequestBody GoogleLoginRequest request) {
+        log.info("[GOOGLE-AUTH-AUDIT] AuthController /google-login recibido: hasIdToken={} hasAccessToken={}",
+                request.idToken() != null && !request.idToken().isBlank(),
+                request.accessToken() != null && !request.accessToken().isBlank());
         return ResponseEntity.ok(googleAuthUseCase.googleLogin(request));
     }
 
