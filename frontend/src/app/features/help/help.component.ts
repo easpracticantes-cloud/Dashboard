@@ -87,7 +87,7 @@ export class HelpComponent {
     {
       icon: 'support_agent',
       title: 'Soporte Escuela Aves',
-      body: 'Escríbenos a escuelaavescomercial@gmail.com o easpracticantes@gmail.com.',
+      body: 'Escríbenos a escuelaavescomercial@gmail.com, easpracticantes@gmail.com o escuelaavesdesalento@gmail.com.',
       steps: ['Describe el módulo afectado.', 'Incluye captura y hora del incidente.', 'Indica el usuario con el que ingresaste.']
     }
   ];
@@ -95,7 +95,7 @@ export class HelpComponent {
   readonly faqs = [
     {
       q: '¿Cómo inicio sesión?',
-      a: 'Solo con Google. Usa escuelaavescomercial@gmail.com o easpracticantes@gmail.com.'
+      a: 'Solo con Google. Usa escuelaavescomercial@gmail.com, easpracticantes@gmail.com o escuelaavesdesalento@gmail.com.'
     },
     {
       q: '¿Por qué no veo datos nuevos?',

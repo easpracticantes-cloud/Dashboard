@@ -6,6 +6,7 @@ y solo para cuentas autorizadas.
 Cuentas permitidas actualmente:
 - `escuelaavescomercial@gmail.com`
 - `easpracticantes@gmail.com`
+- `escuelaavesdesalento@gmail.com`
 
 ## 1. Crear el OAuth Client ID en Google Cloud Console
 
@@ -18,6 +19,7 @@ Cuentas permitidas actualmente:
    - En **Usuarios de prueba** agrega:
      - `escuelaavescomercial@gmail.com`
      - `easpracticantes@gmail.com`
+     - `escuelaavesdesalento@gmail.com`
      mientras la app esté en modo *Testing*. (En producción puedes publicarla).
 4. Menú → **APIs y servicios → Credenciales → Crear credenciales → ID de cliente de OAuth**:
    - Tipo de aplicación: **Aplicación web**.
@@ -39,7 +41,7 @@ Variables de entorno (archivo `.env` en la raíz, ya soportadas por `docker-comp
 
 ```env
 GOOGLE_CLIENT_ID=896582936314-7mnegqbnnnaeduahj1m4kp256q0k574g.apps.googleusercontent.com
-GOOGLE_ALLOWED_EMAILS=escuelaavescomercial@gmail.com,easpracticantes@gmail.com
+GOOGLE_ALLOWED_EMAILS=escuelaavescomercial@gmail.com,easpracticantes@gmail.com,escuelaavesdesalento@gmail.com
 GOOGLE_DEFAULT_ROLE=GERENCIA
 ```
 
