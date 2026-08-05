@@ -7,6 +7,8 @@ import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionStepDto;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ChatRequest;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ChatResponse;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ChecklistResponse;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.CopilotRequest;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.CopilotResponse;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.DashboardSummaryRequest;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.DashboardSummaryResponse;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ProviderRecommendationDto;
@@ -185,6 +187,12 @@ public class GenerativeAiController {
                 outcome.dryRun(),
                 outcome.plan().stream().map(p -> p.tool().name()).toList()
         ));
+    }
+
+    @PostMapping("/copilot")
+    @Operation(summary = "Copiloto conversacional Ave (FAQ + cotización/checklist/tools)")
+    public ResponseEntity<CopilotResponse> copilot(@Valid @RequestBody CopilotRequest request) {
+        return ResponseEntity.ok(intelligenceService.copilot(request));
     }
 
     @PostMapping("/memory/sessions")

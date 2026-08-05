@@ -1,7 +1,7 @@
 <eas-page-header
-  eyebrow="Enterprise AI Engine"
-  title="Inteligencia Artificial"
-  subtitle="Cotizador, reglas de negocio, checklists, proveedores, WhatsApp e insights — sin acoplar la UI a Gemini."
+  eyebrow="Consola técnica"
+  title="Consola IA"
+  subtitle="Herramientas admin: cotizador batch, reglas, checklists, proveedores, WhatsApp e insights. El chat del día a día es Ave (muñeco flotante abajo a la derecha)."
 ></eas-page-header>
 
 @if (providerStatus(); as st) {
@@ -48,44 +48,6 @@
             <p><strong>Asunto:</strong> {{ q.emailSubject }}</p>
             <pre class="ai-pre">{{ q.emailBody }}</pre>
           }
-        </article>
-      }
-    </section>
-  }
-  @case ('actions') {
-    <section class="ai-panel">
-      <p class="ai-muted">
-        Function-calling interno: la IA propone tools; el CRM ejecuta. Por defecto simula (dryRun).
-        Para mutar datos reales marca Confirmación y desactiva Dry-run.
-      </p>
-      <label class="ai-label">Instrucción operativa</label>
-      <textarea class="ai-input" rows="4" [(ngModel)]="actionInstruction"></textarea>
-      <label class="ai-label">Contexto JSON (IDs, teléfono, etc.)</label>
-      <textarea class="ai-input" rows="3" [(ngModel)]="actionContextJson"></textarea>
-      <div class="ai-form-row">
-        <label class="ai-check"><input type="checkbox" [(ngModel)]="actionDryRun" /> Dry-run (simular)</label>
-        <label class="ai-check"><input type="checkbox" [(ngModel)]="actionConfirm" /> Confirmar mutaciones</label>
-      </div>
-      <button type="button" class="eas-btn-primary" [disabled]="loading()" (click)="runActions()">
-        {{ loading() ? 'Ejecutando…' : 'Ejecutar asistente' }}
-      </button>
-      @if (actionOutcome(); as ao) {
-        <article class="ai-result">
-          <p>
-            <strong>{{ ao.executed ? 'Ejecutado' : 'Simulado' }}</strong>
-            · tools: {{ ao.plannedTools.join(', ') || 'ninguno' }}
-          </p>
-          <p class="ai-muted">{{ ao.rationale }}</p>
-          <ul>
-            @for (step of ao.results; track step.tool + step.message) {
-              <li>
-                <strong>{{ step.tool }}</strong>
-                {{ step.success ? '✓' : '✗' }}
-                {{ step.dryRun ? '(dry)' : '' }} — {{ step.message }}
-              </li>
-            }
-          </ul>
-          <pre class="ai-pre">{{ ao.narrative }}</pre>
         </article>
       }
     </section>

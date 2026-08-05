@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import {
-  ActionExecuteResponse,
   AnalyticsInsight,
   ChecklistResponse,
   EnterpriseAiService,
@@ -15,7 +14,7 @@ import {
   UsageLog
 } from '../../core/services/enterprise-ai.service';
 
-type AiTab = 'quote' | 'actions' | 'rules' | 'checklist' | 'providers' | 'whatsapp' | 'insights' | 'usage';
+type AiTab = 'quote' | 'rules' | 'checklist' | 'providers' | 'whatsapp' | 'insights' | 'usage';
 
 @Component({
   selector: 'eas-ai',
@@ -34,13 +33,6 @@ export class AiComponent implements OnInit {
 
   quoteMessage = 'Necesito una cotización para cinco personas al tour Acaime desde Armenia con transporte y almuerzo.';
   readonly quotation = signal<QuotationResponse | null>(null);
-
-  actionInstruction =
-    'Crea o encuentra el cliente con teléfono 3001112233 nombre Laura, resuelve checklist ACAIME y sugiere proveedores.';
-  actionContextJson = '{}';
-  actionDryRun = true;
-  actionConfirm = false;
-  readonly actionOutcome = signal<ActionExecuteResponse | null>(null);
 
   ruleTour = 'ACAIME';
   rulePeople = 5;
@@ -66,7 +58,6 @@ export class AiComponent implements OnInit {
 
   readonly tabs: { key: AiTab; label: string; icon: string }[] = [
     { key: 'quote', label: 'Cotizador', icon: 'request_quote' },
-    { key: 'actions', label: 'Asistente', icon: 'bolt' },
     { key: 'rules', label: 'Reglas', icon: 'rule' },
     { key: 'checklist', label: 'Checklists', icon: 'checklist' },
     { key: 'providers', label: 'Proveedores', icon: 'handshake' },
@@ -101,25 +92,6 @@ export class AiComponent implements OnInit {
       },
       error: (err) => this.fail(err)
     });
-  }
-
-  runActions(): void {
-    this.loading.set(true);
-    this.error.set(null);
-    this.ai
-      .executeActions({
-        instruction: this.actionInstruction,
-        contextJson: this.actionContextJson,
-        dryRun: this.actionDryRun,
-        confirm: this.actionConfirm
-      })
-      .subscribe({
-        next: (r) => {
-          this.actionOutcome.set(r);
-          this.loading.set(false);
-        },
-        error: (err) => this.fail(err)
-      });
   }
 
   loadRules(): void {

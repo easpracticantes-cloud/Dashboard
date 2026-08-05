@@ -1,0 +1,82 @@
+<div class="ave" [class.ave--open]="open()">
+  @if (!open() && bounce()) {
+    <div class="ave-hint" aria-hidden="true">¿Necesitas ayuda?</div>
+  }
+
+  @if (open()) {
+    <section class="ave-panel" role="dialog" aria-label="Chat con Ave">
+      <header class="ave-panel__head">
+        <div class="ave-panel__identity">
+          <div class="ave-avatar ave-avatar--sm">
+            <img src="assets/brand/mark-bird.svg" alt="" width="28" height="28" />
+          </div>
+          <div>
+            <strong>Ave</strong>
+            <span>Copiloto · Escuela Aves</span>
+          </div>
+        </div>
+        <button type="button" class="ave-icon-btn" (click)="toggle()" aria-label="Cerrar chat">
+          <mat-icon>close</mat-icon>
+        </button>
+      </header>
+
+      <div class="ave-panel__body" #scroller>
+        @for (m of messages(); track $index) {
+          <div class="ave-msg" [class.ave-msg--user]="m.role === 'user'" [class.ave-msg--system]="m.role === 'system'">
+            <div class="ave-msg__bubble" [innerHTML]="formatHtml(m.text)"></div>
+            @if (m.mode && m.role === 'assistant' && m.mode !== 'ANSWER') {
+              <span class="ave-msg__mode">{{ m.mode }}</span>
+            }
+          </div>
+        }
+        @if (sending()) {
+          <div class="ave-msg">
+            <div class="ave-msg__bubble ave-msg__bubble--typing">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="ave-panel__hints">
+        @for (s of suggestions; track s) {
+          <button type="button" class="ave-chip" (click)="useSuggestion(s)">{{ s }}</button>
+        }
+      </div>
+
+      <footer class="ave-panel__foot">
+        <textarea
+          class="ave-input"
+          rows="2"
+          [(ngModel)]="draft"
+          (keydown)="onKeydown($event)"
+          placeholder="Escríbele a Ave…"
+          [disabled]="sending()"
+        ></textarea>
+        <button type="button" class="ave-send" (click)="send()" [disabled]="sending() || !draft.trim()" aria-label="Enviar">
+          <mat-icon>send</mat-icon>
+        </button>
+      </footer>
+    </section>
+  }
+
+  <button
+    type="button"
+    class="ave-doll"
+    [class.ave-doll--pulse]="bounce() && !open()"
+    [class.ave-doll--open]="open()"
+    (click)="toggle()"
+    [attr.aria-label]="open() ? 'Cerrar Ave' : 'Abrir chat con Ave'"
+  >
+    <span class="ave-doll__shadow" aria-hidden="true"></span>
+    <span class="ave-doll__body">
+      <span class="ave-doll__face">
+        <img src="assets/brand/mark-bird.svg" alt="" />
+      </span>
+      <span class="ave-doll__feet" aria-hidden="true"></span>
+    </span>
+    @if (!open()) {
+      <span class="ave-doll__badge">Ave</span>
+    }
+  </button>
+</div>

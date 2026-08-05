@@ -24,6 +24,8 @@ import com.escuelaaves.sig.domain.ai.port.out.ChecklistPort;
 import com.escuelaaves.sig.domain.ai.port.out.ConversationMemoryPort;
 import com.escuelaaves.sig.domain.ai.port.out.RecommendationPort;
 import com.escuelaaves.sig.domain.ai.port.out.WhatsAppAiAssistPort;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.CopilotRequest;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.CopilotResponse;
 import com.escuelaaves.sig.domain.ai.model.ActionPlanOutcome;
 import com.escuelaaves.sig.domain.port.in.AIUseCase;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity.AiUsageLogEntity;
@@ -54,6 +56,7 @@ public class IntelligenceService implements AIUseCase {
     private final AiProviderFactory aiProviderFactory;
     private final QuotationOrchestrator quotationOrchestrator;
     private final ActionOrchestrator actionOrchestrator;
+    private final CopilotOrchestrator copilotOrchestrator;
     private final ChecklistPort checklistPort;
     private final RecommendationPort recommendationPort;
     private final AiObservabilityPort observabilityPort;
@@ -191,6 +194,10 @@ public class IntelligenceService implements AIUseCase {
 
     public ActionPlanOutcome executeActions(String instruction, String contextJson, boolean dryRun, boolean confirm) {
         return actionOrchestrator.run(instruction, contextJson, dryRun, confirm);
+    }
+
+    public CopilotResponse copilot(CopilotRequest request) {
+        return copilotOrchestrator.chat(request);
     }
 
     @Transactional(readOnly = true)

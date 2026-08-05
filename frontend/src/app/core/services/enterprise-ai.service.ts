@@ -154,6 +154,19 @@ export class EnterpriseAiService {
   }): Observable<ActionExecuteResponse> {
     return this.api.post('/ai/actions/execute', body);
   }
+
+  copilot(message: string, sessionId?: string): Observable<CopilotResponse> {
+    return this.api.post('/ai/copilot', { message, sessionId });
+  }
+}
+
+export interface CopilotResponse {
+  sessionId: string;
+  reply: string;
+  mode: string;
+  toolsUsed: string[];
+  provider: string;
+  success: boolean;
 }
 
 export interface ActionExecuteResponse {

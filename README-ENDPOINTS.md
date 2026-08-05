@@ -118,6 +118,7 @@ JWT requerido. Precios solo desde PostgreSQL; la IA interpreta/redacta.
 | POST | `/ai/insights` | Insights analíticos IA |
 | POST | `/ai/whatsapp/auto-reply` | Borrador WhatsApp + prioridad |
 | POST | `/ai/actions/execute` | Asistente operativo (tools CRM; `dryRun` default true, `confirm` para mutar) |
+| POST | `/ai/copilot` | Copiloto Ave (FAQ + cotización/checklist/proveedores; UI = muñeco flotante) |
 | POST | `/ai/memory/sessions` | Iniciar memoria conversacional |
 | POST | `/ai/memory/{id}/messages` | Append mensaje |
 | GET | `/ai/memory/{id}/messages` | Leer memoria |

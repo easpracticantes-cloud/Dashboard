@@ -143,4 +143,20 @@ public final class AiModuleDtos {
             java.util.List<String> plannedTools
     ) {
     }
+
+    public record CopilotRequest(
+            @NotBlank String message,
+            String sessionId
+    ) {
+    }
+
+    public record CopilotResponse(
+            String sessionId,
+            String reply,
+            String mode,
+            java.util.List<String> toolsUsed,
+            String provider,
+            boolean success
+    ) {
+    }
 }

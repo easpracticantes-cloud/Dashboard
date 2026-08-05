@@ -9,11 +9,12 @@ import { SidebarComponent } from './sidebar/sidebar.component';
 import { TopbarComponent } from './topbar/topbar.component';
 import { LiveSyncService } from '../../core/services/live-sync.service';
 import { CommandPaletteComponent } from '../../shared/components/command-palette/command-palette.component';
+import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-copilot.component';
 
 @Component({
   selector: 'eas-shell',
   standalone: true,
-  imports: [RouterOutlet, MatSidenavModule, MatDialogModule, SidebarComponent, TopbarComponent],
+  imports: [RouterOutlet, MatSidenavModule, MatDialogModule, SidebarComponent, TopbarComponent, AveCopilotComponent],
   template: `
     <mat-sidenav-container class="shell">
       <mat-sidenav
@@ -33,6 +34,7 @@ import { CommandPaletteComponent } from '../../shared/components/command-palette
             <router-outlet></router-outlet>
           </div>
         </main>
+        <eas-ave-copilot />
       </mat-sidenav-content>
     </mat-sidenav-container>
   `,
