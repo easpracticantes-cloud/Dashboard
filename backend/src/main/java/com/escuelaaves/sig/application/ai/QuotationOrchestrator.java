@@ -51,8 +51,9 @@ public class QuotationOrchestrator {
         GenerativeAiPort ai = aiProviderFactory.getActiveProvider();
         boolean success = true;
         String error = null;
+        String providerId = ai.providerId();
         try {
-            QuoteInterpretation interpretation = ai.interpretQuote(request.message());
+            QuoteInterpretation interpretation = interpretWithFallback(ai, request.message());
             RuleContext ruleContext = new RuleContext(
                     interpretation.tour(),
                     interpretation.people(),
@@ -74,7 +75,7 @@ public class QuotationOrchestrator {
 
             NaturalLanguageQuotation natural = null;
             if (request.shouldGenerateNarrative()) {
-                natural = ai.generateQuotationNarrative(priced);
+                natural = narrativeWithFallback(ai, priced);
             }
 
             return toResponse(priced, natural, rules, checklist, recommendations);
@@ -87,13 +88,49 @@ public class QuotationOrchestrator {
                     null,
                     "/api/v1/ai/quotation",
                     "quotation",
-                    ai.providerId(),
+                    providerId,
                     null,
                     System.currentTimeMillis() - start,
                     estimateTokens(request.message()),
                     success,
                     error
             ));
+        }
+    }
+
+    private QuoteInterpretation interpretWithFallback(GenerativeAiPort ai, String message) {
+        try {
+            return ai.interpretQuote(message);
+        } catch (Exception ex) {
+            log.warn("[QuoteOrchestrator] interpret IA falló, heuristic local: {}", ex.getMessage());
+            return HeuristicQuoteInterpreter.interpret(message);
+        }
+    }
+
+    private NaturalLanguageQuotation narrativeWithFallback(GenerativeAiPort ai, PricedQuotation priced) {
+        try {
+            return ai.generateQuotationNarrative(priced);
+        } catch (Exception ex) {
+            log.warn("[QuoteOrchestrator] narrativa IA falló, texto local: {}", ex.getMessage());
+            String text = """
+                    Cotización %s para %s personas.
+                    Tour: %s %s | Transporte: %s | Restaurante: %s
+                    Total: %s %s
+                    """.formatted(
+                    priced.tourName(),
+                    priced.interpretation().people(),
+                    priced.subtotalTour(),
+                    priced.currency(),
+                    priced.subtotalTransport(),
+                    priced.subtotalRestaurant(),
+                    priced.total(),
+                    priced.currency()
+            ).trim();
+            return new NaturalLanguageQuotation(
+                    "Cotización " + priced.tourName(),
+                    text,
+                    text
+            );
         }
     }
 

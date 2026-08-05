@@ -10,6 +10,28 @@ interface ChatBubble {
   mode?: string;
 }
 
+const LOCAL_FAQ: { keys: string[]; reply: string }[] = [
+  {
+    keys: ['hola', 'buenas', 'buenos dias', 'hey', 'saludos'],
+    reply:
+      '¡Hola! Soy **Ave**. Puedo ayudarte con cotizaciones, jeep, checklists y el uso del SIG. Prueba: *“¿Jeep privado o público?”*'
+  },
+  {
+    keys: ['jeep privado', 'jeep publico', 'jeep público', 'transporte privado'],
+    reply:
+      '**Jeep:** más de 4 personas → **privado**; 4 o menos → **público**. Guías no pagan entrada; sí pagan almuerzo.'
+  },
+  {
+    keys: ['como cotiz', 'cómo cotiz', 'crear cotizacion', 'crear cotización'],
+    reply:
+      'Ve a **Cotizaciones → Nueva**, o escríbeme: *“Cotiza Acaime para 5 con transporte y almuerzo”*.'
+  },
+  {
+    keys: ['checklist', 'que llevar', 'qué llevar'],
+    reply: 'Dime el tour (ej. Acaime) y te traigo el checklist operativo desde el SIG.'
+  }
+];
+
 @Component({
   selector: 'eas-ave-copilot',
   standalone: true,
@@ -89,10 +111,30 @@ export class AveCopilotComponent {
         this.scrollBottom();
       },
       error: (err) => {
-        const msg =
-          (err as { error?: { message?: string } })?.error?.message ||
-          'No pude responder ahora. Revisa la conexión o GEMINI_API_KEY e inténtalo de nuevo.';
-        this.messages.update((m) => [...m, { role: 'system', text: msg }]);
+        const local = this.localReply(text);
+        if (local) {
+          this.messages.update((m) => [...m, { role: 'assistant', text: local, mode: 'LOCAL' }]);
+        } else {
+          const apiMsg =
+            (err as { error?: { message?: string; detail?: string } })?.error?.message ||
+            (err as { error?: { detail?: string } })?.error?.detail ||
+            (err as { message?: string })?.message ||
+            '';
+          const status = (err as { status?: number })?.status;
+          const hint =
+            status === 404
+              ? 'El backend aún no tiene `/ai/copilot` (redeploy pendiente).'
+              : status === 0
+                ? 'No hay conexión con el API.'
+                : apiMsg || 'Revisa GEMINI_API_KEY / modelo en el servidor.';
+          this.messages.update((m) => [
+            ...m,
+            {
+              role: 'system',
+              text: `No pude hablar con el servidor. ${hint}`
+            }
+          ]);
+        }
         this.sending.set(false);
         this.scrollBottom();
       }
@@ -104,6 +146,19 @@ export class AveCopilotComponent {
       event.preventDefault();
       this.send();
     }
+  }
+
+  private localReply(text: string): string | null {
+    const n = text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '');
+    for (const faq of LOCAL_FAQ) {
+      if (faq.keys.some((k) => n.includes(k.normalize('NFD').replace(/\p{M}/gu, '')))) {
+        return faq.reply;
+      }
+    }
+    return null;
   }
 
   private scrollBottom(): void {

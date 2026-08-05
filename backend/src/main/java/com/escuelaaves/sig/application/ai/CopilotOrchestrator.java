@@ -71,6 +71,13 @@ public class CopilotOrchestrator {
 
     private static final List<FaqEntry> FAQ = List.of(
             new FaqEntry(
+                    List.of("hola", "buenas", "buenos dias", "buenos días", "hey", "qué tal", "que tal", "saludos"),
+                    """
+                    ¡Hola! Soy **Ave**, tu copiloto del SIG.
+                    Pregúntame por cotizaciones, jeep, checklists, clientes o cómo usar Seguimiento/Reservas.
+                    Ejemplo: *“Cotiza Acaime para 5 con transporte”*."""
+            ),
+            new FaqEntry(
                     List.of("jeep privado", "jeep publico", "jeep público", "transporte privado", "transporte publico"),
                     """
                     **Jeep: privado vs público**
@@ -210,31 +217,93 @@ public class CopilotOrchestrator {
         long start = System.currentTimeMillis();
         boolean success = true;
         String error = null;
-        String usedProvider = aiProviderFactory.activeType().id();
+        String usedProvider = "local";
+        String sessionId = "ephemeral";
         try {
             if (request == null || request.message() == null || request.message().isBlank()) {
                 throw new BadRequestException("Escribe un mensaje para Ave");
             }
-            String sessionId = ensureSession(request.sessionId());
+            try {
+                usedProvider = aiProviderFactory.activeType().id();
+            } catch (Exception ignored) {
+                usedProvider = "local";
+            }
+            final String sid = softSession(request.sessionId());
+            sessionId = sid;
             String userMsg = request.message().trim();
-            memoryPort.appendMessage(sessionId, "user", userMsg);
+            softAppend(sid, "user", userMsg);
 
-            CopilotResponse response = routeLocally(sessionId, userMsg)
-                    .orElseGet(() -> routeWithLlm(sessionId, userMsg));
+            CopilotResponse response;
+            try {
+                response = routeLocally(sid, userMsg)
+                        .orElseGet(() -> routeWithLlm(sid, userMsg));
+            } catch (Exception ex) {
+                log.warn("[Copilot] ruta falló, softFallback: {}", ex.getMessage());
+                response = softFallback(sid, userMsg);
+            }
             usedProvider = response.provider() != null ? response.provider() : usedProvider;
-
-            memoryPort.appendMessage(sessionId, "assistant", response.reply());
+            softAppend(sid, "assistant", response.reply());
             return response;
+        } catch (BadRequestException ex) {
+            success = false;
+            error = ex.getMessage();
+            return new CopilotResponse(sessionId, ex.getMessage(), "ANSWER", List.of("error"), "local", false);
         } catch (RuntimeException ex) {
             success = false;
             error = ex.getMessage();
-            throw ex;
+            log.error("[Copilot] error inesperado: {}", ex.getMessage());
+            return softFallback(sessionId, request != null ? request.message() : "");
         } finally {
-            observabilityPort.record(new AiObservabilityPort.AiUsageEvent(
-                    null, "/api/v1/ai/copilot", "copilot", usedProvider, null,
-                    System.currentTimeMillis() - start, null, success, error
-            ));
+            try {
+                observabilityPort.record(new AiObservabilityPort.AiUsageEvent(
+                        null, "/api/v1/ai/copilot", "copilot", usedProvider, null,
+                        System.currentTimeMillis() - start, null, success, error
+                ));
+            } catch (Exception obsEx) {
+                log.warn("[Copilot] no se pudo registrar uso: {}", obsEx.getMessage());
+            }
         }
+    }
+
+    private String softSession(String sessionId) {
+        try {
+            return ensureSession(sessionId);
+        } catch (Exception ex) {
+            log.warn("[Copilot] memoria no disponible, sesión efímera: {}", ex.getMessage());
+            return "ephemeral-" + java.util.UUID.randomUUID().toString().replace("-", "");
+        }
+    }
+
+    private void softAppend(String sessionId, String role, String content) {
+        if (sessionId == null || sessionId.startsWith("ephemeral")) {
+            return;
+        }
+        try {
+            memoryPort.appendMessage(sessionId, role, content);
+        } catch (Exception ex) {
+            log.warn("[Copilot] append memoria omitido: {}", ex.getMessage());
+        }
+    }
+
+    private String softHistory(String sessionId) {
+        if (sessionId == null || sessionId.startsWith("ephemeral")) {
+            return "(sin historial)";
+        }
+        try {
+            return memoryPort.recentMessages(sessionId, 8).stream()
+                    .map(m -> m.role() + ": " + m.content())
+                    .collect(Collectors.joining("\n"));
+        } catch (Exception ex) {
+            return "(sin historial)";
+        }
+    }
+
+    private static String safeMsg(Exception ex) {
+        String m = ex.getMessage();
+        if (m == null || m.isBlank()) {
+            return ex.getClass().getSimpleName();
+        }
+        return m.length() > 160 ? m.substring(0, 160) + "…" : m;
     }
 
     private Optional<CopilotResponse> routeLocally(String sessionId, String message) {
@@ -269,9 +338,7 @@ public class CopilotOrchestrator {
 
     private CopilotResponse routeWithLlm(String sessionId, String message) {
         String catalog = buildTariffHint();
-        String history = memoryPort.recentMessages(sessionId, 8).stream()
-                .map(m -> m.role() + ": " + m.content())
-                .collect(Collectors.joining("\n"));
+        String history = softHistory(sessionId);
         String provider = aiProviderFactory.activeType().id();
         try {
             GenerativeAiPort ai = aiProviderFactory.getActiveProvider();
@@ -333,40 +400,55 @@ public class CopilotOrchestrator {
     }
 
     private CopilotResponse handleQuote(String sessionId, String message, String provider) {
-        QuotationResponse q = quotationOrchestrator.orchestrate(new QuotationRequest(message, true));
-        String reply = """
-                Cotización lista (precios desde PostgreSQL, no inventados):
+        try {
+            QuotationResponse q = quotationOrchestrator.orchestrate(new QuotationRequest(message, true));
+            String reply = """
+                    Cotización lista (precios desde PostgreSQL, no inventados):
 
-                **%s** · %s personas
-                Total: **%s %s**
-                Tour: %s | Transporte: %s | Restaurante: %s
+                    **%s** · %s personas
+                    Total: **%s %s**
+                    Tour: %s | Transporte: %s | Restaurante: %s
 
-                %s
-                """.formatted(
-                q.tourName() != null ? q.tourName() : q.tour(),
-                q.people(),
-                q.total(),
-                q.currency(),
-                q.subtotalTour(),
-                q.subtotalTransport(),
-                q.subtotalRestaurant(),
-                q.quotationText() != null ? q.quotationText() : (q.emailBody() != null ? q.emailBody() : "")
-        ).trim();
-        List<String> tools = new ArrayList<>();
-        tools.add("quotation");
-        if (q.rulesApplied() != null) {
-            tools.addAll(q.rulesApplied());
+                    %s
+                    """.formatted(
+                    q.tourName() != null ? q.tourName() : q.tour(),
+                    q.people(),
+                    q.total(),
+                    q.currency(),
+                    q.subtotalTour(),
+                    q.subtotalTransport(),
+                    q.subtotalRestaurant(),
+                    q.quotationText() != null ? q.quotationText() : (q.emailBody() != null ? q.emailBody() : "")
+            ).trim();
+            List<String> tools = new ArrayList<>();
+            tools.add("quotation");
+            if (q.rulesApplied() != null) {
+                tools.addAll(q.rulesApplied());
+            }
+            return new CopilotResponse(sessionId, reply, "QUOTE", tools, provider, true);
+        } catch (Exception ex) {
+            log.warn("[Copilot] cotización falló: {}", ex.getMessage());
+            return new CopilotResponse(sessionId,
+                    "No pude calcular la cotización ahora (" + safeMsg(ex) + "). "
+                            + "Revisa que existan tarifas del tour en PostgreSQL. "
+                            + "Mientras tanto puedo ayudarte con jeep, checklist o cómo cotizar en el menú Cotizaciones.",
+                    "ANSWER", List.of("quote-error"), "local", false);
         }
-        return new CopilotResponse(sessionId, reply, "QUOTE", tools, provider, true);
     }
 
     private CopilotResponse handleChecklist(String sessionId, String tour, String provider) {
-        ChecklistPort.Checklist c = checklistPort.resolve(tour);
-        String items = c.items().stream()
-                .map(i -> (i.required() ? "☐ " : "○ ") + i.label() + " (" + i.category() + ")")
-                .collect(Collectors.joining("\n"));
-        String reply = "**" + c.title() + "**\n\n" + items;
-        return new CopilotResponse(sessionId, reply, "CHECKLIST", List.of("checklist:" + tour), provider, true);
+        try {
+            ChecklistPort.Checklist c = checklistPort.resolve(tour);
+            String items = c.items().stream()
+                    .map(i -> (i.required() ? "☐ " : "○ ") + i.label() + " (" + i.category() + ")")
+                    .collect(Collectors.joining("\n"));
+            String reply = "**" + c.title() + "**\n\n" + items;
+            return new CopilotResponse(sessionId, reply, "CHECKLIST", List.of("checklist:" + tour), provider, true);
+        } catch (Exception ex) {
+            return new CopilotResponse(sessionId,
+                    "No encontré checklist para **" + tour + "**. Prueba ACAIME, COCORA, FILANDIA, TERMALES o CAFE.",
+                    "ANSWER", List.of(), "local", false);
+        }
     }
 
     private CopilotResponse handleProviders(String sessionId, String tour, String category, String provider) {
