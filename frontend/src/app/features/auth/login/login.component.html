@@ -2,17 +2,23 @@
   <aside class="login-hero">
     <div class="login-hero__photo" role="img" aria-label="Valle de Cócora al atardecer, Salento Quindío"></div>
     <div class="login-hero__veil"></div>
+    <div class="login-hero__glow login-hero__glow--sun"></div>
+    <div class="login-hero__glow login-hero__glow--leaf"></div>
     <div class="login-hero__mist login-hero__mist--a"></div>
     <div class="login-hero__mist login-hero__mist--b"></div>
+    <div class="login-hero__particles" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
 
     <div class="login-hero__inner">
       <eas-brand-logo variant="lockup-light" [height]="44" subtitle="Sistema Inteligente de Gestión"></eas-brand-logo>
 
       <div class="login-hero__copy">
         <p class="login-hero__eyebrow">Escuela Aves Salento</p>
-        <h1>
-          escuela<span>aves</span>
+        <h1 class="login-hero__brand" aria-label="EAS">
+          <span class="login-hero__brand-letter login-hero__brand-letter--e">E</span><span class="login-hero__brand-letter login-hero__brand-letter--a">A</span><span class="login-hero__brand-letter login-hero__brand-letter--s">S</span>
         </h1>
+        <p class="login-hero__tagline">SIG · Operación que vuela alto</p>
         <p class="login-hero__lead">
           Del Valle de Cócora a tu operación diaria:
           conversaciones, clientes e indicadores en un solo lugar.
@@ -30,7 +36,13 @@
   </aside>
 
   <main class="login-main">
+    <div class="login-main__orb login-main__orb--a" aria-hidden="true"></div>
+    <div class="login-main__orb login-main__orb--b" aria-hidden="true"></div>
+    <div class="login-main__orb login-main__orb--c" aria-hidden="true"></div>
+
     <div class="login-card eas-animate-rise">
+      <div class="login-card__shine" aria-hidden="true"></div>
+
       <div class="login-card__head">
         <eas-brand-logo variant="full" [height]="58"></eas-brand-logo>
         <div class="login-card__titles">
