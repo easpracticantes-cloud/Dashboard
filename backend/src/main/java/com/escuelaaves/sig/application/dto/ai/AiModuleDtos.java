@@ -108,4 +108,39 @@ public final class AiModuleDtos {
             String category
     ) {
     }
+
+    public record ActionExecuteRequest(
+            @NotBlank String instruction,
+            String contextJson,
+            Boolean dryRun,
+            Boolean confirm
+    ) {
+        public boolean dryRunOrDefault() {
+            return dryRun == null || Boolean.TRUE.equals(dryRun);
+        }
+
+        public boolean confirmOrFalse() {
+            return Boolean.TRUE.equals(confirm);
+        }
+    }
+
+    public record ActionStepDto(
+            String tool,
+            boolean success,
+            boolean skipped,
+            boolean dryRun,
+            String message,
+            java.util.Map<String, Object> data
+    ) {
+    }
+
+    public record ActionExecuteResponse(
+            String rationale,
+            java.util.List<ActionStepDto> results,
+            String narrative,
+            boolean executed,
+            boolean dryRun,
+            java.util.List<String> plannedTools
+    ) {
+    }
 }

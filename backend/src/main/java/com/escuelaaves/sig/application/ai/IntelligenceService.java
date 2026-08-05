@@ -19,14 +19,22 @@ import com.escuelaaves.sig.domain.ai.model.SentimentAnalysis;
 import com.escuelaaves.sig.domain.ai.port.AiProviderFactory;
 import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
 import com.escuelaaves.sig.domain.ai.port.out.AiObservabilityPort;
+import com.escuelaaves.sig.domain.ai.port.out.AnalyticsInsightPort;
 import com.escuelaaves.sig.domain.ai.port.out.ChecklistPort;
+import com.escuelaaves.sig.domain.ai.port.out.ConversationMemoryPort;
 import com.escuelaaves.sig.domain.ai.port.out.RecommendationPort;
+import com.escuelaaves.sig.domain.ai.port.out.WhatsAppAiAssistPort;
+import com.escuelaaves.sig.domain.ai.model.ActionPlanOutcome;
 import com.escuelaaves.sig.domain.port.in.AIUseCase;
+import com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity.AiUsageLogEntity;
+import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.AiUsageLogJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 
 /**
@@ -45,9 +53,14 @@ public class IntelligenceService implements AIUseCase {
 
     private final AiProviderFactory aiProviderFactory;
     private final QuotationOrchestrator quotationOrchestrator;
+    private final ActionOrchestrator actionOrchestrator;
     private final ChecklistPort checklistPort;
     private final RecommendationPort recommendationPort;
     private final AiObservabilityPort observabilityPort;
+    private final ConversationMemoryPort conversationMemoryPort;
+    private final WhatsAppAiAssistPort whatsAppAiAssistPort;
+    private final AnalyticsInsightPort analyticsInsightPort;
+    private final AiUsageLogJpaRepository usageLogRepository;
 
     private GenerativeAiPort ai() {
         return aiProviderFactory.getActiveProvider();
@@ -141,6 +154,63 @@ public class IntelligenceService implements AIUseCase {
                 .map(i -> new ChecklistItemDto(i.code(), i.label(), i.category(), i.required(), i.sortOrder()))
                 .toList();
         return new AiModuleDtos.ChecklistResponse(c.tourCode(), c.title(), items);
+    }
+
+    public Map<String, Object> providerStatus() {
+        GenerativeAiPort provider = ai();
+        return Map.of(
+                "provider", provider.providerId(),
+                "code", provider.code().name(),
+                "status", provider.status().name(),
+                "activeType", aiProviderFactory.activeType().id()
+        );
+    }
+
+    public String startMemorySession(Long userId, String title) {
+        return conversationMemoryPort.startSession(userId, title);
+    }
+
+    public void appendMemory(String sessionId, String role, String content) {
+        conversationMemoryPort.appendMessage(sessionId, role, content);
+    }
+
+    public List<ConversationMemoryPort.MemoryMessage> memoryMessages(String sessionId, int limit) {
+        return conversationMemoryPort.recentMessages(sessionId, limit);
+    }
+
+    public Map<String, String> whatsappAutoReply(String conversationText) {
+        return observe("whatsappAutoReply", "/api/v1/ai/whatsapp/auto-reply", () -> Map.of(
+                "reply", whatsAppAiAssistPort.draftAutoReply(conversationText),
+                "priority", whatsAppAiAssistPort.prioritizeCustomer(conversationText)
+        ));
+    }
+
+    public AnalyticsInsightPort.AnalyticsInsight insights(String context) {
+        return observe("insights", "/api/v1/ai/insights", () -> analyticsInsightPort.generate(context));
+    }
+
+    public ActionPlanOutcome executeActions(String instruction, String contextJson, boolean dryRun, boolean confirm) {
+        return actionOrchestrator.run(instruction, contextJson, dryRun, confirm);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> recentUsage() {
+        return usageLogRepository.findTop50ByOrderByCreatedAtDesc().stream()
+                .map(this::toUsageMap)
+                .toList();
+    }
+
+    private Map<String, Object> toUsageMap(AiUsageLogEntity e) {
+        return Map.of(
+                "id", e.getId() != null ? e.getId() : 0,
+                "operation", e.getOperation() != null ? e.getOperation() : "",
+                "provider", e.getProvider() != null ? e.getProvider() : "",
+                "endpoint", e.getEndpoint() != null ? e.getEndpoint() : "",
+                "latencyMs", e.getLatencyMs() != null ? e.getLatencyMs() : 0,
+                "estimatedTokens", e.getEstimatedTokens() != null ? e.getEstimatedTokens() : 0,
+                "success", e.isSuccess(),
+                "createdAt", e.getCreatedAt() != null ? e.getCreatedAt().toString() : ""
+        );
     }
 
     private <T> T observe(String operation, String endpoint, Supplier<T> action) {

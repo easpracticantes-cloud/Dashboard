@@ -1,25 +1,231 @@
 <eas-page-header
-  eyebrow="Claude-ready"
+  eyebrow="Enterprise AI Engine"
   title="Inteligencia Artificial"
-  subtitle="Arquitectura preparada para Claude API: resúmenes, prioridades, sentimiento y predicción comercial."
+  subtitle="Cotizador, reglas de negocio, checklists, proveedores, WhatsApp e insights — sin acoplar la UI a Gemini."
 ></eas-page-header>
 
-<section class="ai-hero eas-card">
-  <div class="ai-hero__badge"><mat-icon>auto_awesome</mat-icon> En preparación · Claude API</div>
-  <h2>Copiloto operativo para el CRM</h2>
-  <p>
-    Este módulo está listo a nivel de producto y arquitectura hexagonal. Cuando se conecte Claude API,
-    cada capacidad se activará sin reescribir la interfaz.
-  </p>
-</section>
+@if (providerStatus(); as st) {
+  <div class="ai-status">
+    <mat-icon>auto_awesome</mat-icon>
+    <span>Proveedor <strong>{{ st['provider'] || st['activeType'] || 'gemini' }}</strong></span>
+    <span class="ai-status__pill">{{ st['status'] || 'READY' }}</span>
+  </div>
+}
 
-<section class="ai-grid">
-  @for (feature of features; track feature.title) {
-    <article class="ai-card eas-card">
-      <span class="ai-card__icon"><mat-icon>{{ feature.icon }}</mat-icon></span>
-      <h3>{{ feature.title }}</h3>
-      <p>{{ feature.description }}</p>
-      <span class="ai-card__soon">Próximamente</span>
-    </article>
+<nav class="ai-tabs" aria-label="Secciones IA">
+  @for (t of tabs; track t.key) {
+    <button type="button" class="ai-tabs__btn" [class.is-active]="tab() === t.key" (click)="setTab(t.key)">
+      <mat-icon>{{ t.icon }}</mat-icon>
+      {{ t.label }}
+    </button>
   }
-</section>
+</nav>
+
+@if (error()) {
+  <p class="ai-error" role="alert">{{ error() }}</p>
+}
+
+@switch (tab()) {
+  @case ('quote') {
+    <section class="ai-panel">
+      <label class="ai-label">Mensaje del cliente</label>
+      <textarea class="ai-input" rows="4" [(ngModel)]="quoteMessage"></textarea>
+      <button type="button" class="eas-btn-primary" [disabled]="loading()" (click)="runQuotation()">
+        {{ loading() ? 'Calculando…' : 'Generar cotización' }}
+      </button>
+      @if (quotation(); as q) {
+        <article class="ai-result">
+          <h3>{{ q.tourName || q.tour }} · {{ q.people }} pax</h3>
+          <p class="ai-muted">{{ q.pickup || '—' }} · {{ q.date || 'sin fecha' }}</p>
+          <p class="ai-total">{{ q.total | currency: (q.currency || 'COP') : 'symbol-narrow' : '1.0-0' }}</p>
+          @if (q.rulesApplied?.length) {
+            <p><strong>Reglas:</strong> {{ q.rulesApplied!.join(', ') }}</p>
+          }
+          @if (q.quotationText) {
+            <pre class="ai-pre">{{ q.quotationText }}</pre>
+          }
+          @if (q.emailSubject) {
+            <p><strong>Asunto:</strong> {{ q.emailSubject }}</p>
+            <pre class="ai-pre">{{ q.emailBody }}</pre>
+          }
+        </article>
+      }
+    </section>
+  }
+  @case ('actions') {
+    <section class="ai-panel">
+      <p class="ai-muted">
+        Function-calling interno: la IA propone tools; el CRM ejecuta. Por defecto simula (dryRun).
+        Para mutar datos reales marca Confirmación y desactiva Dry-run.
+      </p>
+      <label class="ai-label">Instrucción operativa</label>
+      <textarea class="ai-input" rows="4" [(ngModel)]="actionInstruction"></textarea>
+      <label class="ai-label">Contexto JSON (IDs, teléfono, etc.)</label>
+      <textarea class="ai-input" rows="3" [(ngModel)]="actionContextJson"></textarea>
+      <div class="ai-form-row">
+        <label class="ai-check"><input type="checkbox" [(ngModel)]="actionDryRun" /> Dry-run (simular)</label>
+        <label class="ai-check"><input type="checkbox" [(ngModel)]="actionConfirm" /> Confirmar mutaciones</label>
+      </div>
+      <button type="button" class="eas-btn-primary" [disabled]="loading()" (click)="runActions()">
+        {{ loading() ? 'Ejecutando…' : 'Ejecutar asistente' }}
+      </button>
+      @if (actionOutcome(); as ao) {
+        <article class="ai-result">
+          <p>
+            <strong>{{ ao.executed ? 'Ejecutado' : 'Simulado' }}</strong>
+            · tools: {{ ao.plannedTools.join(', ') || 'ninguno' }}
+          </p>
+          <p class="ai-muted">{{ ao.rationale }}</p>
+          <ul>
+            @for (step of ao.results; track step.tool + step.message) {
+              <li>
+                <strong>{{ step.tool }}</strong>
+                {{ step.success ? '✓' : '✗' }}
+                {{ step.dryRun ? '(dry)' : '' }} — {{ step.message }}
+              </li>
+            }
+          </ul>
+          <pre class="ai-pre">{{ ao.narrative }}</pre>
+        </article>
+      }
+    </section>
+  }
+  @case ('rules') {
+    <section class="ai-panel">
+      <div class="ai-form-row">
+        <label>Tour <input class="ai-input" [(ngModel)]="ruleTour" /></label>
+        <label>Personas <input class="ai-input" type="number" [(ngModel)]="rulePeople" /></label>
+        <label class="ai-check"><input type="checkbox" [(ngModel)]="ruleTransport" /> Transporte</label>
+        <label class="ai-check"><input type="checkbox" [(ngModel)]="ruleRestaurant" /> Restaurante</label>
+        <label class="ai-check"><input type="checkbox" [(ngModel)]="ruleGuides" /> Incluye guías</label>
+      </div>
+      <div class="ai-actions">
+        <button type="button" class="eas-btn-primary" [disabled]="loading()" (click)="evaluateRules(false)">Evaluar</button>
+        <button type="button" class="eas-btn-ghost" [disabled]="loading()" (click)="evaluateRules(true)">Simular</button>
+        <button type="button" class="eas-btn-ghost" (click)="loadRules()">Recargar catálogo</button>
+      </div>
+      @if (ruleResult(); as rr) {
+        <article class="ai-result">
+          <h3>{{ rr.simulated ? 'Simulación' : 'Evaluación' }}</h3>
+          <p><strong>Aplicadas:</strong> {{ rr.appliedRuleCodes.join(', ') || 'ninguna' }}</p>
+          <ul>
+            @for (m of rr.messages; track m) {
+              <li>{{ m }}</li>
+            }
+          </ul>
+        </article>
+      }
+      <div class="ai-table-wrap">
+        <table class="ai-table">
+          <thead>
+            <tr><th>Código</th><th>Nombre</th><th>Prioridad</th><th>Tour</th><th>Cond.</th><th>Acc.</th></tr>
+          </thead>
+          <tbody>
+            @for (r of rules(); track r.code) {
+              <tr>
+                <td>{{ r.code }}</td>
+                <td>{{ r.name }}</td>
+                <td>{{ r.priority }}</td>
+                <td>{{ r.tourCode || '—' }}</td>
+                <td>{{ r.conditions }}</td>
+                <td>{{ r.actions }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+  @case ('checklist') {
+    <section class="ai-panel">
+      <label class="ai-label">Tour</label>
+      <input class="ai-input" [(ngModel)]="checklistTour" />
+      <button type="button" class="eas-btn-primary" [disabled]="loading()" (click)="loadChecklist()">Cargar checklist</button>
+      @if (checklist(); as c) {
+        <article class="ai-result">
+          <h3>{{ c.title }}</h3>
+          <ul class="ai-checklist">
+            @for (i of c.items; track i.code) {
+              <li>
+                <mat-icon>{{ i.required ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+                <span>{{ i.label }}</span>
+                <em>{{ i.category }}</em>
+              </li>
+            }
+          </ul>
+        </article>
+      }
+    </section>
+  }
+  @case ('providers') {
+    <section class="ai-panel">
+      <label class="ai-label">Tour</label>
+      <input class="ai-input" [(ngModel)]="providerTour" />
+      <button type="button" class="eas-btn-primary" [disabled]="loading()" (click)="loadProviders()">Recomendar</button>
+      <div class="ai-cards">
+        @for (p of providers(); track p.code) {
+          <article class="ai-mini-card">
+            <h4>{{ p.name }}</h4>
+            <p>{{ p.category }} · prioridad {{ p.priority }}</p>
+            <p class="ai-muted">{{ p.notes || '—' }}</p>
+          </article>
+        }
+      </div>
+    </section>
+  }
+  @case ('whatsapp') {
+    <section class="ai-panel">
+      <label class="ai-label">Conversación</label>
+      <textarea class="ai-input" rows="5" [(ngModel)]="whatsappText"></textarea>
+      <button type="button" class="eas-btn-primary" [disabled]="loading()" (click)="runWhatsapp()">Borrador auto-respuesta</button>
+      @if (whatsappReply(); as w) {
+        <article class="ai-result">
+          <p><strong>Prioridad:</strong> {{ w.priority }}</p>
+          <pre class="ai-pre">{{ w.reply }}</pre>
+        </article>
+      }
+    </section>
+  }
+  @case ('insights') {
+    <section class="ai-panel">
+      <label class="ai-label">Contexto (métricas opcionales)</label>
+      <textarea class="ai-input" rows="4" [(ngModel)]="insightsContext" placeholder="Ej: reservas subieron 12% esta semana…"></textarea>
+      <button type="button" class="eas-btn-primary" [disabled]="loading()" (click)="runInsights()">Generar insights</button>
+      @if (insights(); as ins) {
+        <article class="ai-result">
+          <p>{{ ins.summary }}</p>
+          <h4>Highlights</h4>
+          <ul>@for (h of ins.highlights; track h) { <li>{{ h }}</li> }</ul>
+          <h4>Riesgos</h4>
+          <ul>@for (r of ins.risks; track r) { <li>{{ r }}</li> }</ul>
+          <h4>Oportunidades</h4>
+          <ul>@for (o of ins.opportunities; track o) { <li>{{ o }}</li> }</ul>
+        </article>
+      }
+    </section>
+  }
+  @case ('usage') {
+    <section class="ai-panel">
+      <button type="button" class="eas-btn-ghost" (click)="loadUsage()">Actualizar</button>
+      <div class="ai-table-wrap">
+        <table class="ai-table">
+          <thead>
+            <tr><th>Cuándo</th><th>Operación</th><th>Proveedor</th><th>ms</th><th>Tokens</th><th>OK</th></tr>
+          </thead>
+          <tbody>
+            @for (u of usage(); track u.id) {
+              <tr>
+                <td>{{ u.createdAt | date: 'short' }}</td>
+                <td>{{ u.operation }}</td>
+                <td>{{ u.provider }}</td>
+                <td>{{ u.latencyMs }}</td>
+                <td>{{ u.estimatedTokens }}</td>
+                <td>{{ u.success ? 'Sí' : 'No' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+}

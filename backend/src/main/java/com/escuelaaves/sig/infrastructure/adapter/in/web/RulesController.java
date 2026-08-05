@@ -2,6 +2,7 @@ package com.escuelaaves.sig.infrastructure.adapter.in.web;
 
 import com.escuelaaves.sig.application.dto.rules.RulesDtos.EvaluateRequest;
 import com.escuelaaves.sig.application.dto.rules.RulesDtos.EvaluateResponse;
+import com.escuelaaves.sig.domain.rules.model.BusinessRule;
 import com.escuelaaves.sig.domain.rules.model.RuleContext;
 import com.escuelaaves.sig.domain.rules.model.RuleResult;
 import com.escuelaaves.sig.domain.rules.port.RuleEnginePort;
@@ -9,10 +10,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/rules")
@@ -21,6 +27,25 @@ import org.springframework.web.bind.annotation.RestController;
 public class RulesController {
 
     private final RuleEnginePort ruleEnginePort;
+
+    @GetMapping
+    @Operation(summary = "Lista reglas activas (admin)")
+    public ResponseEntity<List<Map<String, Object>>> list(@RequestParam(required = false) String tourCode) {
+        List<BusinessRule> rules = ruleEnginePort.listActiveRules(tourCode);
+        List<Map<String, Object>> body = rules.stream()
+                .map(r -> Map.<String, Object>of(
+                        "id", r.id() != null ? r.id() : 0,
+                        "code", r.code(),
+                        "name", r.name(),
+                        "priority", r.priority(),
+                        "active", r.active(),
+                        "tourCode", r.tourCode() != null ? r.tourCode() : "",
+                        "conditions", r.conditions().size(),
+                        "actions", r.actions().size()
+                ))
+                .toList();
+        return ResponseEntity.ok(body);
+    }
 
     @PostMapping("/evaluate")
     @Operation(summary = "Evalúa reglas de negocio activas")

@@ -29,6 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Reservas', icon: 'event_available', route: '/app/reservations', roles: ALL_ROLES },
   { label: 'Ventas', icon: 'payments', route: '/app/sales', roles: ALL_ROLES },
   { label: 'Analítica', icon: 'monitoring', route: '/app/analytics', roles: ALL_ROLES },
+  { label: 'IA Enterprise', icon: 'auto_awesome', route: '/app/ai', roles: ALL_ROLES },
   { label: 'Reportes', icon: 'summarize', route: '/app/reports', roles: ALL_ROLES },
   { label: 'Usuarios', icon: 'group', route: '/app/users', roles: ['ADMINISTRADOR', 'GERENCIA', 'SUPERVISOR'] },
   { label: 'Configuración', icon: 'settings', route: '/app/settings', roles: ALL_ROLES },

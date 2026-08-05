@@ -96,4 +96,41 @@ Configuración: ver [`documentos/google-login-setup.md`](documentos/google-login
 | GET | `/reports/conversations/export/pdf` | Export PDF (stub) |
 | GET | `/integrations/status` | Estado de puertos de integración |
 
+## Enterprise AI Engine (`/ai/*`)
+JWT requerido. Precios solo desde PostgreSQL; la IA interpreta/redacta.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/ai/chat` | Chat libre |
+| POST | `/ai/quotation` | Interpretar → rules → precios PG → checklist → narrativa |
+| POST | `/ai/interpret-quote` | Solo interpretación estructurada |
+| POST | `/ai/interpret-quotation` | Alias de interpret-quote |
+| POST | `/ai/generate-email` | Correo profesional |
+| POST | `/ai/extract-reservation` | Extraer reserva |
+| POST | `/ai/analyze-sentiment` | Sentimiento |
+| POST | `/ai/classify` | Clasificar conversación |
+| POST | `/ai/suggest-reply` | Sugerir respuesta |
+| POST | `/ai/dashboard-summary` | Resumen ejecutivo dashboard |
+| POST | `/ai/provider-recommendation` | Proveedores/guías/transporte |
+| POST | `/ai/checklist` | Checklist operativa por tour |
+| GET | `/ai/status` | Proveedor activo y estado |
+| GET | `/ai/usage-logs` | Observabilidad (últimos usos) |
+| POST | `/ai/insights` | Insights analíticos IA |
+| POST | `/ai/whatsapp/auto-reply` | Borrador WhatsApp + prioridad |
+| POST | `/ai/actions/execute` | Asistente operativo (tools CRM; `dryRun` default true, `confirm` para mutar) |
+| POST | `/ai/memory/sessions` | Iniciar memoria conversacional |
+| POST | `/ai/memory/{id}/messages` | Append mensaje |
+| GET | `/ai/memory/{id}/messages` | Leer memoria |
+
+## Business Rules (`/rules/*`)
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/rules` | Listar reglas activas (`?tourCode=`) |
+| POST | `/rules/evaluate` | Evaluar reglas |
+| POST | `/rules/simulate` | Simular reglas |
+
+UI admin: `/app/ai` (cotizador, reglas, checklists, proveedores, WhatsApp, insights, uso).
+
+Env: `GEMINI_API_KEY`, `GEMINI_MODEL`, `APP_AI_PROVIDER=gemini`
+
 Swagger: http://localhost:8081/swagger-ui.html

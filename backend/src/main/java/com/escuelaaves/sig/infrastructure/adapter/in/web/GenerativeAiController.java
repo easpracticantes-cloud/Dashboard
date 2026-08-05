@@ -1,6 +1,9 @@
 package com.escuelaaves.sig.infrastructure.adapter.in.web;
 
 import com.escuelaaves.sig.application.ai.IntelligenceService;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionExecuteRequest;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionExecuteResponse;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionStepDto;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ChatRequest;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ChatResponse;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ChecklistResponse;
@@ -22,6 +25,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -135,6 +139,77 @@ public class GenerativeAiController {
             throw new BadRequestException("Campo requerido: tourCode");
         }
         return ResponseEntity.ok(intelligenceService.checklist(tour));
+    }
+
+    @GetMapping("/status")
+    @Operation(summary = "Estado del proveedor IA activo")
+    public ResponseEntity<Map<String, Object>> status() {
+        return ResponseEntity.ok(intelligenceService.providerStatus());
+    }
+
+    @GetMapping("/usage-logs")
+    @Operation(summary = "Últimos registros de uso IA (observabilidad)")
+    public ResponseEntity<List<Map<String, Object>>> usageLogs() {
+        return ResponseEntity.ok(intelligenceService.recentUsage());
+    }
+
+    @PostMapping("/insights")
+    @Operation(summary = "Insights analíticos con IA")
+    public ResponseEntity<?> insights(@RequestBody(required = false) Map<String, String> body) {
+        String context = body != null ? body.getOrDefault("context", "") : "";
+        return ResponseEntity.ok(intelligenceService.insights(context));
+    }
+
+    @PostMapping("/whatsapp/auto-reply")
+    @Operation(summary = "Borrador de auto-respuesta WhatsApp + prioridad")
+    public ResponseEntity<Map<String, String>> whatsappAutoReply(@RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(intelligenceService.whatsappAutoReply(required(body, "text")));
+    }
+
+    @PostMapping("/actions/execute")
+    @Operation(summary = "Asistente operativo: interpreta instrucción y ejecuta tools del CRM (dryRun por defecto)")
+    public ResponseEntity<ActionExecuteResponse> executeActions(@Valid @RequestBody ActionExecuteRequest request) {
+        var outcome = intelligenceService.executeActions(
+                request.instruction(),
+                request.contextJson(),
+                request.dryRunOrDefault(),
+                request.confirmOrFalse()
+        );
+        return ResponseEntity.ok(new ActionExecuteResponse(
+                outcome.rationale(),
+                outcome.results().stream()
+                        .map(r -> new ActionStepDto(r.tool(), r.success(), r.skipped(), r.dryRun(), r.message(), r.data()))
+                        .toList(),
+                outcome.narrative(),
+                outcome.executed(),
+                outcome.dryRun(),
+                outcome.plan().stream().map(p -> p.tool().name()).toList()
+        ));
+    }
+
+    @PostMapping("/memory/sessions")
+    @Operation(summary = "Inicia sesión de memoria conversacional")
+    public ResponseEntity<Map<String, String>> startMemory(@RequestBody(required = false) Map<String, String> body) {
+        String title = body != null ? body.getOrDefault("title", "Sesión IA") : "Sesión IA";
+        return ResponseEntity.ok(Map.of("sessionId", intelligenceService.startMemorySession(null, title)));
+    }
+
+    @PostMapping("/memory/{sessionId}/messages")
+    @Operation(summary = "Agrega mensaje a memoria")
+    public ResponseEntity<Void> appendMemory(
+            @org.springframework.web.bind.annotation.PathVariable String sessionId,
+            @RequestBody Map<String, String> body) {
+        intelligenceService.appendMemory(sessionId,
+                body.getOrDefault("role", "user"),
+                required(body, "content"));
+        return ResponseEntity.accepted().build();
+    }
+
+    @GetMapping("/memory/{sessionId}/messages")
+    @Operation(summary = "Lee mensajes recientes de memoria")
+    public ResponseEntity<?> memoryMessages(
+            @org.springframework.web.bind.annotation.PathVariable String sessionId) {
+        return ResponseEntity.ok(intelligenceService.memoryMessages(sessionId, 40));
     }
 
     private static String required(Map<String, String> body, String key) {
