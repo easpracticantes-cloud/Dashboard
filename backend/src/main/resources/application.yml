@@ -62,9 +62,17 @@ app:
     webapp-url: ${GOOGLE_SHEETS_WEBAPP_URL:https://script.google.com/macros/s/AKfycbzMkCg7PfddRA048GAZBc5jz_2lKpmtJg13589XteWmONKBiQBQLKZxw-eBeEwa0uDslw/exec}
     sync-interval-ms: ${SHEETS_SYNC_INTERVAL_MS:300000}
   ai:
+    provider: ${APP_AI_PROVIDER:gemini}
     quote:
       base-price-per-person: ${AI_QUOTE_BASE_PRICE:75000}
       min-confidence: ${AI_QUOTE_MIN_CONFIDENCE:25}
+    gemini:
+      # Nunca hardcodear la key: definir GEMINI_API_KEY en entorno / Render
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
+      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+      connect-timeout-seconds: ${GEMINI_CONNECT_TIMEOUT_SECONDS:15}
+      read-timeout-seconds: ${GEMINI_READ_TIMEOUT_SECONDS:60}
 
 management:
   endpoints:

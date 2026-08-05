@@ -38,6 +38,9 @@ services:
       GOOGLE_DEFAULT_ROLE: ${GOOGLE_DEFAULT_ROLE:-GERENCIA}
       GOOGLE_SHEETS_WEBAPP_URL: ${GOOGLE_SHEETS_WEBAPP_URL:-https://script.google.com/macros/s/AKfycbzMkCg7PfddRA048GAZBc5jz_2lKpmtJg13589XteWmONKBiQBQLKZxw-eBeEwa0uDslw/exec}
       SHEETS_SYNC_INTERVAL_MS: ${SHEETS_SYNC_INTERVAL_MS:-300000}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      APP_AI_PROVIDER: ${APP_AI_PROVIDER:-gemini}
     ports:
       - "${BACKEND_PORT}:8080"
     depends_on:
