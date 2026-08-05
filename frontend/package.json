@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --host localhost --port 5173",
-    "build": "ng build",
+    "build": "ng build --configuration production && node scripts/copy-spa-fallback.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
