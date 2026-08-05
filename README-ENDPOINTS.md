@@ -131,6 +131,6 @@ JWT requerido. Precios solo desde PostgreSQL; la IA interpreta/redacta.
 
 UI admin: `/app/ai` (cotizador, reglas, checklists, proveedores, WhatsApp, insights, uso).
 
-Env: `GEMINI_API_KEY`, `GEMINI_MODEL`, `APP_AI_PROVIDER=gemini`
+Env: `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-3.6-flash`, `APP_AI_PROVIDER=gemini`
 
 Swagger: http://localhost:8081/swagger-ui.html

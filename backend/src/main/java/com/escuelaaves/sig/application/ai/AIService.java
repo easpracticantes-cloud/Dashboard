@@ -48,7 +48,7 @@ public class AIService {
                 ? DEFAULT_SYSTEM
                 : request.systemPrompt();
         String reply = generativeAiPort.chat(system, request.message());
-        return new ChatResponse(reply, "gemini-2.5-flash", true, "OK");
+        return new ChatResponse(reply, generativeAiPort.providerId(), true, "OK");
     }
 
     @Transactional(readOnly = true)

@@ -27,7 +27,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 /**
- * Adapter hexagonal hacia Google Gemini 2.5 Flash vía REST (RestClient).
+ * Adapter hexagonal hacia Google Gemini vía REST (RestClient).
  * Única clase autorizada a hablar con la API de Gemini.
  */
 @Slf4j
