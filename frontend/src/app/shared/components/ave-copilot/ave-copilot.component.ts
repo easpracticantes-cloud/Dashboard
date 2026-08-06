@@ -118,15 +118,20 @@ export class AveCopilotComponent {
           const apiMsg =
             (err as { error?: { message?: string; detail?: string } })?.error?.message ||
             (err as { error?: { detail?: string } })?.error?.detail ||
-            (err as { message?: string })?.message ||
             '';
           const status = (err as { status?: number })?.status;
-          const hint =
-            status === 404
-              ? 'El backend aún no tiene `/ai/copilot` (redeploy pendiente).'
-              : status === 0
-                ? 'No hay conexión con el API.'
-                : apiMsg || 'Revisa GEMINI_API_KEY / modelo en el servidor.';
+          let hint: string;
+          if (status === 401 || status === 403) {
+            hint =
+              apiMsg ||
+              'Tu sesión expiró o no tienes permiso. Cierra sesión e inicia de nuevo; luego vuelve a escribirme.';
+          } else if (status === 404) {
+            hint = 'El backend aún no tiene `/ai/copilot` (redeploy pendiente).';
+          } else if (status === 0) {
+            hint = 'No hay conexión con el API.';
+          } else {
+            hint = apiMsg || 'Revisa la conexión con el servidor.';
+          }
           this.messages.update((m) => [
             ...m,
             {
