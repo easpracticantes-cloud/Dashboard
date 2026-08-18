@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../../core/services/auth.service';
 import { BrandLogoComponent } from '../../../shared/components/brand-logo/brand-logo.component';
-import { environment } from '../../../../environments/environment';
+import { AppConfigService } from '../../../core/services/app-config.service';
 import type { GoogleTokenClient, GoogleTokenResponse } from '../../../core/types/google-accounts';
 
 const LAST_USER_KEY = 'sig_last_username';
@@ -28,6 +28,7 @@ const LAST_USER_KEY = 'sig_last_username';
 })
 export class LoginComponent implements AfterViewInit {
   private readonly auth = inject(AuthService);
+  private readonly appConfig = inject(AppConfigService);
   private readonly router = inject(Router);
   private readonly zone = inject(NgZone);
   private readonly fb = inject(FormBuilder);
@@ -39,7 +40,7 @@ export class LoginComponent implements AfterViewInit {
   readonly errorMessage = signal<string | null>(null);
   readonly showPassword = signal(false);
   readonly capsLockOn = signal(false);
-  readonly googleEnabled = signal(!!environment.googleClientId?.trim());
+  readonly googleEnabled = signal(!!this.appConfig.googleClientId?.trim());
   readonly googleReady = signal(false);
 
   readonly form = this.fb.nonNullable.group({
@@ -154,7 +155,7 @@ export class LoginComponent implements AfterViewInit {
     }
 
     this.googleTokenClient = oauth2.initTokenClient({
-      client_id: environment.googleClientId,
+      client_id: this.appConfig.googleClientId,
       scope: 'openid email profile',
       prompt: 'select_account',
       callback: (response) => this.handleGoogleToken(response),

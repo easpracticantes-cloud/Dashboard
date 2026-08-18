@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, forkJoin, map, of, shareReplay } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { ApiService } from './api.service';
+import { AppConfigService } from './app-config.service';
 import { CommercialStatus, QuoteDto, ReservationDto, SaleDto } from './commercial.service';
 import { Client } from '../models/client.model';
 import { ConversationStatus } from '../models/conversation.model';
@@ -73,7 +73,11 @@ export interface ConversationSearchHit {
 export class OpsService {
   private readonly api = inject(ApiService);
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.apiBaseUrl;
+  private readonly appConfig = inject(AppConfigService);
+
+  private get baseUrl(): string {
+    return this.appConfig.apiBaseUrl;
+  }
   private commandCenter$?: Observable<{
     pulse: BusinessPulse;
     funnel: FunnelMetrics | null;

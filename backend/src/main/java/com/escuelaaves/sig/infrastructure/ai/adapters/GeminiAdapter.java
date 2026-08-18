@@ -317,7 +317,7 @@ public class GeminiAdapter implements GenerativeAiPort {
     private void ensureConfigured() {
         if (!properties.hasApiKey()) {
             throw new BadRequestException(
-                    "Gemini no está configurado. Define la variable de entorno GEMINI_API_KEY (app.ai.gemini.api-key)."
+                    "Gemini no está configurado. Define la variable de entorno GEMINI_API_KEY (app.ai.provider=gemini)."
             );
         }
     }

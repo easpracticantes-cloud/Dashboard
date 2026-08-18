@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { AppConfigService } from './app-config.service';
 
 /**
  * Thin wrapper around HttpClient that centralises the API base URL.
@@ -10,7 +10,11 @@ import { environment } from '../../../environments/environment';
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.apiBaseUrl;
+  private readonly appConfig = inject(AppConfigService);
+
+  private get baseUrl(): string {
+    return this.appConfig.apiBaseUrl;
+  }
 
   get<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Observable<T> {
     return this.http.get<T>(this.url(path), { params: this.cleanParams(params) });

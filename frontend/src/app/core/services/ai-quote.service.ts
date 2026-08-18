@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, catchError, of } from 'rxjs';
-import { environment } from '../../../environments/environment';
 import { ApiService } from './api.service';
+import { AppConfigService } from './app-config.service';
 import { QuoteDto } from './commercial.service';
 
 export interface AiQuoteDraft {
@@ -43,7 +43,11 @@ export interface AiQuoteOverrides {
 export class AiQuoteService {
   private readonly api = inject(ApiService);
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.apiBaseUrl;
+  private readonly appConfig = inject(AppConfigService);
+
+  private get baseUrl(): string {
+    return this.appConfig.apiBaseUrl;
+  }
 
   getSuggestion(conversationId: string): Observable<AiQuoteSuggestion | null> {
     return this.api

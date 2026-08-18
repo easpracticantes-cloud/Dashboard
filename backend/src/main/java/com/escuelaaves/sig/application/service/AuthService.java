@@ -88,16 +88,24 @@ public class AuthService implements AuthUseCase {
     }
 
     private LoginResponse issueTokens(UserEntity user, boolean rememberMe) {
+        if (user.getRole() == null || user.getRole().getName() == null) {
+            throw new BadRequestException("Usuario sin rol asignado. Contacta al administrador.");
+        }
         String token = jwtService.generateToken(user.getId(), user.getUsername(), user.getRole().getName().name(), rememberMe);
         long minutes = rememberMe ? rememberMeExpirationMinutes : expirationMinutes;
 
         String refresh = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
-        refreshTokenJpaRepository.save(RefreshTokenEntity.builder()
-                .token(refresh)
-                .user(user)
-                .expiresAt(Instant.now().plusSeconds(refreshExpirationDays * 24 * 60 * 60))
-                .revoked(false)
-                .build());
+        try {
+            refreshTokenJpaRepository.save(RefreshTokenEntity.builder()
+                    .token(refresh)
+                    .user(user)
+                    .expiresAt(Instant.now().plusSeconds(refreshExpirationDays * 24 * 60 * 60))
+                    .revoked(false)
+                    .build());
+        } catch (Exception ex) {
+            log.error("No se pudo guardar refresh token para {}: {}", user.getUsername(), ex.getMessage());
+            refresh = null;
+        }
 
         return new LoginResponse(token, refresh, "Bearer", minutes, userMapper.toDto(user));
     }

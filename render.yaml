@@ -1,6 +1,11 @@
-# Blueprint Render — Frontend SPA (Angular)
-# Si el Static Site ya existe en el Dashboard, también puedes añadir
-# Redirects/Rewrites → Source: /*  Destination: /index.html  Action: Rewrite
+# Blueprint Render — Frontend SPA + variables necesarias del backend
+#
+# Frontend Static Site: rewrite /* → /index.html
+# Backend (servicio Java existente dashboard-7spt): configurar en Dashboard → Environment:
+#   GEMINI_API_KEY=<tu key>
+#   GEMINI_MODEL=gemini-3.6-flash
+#   APP_AI_PROVIDER=gemini
+#   CORS_ALLOWED_ORIGINS=https://dashboard-frontend.onrender.com,https://*.onrender.com,http://localhost:4200
 
 services:
   - type: web
@@ -20,3 +25,6 @@ services:
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
+      - path: /runtime-config.json
+        name: Cache-Control
+        value: no-store
