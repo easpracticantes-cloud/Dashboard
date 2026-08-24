@@ -1,6 +1,6 @@
 <div class="ave" [class.ave--open]="open()">
   @if (!open() && bounce()) {
-    <div class="ave-hint" aria-hidden="true">¿Necesitas ayuda?</div>
+    <div class="ave-hint" aria-hidden="true">Habla conmigo</div>
   }
 
   @if (open()) {
@@ -12,7 +12,7 @@
           </div>
           <div>
             <strong>Ave</strong>
-            <span>Copiloto · Escuela Aves</span>
+            <span>Chat abierto · precios del catálogo</span>
           </div>
         </div>
         <button type="button" class="ave-icon-btn" (click)="toggle()" aria-label="Cerrar chat">
@@ -22,11 +22,13 @@
 
       <div class="ave-panel__body" #scroller>
         @for (m of messages(); track $index) {
-          <div class="ave-msg" [class.ave-msg--user]="m.role === 'user'" [class.ave-msg--system]="m.role === 'system'">
+          <div
+            class="ave-msg"
+            [class.ave-msg--user]="m.role === 'user'"
+            [class.ave-msg--system]="m.role === 'system'"
+            [class.ave-msg--quote]="m.mode === 'QUOTE'"
+          >
             <div class="ave-msg__bubble" [innerHTML]="formatHtml(m.text)"></div>
-            @if (m.mode && m.role === 'assistant' && m.mode !== 'ANSWER') {
-              <span class="ave-msg__mode">{{ m.mode }}</span>
-            }
           </div>
         }
         @if (sending()) {
@@ -46,14 +48,21 @@
 
       <footer class="ave-panel__foot">
         <textarea
+          #inputEl
           class="ave-input"
           rows="2"
           [(ngModel)]="draft"
           (keydown)="onKeydown($event)"
-          placeholder="Escríbele a Ave…"
+          placeholder="Escríbele como en un chat… (Enter envía)"
           [disabled]="sending()"
         ></textarea>
-        <button type="button" class="ave-send" (click)="send()" [disabled]="sending() || !draft.trim()" aria-label="Enviar">
+        <button
+          type="button"
+          class="ave-send"
+          (click)="send()"
+          [disabled]="sending() || !draft.trim()"
+          aria-label="Enviar"
+        >
           <mat-icon>send</mat-icon>
         </button>
       </footer>

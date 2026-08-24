@@ -22,16 +22,14 @@ import com.escuelaaves.sig.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
 /**
- * Orquestador enterprise de cotización:
- * interpret (IA) → rules (PG) → pricing (PG) → checklist → recommendations → narrative (IA) → obs.
- * La IA nunca calcula precios.
+ * Orquestador de cotización: interpret → rules (best-effort) → pricing catálogo → narrativa.
+ * Sin @Transactional: precios vienen de archivos; evita rollback-only al loguear uso.
  */
 @Slf4j
 @Service
@@ -45,7 +43,6 @@ public class QuotationOrchestrator {
     private final RecommendationPort recommendationPort;
     private final AiObservabilityPort observabilityPort;
 
-    @Transactional(readOnly = true)
     public QuotationResponse orchestrate(QuotationRequest request) {
         long start = System.currentTimeMillis();
         GenerativeAiPort ai = aiProviderFactory.getActiveProvider();
@@ -54,24 +51,12 @@ public class QuotationOrchestrator {
         String providerId = ai.providerId();
         try {
             QuoteInterpretation interpretation = interpretWithFallback(ai, request.message());
-            RuleContext ruleContext = new RuleContext(
-                    interpretation.tour(),
-                    interpretation.people(),
-                    interpretation.transport(),
-                    interpretation.restaurant(),
-                    false,
-                    0,
-                    interpretation.pickup(),
-                    java.util.Map.of()
-            );
-            RuleResult rules = ruleEnginePort.evaluate(ruleContext);
-
+            RuleResult rules = softRules(interpretation);
             QuoteInterpretation adjusted = applyRuleFlagsToInterpretation(interpretation, rules);
             PricedQuotation priced = priceInterpretation(adjusted, rules);
 
-            ChecklistPort.Checklist checklist = checklistPort.resolve(priced.tourCode());
-            List<RecommendationPort.ProviderRecommendation> recommendations = recommendationPort.suggest(
-                    priced.tourCode(), null);
+            ChecklistPort.Checklist checklist = softChecklist(priced.tourCode());
+            List<RecommendationPort.ProviderRecommendation> recommendations = softProviders(priced.tourCode());
 
             NaturalLanguageQuotation natural = null;
             if (request.shouldGenerateNarrative()) {
@@ -84,17 +69,58 @@ public class QuotationOrchestrator {
             error = ex.getMessage();
             throw ex;
         } finally {
-            observabilityPort.record(new AiObservabilityPort.AiUsageEvent(
-                    null,
-                    "/api/v1/ai/quotation",
-                    "quotation",
-                    providerId,
-                    null,
-                    System.currentTimeMillis() - start,
-                    estimateTokens(request.message()),
-                    success,
-                    error
-            ));
+            try {
+                observabilityPort.record(new AiObservabilityPort.AiUsageEvent(
+                        null,
+                        "/api/v1/ai/quotation",
+                        "quotation",
+                        providerId,
+                        null,
+                        System.currentTimeMillis() - start,
+                        estimateTokens(request.message()),
+                        success,
+                        error
+                ));
+            } catch (Exception obsEx) {
+                log.warn("[QuoteOrchestrator] obs omitido: {}", obsEx.getMessage());
+            }
+        }
+    }
+
+    private RuleResult softRules(QuoteInterpretation interpretation) {
+        try {
+            RuleContext ruleContext = new RuleContext(
+                    interpretation.tour(),
+                    interpretation.people(),
+                    interpretation.transport(),
+                    interpretation.restaurant(),
+                    false,
+                    0,
+                    interpretation.pickup(),
+                    java.util.Map.of()
+            );
+            return ruleEnginePort.evaluate(ruleContext);
+        } catch (Exception ex) {
+            log.warn("[QuoteOrchestrator] reglas omitidas: {}", ex.getMessage());
+            return RuleResult.empty();
+        }
+    }
+
+    private ChecklistPort.Checklist softChecklist(String tourCode) {
+        try {
+            return checklistPort.resolve(tourCode);
+        } catch (Exception ex) {
+            log.warn("[QuoteOrchestrator] checklist omitido: {}", ex.getMessage());
+            return new ChecklistPort.Checklist(tourCode, "Sin checklist", List.of());
+        }
+    }
+
+    private List<RecommendationPort.ProviderRecommendation> softProviders(String tourCode) {
+        try {
+            return recommendationPort.suggest(tourCode, null);
+        } catch (Exception ex) {
+            log.warn("[QuoteOrchestrator] proveedores omitidos: {}", ex.getMessage());
+            return List.of();
         }
     }
 
@@ -137,11 +163,11 @@ public class QuotationOrchestrator {
     private QuoteInterpretation applyRuleFlagsToInterpretation(QuoteInterpretation base, RuleResult rules) {
         boolean transport = Boolean.TRUE.equals(base.transport());
         boolean restaurant = Boolean.TRUE.equals(base.restaurant());
-        if (Boolean.TRUE.equals(rules.flags().get("suggestTransport")) && !transport) {
+        if (rules != null && Boolean.TRUE.equals(rules.flags().get("suggestTransport")) && !transport) {
             transport = true;
         }
         String notes = base.rawNotes();
-        if (!rules.messages().isEmpty()) {
+        if (rules != null && !rules.messages().isEmpty()) {
             String extra = String.join("; ", rules.messages());
             notes = notes == null || notes.isBlank() ? extra : notes + " | " + extra;
         }
@@ -176,12 +202,10 @@ public class QuotationOrchestrator {
 
         TourPrice tour = tourPricingPort.findBestMatch(tourHint, people)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "No hay tarifa en catálogo/PostgreSQL para el tour: " + interpretation.tour()
+                        "No hay tarifa en catálogo para el tour: " + interpretation.tour()
                 ));
 
         BigDecimal pax = BigDecimal.valueOf(people);
-        // Precio del catálogo 2026 ya es venta/paquete por persona (escala por pax).
-        // Solo sumar transporte/restaurante si la tarifa trae montos > 0 (legacy PG).
         BigDecimal subTour = tour.pricePerPerson().multiply(pax).setScale(2, RoundingMode.HALF_UP);
         boolean hasTransportFee = tour.transportPerPerson() != null
                 && tour.transportPerPerson().compareTo(BigDecimal.ZERO) > 0;
@@ -194,7 +218,6 @@ public class QuotationOrchestrator {
                 ? tour.restaurantPerPerson().multiply(pax).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 
-        // Amplificación suave según reglas (modo privado jeep: +15% transporte)
         Object mode = rules != null ? rules.flags().get("transportMode") : null;
         if (transport && "PRIVATE_JEEP".equals(String.valueOf(mode))) {
             subTransport = subTransport.multiply(new BigDecimal("1.15")).setScale(2, RoundingMode.HALF_UP);
@@ -242,6 +265,8 @@ public class QuotationOrchestrator {
                         r.code(), r.name(), r.category(), r.tourCode(), r.notes(), r.priority()))
                 .toList();
 
+        RuleResult safeRules = rules != null ? rules : RuleResult.empty();
+
         return new QuotationResponse(
                 priced.interpretation().tour(),
                 priced.interpretation().people(),
@@ -262,7 +287,7 @@ public class QuotationOrchestrator {
                 natural != null ? natural.emailBody() : null,
                 natural != null ? natural.quotationText() : null,
                 priced.interpretation().rawNotes(),
-                rules.appliedRuleCodes(),
+                safeRules.appliedRuleCodes(),
                 checklistDtos,
                 recDtos
         );

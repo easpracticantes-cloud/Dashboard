@@ -10,28 +10,6 @@ interface ChatBubble {
   mode?: string;
 }
 
-const LOCAL_FAQ: { keys: string[]; reply: string }[] = [
-  {
-    keys: ['hola', 'buenas', 'buenos dias', 'hey', 'saludos'],
-    reply:
-      '¡Hola! Soy **Ave**. Puedo ayudarte con cotizaciones, jeep, checklists y el uso del SIG. Prueba: *“¿Jeep privado o público?”*'
-  },
-  {
-    keys: ['jeep privado', 'jeep publico', 'jeep público', 'transporte privado'],
-    reply:
-      '**Jeep:** más de 4 personas → **privado**; 4 o menos → **público**. Guías no pagan entrada; sí pagan almuerzo.'
-  },
-  {
-    keys: ['como cotiz', 'cómo cotiz', 'crear cotizacion', 'crear cotización'],
-    reply:
-      'Ve a **Cotizaciones → Nueva**, o escríbeme: *“Cotiza Acaime para 5 con transporte y almuerzo”*.'
-  },
-  {
-    keys: ['checklist', 'que llevar', 'qué llevar'],
-    reply: 'Dime el tour (ej. Acaime) y te traigo el checklist operativo desde el SIG.'
-  }
-];
-
 @Component({
   selector: 'eas-ave-copilot',
   standalone: true,
@@ -44,6 +22,7 @@ export class AveCopilotComponent {
   private readonly sanitizer = inject(DomSanitizer);
 
   @ViewChild('scroller') scroller?: ElementRef<HTMLDivElement>;
+  @ViewChild('inputEl') inputEl?: ElementRef<HTMLTextAreaElement>;
 
   readonly open = signal(false);
   readonly sending = signal(false);
@@ -51,7 +30,8 @@ export class AveCopilotComponent {
   readonly messages = signal<ChatBubble[]>([
     {
       role: 'assistant',
-      text: '¡Hola! Soy **Ave**, tu copiloto del SIG. Pregúntame por tours, cotizaciones, jeep, checklists o cómo usar el CRM.',
+      text:
+        'Hola, soy **Ave**. Cuéntame qué necesitas como si me hablaras por WhatsApp: una cotización, una duda de un tour, jeep, proveedores o cómo mover algo en el SIG. Yo interpreto lo que quieras decir.',
       mode: 'ANSWER'
     }
   ]);
@@ -60,17 +40,20 @@ export class AveCopilotComponent {
   private sessionId: string | null = null;
 
   readonly suggestions = [
-    '¿Cuánto sale Acaime para 5 con transporte?',
-    'Checklist del tour Acaime',
-    '¿Jeep privado o público?',
-    '¿Cómo creo una cotización?'
+    'Necesito cotizar Acaime para 4 personas privado',
+    '¿Qué incluye el parapente?',
+    'Cliente pregunta rafting para 6, ¿cuánto le digo?',
+    '¿Me ayudas a responder un WhatsApp de Cócora?'
   ];
 
   toggle(): void {
     this.open.update((v) => !v);
     this.bounce.set(false);
     if (this.open()) {
-      queueMicrotask(() => this.scrollBottom());
+      queueMicrotask(() => {
+        this.scrollBottom();
+        this.inputEl?.nativeElement?.focus();
+      });
     }
   }
 
@@ -86,6 +69,7 @@ export class AveCopilotComponent {
       .replace(/>/g, '&gt;');
     const html = escaped
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^• /gm, '• ')
       .replace(/\n/g, '<br>');
     return this.sanitizer.bypassSecurityTrustHtml(html);
   }
@@ -109,37 +93,33 @@ export class AveCopilotComponent {
         ]);
         this.sending.set(false);
         this.scrollBottom();
+        queueMicrotask(() => this.inputEl?.nativeElement?.focus());
       },
       error: (err) => {
-        const local = this.localReply(text);
-        if (local) {
-          this.messages.update((m) => [...m, { role: 'assistant', text: local, mode: 'LOCAL' }]);
+        const apiMsg =
+          (err as { error?: { message?: string; detail?: string } })?.error?.message ||
+          (err as { error?: { detail?: string } })?.error?.detail ||
+          '';
+        const status = (err as { status?: number })?.status;
+        let hint: string;
+        if (status === 401 || status === 403) {
+          hint =
+            apiMsg ||
+            'Tu sesión expiró. Cierra sesión, entra de nuevo y vuelve a escribirme.';
+        } else if (status === 404) {
+          hint = 'El endpoint de Ave aún no está desplegado en el servidor.';
+        } else if (status === 0) {
+          hint = 'No hay conexión con el API.';
         } else {
-          const apiMsg =
-            (err as { error?: { message?: string; detail?: string } })?.error?.message ||
-            (err as { error?: { detail?: string } })?.error?.detail ||
-            '';
-          const status = (err as { status?: number })?.status;
-          let hint: string;
-          if (status === 401 || status === 403) {
-            hint =
-              apiMsg ||
-              'Tu sesión expiró o no tienes permiso. Cierra sesión e inicia de nuevo; luego vuelve a escribirme.';
-          } else if (status === 404) {
-            hint = 'El backend aún no tiene `/ai/copilot` (redeploy pendiente).';
-          } else if (status === 0) {
-            hint = 'No hay conexión con el API.';
-          } else {
-            hint = apiMsg || 'Revisa la conexión con el servidor.';
-          }
-          this.messages.update((m) => [
-            ...m,
-            {
-              role: 'system',
-              text: `No pude hablar con el servidor. ${hint}`
-            }
-          ]);
+          hint = apiMsg || 'Revisa la conexión con el servidor e intenta otra vez.';
         }
+        this.messages.update((m) => [
+          ...m,
+          {
+            role: 'system',
+            text: `No pude completar la respuesta. ${hint}`
+          }
+        ]);
         this.sending.set(false);
         this.scrollBottom();
       }
@@ -151,19 +131,6 @@ export class AveCopilotComponent {
       event.preventDefault();
       this.send();
     }
-  }
-
-  private localReply(text: string): string | null {
-    const n = text
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/\p{M}/gu, '');
-    for (const faq of LOCAL_FAQ) {
-      if (faq.keys.some((k) => n.includes(k.normalize('NFD').replace(/\p{M}/gu, '')))) {
-        return faq.reply;
-      }
-    }
-    return null;
   }
 
   private scrollBottom(): void {
