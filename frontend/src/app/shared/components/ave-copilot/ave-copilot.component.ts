@@ -2,18 +2,23 @@ import { Component, ElementRef, ViewChild, inject, signal } from '@angular/core'
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { EnterpriseAiService } from '../../../core/services/enterprise-ai.service';
+import {
+  EnterpriseAiService,
+  QuoteDraft
+} from '../../../core/services/enterprise-ai.service';
+import { AveQuoteReviewComponent } from './ave-quote-review.component';
 
 interface ChatBubble {
   role: 'user' | 'assistant' | 'system';
   text: string;
   mode?: string;
+  hasQuote?: boolean;
 }
 
 @Component({
   selector: 'eas-ave-copilot',
   standalone: true,
-  imports: [FormsModule, MatIconModule],
+  imports: [FormsModule, MatIconModule, AveQuoteReviewComponent],
   templateUrl: './ave-copilot.component.html',
   styleUrl: './ave-copilot.component.scss'
 })
@@ -27,6 +32,7 @@ export class AveCopilotComponent {
   readonly open = signal(false);
   readonly sending = signal(false);
   readonly bounce = signal(true);
+  readonly quoteDraft = signal<QuoteDraft | null>(null);
   readonly messages = signal<ChatBubble[]>([
     {
       role: 'assistant',
@@ -38,6 +44,7 @@ export class AveCopilotComponent {
 
   draft = '';
   private sessionId: string | null = null;
+  private lastQuote: QuoteDraft | null = null;
 
   readonly suggestions = [
     'Necesito cotizar Acaime para 4 personas privado',
@@ -69,7 +76,6 @@ export class AveCopilotComponent {
       .replace(/>/g, '&gt;');
     const html = escaped
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/^• /gm, '• ')
       .replace(/\n/g, '<br>');
     return this.sanitizer.bypassSecurityTrustHtml(html);
   }
@@ -87,10 +93,20 @@ export class AveCopilotComponent {
     this.ai.copilot(text, this.sessionId ?? undefined).subscribe({
       next: (res) => {
         this.sessionId = res.sessionId;
+        const hasQuote = res.mode === 'QUOTE' && !!res.quoteDraft;
         this.messages.update((m) => [
           ...m,
-          { role: 'assistant', text: res.reply, mode: res.mode }
+          {
+            role: 'assistant',
+            text: res.reply,
+            mode: res.mode,
+            hasQuote
+          }
         ]);
+        if (hasQuote && res.quoteDraft) {
+          this.lastQuote = res.quoteDraft;
+          this.quoteDraft.set(res.quoteDraft);
+        }
         this.sending.set(false);
         this.scrollBottom();
         queueMicrotask(() => this.inputEl?.nativeElement?.focus());
@@ -124,6 +140,29 @@ export class AveCopilotComponent {
         this.scrollBottom();
       }
     });
+  }
+
+  openQuoteReview(draft?: QuoteDraft | null): void {
+    const d = draft || this.lastQuote;
+    if (d) {
+      this.quoteDraft.set({ ...d });
+    }
+  }
+
+  closeQuoteReview(): void {
+    this.quoteDraft.set(null);
+  }
+
+  onQuoteConfirmed(draft: QuoteDraft): void {
+    this.lastQuote = draft;
+    this.messages.update((m) => [
+      ...m,
+      {
+        role: 'system',
+        text: `Cotización revisada: **${draft.name}** · ${draft.people} pax · total listo para PDF.`
+      }
+    ]);
+    this.scrollBottom();
   }
 
   onKeydown(event: KeyboardEvent): void {

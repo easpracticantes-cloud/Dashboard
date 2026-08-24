@@ -150,13 +150,46 @@ public final class AiModuleDtos {
     ) {
     }
 
+    /**
+     * Borrador de cotización para revisión en UI (editable + PDF).
+     */
+    public record QuoteDraftDto(
+            String code,
+            String name,
+            String modality,
+            Integer people,
+            java.math.BigDecimal unitPrice,
+            java.math.BigDecimal total,
+            String currency,
+            String date,
+            String pickup,
+            String clientName,
+            String notes,
+            String includes,
+            String excludes,
+            boolean reviewFlag,
+            java.util.Map<String, java.math.BigDecimal> priceScaleByPax
+    ) {
+    }
+
     public record CopilotResponse(
             String sessionId,
             String reply,
             String mode,
             java.util.List<String> toolsUsed,
             String provider,
-            boolean success
+            boolean success,
+            QuoteDraftDto quoteDraft
     ) {
+        public CopilotResponse(
+                String sessionId,
+                String reply,
+                String mode,
+                java.util.List<String> toolsUsed,
+                String provider,
+                boolean success
+        ) {
+            this(sessionId, reply, mode, toolsUsed, provider, success, null);
+        }
     }
 }

@@ -174,8 +174,9 @@ public class CopilotOrchestrator {
         if (CLEAR_QUOTE.matcher(message).find() && HAS_PEOPLE.matcher(message).find()) {
             var maybe = catalogQuoteService.tryQuote(message);
             if (maybe.isPresent()) {
-                String blended = text + "\n\n---\n\n" + maybe.get().markdown();
-                return new CopilotResponse(sessionId, blended, "QUOTE", List.of("catalog-quote"), provider, true);
+                CatalogQuoteService.QuoteResult q = maybe.get();
+                String blended = text + "\n\n---\n\n" + q.markdown();
+                return quoteResponse(sessionId, blended, List.of("catalog-quote"), provider, q);
             }
         }
 
@@ -185,8 +186,7 @@ public class CopilotOrchestrator {
     private CopilotResponse doQuote(String sessionId, String message, String provider) {
         try {
             CatalogQuoteService.QuoteResult q = catalogQuoteService.quote(message);
-            return new CopilotResponse(sessionId, q.markdown(), "QUOTE",
-                    List.of("catalog-quote", q.code()), provider, true);
+            return quoteResponse(sessionId, q.markdown(), List.of("catalog-quote", q.code()), provider, q);
         } catch (Exception ex) {
             log.warn("[Ave] cotización: {}", ex.getMessage());
             String soft = """
@@ -225,8 +225,8 @@ public class CopilotOrchestrator {
     private CopilotResponse localFallback(String sessionId, String message) {
         if (message != null && CLEAR_QUOTE.matcher(message).find()) {
             return catalogQuoteService.tryQuote(message)
-                    .map(q -> new CopilotResponse(sessionId, q.markdown(), "QUOTE",
-                            List.of("catalog-quote-local"), "local", true))
+                    .map(q -> quoteResponse(sessionId, q.markdown(),
+                            List.of("catalog-quote-local"), "local", q))
                     .orElseGet(() -> new CopilotResponse(sessionId,
                             "Puedo cotizarte si me dices el tour y el número de personas. "
                                     + "Ejemplo: “Acaime para 4 personas, privado”.",
@@ -236,6 +236,24 @@ public class CopilotOrchestrator {
                 "Estoy un poco lenta con el modelo ahora. Cuéntame de nuevo qué necesitas "
                         + "(cotización, duda de un tour, jeep, proveedores…) y te ayudo.",
                 "ANSWER", List.of("fallback"), "local", true);
+    }
+
+    private CopilotResponse quoteResponse(
+            String sessionId,
+            String reply,
+            List<String> tools,
+            String provider,
+            CatalogQuoteService.QuoteResult q
+    ) {
+        return new CopilotResponse(
+                sessionId,
+                reply,
+                "QUOTE",
+                tools,
+                provider,
+                true,
+                catalogQuoteService.toDraft(q)
+        );
     }
 
     private JsonNode tryParseTool(String raw) {

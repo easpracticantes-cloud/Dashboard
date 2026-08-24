@@ -167,6 +167,25 @@ export interface CopilotResponse {
   toolsUsed: string[];
   provider: string;
   success: boolean;
+  quoteDraft?: QuoteDraft | null;
+}
+
+export interface QuoteDraft {
+  code?: string;
+  name?: string;
+  modality?: string;
+  people?: number;
+  unitPrice?: number;
+  total?: number;
+  currency?: string;
+  date?: string;
+  pickup?: string;
+  clientName?: string;
+  notes?: string;
+  includes?: string;
+  excludes?: string;
+  reviewFlag?: boolean;
+  priceScaleByPax?: Record<string, number>;
 }
 
 export interface ActionExecuteResponse {

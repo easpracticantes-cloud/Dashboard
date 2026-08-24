@@ -1,6 +1,7 @@
 package com.escuelaaves.sig.application.ai;
 
 import com.escuelaaves.sig.application.ai.CommercialCatalogService.CatalogProduct;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.QuoteDraftDto;
 import com.escuelaaves.sig.domain.ai.model.QuoteInterpretation;
 import com.escuelaaves.sig.shared.exception.BadRequestException;
 import com.escuelaaves.sig.shared.exception.ResourceNotFoundException;
@@ -11,7 +12,9 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -59,6 +62,9 @@ public class CatalogQuoteService {
         BigDecimal total = unit.multiply(BigDecimal.valueOf(people)).setScale(0, RoundingMode.HALF_UP);
 
         String currency = product.currency() != null ? product.currency() : "COP";
+        Map<String, BigDecimal> scale = new LinkedHashMap<>();
+        product.priceScaleByPax().forEach((k, v) -> scale.put(String.valueOf(k), v));
+
         StringBuilder markdown = new StringBuilder();
         markdown.append("**").append(product.name()).append("**");
         if (product.modality() != null) {
@@ -78,7 +84,7 @@ public class CatalogQuoteService {
         if (product.reviewFlag()) {
             markdown.append("\n⚠️ Tarifa marcada para revisión comercial.\n");
         }
-        markdown.append("\n_Precios desde catálogo de archivos (no inventados)._");
+        markdown.append("\n_Abre el panel de revisión para editar y descargar PDF._");
 
         log.info("[CatalogQuote] code={} people={} unit={} total={}", product.code(), people, unit, total);
         return new QuoteResult(
@@ -90,7 +96,13 @@ public class CatalogQuoteService {
                 total,
                 currency,
                 markdown.toString(),
-                product.reviewFlag()
+                product.reviewFlag(),
+                interpretation.date(),
+                interpretation.pickup(),
+                product.includes(),
+                product.excludes(),
+                interpretation.rawNotes(),
+                scale
         );
     }
 
@@ -101,6 +113,26 @@ public class CatalogQuoteService {
             log.warn("[CatalogQuote] no cotizable: {}", ex.getMessage());
             return Optional.empty();
         }
+    }
+
+    public QuoteDraftDto toDraft(QuoteResult q) {
+        return new QuoteDraftDto(
+                q.code(),
+                q.name(),
+                q.modality(),
+                q.people(),
+                q.unitPrice(),
+                q.total(),
+                q.currency(),
+                q.date(),
+                q.pickup(),
+                null,
+                q.notes(),
+                q.includes(),
+                q.excludes(),
+                q.reviewFlag(),
+                q.priceScaleByPax()
+        );
     }
 
     private static String formatMoney(BigDecimal amount, String currency) {
@@ -118,7 +150,13 @@ public class CatalogQuoteService {
             BigDecimal total,
             String currency,
             String markdown,
-            boolean reviewFlag
+            boolean reviewFlag,
+            String date,
+            String pickup,
+            String includes,
+            String excludes,
+            String notes,
+            Map<String, BigDecimal> priceScaleByPax
     ) {
     }
 }

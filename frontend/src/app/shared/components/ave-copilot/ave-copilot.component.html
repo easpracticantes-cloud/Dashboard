@@ -12,7 +12,7 @@
           </div>
           <div>
             <strong>Ave</strong>
-            <span>Chat abierto · precios del catálogo</span>
+            <span>Chat abierto · revisión + PDF</span>
           </div>
         </div>
         <button type="button" class="ave-icon-btn" (click)="toggle()" aria-label="Cerrar chat">
@@ -29,6 +29,12 @@
             [class.ave-msg--quote]="m.mode === 'QUOTE'"
           >
             <div class="ave-msg__bubble" [innerHTML]="formatHtml(m.text)"></div>
+            @if (m.hasQuote) {
+              <button type="button" class="ave-msg__review" (click)="openQuoteReview()">
+                <mat-icon>open_in_new</mat-icon>
+                Revisar / editar / PDF
+              </button>
+            }
           </div>
         }
         @if (sending()) {
@@ -89,3 +95,11 @@
     }
   </button>
 </div>
+
+@if (quoteDraft(); as q) {
+  <eas-ave-quote-review
+    [draft]="q"
+    (closed)="closeQuoteReview()"
+    (confirmed)="onQuoteConfirmed($event)"
+  />
+}

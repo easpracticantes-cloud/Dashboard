@@ -1,0 +1,108 @@
+<div class="aqr" role="dialog" aria-modal="true" aria-label="Revisar cotización">
+  <div class="aqr__backdrop" (click)="close()"></div>
+  <section class="aqr__panel">
+    <header class="aqr__head">
+      <div>
+        <p class="aqr__eyebrow">Revisión de cotización</p>
+        <h2>Verifica y ajusta antes de enviar</h2>
+      </div>
+      <button type="button" class="aqr__x" (click)="close()" aria-label="Cerrar">
+        <mat-icon>close</mat-icon>
+      </button>
+    </header>
+
+    @if (reviewFlag()) {
+      <p class="aqr__warn">
+        <mat-icon>warning</mat-icon>
+        Esta tarifa está marcada para revisión comercial en el catálogo.
+      </p>
+    }
+
+    <div class="aqr__body">
+      <label class="aqr__field aqr__field--full">
+        <span>Tour / experiencia</span>
+        <input type="text" [ngModel]="name()" (ngModelChange)="name.set($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Código</span>
+        <input type="text" [ngModel]="code()" (ngModelChange)="code.set($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Modalidad</span>
+        <select [ngModel]="modality()" (ngModelChange)="modality.set($event)">
+          <option value="PRIVADO">PRIVADO</option>
+          <option value="COMPARTIDO">COMPARTIDO</option>
+        </select>
+      </label>
+
+      <label class="aqr__field">
+        <span>Cliente</span>
+        <input type="text" placeholder="Nombre del cliente" [ngModel]="clientName()" (ngModelChange)="clientName.set($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Personas</span>
+        <input type="number" min="1" [ngModel]="people()" (ngModelChange)="onPeopleChange($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Fecha del servicio</span>
+        <input type="date" [ngModel]="date()" (ngModelChange)="date.set($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Pickup</span>
+        <input type="text" placeholder="Armenia, Salento…" [ngModel]="pickup()" (ngModelChange)="pickup.set($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Precio / persona ({{ unitPrice() | currency: currency():'symbol-narrow':'1.0-0' }})</span>
+        <input type="number" min="0" step="1000" [ngModel]="unitPrice()" (ngModelChange)="onUnitChange($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Total ({{ displayTotal() | currency: currency():'symbol-narrow':'1.0-0' }})</span>
+        <input type="number" min="0" step="1000" [ngModel]="total()" (ngModelChange)="onTotalChange($event)" />
+      </label>
+
+      <label class="aqr__field aqr__field--full">
+        <span>Incluye</span>
+        <textarea rows="3" [ngModel]="includes()" (ngModelChange)="includes.set($event)"></textarea>
+      </label>
+
+      <label class="aqr__field aqr__field--full">
+        <span>No incluye</span>
+        <textarea rows="2" [ngModel]="excludes()" (ngModelChange)="excludes.set($event)"></textarea>
+      </label>
+
+      <label class="aqr__field aqr__field--full">
+        <span>Notas</span>
+        <textarea rows="2" [ngModel]="notes()" (ngModelChange)="notes.set($event)"></textarea>
+      </label>
+    </div>
+
+    <div class="aqr__summary">
+      <div>
+        <span>Total a cotizar</span>
+        <strong>{{ displayTotal() | currency: currency():'symbol-narrow':'1.0-0' }}</strong>
+      </div>
+      @if (reviewed()) {
+        <span class="aqr__ok"><mat-icon>task_alt</mat-icon> Revisada</span>
+      }
+    </div>
+
+    <footer class="aqr__foot">
+      <button type="button" class="aqr__btn aqr__btn--ghost" (click)="close()">Cerrar</button>
+      <button type="button" class="aqr__btn aqr__btn--soft" (click)="markReviewed()">
+        <mat-icon>fact_check</mat-icon>
+        Confirmar revisión
+      </button>
+      <button type="button" class="aqr__btn aqr__btn--primary" (click)="downloadPdf()">
+        <mat-icon>picture_as_pdf</mat-icon>
+        Descargar PDF
+      </button>
+    </footer>
+  </section>
+</div>
