@@ -53,9 +53,10 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
         max-width: 100%;
         overflow: hidden;
         background:
-          radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in srgb, var(--eas-amber) 12%, transparent), transparent 55%),
-          radial-gradient(ellipse 50% 45% at 0% 100%, color-mix(in srgb, var(--eas-leaf) 10%, transparent), transparent 50%),
-          var(--eas-canvas);
+          radial-gradient(ellipse 80% 50% at 0% -5%, rgba(228, 160, 26, 0.28), transparent 50%),
+          radial-gradient(ellipse 70% 55% at 100% 5%, rgba(31, 122, 76, 0.22), transparent 48%),
+          radial-gradient(ellipse 55% 40% at 50% 110%, rgba(61, 154, 106, 0.18), transparent 55%),
+          linear-gradient(165deg, #d5e4db 0%, #e8f0eb 40%, #dfeae3 100%);
       }
 
       .shell__drawer {
@@ -73,7 +74,7 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
         max-width: 100%;
         overflow-x: clip;
         overflow-y: auto;
-        background: var(--eas-canvas);
+        background: transparent;
         box-sizing: border-box;
       }
 
@@ -82,7 +83,7 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
         min-width: 0;
         max-width: 100%;
         width: 100%;
-        padding: 1.35rem 1.25rem 2.75rem;
+        padding: 1.45rem 1.35rem 3rem;
         box-sizing: border-box;
       }
 

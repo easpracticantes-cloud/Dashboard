@@ -32,29 +32,31 @@ import { KpiItem } from '../../../core/models/kpi.model';
     `
       .kpi {
         position: relative;
-        padding: 1.15rem 1.2rem 1.15rem;
-        background: var(--eas-surface);
-        border: 1px solid var(--eas-line-soft);
-        border-radius: 18px;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        padding: 1.25rem 1.3rem 1.25rem;
+        background:
+          radial-gradient(ellipse 80% 70% at 100% 0%, rgba(228, 160, 26, 0.14), transparent 55%),
+          var(--eas-surface);
+        border: 2px solid color-mix(in srgb, var(--eas-leaf) 22%, var(--eas-line-soft));
+        border-radius: 22px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
         overflow: hidden;
       }
 
       .kpi:hover {
-        border-color: color-mix(in srgb, var(--eas-leaf) 22%, var(--eas-line-soft));
-        box-shadow: var(--eas-shadow-sm);
+        border-color: #e4a01a;
+        box-shadow: 0 22px 44px rgba(20, 38, 28, 0.16), 0 0 0 4px rgba(228, 160, 26, 0.18);
+        transform: translateY(-6px);
       }
 
       .kpi::before {
         content: '';
         position: absolute;
         left: 0;
-        top: 12px;
-        bottom: 12px;
-        width: 3px;
-        border-radius: 999px;
-        background: linear-gradient(180deg, var(--eas-amber), var(--eas-leaf));
-        opacity: 0.95;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        border-radius: 22px 0 0 22px;
+        background: linear-gradient(180deg, #f0bc48, #e4a01a, #1f7a4c);
       }
 
       .kpi::after {
@@ -62,10 +64,10 @@ import { KpiItem } from '../../../core/models/kpi.model';
         position: absolute;
         right: -20px;
         top: -24px;
-        width: 80px;
-        height: 80px;
+        width: 110px;
+        height: 110px;
         border-radius: 999px;
-        background: radial-gradient(circle, rgba(31, 122, 76, 0.08), transparent 70%);
+        background: radial-gradient(circle, rgba(228, 160, 26, 0.22), transparent 70%);
         pointer-events: none;
       }
 
@@ -78,9 +80,9 @@ import { KpiItem } from '../../../core/models/kpi.model';
 
       .kpi__label {
         margin: 0;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.01em;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
         color: var(--eas-muted);
         line-height: 1.3;
       }
@@ -88,38 +90,42 @@ import { KpiItem } from '../../../core/models/kpi.model';
       .kpi__icon {
         display: inline-grid;
         place-items: center;
-        width: 32px;
-        height: 32px;
-        border-radius: 10px;
-        background: var(--eas-mist);
-        color: var(--eas-leaf);
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, rgba(228, 160, 26, 0.28), rgba(31, 122, 76, 0.2));
+        color: #1a3d2c;
         flex: none;
+        box-shadow: 0 8px 16px rgba(31, 122, 76, 0.18);
       }
 
       .kpi__icon mat-icon {
-        font-size: 18px !important;
-        width: 18px !important;
-        height: 18px !important;
+        font-size: 24px !important;
+        width: 24px !important;
+        height: 24px !important;
       }
 
       .kpi__value {
-        margin: 0.7rem 0 0;
+        margin: 0.75rem 0 0;
         font-family: 'Montserrat', 'Sora', sans-serif;
-        font-weight: 800;
-        font-size: 2.15rem;
+        font-weight: 900;
+        font-size: clamp(2.3rem, 3.5vw, 2.9rem);
         line-height: 1;
-        letter-spacing: -0.04em;
+        letter-spacing: -0.045em;
         font-variant-numeric: tabular-nums;
-        color: var(--eas-ink);
+        background: linear-gradient(135deg, #14261c, #1f7a4c);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
 
       .kpi__icon[data-accent='amber'] {
-        background: rgba(228, 160, 26, 0.16);
+        background: linear-gradient(135deg, rgba(228, 160, 26, 0.4), rgba(201, 132, 14, 0.25));
         color: var(--eas-amber-deep);
       }
 
       .kpi__icon[data-accent='danger'] {
-        background: rgba(194, 81, 69, 0.14);
+        background: rgba(194, 81, 69, 0.18);
         color: var(--eas-danger);
       }
 
@@ -128,15 +134,16 @@ import { KpiItem } from '../../../core/models/kpi.model';
         font-size: 0.75rem;
         color: var(--eas-muted);
         margin-left: 0.15rem;
+        -webkit-text-fill-color: var(--eas-muted);
       }
 
       .kpi__delta {
         display: inline-flex;
         align-items: center;
         gap: 0.2rem;
-        margin: 0.7rem 0 0;
-        font-size: 0.6875rem;
-        font-weight: 600;
+        margin: 0.75rem 0 0;
+        font-size: 0.72rem;
+        font-weight: 700;
         color: var(--eas-muted);
       }
 
