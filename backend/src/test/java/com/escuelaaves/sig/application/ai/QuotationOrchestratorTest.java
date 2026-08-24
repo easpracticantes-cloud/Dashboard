@@ -71,7 +71,7 @@ class QuotationOrchestratorTest {
                 Map.of("transportMode", "PRIVATE_JEEP"),
                 Map.of()
         ));
-        when(tourPricingPort.findBestMatch("ACAIME")).thenReturn(Optional.of(new TourPrice(
+        when(tourPricingPort.findBestMatch(eq("ACAIME"), eq(5))).thenReturn(Optional.of(new TourPrice(
                 "ACAIME", "Tour Acaime",
                 new BigDecimal("120000"), new BigDecimal("35000"), new BigDecimal("45000"),
                 "COP", true
@@ -112,7 +112,7 @@ class QuotationOrchestratorTest {
                 new QuoteInterpretation("CAFE", 2, null, null, false, false, null)
         );
         when(ruleEnginePort.evaluate(any())).thenReturn(RuleResult.empty());
-        when(tourPricingPort.findBestMatch("CAFE")).thenReturn(Optional.of(new TourPrice(
+        when(tourPricingPort.findBestMatch(eq("CAFE"), eq(2))).thenReturn(Optional.of(new TourPrice(
                 "CAFE", "Tour Cafe",
                 new BigDecimal("85000"), BigDecimal.ZERO, BigDecimal.ZERO, "COP", true
         )));

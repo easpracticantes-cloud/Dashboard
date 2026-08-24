@@ -1,0 +1,1 @@
+# Catálogo comercial EAS\n\nFuente de precios para la IA (backend).\n\n- productos.json — tarifas / escala por pax\n- proveedores.json — proveedores\n- meta.json — reglas, paquetes, políticas\n\nEdita estos archivos y reinicia el backend. No depende de tablas PG.\n

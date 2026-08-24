@@ -1,0 +1,2329 @@
+{
+  "products": [
+    {
+      "code": "RAFTING_EN_EL_EJE_CAFETERO",
+      "name": "Rafting en el Eje Cafetero",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 705000,
+      "priceScaleByPax": {
+        "1": 705000,
+        "2": 429000,
+        "3": 336000,
+        "4": 368000,
+        "5": 329000,
+        "6": 303000
+      },
+      "minPriceBeforeVat1Pax": 592000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "rafting",
+        "rio",
+        "eje cafetero"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "CABALGATA_ECOLOGICA",
+      "name": "Cabalgata Ecológica",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 906000,
+      "priceScaleByPax": {
+        "1": 906000,
+        "2": 473000,
+        "3": 377000,
+        "4": 427000,
+        "5": 382000,
+        "6": 353000
+      },
+      "minPriceBeforeVat1Pax": 761000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "cabalgata",
+        "caballo",
+        "ecologica"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "CANOPY_EXTREMO_EN_EL_QUINDIO",
+      "name": "Canopy Extremo en el Quindío",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 663000,
+      "priceScaleByPax": {
+        "1": 663000,
+        "2": 384000,
+        "3": 291000,
+        "4": 316000,
+        "5": 277000,
+        "6": 250000
+      },
+      "minPriceBeforeVat1Pax": 557000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "canopy",
+        "extremos",
+        "quindio"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "BICIRRIEL_EN_EL_QUINDIO",
+      "name": "Bicirriel en el Quindío",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 730000,
+      "priceScaleByPax": {
+        "1": 730000,
+        "2": 440000,
+        "3": 342000,
+        "4": 387000,
+        "5": 343000,
+        "6": 315000
+      },
+      "minPriceBeforeVat1Pax": 613000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "bicirriel",
+        "bici"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "GLOBO_AEROSTATICO",
+      "name": "Globo Aerostático",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1253000,
+      "priceScaleByPax": {
+        "1": 1253000,
+        "2": 1015000,
+        "3": 936000,
+        "4": 896000
+      },
+      "minPriceBeforeVat1Pax": 1212000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "globo",
+        "aerostatico",
+        "vuelo"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "PARAPENTE",
+      "name": "Parapente",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 825000,
+      "priceScaleByPax": {
+        "1": 825000,
+        "2": 535000,
+        "3": 437000,
+        "4": 531000,
+        "5": 484000,
+        "6": 453000
+      },
+      "minPriceBeforeVat1Pax": 693000,
+      "includes": "Transporte desde casco urbano (Armenia, Salento, Filandia, Calarcá, Tebaida, Montenegro, Circasia), 4x4 a pista, vuelo 15 min, parqueadero, póliza, video ~3 min y 25 fotos, pilotos certificados.",
+      "excludes": "Tours adicionales, bebidas alcohólicas, propinas, alimentos no mencionados.",
+      "notes": null,
+      "keywords": [
+        "parapente",
+        "vuelo"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "PARAMOTOR",
+      "name": "Paramotor",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 892000,
+      "priceScaleByPax": {
+        "1": 892000,
+        "2": 600000,
+        "3": 504000,
+        "4": 535000,
+        "5": 494000,
+        "6": 467000
+      },
+      "minPriceBeforeVat1Pax": 749000,
+      "includes": "Transporte casco urbano, vuelo 20 min, póliza, video 360 ~3 min y 25 fotos, piloto certificado.",
+      "excludes": "Tours adicionales, bebidas alcohólicas, propinas, alimentos no mencionados.",
+      "notes": "Inicio 9:00 a.m. Duración aprox. con logística/transporte.",
+      "keywords": [
+        "paramotor",
+        "paratrike",
+        "vuelo"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "SANTUARIO_DE_LA_PALMA_DE_CERA",
+      "name": "Santuario de la Palma de Cera",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1079000,
+      "priceScaleByPax": {
+        "1": 1079000,
+        "2": 600000,
+        "3": 457000,
+        "4": 375000,
+        "5": 325000,
+        "6": 292000
+      },
+      "minPriceBeforeVat1Pax": 906000,
+      "includes": "Willys ida/regreso Salento-Carbonera, guianza, entradas, hidratación, snack, almuerzo típico, bastones, carpa lluvia, seguro.",
+      "excludes": "Tours adicionales, bebidas alcohólicas, propinas, alimentos no mencionados.",
+      "notes": "Lun-Dom 8:00am. 8-9h (hasta 11h con transfer). Altitud 3340 msnm.",
+      "keywords": [
+        "santuario",
+        "palma de cera",
+        "carbonera"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "TREKKING_EN_RN_ACAIME",
+      "name": "Trekking en RN Acaime",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 611000,
+      "priceScaleByPax": {
+        "1": 611000,
+        "2": 357000,
+        "3": 312000,
+        "4": 263000,
+        "5": 248000,
+        "6": 227000
+      },
+      "minPriceBeforeVat1Pax": 513000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "trekking",
+        "acaime",
+        "reserva"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "SALENTO_Y_VALLE_DEL_COCORA",
+      "name": "Salento y Valle del Cócora",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 682000,
+      "priceScaleByPax": {
+        "1": 682000,
+        "2": 405000,
+        "3": 357000,
+        "4": 305000,
+        "5": 273000,
+        "6": 252000
+      },
+      "minPriceBeforeVat1Pax": 573000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "salento",
+        "cocora",
+        "valle"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "SALENTO_Y_VALLE_DEL_COCORA_MAS",
+      "name": "Salento y Valle del Cócora más",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 883000,
+      "priceScaleByPax": {
+        "1": 883000,
+        "2": 537000,
+        "3": 422000,
+        "4": 416000,
+        "5": 377000,
+        "6": 349000
+      },
+      "minPriceBeforeVat1Pax": 742000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "salento",
+        "cocora",
+        "plus"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RECORRIDO_DEL_MONOAULLADOR",
+      "name": "Recorrido del Mono Aullador",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 578000,
+      "priceScaleByPax": {
+        "1": 578000,
+        "2": 394000,
+        "3": 380000,
+        "4": 346000,
+        "5": 324000,
+        "6": 311000
+      },
+      "minPriceBeforeVat1Pax": 485000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "mono aullador",
+        "kirakai"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RUTA_PARQUE_DE_LA_VIDA",
+      "name": "Ruta Parque de la Vida",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 448000,
+      "priceScaleByPax": {
+        "1": 448000,
+        "2": 268000,
+        "3": 238000,
+        "4": 204000,
+        "5": 184000
+      },
+      "minPriceBeforeVat1Pax": 376000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "parque de la vida"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RUTA_AVES_Y_CAFE",
+      "name": "Ruta Aves y Café",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 532000,
+      "priceScaleByPax": {
+        "1": 532000,
+        "2": 341000,
+        "3": 325000,
+        "4": 287000,
+        "5": 263000
+      },
+      "minPriceBeforeVat1Pax": 447000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "aves",
+        "cafe",
+        "birdwatching"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RUTA_JARDIN_BOTANICO",
+      "name": "Ruta Jardín Botánico",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 561000,
+      "priceScaleByPax": {
+        "1": 561000,
+        "2": 369000,
+        "3": 357000,
+        "4": 319000,
+        "5": 296000
+      },
+      "minPriceBeforeVat1Pax": 471000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "jardin botanico",
+        "calarca"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RUTA_GALLITO_DE_ROCA",
+      "name": "Ruta Gallito de Roca",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 607000,
+      "priceScaleByPax": {
+        "1": 607000,
+        "2": 348000,
+        "3": 308000,
+        "4": 256000,
+        "5": 225000
+      },
+      "minPriceBeforeVat1Pax": 510000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "gallito de roca",
+        "santa rita"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RUTA_COCORA",
+      "name": "Ruta Cócora",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 526000,
+      "priceScaleByPax": {
+        "1": 526000,
+        "2": 325000,
+        "3": 303000,
+        "4": 262000,
+        "5": 238000
+      },
+      "minPriceBeforeVat1Pax": 442000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "ruta cocora"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RUTA_RESERVA_ACAIME",
+      "name": "Ruta Reserva Acaime",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 607000,
+      "priceScaleByPax": {
+        "1": 607000,
+        "2": 388000,
+        "3": 361000,
+        "4": 319000,
+        "5": 294000
+      },
+      "minPriceBeforeVat1Pax": 510000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "reserva acaime"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RUTA_CACIQUE_CALARCA",
+      "name": "Ruta Cacique Calarcá",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 756000,
+      "priceScaleByPax": {
+        "1": 756000,
+        "2": 459000,
+        "3": 421000,
+        "4": 362000,
+        "5": 327000
+      },
+      "minPriceBeforeVat1Pax": 635000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "cacique calarca",
+        "peñas blancas"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RUTA_SUSURRO_DE_GUADUALES",
+      "name": "Ruta Susurro de Guaduales",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 513000,
+      "priceScaleByPax": {
+        "1": 513000,
+        "2": 323000,
+        "3": 304000,
+        "4": 266000,
+        "5": 242000
+      },
+      "minPriceBeforeVat1Pax": 431000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "guaduales",
+        "soñarte"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RUTA_RESERVA_KIRAKAI",
+      "name": "Ruta Reserva Kirakai",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 557000,
+      "priceScaleByPax": {
+        "1": 557000,
+        "2": 412000,
+        "3": 360000,
+        "4": 329000,
+        "5": 309000
+      },
+      "minPriceBeforeVat1Pax": 468000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "kirakai"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "PIJAO_AVES_Y_COMUNIDAD",
+      "name": "Pijao, aves y comunidad",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 780000,
+      "priceScaleByPax": {
+        "1": 780000,
+        "2": 471000,
+        "3": 413000,
+        "4": 319000,
+        "5": 313000,
+        "6": 347000
+      },
+      "minPriceBeforeVat1Pax": 655000,
+      "includes": "Jeep Willys Pijao-La Palmera, almuerzo, guía bilingüe, bebida, dulces, filtrados, póliza.",
+      "excludes": "Tours adicionales, alcohol, transporte desde alojamiento, propinas.",
+      "notes": "Inicio 8:00. 8-9h + transfer. Altura 1739 msnm. Sin mascotas.",
+      "keywords": [
+        "pijao",
+        "aves",
+        "comunidad"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "PARAMO_DE_CHILI",
+      "name": "Páramo de Chili",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1062000,
+      "priceScaleByPax": {
+        "1": 1062000,
+        "2": 566000,
+        "3": 400000,
+        "4": 318000,
+        "5": 268000,
+        "6": 340000
+      },
+      "minPriceBeforeVat1Pax": 892000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "paramo",
+        "chili"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "VOLCAN_EL_MACHIN",
+      "name": "Volcán El Machín",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1756000,
+      "priceScaleByPax": {
+        "1": 1756000,
+        "2": 936000,
+        "3": 662000,
+        "4": 525000,
+        "5": 443000,
+        "6": 390000
+      },
+      "minPriceBeforeVat1Pax": 1475000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "volcan",
+        "machin"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "EXPEDICION_MURILLO",
+      "name": "Expedición Murillo",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 3632000,
+      "priceScaleByPax": {
+        "1": 3632000,
+        "2": 2014000,
+        "3": 1475000,
+        "4": 1329000,
+        "5": 1142000,
+        "6": 1018000
+      },
+      "minPriceBeforeVat1Pax": 3052000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "murillo",
+        "expedicion",
+        "nevados"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "PLAN_PARQUE_LOS_NEVADOS",
+      "name": "Plan Parque Los Nevados",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1691000,
+      "priceScaleByPax": {
+        "1": 1691000,
+        "2": 949000,
+        "3": 701000,
+        "4": 688000,
+        "5": 592000,
+        "6": 528000
+      },
+      "minPriceBeforeVat1Pax": 1421000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "parque nevados",
+        "nevados"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "SENDERISMO_PENAS_BLANCAS",
+      "name": "Senderismo Peñas Blancas",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 676000,
+      "priceScaleByPax": {
+        "1": 676000,
+        "2": 385000,
+        "3": 287000,
+        "4": 273000,
+        "5": 240000,
+        "6": 260000
+      },
+      "minPriceBeforeVat1Pax": 568000,
+      "includes": "Jeep Willys Calarcá-entrada, guía local, almuerzo, entrada ecoparque, seguro.",
+      "excludes": null,
+      "notes": "Menú ovo-lacto vegetariano OVOP.",
+      "keywords": [
+        "peñas blancas",
+        "senderismo",
+        "calarca"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "SENDERISMO_SANTA_RITA",
+      "name": "Senderismo Santa Rita",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 378000,
+      "priceScaleByPax": {
+        "1": 378000,
+        "2": 210000,
+        "3": 175000,
+        "4": 143000,
+        "5": 124000,
+        "6": 111000
+      },
+      "minPriceBeforeVat1Pax": 317000,
+      "includes": "Jeep Willys desde Salento, guía bilingüe, refrigerio, entradas, seguro.",
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "santa rita",
+        "senderismo"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "SENDERISMO_OTUN_QUIMBAYA",
+      "name": "Senderismo Otún Quimbaya",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 731000,
+      "priceScaleByPax": {
+        "1": 731000,
+        "2": 415000,
+        "3": 353000,
+        "4": 359000,
+        "5": 309000,
+        "6": 277000
+      },
+      "minPriceBeforeVat1Pax": 614000,
+      "includes": "Transporte desde alojamiento Salento, entradas con guía, almuerzo casero.",
+      "excludes": null,
+      "notes": "Sin mascotas (jeep + autopista del café).",
+      "keywords": [
+        "otun",
+        "quimbaya",
+        "senderismo"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RECORRIDO_POR_LA_CORDILLERA",
+      "name": "Recorrido por la Cordillera",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1400000,
+      "priceScaleByPax": {
+        "1": 1400000,
+        "2": 753000,
+        "3": 537000,
+        "4": 479000,
+        "5": 404000,
+        "6": 354000
+      },
+      "minPriceBeforeVat1Pax": 1176000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "cordillera",
+        "pijao"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RECORRIDO_CAFETERO_CON_CATACION",
+      "name": "Recorrido cafetero con catación",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 917000,
+      "priceScaleByPax": {
+        "1": 917000,
+        "2": 581000,
+        "3": 471000,
+        "4": 531000,
+        "5": 374000,
+        "6": 343000
+      },
+      "minPriceBeforeVat1Pax": 770000,
+      "includes": "Transporte casco urbano, finca + programa café, taza, souvenir 250g, seguro.",
+      "excludes": null,
+      "notes": "Lun-Vie 8:00-14:00. Máx 20 pax.",
+      "keywords": [
+        "cafetero",
+        "catacion",
+        "cafe"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RECORRIDO_CAFETERO_TRADICIONAL",
+      "name": "Recorrido cafetero tradicional",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 599000,
+      "priceScaleByPax": {
+        "1": 599000,
+        "2": 369000,
+        "3": 348000,
+        "4": 338000,
+        "5": 303000,
+        "6": 279000
+      },
+      "minPriceBeforeVat1Pax": 503000,
+      "includes": "Transporte casco urbano, programa café, almuerzo típico, seguro.",
+      "excludes": null,
+      "notes": "[REVISAR] Existe tarifa alternativa 488000 (código RECORRIDO_CAFETERO_TRADICIONAL_2).",
+      "keywords": [
+        "cafetero tradicional",
+        "cafe",
+        "almuerzo"
+      ],
+      "active": true,
+      "reviewFlag": true,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RECORRIDO_CAFETERO_TRADICIONAL_2",
+      "name": "Recorrido cafetero tradicional (alt.)",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 488000,
+      "priceScaleByPax": {
+        "1": 488000,
+        "2": 317000,
+        "3": 290000,
+        "4": 357000,
+        "5": 319000,
+        "6": 293000
+      },
+      "minPriceBeforeVat1Pax": 410000,
+      "includes": null,
+      "excludes": null,
+      "notes": "[REVISAR] Confirmar vigencia vs 599000.",
+      "keywords": [
+        "cafetero tradicional",
+        "alternativa"
+      ],
+      "active": true,
+      "reviewFlag": true,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "RECORRIDO_LA_GUAYABA",
+      "name": "Recorrido la Guayaba",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 948000,
+      "priceScaleByPax": {
+        "1": 948000,
+        "2": 478000,
+        "3": 321000,
+        "4": 292000,
+        "5": 268000,
+        "6": 222000
+      },
+      "minPriceBeforeVat1Pax": 796000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "guayaba"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "PROGRAMA_DE_CACAO",
+      "name": "Programa de Cacao",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 662000,
+      "priceScaleByPax": {
+        "1": 662000,
+        "2": 394000,
+        "3": 349000,
+        "4": 336000,
+        "5": 298000,
+        "6": 273000
+      },
+      "minPriceBeforeVat1Pax": 556000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "cacao",
+        "chocolate"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "METODOS_DE_FILTRADO",
+      "name": "Métodos de Filtrado",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 759000,
+      "priceScaleByPax": {
+        "1": 759000,
+        "2": 459000,
+        "3": 409000,
+        "4": 409000,
+        "5": 363000,
+        "6": 333000
+      },
+      "minPriceBeforeVat1Pax": 637000,
+      "includes": "Transporte casco urbano, programa filtrado Armenia/Salento, seguro.",
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "filtrado",
+        "cafe",
+        "metodos"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "PROGRAMA_DE_PERMACULTURA",
+      "name": "Programa de Permacultura",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 954000,
+      "priceScaleByPax": {
+        "1": 954000,
+        "2": 541000,
+        "3": 403000,
+        "4": 369000,
+        "5": 321000,
+        "6": 288000
+      },
+      "minPriceBeforeVat1Pax": 801000,
+      "includes": "Transporte, granja autosustentable Quimbaya, almuerzo típico, seguro.",
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "permacultura",
+        "mama lulu",
+        "quimbaya"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "CREA_TU_PROPIO_SOUVENIR",
+      "name": "Crea tu propio souvenir",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 691000,
+      "priceScaleByPax": {
+        "1": 691000,
+        "2": 390000,
+        "3": 331000,
+        "4": 331000,
+        "5": 285000,
+        "6": 255000
+      },
+      "minPriceBeforeVat1Pax": 580000,
+      "includes": "Transporte, taller pintura/arte, materiales, refrigerio, seguro.",
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "souvenir",
+        "taller",
+        "arte"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "CITY_TOUR_POR_SALENTO",
+      "name": "City tour por Salento",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 923000,
+      "priceScaleByPax": {
+        "1": 923000,
+        "2": 481000,
+        "3": 381000,
+        "4": 354000,
+        "5": 292000,
+        "6": 252000
+      },
+      "minPriceBeforeVat1Pax": 775000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "city tour",
+        "salento"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "PROGRAMA_DE_CESTERIA_EN_FILANDIA",
+      "name": "Programa de cestería en Filandia",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1089000,
+      "priceScaleByPax": {
+        "1": 1089000,
+        "2": 629000,
+        "3": 475000,
+        "4": 449000,
+        "5": 393000,
+        "6": 355000
+      },
+      "minPriceBeforeVat1Pax": 915000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "cesteria",
+        "filandia",
+        "bejuco"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "TALLER_DE_COCINA_DE_AUTOR",
+      "name": "Taller de cocina de autor",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1402000,
+      "priceScaleByPax": {
+        "1": 1402000,
+        "2": 1136000,
+        "3": 1047000,
+        "4": 399000,
+        "5": 363000,
+        "6": 340000
+      },
+      "minPriceBeforeVat1Pax": 1178000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "cocina",
+        "taller",
+        "autor"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "BARISTA_POR_UN_DIA",
+      "name": "Barista por un día",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1402000,
+      "priceScaleByPax": {
+        "1": 1402000,
+        "2": 1136000,
+        "3": 1047000,
+        "4": 399000,
+        "5": 409000,
+        "6": 382000
+      },
+      "minPriceBeforeVat1Pax": 1178000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "barista",
+        "cafe"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "FILANDIA_SALENTO_Y_VALLE_DE_COCORA",
+      "name": "Filandia, Salento y Valle de Cócora",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1177000,
+      "priceScaleByPax": {
+        "1": 1177000,
+        "2": 661000,
+        "3": 480000,
+        "4": 475000,
+        "5": 400000,
+        "6": 353000
+      },
+      "minPriceBeforeVat1Pax": 989000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "filandia",
+        "salento",
+        "cocora",
+        "combo"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "PROGRAMA_DE_CACAO_POPORO",
+      "name": "Programa de Cacao + Poporo",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 986000,
+      "priceScaleByPax": {
+        "1": 986000,
+        "2": 638000,
+        "3": 569000,
+        "4": 526000,
+        "5": 472000,
+        "6": 434000
+      },
+      "minPriceBeforeVat1Pax": 828000,
+      "includes": "Transporte, cacao ES/EN, cultura Quimbaya, cerámica, snack arepa, tarjeta asistencia.",
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "cacao",
+        "poporo",
+        "quimbaya"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "CITYTOUR_SALENTO_COMP",
+      "name": "Citytour Salento",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 364000,
+      "priceScaleByPax": {
+        "1": 364000,
+        "2": 134000,
+        "3": 134000,
+        "4": 125000,
+        "5": 125000,
+        "6": 93000,
+        "7": 93000,
+        "8": 93000,
+        "9": 93000,
+        "10": 93000
+      },
+      "minPriceBeforeVat1Pax": 273000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "citytour",
+        "salento",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "SANTA_RITA_PRINCIPIANTES_COMP",
+      "name": "Santa Rita - Principiantes",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 550000,
+      "priceScaleByPax": {
+        "1": 550000,
+        "2": 327000,
+        "3": 327000,
+        "4": 327000,
+        "5": 327000
+      },
+      "minPriceBeforeVat1Pax": 413000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "santa rita",
+        "principiantes",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "INTERPRETACION_PALMA_DE_CERA_COMP",
+      "name": "Interpretación Palma de Cera",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 154000,
+      "priceScaleByPax": {
+        "1": 154000,
+        "2": 130000,
+        "3": 84000,
+        "4": 84000,
+        "5": 84000,
+        "6": 84000,
+        "7": 84000,
+        "8": 84000,
+        "9": 84000,
+        "10": 84000
+      },
+      "minPriceBeforeVat1Pax": 131000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "palma de cera",
+        "interpretacion",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "KIRAKAI_DESDE_SALENTO_COMP",
+      "name": "Kirakai desde Salento",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 785000,
+      "priceScaleByPax": {
+        "1": 785000,
+        "2": 365000,
+        "3": 365000,
+        "4": 365000,
+        "5": 365000
+      },
+      "minPriceBeforeVat1Pax": 589000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "kirakai",
+        "salento",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "KIRAKAI_DESDE_FILANDIA_COMP",
+      "name": "Kirakai desde Filandia",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 567000,
+      "priceScaleByPax": {
+        "1": 567000,
+        "2": 338000,
+        "3": 338000,
+        "4": 338000,
+        "5": 338000
+      },
+      "minPriceBeforeVat1Pax": 426000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "kirakai",
+        "filandia",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "PIJAO_AVES_Y_COMUNIDAD_COMP",
+      "name": "Pijao, aves y comunidad",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 730000,
+      "priceScaleByPax": {
+        "1": 730000,
+        "2": 396000,
+        "3": 300000,
+        "4": 300000,
+        "5": 300000,
+        "6": 300000,
+        "7": 300000
+      },
+      "minPriceBeforeVat1Pax": 548000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "pijao",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "PIJAO_DESDE_FILANDIA_COMP",
+      "name": "Pijao desde Filandia",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1313000,
+      "priceScaleByPax": {
+        "1": 1313000,
+        "2": 688000,
+        "3": 454000,
+        "4": 434000,
+        "5": 434000,
+        "6": 434000,
+        "7": 434000,
+        "8": 434000,
+        "9": 434000,
+        "10": 434000
+      },
+      "minPriceBeforeVat1Pax": 985000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "pijao",
+        "filandia",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "BARISTA_POR_UN_DIA_EN_ARMENIA_COMP",
+      "name": "Barista por un día en Armenia",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 559000,
+      "priceScaleByPax": {
+        "1": 559000,
+        "2": 442000,
+        "3": 403000,
+        "4": 384000,
+        "5": 384000,
+        "6": 384000,
+        "7": 384000,
+        "8": 384000,
+        "9": 384000,
+        "10": 384000
+      },
+      "minPriceBeforeVat1Pax": 420000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "barista",
+        "armenia",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "BARISTA_POR_UN_DIA_SALENTO_FIL_COMP",
+      "name": "Barista por un día Salento/Filandia",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 493000,
+      "priceScaleByPax": {
+        "1": 493000,
+        "2": 493000,
+        "3": 493000,
+        "4": 462000,
+        "5": 462000,
+        "6": 462000,
+        "7": 462000,
+        "8": 462000,
+        "9": 462000,
+        "10": 462000
+      },
+      "minPriceBeforeVat1Pax": 370000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "barista",
+        "salento",
+        "filandia",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "METODOS_DE_FILTRADO_COMP",
+      "name": "Métodos de filtrado",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 60000,
+      "priceScaleByPax": {
+        "1": 60000,
+        "2": 60000,
+        "3": 60000,
+        "4": 60000,
+        "5": 60000,
+        "6": 60000,
+        "7": 60000,
+        "8": 60000,
+        "9": 60000,
+        "10": 60000
+      },
+      "minPriceBeforeVat1Pax": 45000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "filtrado",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "PEI_FILANDIA_SALENTO_COCORA_COMP",
+      "name": "PEI Filandia Salento Cócora",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 576000,
+      "priceScaleByPax": {
+        "1": 576000,
+        "2": 576000,
+        "3": 576000,
+        "4": 576000,
+        "5": 576000,
+        "6": 576000,
+        "7": 576000,
+        "8": 576000,
+        "9": 576000,
+        "10": 576000
+      },
+      "minPriceBeforeVat1Pax": 420000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "pei",
+        "filandia",
+        "salento",
+        "cocora",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "ARMENIA_FILANDIA_SALENTO_COCORA_COMP",
+      "name": "Armenia-Filandia-Salento-Cócora",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1197000,
+      "priceScaleByPax": {
+        "1": 1197000,
+        "2": 548000,
+        "3": 548000,
+        "4": 548000,
+        "5": 548000,
+        "6": 548000,
+        "7": 548000,
+        "8": 548000,
+        "9": 548000,
+        "10": 548000
+      },
+      "minPriceBeforeVat1Pax": 871000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "armenia",
+        "filandia",
+        "salento",
+        "cocora",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "TOUR_CASA_DE_LOS_COLIBRIES_COMP",
+      "name": "Tour Casa de los Colibríes",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 606000,
+      "priceScaleByPax": {
+        "1": 606000,
+        "2": 363000,
+        "3": 326000,
+        "4": 312000,
+        "5": 312000,
+        "6": 312000,
+        "7": 312000,
+        "8": 312000,
+        "9": 312000,
+        "10": 312000
+      },
+      "minPriceBeforeVat1Pax": 516000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "colibries",
+        "colibríes",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "SALENTO_Y_VALLE_DEL_COCORA_COMP",
+      "name": "Salento y Valle del Cócora",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 573000,
+      "priceScaleByPax": {
+        "1": 573000,
+        "2": 283000,
+        "3": 283000,
+        "4": 283000,
+        "5": 283000,
+        "6": 283000,
+        "7": 283000,
+        "8": 283000,
+        "9": 283000,
+        "10": 283000
+      },
+      "minPriceBeforeVat1Pax": 418290,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "salento",
+        "cocora",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "SALENTO_Y_VALLE_DEL_COCORA_DESD_COMP",
+      "name": "Salento y Valle del Cócora (desde)",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 220000,
+      "priceScaleByPax": {
+        "1": 220000,
+        "2": 220000,
+        "3": 220000,
+        "4": 220000,
+        "5": 220000,
+        "6": 220000,
+        "7": 220000,
+        "8": 220000,
+        "9": 283000,
+        "10": 283000
+      },
+      "minPriceBeforeVat1Pax": 165000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "salento",
+        "cocora",
+        "desde",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "FILANDIA_SALENTO_Y_VALLE_DEL_CO_COMP",
+      "name": "Filandia, Salento y Valle del Cócora",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 359000,
+      "priceScaleByPax": {
+        "1": 359000,
+        "2": 359000,
+        "3": 290000,
+        "4": 246000,
+        "5": 200000,
+        "6": 157000,
+        "7": 142000,
+        "8": 134000,
+        "9": 125000,
+        "10": 118000
+      },
+      "minPriceBeforeVat1Pax": 305150,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "filandia",
+        "salento",
+        "cocora",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "VISITA_GUIADA_POR_FILANDIA_COMP",
+      "name": "Visita Guiada por Filandia",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 441000,
+      "priceScaleByPax": {
+        "1": 441000,
+        "2": 231000,
+        "3": 231000,
+        "4": 205000,
+        "5": 185000,
+        "6": 185000,
+        "7": 185000,
+        "8": 185000,
+        "9": 185000,
+        "10": 185000
+      },
+      "minPriceBeforeVat1Pax": 375000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "filandia",
+        "visita guiada",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "PARQUE_DE_LA_VIDA_COMP",
+      "name": "Parque de la Vida",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 345000,
+      "priceScaleByPax": {
+        "1": 345000,
+        "2": 192000,
+        "3": 85000,
+        "4": 85000,
+        "5": 85000,
+        "6": 85000,
+        "7": 85000,
+        "8": 85000,
+        "9": 85000,
+        "10": 85000
+      },
+      "minPriceBeforeVat1Pax": 294000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "parque de la vida",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "EXCURSION_AL_VOLCAN_MACHIN_COMP",
+      "name": "Excursión al Volcán Machín",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1285000,
+      "priceScaleByPax": {
+        "1": 1285000,
+        "2": 701000,
+        "3": 534000,
+        "4": 534000,
+        "5": 534000,
+        "6": 534000,
+        "7": 534000,
+        "8": 534000,
+        "9": 534000,
+        "10": 534000
+      },
+      "minPriceBeforeVat1Pax": 1093000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "volcan",
+        "machin",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "TOUR_POR_LOS_MIRADORES_DE_SALEN_COMP",
+      "name": "Tour por los Miradores de Salento",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 503000,
+      "priceScaleByPax": {
+        "1": 503000,
+        "2": 418000,
+        "3": 389000,
+        "4": 375000,
+        "5": 367000,
+        "6": 361000,
+        "7": 378000,
+        "8": 372000,
+        "9": 368000,
+        "10": 364000
+      },
+      "minPriceBeforeVat1Pax": 377250,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "miradores",
+        "salento",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "TERMALES_SAN_VICENTE_PEREIRA_COMP",
+      "name": "Termales San Vicente - Pereira",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 263000,
+      "priceScaleByPax": {
+        "1": 263000,
+        "2": 276000,
+        "3": 276000,
+        "4": 276000,
+        "5": 276000,
+        "6": 276000,
+        "7": 276000,
+        "8": 276000
+      },
+      "minPriceBeforeVat1Pax": 197250,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "termales",
+        "san vicente",
+        "pereira",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "TERMALES_SAN_VICENTE_SALENTO_COMP",
+      "name": "Termales San Vicente - Salento",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 789000,
+      "priceScaleByPax": {
+        "1": 789000,
+        "2": 489000,
+        "3": 389000,
+        "4": 357000,
+        "5": 324000,
+        "6": 301000,
+        "7": 285000,
+        "8": 282000
+      },
+      "minPriceBeforeVat1Pax": 789000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "termales",
+        "san vicente",
+        "salento",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "TERMALES_SAN_VICENTE_ARMENIA_COMP",
+      "name": "Termales San Vicente - Armenia",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 697000,
+      "priceScaleByPax": {
+        "1": 697000,
+        "2": 437000,
+        "3": 350000,
+        "4": 356000,
+        "5": 320000,
+        "6": 297000,
+        "7": 280000,
+        "8": 275000
+      },
+      "minPriceBeforeVat1Pax": 592450,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "termales",
+        "san vicente",
+        "armenia",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "FINCA_CACAOTERA_COMP",
+      "name": "Finca Cacaotera",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 896000,
+      "priceScaleByPax": {
+        "1": 896000,
+        "2": 358000,
+        "3": 358000,
+        "4": 358000,
+        "5": 358000,
+        "6": 358000,
+        "7": 358000,
+        "8": 358000,
+        "9": 358000,
+        "10": 358000
+      },
+      "minPriceBeforeVat1Pax": 896000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "finca",
+        "cacao",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "SANTUARIO_DE_LA_PALMA_CARBONERA_COMP",
+      "name": "Santuario de la Palma Carbonera",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 990000,
+      "priceScaleByPax": {
+        "1": 990000,
+        "2": 531000,
+        "3": 385000,
+        "4": 385000,
+        "5": 385000,
+        "6": 385000,
+        "7": 385000,
+        "8": 385000,
+        "9": 385000,
+        "10": 385000
+      },
+      "minPriceBeforeVat1Pax": 990000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "santuario",
+        "carbonera",
+        "palma",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "OTUN_QUIMBAYA_COMP",
+      "name": "Otún Quimbaya",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 843000,
+      "priceScaleByPax": {
+        "1": 843000,
+        "2": 350000,
+        "3": 350000,
+        "4": 350000,
+        "5": 320000,
+        "6": 320000,
+        "7": 320000,
+        "8": 320000,
+        "9": 320000,
+        "10": 320000
+      },
+      "minPriceBeforeVat1Pax": 632250,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "otun",
+        "quimbaya",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "FILANDIA_PROGRAMA_DE_CACAO_COMP",
+      "name": "Filandia + Programa de Cacao",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 731000,
+      "priceScaleByPax": {
+        "1": 731000,
+        "2": 475000,
+        "3": 389000,
+        "4": 389000,
+        "5": 389000,
+        "6": 389000,
+        "7": 389000,
+        "8": 389000,
+        "9": 389000,
+        "10": 389000
+      },
+      "minPriceBeforeVat1Pax": 622000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "filandia",
+        "cacao",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "FINCA_CAFETERA_COMP",
+      "name": "Finca Cafetera",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 192000,
+      "priceScaleByPax": {
+        "1": 192000,
+        "2": 124000,
+        "3": 111000,
+        "4": 111000,
+        "5": 111000,
+        "6": 111000,
+        "7": 111000,
+        "8": 111000,
+        "9": 111000,
+        "10": 111000
+      },
+      "minPriceBeforeVat1Pax": 164000,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "finca cafetera",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "SALENTO_Y_VALLE_COCORA_CAFE_COMP",
+      "name": "Salento y Valle Cócora + Café",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 990000,
+      "priceScaleByPax": {
+        "1": 990000,
+        "2": 414000,
+        "3": 414000,
+        "4": 414000,
+        "5": 414000,
+        "6": 414000,
+        "7": 414000,
+        "8": 414000,
+        "9": 414000,
+        "10": 414000
+      },
+      "minPriceBeforeVat1Pax": 841500,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "salento",
+        "cocora",
+        "cafe",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "SALENTO_Y_VALLE_COCORA_CAFE_D_COMP",
+      "name": "Salento y Valle Cócora + Café (desde)",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 1122000,
+      "priceScaleByPax": {
+        "1": 1122000,
+        "2": 460000,
+        "3": 460000,
+        "4": 460000,
+        "5": 460000,
+        "6": 460000,
+        "7": 460000,
+        "8": 460000,
+        "9": 460000,
+        "10": 460000
+      },
+      "minPriceBeforeVat1Pax": 841500,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "salento",
+        "cocora",
+        "cafe",
+        "desde",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "PROGRAMA_DE_CAFE_CON_TERMALES_S_COMP",
+      "name": "Programa de Café con Termales",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 971000,
+      "priceScaleByPax": {
+        "1": 971000,
+        "2": 633000,
+        "3": 521000,
+        "4": 465000,
+        "5": 465000,
+        "6": 465000,
+        "7": 465000,
+        "8": 465000,
+        "9": 465000,
+        "10": 465000
+      },
+      "minPriceBeforeVat1Pax": 825350,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "cafe",
+        "termales",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "PROGRAMA_DE_TERMALES_DE_SANTA_R_COMP",
+      "name": "Programa de Termales de Santa Rosa",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 765000,
+      "priceScaleByPax": {
+        "1": 765000,
+        "2": 465000,
+        "3": 365000,
+        "4": 365000,
+        "5": 365000,
+        "6": 365000,
+        "7": 365000,
+        "8": 365000,
+        "9": 365000,
+        "10": 365000
+      },
+      "minPriceBeforeVat1Pax": 573750,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "termales",
+        "santa rosa",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "PEREIRA_PROGRAMA_DE_TERMALES_DE_COMP",
+      "name": "Pereira - Programa de Termales",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 365000,
+      "priceScaleByPax": {
+        "1": 365000,
+        "2": 365000,
+        "3": 365000,
+        "4": 365000,
+        "5": 365000,
+        "6": 365000,
+        "7": 365000,
+        "8": 365000,
+        "9": 365000,
+        "10": 365000
+      },
+      "minPriceBeforeVat1Pax": 310250,
+      "includes": null,
+      "excludes": null,
+      "notes": null,
+      "keywords": [
+        "pereira",
+        "termales",
+        "compartido"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "ACAIME",
+      "name": "Tour Acaime / Trekking RN Acaime (alias)",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 611000,
+      "priceScaleByPax": {
+        "1": 611000,
+        "2": 357000,
+        "3": 312000,
+        "4": 263000,
+        "5": 248000,
+        "6": 227000
+      },
+      "minPriceBeforeVat1Pax": 513000,
+      "includes": null,
+      "excludes": null,
+      "notes": "Alias de TREKKING_EN_RN_ACAIME / RUTA_RESERVA_ACAIME.",
+      "keywords": [
+        "acaime"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "COCORA",
+      "name": "Valle de Cócora (alias)",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 682000,
+      "priceScaleByPax": {
+        "1": 682000,
+        "2": 405000,
+        "3": 357000,
+        "4": 305000,
+        "5": 273000,
+        "6": 252000
+      },
+      "minPriceBeforeVat1Pax": 573000,
+      "includes": null,
+      "excludes": null,
+      "notes": "Alias de SALENTO_Y_VALLE_DEL_COCORA.",
+      "keywords": [
+        "cocora"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "PORTAFOLIO DE COSTOS TOURS PRIVADOS 2026.xlsx"
+    },
+    {
+      "code": "FILANDIA",
+      "name": "Filandia (alias visita/combo)",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 441000,
+      "priceScaleByPax": {
+        "1": 441000,
+        "2": 231000,
+        "3": 231000,
+        "4": 205000,
+        "5": 185000,
+        "6": 185000,
+        "7": 185000,
+        "8": 185000,
+        "9": 185000,
+        "10": 185000
+      },
+      "minPriceBeforeVat1Pax": 375000,
+      "includes": null,
+      "excludes": null,
+      "notes": "Alias de VISITA_GUIADA_POR_FILANDIA_COMP.",
+      "keywords": [
+        "filandia"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "TERMALES",
+      "name": "Termales (alias San Vicente desde Salento)",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 789000,
+      "priceScaleByPax": {
+        "1": 789000,
+        "2": 489000,
+        "3": 389000,
+        "4": 357000,
+        "5": 324000,
+        "6": 301000,
+        "7": 285000,
+        "8": 282000
+      },
+      "minPriceBeforeVat1Pax": 789000,
+      "includes": null,
+      "excludes": null,
+      "notes": "Alias de TERMALES_SAN_VICENTE_SALENTO_COMP.",
+      "keywords": [
+        "termales"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "CAFE",
+      "name": "Tour / Finca Café (alias)",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 192000,
+      "priceScaleByPax": {
+        "1": 192000,
+        "2": 124000,
+        "3": 111000,
+        "4": 111000,
+        "5": 111000,
+        "6": 111000,
+        "7": 111000,
+        "8": 111000,
+        "9": 111000,
+        "10": 111000
+      },
+      "minPriceBeforeVat1Pax": 164000,
+      "includes": null,
+      "excludes": null,
+      "notes": "Alias de FINCA_CAFETERA_COMP. Para privados usar RECORRIDO_CAFETERO_*.",
+      "keywords": [
+        "cafe"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "SALENTO",
+      "name": "Citytour / Salento (alias)",
+      "modality": "COMPARTIDO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 364000,
+      "priceScaleByPax": {
+        "1": 364000,
+        "2": 134000,
+        "3": 134000,
+        "4": 125000,
+        "5": 125000,
+        "6": 93000,
+        "7": 93000,
+        "8": 93000,
+        "9": 93000,
+        "10": 93000
+      },
+      "minPriceBeforeVat1Pax": 273000,
+      "includes": null,
+      "excludes": null,
+      "notes": "Alias de CITYTOUR_SALENTO_COMP.",
+      "keywords": [
+        "salento"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    }
+  ]
+}

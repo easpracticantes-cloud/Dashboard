@@ -15,5 +15,12 @@ public interface TourPricingPort {
 
     Optional<TourPrice> findBestMatch(String tourHint);
 
+    /**
+     * Mejor match aplicando escala por número de personas cuando el catálogo lo permite.
+     */
+    default Optional<TourPrice> findBestMatch(String tourHint, int people) {
+        return findBestMatch(tourHint);
+    }
+
     List<TourPrice> findAllActive();
 }

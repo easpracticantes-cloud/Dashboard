@@ -7,6 +7,7 @@ import com.escuelaaves.sig.domain.ai.model.PricedQuotation;
 import com.escuelaaves.sig.domain.ai.model.QuoteInterpretation;
 import com.escuelaaves.sig.domain.ai.model.ReservationExtraction;
 import com.escuelaaves.sig.domain.ai.model.SentimentAnalysis;
+import com.escuelaaves.sig.application.ai.CommercialCatalogService;
 import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
 import com.escuelaaves.sig.domain.model.IntegrationCode;
 import com.escuelaaves.sig.domain.model.IntegrationStatus;
@@ -38,15 +39,18 @@ public class GeminiAdapter implements GenerativeAiPort {
     private final RestClient geminiRestClient;
     private final GeminiProperties properties;
     private final ObjectMapper objectMapper;
+    private final CommercialCatalogService commercialCatalog;
 
     public GeminiAdapter(
             @Qualifier(GeminiRestClientConfig.GEMINI_REST_CLIENT) RestClient geminiRestClient,
             GeminiProperties properties,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            CommercialCatalogService commercialCatalog
     ) {
         this.geminiRestClient = geminiRestClient;
         this.properties = properties;
         this.objectMapper = objectMapper;
+        this.commercialCatalog = commercialCatalog;
     }
 
     @Override
@@ -74,18 +78,21 @@ public class GeminiAdapter implements GenerativeAiPort {
 
     @Override
     public QuoteInterpretation interpretQuote(String message) {
+        String catalogIndex = commercialCatalog.buildPromptIndex(120);
         String system = """
                 Eres un extractor de datos para Escuela Aves Salento (tours en Quindío, Colombia).
                 Devuelve SOLO JSON válido con estas claves:
-                tour (string en MAYÚSCULAS, ej ACAIME, COCORA, FILANDIA, TERMALES),
+                tour (string: usa el CODE exacto del catálogo cuando puedas; ej TREKKING_EN_RN_ACAIME, ACAIME, RAFTING_EN_EL_EJE_CAFETERO),
                 people (integer),
                 date (YYYY-MM-DD o null si no hay fecha clara; si dice "sábado" estima la próxima fecha relativa a hoy),
                 pickup (ciudad de recogida o null),
                 transport (boolean),
                 restaurant (boolean; true si mencionan almuerzo/comida/restaurante),
-                rawNotes (string breve).
+                rawNotes (string breve; indica PRIVADO o COMPARTIDO si el cliente lo dice).
                 No inventes precios. No calcules montos. No agregues texto fuera del JSON.
-                """;
+
+                Catálogo de referencia (elige el code más cercano):
+                """ + catalogIndex;
         String json = generateText(system, message, true);
         return parseQuoteInterpretation(json, message);
     }

@@ -166,17 +166,31 @@ public class QuotationOrchestrator {
         boolean transport = Boolean.TRUE.equals(interpretation.transport());
         boolean restaurant = Boolean.TRUE.equals(interpretation.restaurant());
 
-        TourPrice tour = tourPricingPort.findBestMatch(interpretation.tour())
+        String tourHint = interpretation.tour();
+        String notes = interpretation.rawNotes() != null ? interpretation.rawNotes().toLowerCase() : "";
+        if (notes.contains("compartido")) {
+            tourHint = tourHint + " compartido";
+        } else if (notes.contains("privado")) {
+            tourHint = tourHint + " privado";
+        }
+
+        TourPrice tour = tourPricingPort.findBestMatch(tourHint, people)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "No hay tarifa en PostgreSQL para el tour: " + interpretation.tour()
+                        "No hay tarifa en catálogo/PostgreSQL para el tour: " + interpretation.tour()
                 ));
 
         BigDecimal pax = BigDecimal.valueOf(people);
+        // Precio del catálogo 2026 ya es venta/paquete por persona (escala por pax).
+        // Solo sumar transporte/restaurante si la tarifa trae montos > 0 (legacy PG).
         BigDecimal subTour = tour.pricePerPerson().multiply(pax).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal subTransport = transport
+        boolean hasTransportFee = tour.transportPerPerson() != null
+                && tour.transportPerPerson().compareTo(BigDecimal.ZERO) > 0;
+        boolean hasRestaurantFee = tour.restaurantPerPerson() != null
+                && tour.restaurantPerPerson().compareTo(BigDecimal.ZERO) > 0;
+        BigDecimal subTransport = transport && hasTransportFee
                 ? tour.transportPerPerson().multiply(pax).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        BigDecimal subRestaurant = restaurant
+        BigDecimal subRestaurant = restaurant && hasRestaurantFee
                 ? tour.restaurantPerPerson().multiply(pax).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
 

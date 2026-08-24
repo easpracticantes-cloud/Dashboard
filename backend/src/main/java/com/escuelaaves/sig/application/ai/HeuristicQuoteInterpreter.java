@@ -24,7 +24,23 @@ public final class HeuristicQuoteInterpreter {
         String norm = normalize(text);
 
         String tour = "ACAIME";
-        if (norm.contains("filandia")) {
+        if (norm.contains("rafting")) {
+            tour = "RAFTING_EN_EL_EJE_CAFETERO";
+        } else if (norm.contains("cabalgata")) {
+            tour = "CABALGATA_ECOLOGICA";
+        } else if (norm.contains("canopy")) {
+            tour = "CANOPY_EXTREMO_EN_EL_QUINDIO";
+        } else if (norm.contains("parapente")) {
+            tour = "PARAPENTE";
+        } else if (norm.contains("paramotor")) {
+            tour = "PARAMOTOR";
+        } else if (norm.contains("globo")) {
+            tour = "GLOBO_AEROSTATICO";
+        } else if (norm.contains("santuario") || norm.contains("palma de cera")) {
+            tour = "SANTUARIO_DE_LA_PALMA_DE_CERA";
+        } else if (norm.contains("bicirriel")) {
+            tour = "BICIRRIEL_EN_EL_QUINDIO";
+        } else if (norm.contains("filandia")) {
             tour = "FILANDIA";
         } else if (norm.contains("termales") || norm.contains("termal")) {
             tour = "TERMALES";
@@ -63,6 +79,10 @@ public final class HeuristicQuoteInterpreter {
             restaurant = false;
         }
 
+        String modalityNote = containsAny(norm, "compartido", "civitatis", "grupo")
+                ? "COMPARTIDO"
+                : (containsAny(norm, "privado", "private") ? "PRIVADO" : null);
+
         String pickup = null;
         if (norm.contains("armenia")) {
             pickup = "Armenia";
@@ -74,6 +94,11 @@ public final class HeuristicQuoteInterpreter {
             pickup = "Calarcá";
         }
 
+        String notes = "interpretación local (sin Gemini)";
+        if (modalityNote != null) {
+            notes = notes + " | " + modalityNote;
+        }
+
         return new QuoteInterpretation(
                 tour,
                 people,
@@ -81,7 +106,7 @@ public final class HeuristicQuoteInterpreter {
                 pickup,
                 transport,
                 restaurant,
-                "interpretación local (sin Gemini)"
+                notes
         );
     }
 

@@ -126,7 +126,7 @@ public class AIService {
     }
 
     /**
-     * Calcula montos exclusivamente desde PostgreSQL via TourPricingPort.
+     * Calcula montos desde catálogo 2026 / PostgreSQL via TourPricingPort (escala por pax).
      */
     PricedQuotation priceInterpretation(QuoteInterpretation interpretation) {
         if (interpretation == null) {
@@ -138,22 +138,34 @@ public class AIService {
         boolean transport = Boolean.TRUE.equals(interpretation.transport());
         boolean restaurant = Boolean.TRUE.equals(interpretation.restaurant());
 
-        TourPrice tour = tourPricingPort.findBestMatch(interpretation.tour())
+        String tourHint = interpretation.tour();
+        String notes = interpretation.rawNotes() != null ? interpretation.rawNotes().toLowerCase() : "";
+        if (notes.contains("compartido")) {
+            tourHint = tourHint + " compartido";
+        } else if (notes.contains("privado")) {
+            tourHint = tourHint + " privado";
+        }
+
+        TourPrice tour = tourPricingPort.findBestMatch(tourHint, people)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "No hay tarifa en PostgreSQL para el tour: " + interpretation.tour()
+                        "No hay tarifa en catálogo/PostgreSQL para el tour: " + interpretation.tour()
                 ));
 
         BigDecimal pax = BigDecimal.valueOf(people);
         BigDecimal subTour = tour.pricePerPerson().multiply(pax).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal subTransport = transport
+        boolean hasTransportFee = tour.transportPerPerson() != null
+                && tour.transportPerPerson().compareTo(BigDecimal.ZERO) > 0;
+        boolean hasRestaurantFee = tour.restaurantPerPerson() != null
+                && tour.restaurantPerPerson().compareTo(BigDecimal.ZERO) > 0;
+        BigDecimal subTransport = transport && hasTransportFee
                 ? tour.transportPerPerson().multiply(pax).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        BigDecimal subRestaurant = restaurant
+        BigDecimal subRestaurant = restaurant && hasRestaurantFee
                 ? tour.restaurantPerPerson().multiply(pax).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal total = subTour.add(subTransport).add(subRestaurant);
 
-        log.info("[AI] Pricing PG tour={} people={} total={} {}", tour.code(), people, total, tour.currency());
+        log.info("[AI] Pricing tour={} people={} total={} {}", tour.code(), people, total, tour.currency());
 
         return new PricedQuotation(
                 new QuoteInterpretation(

@@ -25,6 +25,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -79,7 +80,7 @@ class AIServiceTest {
         QuoteInterpretation interpretation = new QuoteInterpretation(
                 "ACAIME", 5, "2026-08-08", "Armenia", true, true, null
         );
-        when(tourPricingPort.findBestMatch("ACAIME")).thenReturn(Optional.of(new TourPrice(
+        when(tourPricingPort.findBestMatch(eq("ACAIME"), eq(5))).thenReturn(Optional.of(new TourPrice(
                 "ACAIME",
                 "Tour Acaime",
                 new BigDecimal("120000.00"),
@@ -105,7 +106,7 @@ class AIServiceTest {
                 "ACAIME", 5, "2026-08-08", "Armenia", true, true, "raw"
         );
         when(generativeAiPort.interpretQuote(anyString())).thenReturn(interpretation);
-        when(tourPricingPort.findBestMatch("ACAIME")).thenReturn(Optional.of(new TourPrice(
+        when(tourPricingPort.findBestMatch(eq("ACAIME"), eq(5))).thenReturn(Optional.of(new TourPrice(
                 "ACAIME", "Tour Acaime",
                 new BigDecimal("120000"), new BigDecimal("35000"), new BigDecimal("45000"),
                 "COP", true
@@ -125,7 +126,7 @@ class AIServiceTest {
         assertEquals(new BigDecimal("1000000.00"), response.total());
         assertEquals("Asunto", response.emailSubject());
         verify(generativeAiPort).interpretQuote(anyString());
-        verify(tourPricingPort).findBestMatch("ACAIME");
+        verify(tourPricingPort).findBestMatch(eq("ACAIME"), eq(5));
         verify(generativeAiPort).generateQuotationNarrative(any());
     }
 
@@ -135,7 +136,7 @@ class AIServiceTest {
         when(generativeAiPort.interpretQuote(anyString())).thenReturn(
                 new QuoteInterpretation("DESCONOCIDO", 2, null, null, false, false, null)
         );
-        when(tourPricingPort.findBestMatch("DESCONOCIDO")).thenReturn(Optional.empty());
+        when(tourPricingPort.findBestMatch(eq("DESCONOCIDO"), eq(2))).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () ->
                 aiService.quotation(new QuotationRequest("tour raro", false))

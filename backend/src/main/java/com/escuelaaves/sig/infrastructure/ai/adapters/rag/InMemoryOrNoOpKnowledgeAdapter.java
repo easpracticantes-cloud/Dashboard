@@ -1,11 +1,13 @@
 package com.escuelaaves.sig.infrastructure.ai.adapters.rag;
 
+import com.escuelaaves.sig.application.ai.CommercialCatalogService;
 import com.escuelaaves.sig.domain.ai.port.out.DocumentChunkerPort;
 import com.escuelaaves.sig.domain.ai.port.out.DocumentIndexer;
 import com.escuelaaves.sig.domain.ai.port.out.EmbeddingProvider;
 import com.escuelaaves.sig.domain.ai.port.out.KnowledgeRetrieverPort;
 import com.escuelaaves.sig.domain.ai.port.out.KnowledgeSearchProvider;
 import com.escuelaaves.sig.domain.ai.port.out.VectorSearchPort;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -13,11 +15,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Stub unificado RAG / vector (fase 1). Sin embeddings reales ni pgvector.
+ * RAG ligero: recupera snippets del catálogo comercial 2026.
  * Contrato listo para sustituir por PgVectorSearchAdapter productivo.
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class InMemoryOrNoOpKnowledgeAdapter implements
         EmbeddingProvider,
         KnowledgeSearchProvider,
@@ -26,9 +29,11 @@ public class InMemoryOrNoOpKnowledgeAdapter implements
         DocumentChunkerPort,
         KnowledgeRetrieverPort {
 
+    private final CommercialCatalogService commercialCatalog;
+
     @Override
     public List<Float> embed(String text) {
-        log.debug("[RAG-stub] embed chars={}", text != null ? text.length() : 0);
+        log.debug("[RAG] embed chars={}", text != null ? text.length() : 0);
         return List.of();
     }
 
@@ -39,13 +44,13 @@ public class InMemoryOrNoOpKnowledgeAdapter implements
 
     @Override
     public List<String> similaritySearch(List<Float> embedding, int topK) {
-        log.debug("[RAG-stub] similaritySearch topK={}", topK);
+        log.debug("[RAG] similaritySearch topK={} (sin embeddings reales)", topK);
         return List.of();
     }
 
     @Override
     public void indexDocument(String documentId, String content, String sourceType) {
-        log.info("[RAG-stub] indexDocument id={} type={} (no-op)", documentId, sourceType);
+        log.info("[RAG] indexDocument id={} type={} (no-op; catálogo JSON es fuente)", documentId, sourceType);
     }
 
     @Override
@@ -63,7 +68,9 @@ public class InMemoryOrNoOpKnowledgeAdapter implements
 
     @Override
     public List<String> retrieve(String query, int limit) {
-        log.debug("[RAG-stub] retrieve queryLen={} limit={}", query != null ? query.length() : 0, limit);
-        return List.of();
+        int top = Math.max(1, limit);
+        List<String> hits = commercialCatalog.retrieveSnippets(query, top);
+        log.debug("[RAG] retrieve queryLen={} hits={}", query != null ? query.length() : 0, hits.size());
+        return hits;
     }
 }

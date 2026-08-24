@@ -1,0 +1,177 @@
+{
+  "version": "2026.1",
+  "generatedAt": "2026-08-18T21:53:40.186Z",
+  "sourceDocument": "informe_completo_acuerdos_tarifas_proveedores_2026.pdf",
+  "organization": "Escuela Aves de Salento / Kuara Expeditions",
+  "currency": "COP",
+  "pricingRules": {
+    "neverInventPrices": true,
+    "preferPriceScaleByPax": true,
+    "privateVsShared": "Usar modality PRIVADO o COMPARTIDO según el cliente; no mezclar.",
+    "doNotUseProviderCostAsSalePrice": true,
+    "reviewFlaggedMustConfirm": true,
+    "jeepRule": ">4 pax suele jeep privado; ≤4 jeep público (operativo CRM).",
+    "guides": "Guías no pagan entrada; sí pagan almuerzo cuando aplica."
+  },
+  "packages": [
+    {
+      "name": "Expedición Murillo 2D/1N",
+      "priceFromCop": 3632000,
+      "modality": "PRIVADO",
+      "relatedCode": "EXPEDICION_MURILLO"
+    },
+    {
+      "name": "Plan Parque de los Nevados",
+      "priceFromCop": 1691000,
+      "modality": "PRIVADO",
+      "relatedCode": "PLAN_PARQUE_LOS_NEVADOS"
+    },
+    {
+      "name": "Filandia + Programa de Cacao",
+      "priceFromCop": 731000,
+      "modality": "COMPARTIDO",
+      "relatedCode": "FILANDIA_PROGRAMA_DE_CACAO_COMP"
+    },
+    {
+      "name": "Salento + Valle Cócora + Café",
+      "priceFromCop": 990000,
+      "modality": "COMPARTIDO",
+      "relatedCode": "SALENTO_Y_VALLE_COCORA_CAFE_COMP"
+    },
+    {
+      "name": "Salento + Valle Cócora + Café desde Filandia",
+      "priceFromCop": 1122000,
+      "modality": "COMPARTIDO",
+      "relatedCode": "SALENTO_Y_VALLE_COCORA_CAFE_D_COMP"
+    },
+    {
+      "name": "Programa Café + Termales",
+      "priceFromCop": 971000,
+      "modality": "COMPARTIDO",
+      "relatedCode": "PROGRAMA_DE_CAFE_CON_TERMALES_S_COMP"
+    },
+    {
+      "name": "Termales Santa Rosa + Café",
+      "priceFromCop": 765000,
+      "modality": "COMPARTIDO",
+      "relatedCode": "PROGRAMA_DE_TERMALES_DE_SANTA_R_COMP"
+    },
+    {
+      "name": "Termales Santa Rosa desde Pereira",
+      "priceFromCop": 365000,
+      "modality": "COMPARTIDO",
+      "relatedCode": "PEREIRA_PROGRAMA_DE_TERMALES_DE_COMP"
+    },
+    {
+      "name": "Pijao + Aves + Comunidad",
+      "priceSharedCop": 730000,
+      "pricePrivate1PaxCop": 780000,
+      "relatedCodes": [
+        "PIJAO_AVES_Y_COMUNIDAD_COMP",
+        "PIJAO_AVES_Y_COMUNIDAD"
+      ]
+    },
+    {
+      "name": "Filandia + Salento + Valle Cócora",
+      "priceFromCop": 1177000,
+      "modality": "PRIVADO",
+      "relatedCode": "FILANDIA_SALENTO_Y_VALLE_DE_COCORA"
+    }
+  ],
+  "policies": [
+    {
+      "code": "POL_GLOBO_CANCELACION",
+      "appliesTo": "GLOBO_AEROSTATICO",
+      "rule": "Cancelación por meteorología: reprogramación o devolución 100% anticipo (máx 5 días hábiles). Cancelación cliente: 1–7 días según política."
+    },
+    {
+      "code": "POL_GLOBO_RESTRICCIONES",
+      "appliesTo": "GLOBO_AEROSTATICO",
+      "rule": "Peso máx ~75 kg/persona; canasta 300 kg; máx 4 pax privado; operación condicionada por clima."
+    },
+    {
+      "code": "POL_CANOPY",
+      "appliesTo": "CANOPY_EXTREMO_EN_EL_QUINDIO",
+      "rule": "Costo proveedor 75000 COP/pax; comisión 10%=7500. Depende del clima."
+    },
+    {
+      "code": "POL_RAFTING",
+      "appliesTo": "RAFTING_EN_EL_EJE_CAFETERO",
+      "rule": "Proveedor 110000 COP/pax; comisión 10%. Extranjeros +5000 seguro. Temporada alta 1 dic–8 feb. Edad mínima comercial 5 años."
+    },
+    {
+      "code": "POL_CABALGATA",
+      "appliesTo": "CABALGATA_ECOLOGICA",
+      "rule": "El Carmelo: Mirador 1.5h desde 3 pax 80000 (alta 90000); Ecológica 3h desde 2 pax 120000 (alta 130000); VIP 5h desde 7 pax 200000 (alta 220000)."
+    },
+    {
+      "code": "POL_TERMAL_SANTA_ROSA",
+      "appliesTo": "TERMALES",
+      "rule": "Tarifa por temporada/fecha/turno. 0–90cm gratis; 91–120 infantil; 121+ adulto."
+    },
+    {
+      "code": "POL_MORELIA",
+      "appliesTo": "CAFE_LA_MORELIA",
+      "rule": "Agencias: tarifas 2025/2026 sin incremento documentado (confirmar vigencia)."
+    },
+    {
+      "code": "POL_MARIA_OCAMPOS",
+      "appliesTo": "RESTAURANTE_MARIA_OCAMPOS",
+      "rule": "Carne 33000; trucha 36000. Vigencia doc. hasta 01/06/2026 [REVISAR]."
+    }
+  ],
+  "checklists": {
+    "CHECK_GEN_RESERVA": [
+      "Confirmar disponibilidad del proveedor",
+      "Confirmar fecha y número de pasajeros",
+      "Confirmar nacionalidad cuando afecte tarifa",
+      "Confirmar origen/alojamiento",
+      "Confirmar idioma",
+      "Confirmar modalidad privado/compartido",
+      "Consultar tarifa vigente en catálogo/BD",
+      "Generar orden de compra",
+      "Confirmar proveedor, transporte, entradas y alimentación",
+      "Generar voucher",
+      "Informar al guía",
+      "Confirmar hora y punto de recogida"
+    ],
+    "CHECK_GUIA": [
+      "Recibir la reserva después de confirmación/pago",
+      "Leer descripción de la ruta",
+      "Solicitar insumos mínimo 1 día antes",
+      "Preparar guion interpretativo",
+      "Revisar clima y terreno",
+      "Confirmar equipamiento",
+      "Verificar estado de viajeros",
+      "Llegar puntualmente",
+      "Preparar plan de contingencia",
+      "No modificar ruta sin autorización",
+      "Vigilar cruces, puentes y quebradas",
+      "Controlar ritmo y descansos",
+      "Notificar inicio/finalización a operaciones",
+      "Tomar fotografías con autorización",
+      "Proteger pertenencias",
+      "Entregar informe máximo 2 días después",
+      "Entregar factura/cuenta de cobro y soportes",
+      "Reportar contingencias"
+    ]
+  },
+  "pendingReviews": [
+    "Transcribir 6 audios OGG",
+    "Revisar 20 imágenes con OCR insuficiente",
+    "Confirmar Recorrido Cafetero Tradicional: 599000 vs 488000",
+    "Actualizar María Ocampos (vigencia terminó 01/06/2026)",
+    "Confirmar tarifa 2026 Finca El Ocaso",
+    "Confirmar tarifa definitiva Rural Cocina",
+    "Confirmar tarifas Finca Evelyza",
+    "Confirmar tarifas Santa Rita",
+    "Confirmar tarifas Paratrike Salento",
+    "Confirmar tarifas Los Pérez / Mi Tierra / Cootracocora / Buses Armenia",
+    "Separar PRIVATE/SHARED/B2B/B2C/NET/COMMISSIONABLE/PUBLIC",
+    "Modelar temporada, nacionalidad, origen y min/max pax"
+  ],
+  "counts": {
+    "products": 83,
+    "providers": 78
+  }
+}
