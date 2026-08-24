@@ -41,7 +41,8 @@
               "src/styles/visual-polish-v3.css",
               "src/styles/sig-ui-real.css",
               "src/styles/soft-motion.css",
-              "src/styles/theme-transitions.css"
+              "src/styles/theme-transitions.css",
+              "src/styles/visual-polish-v6-noticeable.css"
             ],
             "stylePreprocessorOptions": {
               "includePaths": [

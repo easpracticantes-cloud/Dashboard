@@ -49,12 +49,12 @@
   --eas-radius-lg: 16px;
   --eas-radius-xl: 20px;
 
-  --eas-shadow-sm: 0 1px 2px rgba(20, 38, 28, 0.04), 0 2px 8px rgba(20, 38, 28, 0.04);
-  --eas-shadow-md: 0 14px 34px rgba(20, 38, 28, 0.08), 0 4px 10px rgba(20, 38, 28, 0.04);
-  --eas-shadow-lg: 0 32px 64px rgba(20, 38, 28, 0.14);
+  --eas-shadow-sm: 0 1px 2px rgba(20, 38, 28, 0.05), 0 4px 12px rgba(20, 38, 28, 0.05);
+  --eas-shadow-md: 0 16px 36px rgba(20, 38, 28, 0.1), 0 4px 12px rgba(20, 38, 28, 0.05);
+  --eas-shadow-lg: 0 36px 70px rgba(20, 38, 28, 0.16);
 
-  --eas-sidebar-w: 280px;
-  --eas-topbar-h: 66px;
+  --eas-sidebar-w: 286px;
+  --eas-topbar-h: 68px;
 
   color-scheme: light;
 }

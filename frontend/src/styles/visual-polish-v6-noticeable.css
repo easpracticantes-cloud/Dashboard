@@ -1,0 +1,726 @@
+/**
+ * visual-polish-v6-noticeable.css
+ * +60 mejoras visuales NOTORIAS para SIG Escuela Aves Salento.
+ * Marca: bosque + ámbar. Cargar al final del bundle de estilos.
+ */
+
+/* ========== 01 Canvas con textura viva ========== */
+.shell__canvas,
+.shell .mat-sidenav-content {
+  background:
+    radial-gradient(ellipse 90% 55% at 8% -8%, rgba(228, 160, 26, 0.11), transparent 52%),
+    radial-gradient(ellipse 70% 45% at 100% 0%, rgba(31, 122, 76, 0.1), transparent 48%),
+    radial-gradient(ellipse 60% 40% at 70% 100%, rgba(61, 154, 106, 0.07), transparent 55%),
+    linear-gradient(180deg, color-mix(in srgb, var(--eas-canvas) 88%, #dfeae4) 0%, var(--eas-canvas) 100%) !important;
+}
+
+/* ========== 02 Selección de texto marca ========== */
+::selection {
+  background: color-mix(in srgb, var(--eas-amber) 55%, var(--eas-leaf));
+  color: #14261c;
+}
+
+/* ========== 03 Scrollbars branded ========== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--eas-leaf) 55%, #9bb5a6) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--eas-mint), var(--eas-leaf));
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--eas-amber), var(--eas-leaf));
+  background-clip: padding-box;
+}
+
+/* ========== 04 Focus visible fuerte ========== */
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--eas-amber) 80%, white) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px rgba(228, 160, 26, 0.22) !important;
+}
+
+/* ========== 05 Page header con franja ámbar ========== */
+.eas-page-header {
+  position: relative;
+  padding: 1.15rem 1.25rem 1.25rem !important;
+  border-radius: 22px !important;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--eas-surface) 92%, #fff) 0%, var(--eas-surface) 100%) !important;
+  border: 1px solid color-mix(in srgb, var(--eas-line) 70%, transparent) !important;
+  box-shadow: var(--eas-shadow-md) !important;
+  overflow: hidden;
+}
+
+.eas-page-header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: linear-gradient(180deg, var(--eas-amber), var(--eas-leaf));
+}
+
+.eas-page-header::after {
+  content: '';
+  position: absolute;
+  right: -40px;
+  top: -50px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(228, 160, 26, 0.16), transparent 68%);
+  pointer-events: none;
+}
+
+.eas-page-header__eyebrow {
+  color: var(--eas-amber-deep) !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.14em !important;
+}
+
+.eas-page-header__title {
+  font-size: clamp(1.55rem, 2.4vw, 2rem) !important;
+  letter-spacing: -0.045em !important;
+  background: linear-gradient(105deg, var(--eas-ink) 30%, var(--eas-leaf) 140%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+}
+
+html[data-theme='dark'] .eas-page-header__title {
+  background: linear-gradient(105deg, #f5faf7 20%, #5ec993 130%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ========== 06–10 Cards con borde luminoso ========== */
+.eas-card,
+.eas-panel,
+.eas-glass,
+eas-glass-card,
+.commercial-form,
+.commercial-table {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--eas-line) 80%, transparent) !important;
+  box-shadow:
+    var(--eas-shadow-sm),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55) !important;
+}
+
+.eas-card:hover,
+.eas-panel:hover {
+  border-color: color-mix(in srgb, var(--eas-leaf) 35%, var(--eas-line)) !important;
+  box-shadow:
+    0 18px 40px rgba(20, 38, 28, 0.12),
+    0 0 0 1px color-mix(in srgb, var(--eas-amber) 22%, transparent) !important;
+}
+
+html[data-theme='dark'] .eas-card,
+html[data-theme='dark'] .eas-panel {
+  box-shadow:
+    var(--eas-shadow-sm),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+/* ========== 11 KPI cards más dramáticos ========== */
+eas-kpi-card,
+.kpi-card,
+.eas-kpi {
+  border-radius: 20px !important;
+  overflow: hidden;
+}
+
+eas-kpi-card .kpi,
+.kpi-card,
+.command-kpi {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--eas-surface) 90%, #fff), var(--eas-surface)) !important;
+}
+
+/* ========== 12–15 Botones con brillo ========== */
+.eas-btn-primary {
+  background: linear-gradient(135deg, #1a3d2c 0%, #1f7a4c 55%, #2f8f5c 100%) !important;
+  box-shadow:
+    0 10px 24px rgba(31, 122, 76, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+  border: 0 !important;
+  letter-spacing: 0.02em !important;
+}
+
+.eas-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow:
+    0 14px 28px rgba(31, 122, 76, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28) !important;
+}
+
+.eas-btn-accent {
+  background: linear-gradient(135deg, #e4a01a, #c9840e) !important;
+  color: #1a1408 !important;
+  box-shadow: 0 10px 22px rgba(228, 160, 26, 0.4) !important;
+}
+
+.eas-btn-secondary {
+  background: color-mix(in srgb, var(--eas-surface) 70%, transparent) !important;
+  backdrop-filter: blur(8px);
+  border: 1.5px solid color-mix(in srgb, var(--eas-leaf) 28%, var(--eas-line)) !important;
+}
+
+.eas-btn-ghost:hover {
+  background: color-mix(in srgb, var(--eas-mist) 80%, transparent) !important;
+}
+
+/* ========== 16–20 Inputs / selects / textareas ========== */
+.eas-input,
+.eas-select,
+input.eas-input,
+select.eas-select,
+textarea.eas-input,
+.mat-mdc-form-field .mat-mdc-text-field-wrapper,
+.aqr__field input,
+.aqr__field select,
+.aqr__field textarea,
+.commercial-form input,
+.commercial-form select,
+.commercial-form textarea {
+  border-radius: 12px !important;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease !important;
+}
+
+.eas-input:focus,
+.eas-select:focus,
+.aqr__field input:focus,
+.aqr__field select:focus,
+.aqr__field textarea:focus,
+.commercial-form input:focus,
+.commercial-form select:focus,
+.commercial-form textarea:focus {
+  border-color: var(--eas-leaf) !important;
+  box-shadow: 0 0 0 4px rgba(31, 122, 76, 0.18) !important;
+  background: #fff !important;
+}
+
+html[data-theme='dark'] .eas-input:focus,
+html[data-theme='dark'] .aqr__field input:focus {
+  background: var(--eas-surface-2) !important;
+}
+
+/* ========== 21–24 Chips / badges ========== */
+.eas-chip,
+.status-badge,
+.priority-chip,
+eas-status-badge,
+eas-priority-chip {
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.03em !important;
+  box-shadow: 0 2px 8px rgba(20, 38, 28, 0.08);
+}
+
+.eas-chip--active,
+.ave-chip {
+  border: 1px solid color-mix(in srgb, var(--eas-leaf) 30%, transparent) !important;
+}
+
+.ave-chip:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--eas-leaf) 12%, var(--eas-surface)) !important;
+  box-shadow: 0 8px 16px rgba(20, 38, 28, 0.12);
+}
+
+/* ========== 25–30 Sidebar notorio ========== */
+.sb__link {
+  border: 1px solid transparent;
+}
+
+.sb__link:hover {
+  transform: translateX(3px);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.sb__link.is-active,
+.sb__link.active,
+a.sb__link[aria-current='page'] {
+  color: #fff !important;
+  background: var(--eas-sidebar-active) !important;
+  box-shadow:
+    inset 3px 0 0 var(--eas-amber),
+    0 8px 20px rgba(0, 0, 0, 0.22) !important;
+}
+
+.sb__link.is-active mat-icon,
+.sb__link.active mat-icon {
+  color: var(--eas-amber) !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 6px rgba(228, 160, 26, 0.55));
+}
+
+.sb__section {
+  position: relative;
+  padding-left: 0.35rem;
+}
+
+.sb__section::after {
+  content: '';
+  display: block;
+  margin-top: 0.45rem;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(228, 160, 26, 0.45), transparent 80%);
+}
+
+.sb__brand {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent);
+}
+
+/* ========== 31–34 Topbar ========== */
+.tb,
+.topbar,
+eas-topbar .tb {
+  backdrop-filter: blur(18px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--eas-line) 70%, transparent) !important;
+  box-shadow: 0 8px 24px rgba(20, 38, 28, 0.06) !important;
+}
+
+.tb__search,
+.topbar__search {
+  border-radius: 999px !important;
+  border: 1px solid var(--eas-line) !important;
+  background: color-mix(in srgb, var(--eas-surface) 85%, transparent) !important;
+  box-shadow: inset 0 1px 2px rgba(20, 38, 28, 0.04);
+}
+
+.tb__search:focus-within,
+.topbar__search:focus-within {
+  border-color: var(--eas-leaf) !important;
+  box-shadow: 0 0 0 4px rgba(31, 122, 76, 0.15) !important;
+}
+
+/* ========== 35–40 Tablas comerciales ========== */
+.commercial-table {
+  box-shadow: var(--eas-shadow-md) !important;
+  border: 1px solid color-mix(in srgb, var(--eas-line) 75%, transparent) !important;
+}
+
+.commercial-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, #163226, #1a3d2c) !important;
+  color: #f6efe2 !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase;
+  font-size: 0.72rem !important;
+  border-bottom: 0 !important;
+  white-space: nowrap;
+}
+
+.commercial-table tbody tr {
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.commercial-table tbody tr:hover {
+  background: color-mix(in srgb, var(--eas-amber) 10%, var(--eas-mist)) !important;
+  transform: scale(1.002);
+}
+
+.commercial-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--eas-mist) 55%, transparent);
+}
+
+.commercial-form {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--eas-surface) 94%, #fff), var(--eas-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--eas-leaf) 18%, var(--eas-line)) !important;
+  box-shadow: var(--eas-shadow-md) !important;
+}
+
+.commercial-form h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.commercial-form h3::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--eas-amber), var(--eas-leaf));
+  box-shadow: 0 0 0 4px rgba(228, 160, 26, 0.2);
+}
+
+/* ========== 41–44 Empty states ========== */
+eas-empty-state,
+.empty-state {
+  border-radius: 22px !important;
+  border: 1.5px dashed color-mix(in srgb, var(--eas-leaf) 35%, var(--eas-line)) !important;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(228, 160, 26, 0.1), transparent 60%),
+    var(--eas-surface) !important;
+  padding: 2rem 1.5rem !important;
+}
+
+/* ========== 45–48 Material dialogs ========== */
+.mat-mdc-dialog-container .mdc-dialog__surface,
+.cdk-overlay-pane .mat-mdc-dialog-container {
+  border-radius: 20px !important;
+  overflow: hidden !important;
+  box-shadow: 0 28px 60px rgba(20, 38, 28, 0.28) !important;
+  border: 1px solid color-mix(in srgb, var(--eas-line) 60%, transparent);
+}
+
+.mat-mdc-dialog-title {
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+}
+
+/* ========== 49–52 Snackbars / tooltips ========== */
+.mat-mdc-snack-bar-container .mdc-snackbar__surface {
+  border-radius: 14px !important;
+  background: #14261c !important;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.35) !important;
+}
+
+.mat-mdc-tooltip .mdc-tooltip__surface {
+  border-radius: 10px !important;
+  background: #0d1913 !important;
+  font-weight: 600 !important;
+}
+
+/* ========== 53–56 Conversaciones ========== */
+.conv-row,
+eas-conversation-row,
+.conversations-list .row,
+.cl-row {
+  border-radius: 14px !important;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease !important;
+}
+
+.conv-row:hover,
+eas-conversation-row:hover,
+.cl-row:hover {
+  transform: translateX(4px);
+  box-shadow: 0 10px 22px rgba(20, 38, 28, 0.1);
+}
+
+/* ========== 57–60 Ave copiloto ========== */
+.ave-panel {
+  border: 1px solid color-mix(in srgb, var(--eas-amber) 28%, var(--eas-line)) !important;
+  box-shadow:
+    0 28px 56px rgba(15, 36, 24, 0.32),
+    0 0 0 1px rgba(228, 160, 26, 0.12) !important;
+}
+
+.ave-panel__head {
+  background: linear-gradient(120deg, #0d1913 0%, #1f4a33 55%, #2a5c3e 100%) !important;
+}
+
+.ave-doll__face {
+  box-shadow:
+    0 12px 28px rgba(20, 38, 28, 0.35),
+    0 0 0 3px rgba(228, 160, 26, 0.35) !important;
+}
+
+.ave-msg__bubble {
+  box-shadow: 0 6px 16px rgba(20, 38, 28, 0.08) !important;
+}
+
+.ave-msg--quote .ave-msg__bubble {
+  border-width: 2px !important;
+  border-image: linear-gradient(135deg, var(--eas-amber), var(--eas-leaf)) 1;
+}
+
+/* ========== 61 Quote review panel ========== */
+.aqr__panel {
+  border: 1px solid color-mix(in srgb, var(--eas-amber) 35%, var(--eas-line)) !important;
+  box-shadow: 0 32px 70px rgba(12, 24, 18, 0.42) !important;
+}
+
+.aqr__summary {
+  background: linear-gradient(135deg, #eef8f2, #fff8e8) !important;
+  border-color: color-mix(in srgb, var(--eas-amber) 30%, #cfe0d6) !important;
+}
+
+.aqr__btn--primary {
+  background: linear-gradient(135deg, #1a3d2c, #1f7a4c) !important;
+  box-shadow: 0 10px 22px rgba(31, 122, 76, 0.35) !important;
+}
+
+/* ========== 62–65 Login atmosphere boost ========== */
+.login,
+.login-page,
+eas-login {
+  --login-glow: rgba(228, 160, 26, 0.2);
+}
+
+.login__panel,
+.login-card {
+  box-shadow:
+    0 30px 60px rgba(20, 38, 28, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ========== 66–68 Analytics / charts ========== */
+.chart-card,
+.analytics-card,
+.apexcharts-canvas {
+  border-radius: 18px;
+}
+
+.chart-title,
+.analytics .chart-title {
+  letter-spacing: -0.02em;
+  font-weight: 800 !important;
+}
+
+/* ========== 69–72 Settings / profile panels ========== */
+.settings-section,
+.profile-card,
+.settings .eas-card {
+  border-left: 3px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.settings-section:hover,
+.profile-card:hover {
+  border-left-color: var(--eas-amber);
+}
+
+/* ========== 73 Skeleton shimmer ========== */
+.skeleton,
+.eas-skeleton,
+[class*='skeleton'] {
+  background: linear-gradient(
+    90deg,
+    var(--eas-skeleton-a) 0%,
+    var(--eas-skeleton-b) 45%,
+    var(--eas-skeleton-a) 90%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: eas-shimmer 1.4s ease-in-out infinite !important;
+  border-radius: 10px;
+}
+
+@keyframes eas-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ========== 74 Links ========== */
+a:not(.sb__link):not(.eas-btn-primary):not(.eas-btn-secondary):not(.mat-mdc-button):not(.ave-chip) {
+  color: var(--eas-leaf);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+
+a:not(.sb__link):not(.eas-btn-primary):hover {
+  color: var(--eas-amber-deep);
+}
+
+/* ========== 75–78 Action buttons in tables ========== */
+.eas-btn-action {
+  border-radius: 10px !important;
+  border: 1px solid color-mix(in srgb, var(--eas-line) 80%, transparent) !important;
+  background: var(--eas-surface) !important;
+  box-shadow: 0 2px 6px rgba(20, 38, 28, 0.06);
+}
+
+.eas-btn-action:hover {
+  transform: translateY(-2px);
+  border-color: var(--eas-leaf) !important;
+  color: var(--eas-leaf) !important;
+}
+
+.eas-btn-action.is-danger:hover {
+  border-color: var(--eas-danger) !important;
+  color: var(--eas-danger) !important;
+  background: var(--eas-danger-bg) !important;
+}
+
+/* ========== 79–82 Command palette ========== */
+.cp,
+.command-palette,
+eas-command-palette .cp {
+  border-radius: 18px !important;
+  border: 1px solid color-mix(in srgb, var(--eas-amber) 25%, var(--eas-line)) !important;
+  box-shadow: 0 28px 60px rgba(12, 24, 18, 0.4) !important;
+}
+
+/* ========== 83 Notifications list ========== */
+.notif-item,
+.notifications-item,
+.notification-row {
+  border-radius: 14px !important;
+  border: 1px solid transparent;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.notif-item:hover,
+.notification-row:hover {
+  background: color-mix(in srgb, var(--eas-mist) 70%, transparent);
+  border-color: color-mix(in srgb, var(--eas-leaf) 20%, transparent);
+  transform: translateX(3px);
+}
+
+/* ========== 84–86 Mat tables generic ========== */
+table.mat-mdc-table {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.mat-mdc-header-row {
+  background: color-mix(in srgb, var(--eas-mist) 80%, var(--eas-surface)) !important;
+}
+
+.mat-mdc-row:hover {
+  background: color-mix(in srgb, var(--eas-amber) 8%, var(--eas-surface)) !important;
+}
+
+/* ========== 87 Dividers ========== */
+mat-divider,
+.mat-divider {
+  border-top-color: color-mix(in srgb, var(--eas-line) 85%, transparent) !important;
+}
+
+/* ========== 88 Loading spinner brand ========== */
+.mat-mdc-progress-spinner circle,
+.mat-progress-spinner circle {
+  stroke: var(--eas-leaf) !important;
+}
+
+/* ========== 89 Progress bars ========== */
+.mat-mdc-progress-bar .mdc-linear-progress__bar-inner {
+  border-color: var(--eas-leaf) !important;
+}
+
+.mat-mdc-progress-bar .mdc-linear-progress__buffer-bar {
+  background: color-mix(in srgb, var(--eas-mist) 80%, transparent) !important;
+}
+
+/* ========== 90 Avatar rings ========== */
+eas-avatar,
+.avatar,
+.eas-avatar {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--eas-amber) 35%, transparent);
+}
+
+/* ========== 91–93 Mobile polish ========== */
+@media (max-width: 768px) {
+  .eas-page-header {
+    border-radius: 16px !important;
+  }
+
+  .eas-card,
+  .eas-panel,
+  .commercial-table,
+  .commercial-form {
+    border-radius: 16px !important;
+  }
+
+  .shell__canvas {
+    padding-inline: 0.75rem;
+  }
+}
+
+/* ========== 94 Reduced motion respect ========== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========== 95 Dark mode contrast boost ========== */
+html[data-theme='dark'] .eas-page-header {
+  background: linear-gradient(135deg, #1a2620, #17221d) !important;
+  border-color: rgba(245, 250, 247, 0.1) !important;
+}
+
+html[data-theme='dark'] .commercial-table thead th {
+  background: linear-gradient(180deg, #0d1913, #14261c) !important;
+}
+
+html[data-theme='dark'] .eas-btn-primary {
+  background: linear-gradient(135deg, #2f8f5c, #3db87a) !important;
+  color: #06110c !important;
+}
+
+/* ========== 96 Floating action hover lift ========== */
+.ave-doll:hover {
+  transform: translateY(-4px) scale(1.04);
+}
+
+/* ========== 97 Content fade-in for routed views ========== */
+router-outlet + *,
+.shell__canvas > *:not(eas-ave-copilot) {
+  animation: eas-view-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes eas-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ========== 98 Soft glass on filters bars ========== */
+.filters,
+.filter-bar,
+.toolbar-filters,
+.page-filters {
+  background: color-mix(in srgb, var(--eas-glass-bg) 90%, transparent) !important;
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--eas-glass-border) !important;
+  border-radius: 16px !important;
+  padding: 0.75rem !important;
+}
+
+/* ========== 99 Stronger code / mono snippets ========== */
+code,
+pre,
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: color-mix(in srgb, var(--eas-mist) 70%, transparent);
+  border-radius: 8px;
+  padding: 0.1em 0.35em;
+}
+
+/* ========== 100 Final brand pulse on primary CTAs ========== */
+@keyframes eas-cta-pulse {
+  0%, 100% { box-shadow: 0 10px 24px rgba(31, 122, 76, 0.35); }
+  50% { box-shadow: 0 10px 28px rgba(228, 160, 26, 0.35), 0 0 0 6px rgba(228, 160, 26, 0.12); }
+}
+
+.eas-btn-primary:not(:disabled) {
+  animation: eas-cta-pulse 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eas-btn-primary:not(:disabled) {
+    animation: none;
+  }
+}

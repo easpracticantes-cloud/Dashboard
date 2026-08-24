@@ -64,7 +64,7 @@
   color: var(--eas-sidebar-muted);
   font-size: 0.84rem;
   font-weight: 550;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .sb__link mat-icon {
@@ -131,8 +131,11 @@
   padding: 0.65rem;
   border-radius: 14px;
   border: 1px solid var(--eas-sidebar-line);
-  background: rgba(255, 255, 255, 0.05);
+  background:
+    linear-gradient(135deg, rgba(228, 160, 26, 0.12), rgba(61, 154, 106, 0.1)),
+    rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(8px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .sb__user {

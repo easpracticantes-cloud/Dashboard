@@ -1,17 +1,21 @@
 .commercial-form {
-  padding: 1.25rem;
-  margin-bottom: 1.05rem;
-  border-radius: 18px;
+  padding: 1.35rem 1.4rem;
+  margin-bottom: 1.15rem;
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse 70% 60% at 100% 0%, rgba(228, 160, 26, 0.08), transparent 55%),
+    var(--eas-surface);
 }
 
 .commercial-form h3 {
-  margin-bottom: 0.95rem;
-  font-size: 1.08rem;
+  margin-bottom: 1rem;
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
 }
 
 .commercial-form__grid {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.85rem;
   grid-template-columns: repeat(1, minmax(0, 1fr));
 }
 
@@ -28,22 +32,23 @@
 .commercial-form__actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.6rem;
-  margin-top: 1.1rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid var(--eas-line-soft);
+  gap: 0.65rem;
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px dashed color-mix(in srgb, var(--eas-leaf) 25%, var(--eas-line));
 }
 
 .commercial-table {
   overflow-x: auto;
   overflow-y: auto;
   padding: 0;
-  border-radius: 18px;
+  border-radius: 20px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
+  background: var(--eas-surface);
 }
 
 .commercial-table table {
@@ -54,14 +59,14 @@
 
 .commercial-table th,
 .commercial-table td {
-  padding: 0.9rem 1.05rem;
+  padding: 0.95rem 1.1rem;
   text-align: left;
   border-bottom: 1px solid var(--eas-line-soft);
   font-size: 0.85rem;
 }
 
 .commercial-table tbody tr {
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .commercial-table tbody tr:nth-child(even) {
@@ -90,21 +95,23 @@
 
 .amount-cell strong {
   font-family: 'Montserrat', 'Sora', sans-serif;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--eas-leaf);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .pill {
   display: inline-flex;
-  padding: 0.28rem 0.7rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 999px;
   background: var(--eas-mist);
   color: var(--eas-ink);
   font-size: 0.7rem;
   font-weight: 700;
   border: 1px solid transparent;
+  box-shadow: 0 2px 6px rgba(20, 38, 28, 0.06);
 }
 
 .pill[data-quote='DRAFT'] {
@@ -141,6 +148,6 @@ textarea.eas-input {
 .commercial-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.4rem;
   justify-content: flex-end;
 }

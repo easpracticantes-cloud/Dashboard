@@ -10,7 +10,9 @@
   background: var(--eas-topbar-bg);
   border-bottom: 1px solid var(--eas-line-soft);
   backdrop-filter: blur(18px) saturate(160%);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 10px 28px rgba(20, 38, 28, 0.06);
 }
 
 html[data-theme='dark'] .tb {
@@ -42,7 +44,8 @@ html[data-theme='dark'] .tb {
 .tb__icon-btn:hover {
   background: var(--eas-hover-surface);
   border-color: var(--eas-line-soft);
-  box-shadow: none;
+  box-shadow: 0 6px 14px rgba(20, 38, 28, 0.08);
+  transform: translateY(-1px);
 }
 
 .tb__sync {
@@ -66,6 +69,8 @@ html[data-theme='dark'] .tb {
 .tb__sync:hover:not(:disabled) {
   border-color: rgba(31, 122, 76, 0.35);
   background: rgba(31, 122, 76, 0.06);
+  box-shadow: 0 8px 18px rgba(31, 122, 76, 0.15);
+  transform: translateY(-1px);
 }
 
 .tb__sync:disabled {
