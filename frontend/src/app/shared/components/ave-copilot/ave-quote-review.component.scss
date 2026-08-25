@@ -216,6 +216,18 @@
   color: #f6efe2;
 }
 
+.aqr__btn--primary:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.aqr__dl-error {
+  margin: 0 1.15rem 1rem;
+  color: #a33b32;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
 @media (max-width: 640px) {
   .aqr__body {
     grid-template-columns: 1fr;

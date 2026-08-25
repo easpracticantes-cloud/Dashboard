@@ -99,10 +99,13 @@
         <mat-icon>fact_check</mat-icon>
         Confirmar revisión
       </button>
-      <button type="button" class="aqr__btn aqr__btn--primary" (click)="downloadPdf()">
+      <button type="button" class="aqr__btn aqr__btn--primary" [disabled]="downloading()" (click)="downloadPdf()">
         <mat-icon>picture_as_pdf</mat-icon>
-        Descargar PDF
+        {{ downloading() ? 'Generando…' : 'Descargar PDF' }}
       </button>
     </footer>
+    @if (downloadError()) {
+      <p class="aqr__dl-error">{{ downloadError() }}</p>
+    }
   </section>
 </div>
