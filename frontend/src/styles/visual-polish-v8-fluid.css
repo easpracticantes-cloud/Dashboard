@@ -1,0 +1,155 @@
+/**
+ * visual-polish-v8-fluid.css
+ * Navegación más fluida: view transitions, sidebar, topbar, página.
+ */
+
+/* ===== View Transitions (Chrome / Edge / Safari recientes) ===== */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(root) {
+  animation-name: eas-vt-fade-out;
+}
+
+::view-transition-new(root) {
+  animation-name: eas-vt-fade-in;
+}
+
+@keyframes eas-vt-fade-out {
+  to {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+@keyframes eas-vt-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ===== Sidebar más reactiva ===== */
+.sb__link {
+  transition:
+    background 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding-left 220ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.sb__link:hover {
+  transform: none !important;
+}
+
+.sb__link:hover mat-icon {
+  opacity: 1;
+  color: #f0bc48;
+}
+
+.sb__active-bar {
+  transition: height 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease;
+}
+
+.sb__link.is-active .sb__active-bar {
+  height: 28px;
+  box-shadow: 0 0 18px rgba(240, 188, 72, 0.7);
+}
+
+.sb__nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.sb__nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sb__nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 99px;
+}
+
+/* ===== Topbar ===== */
+.tb {
+  transition: background 240ms ease, box-shadow 240ms ease, border-color 240ms ease;
+}
+
+.tb__search {
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    background 200ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.tb__search:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(20, 38, 28, 0.1) !important;
+}
+
+.tb__search:focus-visible,
+.tb__icon-btn:focus-visible,
+.tb__user:focus-visible,
+.sb__link:focus-visible {
+  outline: 2px solid rgba(228, 160, 26, 0.55);
+  outline-offset: 2px;
+}
+
+/* ===== Contenido al cambiar de ruta ===== */
+.shell__canvas > *:not(router-outlet) {
+  animation: eas-route-child 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes eas-route-child {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Sidenav overlay más suave ===== */
+.mat-drawer-backdrop.mat-drawer-shown {
+  background: rgba(10, 18, 14, 0.42) !important;
+  backdrop-filter: blur(4px);
+  transition: opacity 240ms ease !important;
+}
+
+.mat-drawer.shell__drawer {
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* ===== Headers de página ===== */
+.ph,
+.eas-page-header {
+  transition: box-shadow 240ms ease, transform 240ms ease;
+}
+
+/* ===== Login → app handoff ===== */
+.login-page {
+  view-transition-name: login-root;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+
+  .sb__link:hover,
+  .tb__search:hover {
+    transform: none !important;
+  }
+
+  .shell__canvas > *:not(router-outlet) {
+    animation: none !important;
+  }
+}

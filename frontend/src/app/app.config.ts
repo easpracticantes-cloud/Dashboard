@@ -1,5 +1,5 @@
 import { ApplicationConfig, APP_INITIALIZER, LOCALE_ID, inject } from '@angular/core';
-import { provideRouter, withComponentInputBinding, withPreloading } from '@angular/router';
+import { provideRouter, withComponentInputBinding, withPreloading, withViewTransitions } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { MAT_ICON_DEFAULT_OPTIONS } from '@angular/material/icon';
@@ -21,7 +21,12 @@ function initAppConfig(): () => Promise<void> {
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideRouter(routes, withComponentInputBinding(), withPreloading(CriticalModulesPreloadStrategy)),
+    provideRouter(
+      routes,
+      withComponentInputBinding(),
+      withPreloading(CriticalModulesPreloadStrategy),
+      withViewTransitions({ skipInitialTransition: true })
+    ),
     provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
     provideAnimationsAsync(),
     provideNativeDateAdapter(),

@@ -78,6 +78,7 @@
 .sb__link:hover {
   background: var(--eas-sidebar-hover);
   color: var(--eas-sidebar-ink);
+  box-shadow: inset 3px 0 0 rgba(240, 188, 72, 0.45);
 }
 
 .sb__link:hover mat-icon {

@@ -26,6 +26,7 @@
 .eas-btn-ghost,
 .eas-btn-accent,
 .login-card,
+.login-panel,
 .dash-hero__btn,
 .mat-mdc-row,
 .crm-row {
@@ -45,6 +46,7 @@
 .ph:hover,
 .sb__footer:hover,
 .login-card:hover,
+.login-panel:hover,
 .commercial-form:hover,
 .sheets-dash__kpis > .eas-card:hover,
 .tb__icon-btn:hover,

@@ -3,6 +3,7 @@ import { Component, effect, computed, input, output, signal } from '@angular/cor
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { QuoteDraft } from '../../../core/services/enterprise-ai.service';
+import { downloadQuotePdf } from './quote-pdf';
 
 @Component({
   selector: 'eas-ave-quote-review',
@@ -33,6 +34,8 @@ export class AveQuoteReviewComponent {
   readonly reviewed = signal(false);
   readonly manualTotal = signal(false);
   readonly scale = signal<Record<string, number>>({});
+  readonly downloading = signal(false);
+  readonly downloadError = signal<string | null>(null);
 
   readonly displayTotal = computed(() => this.total() || 0);
 
@@ -61,6 +64,7 @@ export class AveQuoteReviewComponent {
     this.scale.set(d.priceScaleByPax || {});
     this.manualTotal.set(false);
     this.reviewed.set(false);
+    this.downloadError.set(null);
   }
 
   onPeopleChange(value: number | string): void {
@@ -135,101 +139,20 @@ export class AveQuoteReviewComponent {
   }
 
   downloadPdf(): void {
-    const d = this.currentDraft();
-    const money = (n: number) =>
-      new Intl.NumberFormat('es-CO', {
-        style: 'currency',
-        currency: d.currency || 'COP',
-        maximumFractionDigits: 0
-      }).format(n || 0);
-
-    const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <title>Cotización ${escapeHtml(d.code || 'EAS')}</title>
-  <style>
-    @page { margin: 18mm; }
-    body { font-family: Georgia, "Times New Roman", serif; color: #14261c; margin: 0; }
-    .sheet { max-width: 720px; margin: 0 auto; padding: 12px; }
-    .brand { display: flex; justify-content: space-between; align-items: flex-end;
-      border-bottom: 3px solid #1f4a33; padding-bottom: 12px; margin-bottom: 22px; }
-    .brand h1 { margin: 0; font-size: 22px; letter-spacing: 0.02em; }
-    .brand p { margin: 4px 0 0; font-size: 12px; color: #4a5c52; }
-    .meta { font-size: 12px; color: #4a5c52; text-align: right; }
-    h2 { font-size: 18px; margin: 0 0 8px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin: 18px 0; }
-    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7a72; }
-    .value { font-size: 14px; margin-top: 2px; }
-    .total { background: #f3faf5; border: 1px solid #cfe0d6; border-radius: 10px;
-      padding: 14px 16px; margin-top: 8px; }
-    .total strong { font-size: 22px; }
-    .block { margin-top: 18px; }
-    .block h3 { font-size: 13px; margin: 0 0 6px; color: #1f4a33; }
-    .block p { margin: 0; font-size: 13px; line-height: 1.45; white-space: pre-wrap; }
-    .foot { margin-top: 28px; font-size: 11px; color: #6b7a72; border-top: 1px solid #d8e2dc; padding-top: 10px; }
-    @media print { .noprint { display: none !important; } }
-  </style>
-</head>
-<body>
-  <div class="sheet">
-    <div class="brand">
-      <div>
-        <h1>Escuela Aves Salento</h1>
-        <p>Cotización comercial · Kuara Expeditions</p>
-      </div>
-      <div class="meta">
-        <div>${new Date().toLocaleDateString('es-CO')}</div>
-        <div>Código: ${escapeHtml(d.code || '—')}</div>
-      </div>
-    </div>
-    <h2>${escapeHtml(d.name || 'Tour')}</h2>
-    <div class="grid">
-      <div><div class="label">Cliente</div><div class="value">${escapeHtml(d.clientName || 'Por confirmar')}</div></div>
-      <div><div class="label">Modalidad</div><div class="value">${escapeHtml(d.modality || '—')}</div></div>
-      <div><div class="label">Personas</div><div class="value">${d.people ?? '—'}</div></div>
-      <div><div class="label">Fecha servicio</div><div class="value">${escapeHtml(d.date || 'Por confirmar')}</div></div>
-      <div><div class="label">Pickup</div><div class="value">${escapeHtml(d.pickup || 'Por confirmar')}</div></div>
-      <div><div class="label">Precio / persona</div><div class="value">${money(d.unitPrice || 0)}</div></div>
-    </div>
-    <div class="total">
-      <div class="label">Total cotizado</div>
-      <strong>${money(d.total || 0)}</strong>
-    </div>
-    ${d.includes ? `<div class="block"><h3>Incluye</h3><p>${escapeHtml(d.includes)}</p></div>` : ''}
-    ${d.excludes ? `<div class="block"><h3>No incluye</h3><p>${escapeHtml(d.excludes)}</p></div>` : ''}
-    ${d.notes ? `<div class="block"><h3>Notas</h3><p>${escapeHtml(d.notes)}</p></div>` : ''}
-    <div class="foot">
-      Documento generado desde SIG · Ave. Verifica montos antes de enviar al cliente.
-      ${d.reviewFlag ? ' · Tarifa marcada para revisión comercial.' : ''}
-    </div>
-    <p class="noprint" style="margin-top:20px;font-family:system-ui,sans-serif;font-size:13px">
-      En el diálogo de impresión elige <strong>Guardar como PDF</strong>.
-    </p>
-  </div>
-  <script>window.onload = () => { setTimeout(() => window.print(), 250); };</script>
-</body>
-</html>`;
-
-    const w = window.open('', '_blank', 'noopener,noreferrer,width=820,height=900');
-    if (!w) {
-      alert('Permite ventanas emergentes para descargar el PDF.');
-      return;
+    if (this.downloading()) return;
+    this.downloadError.set(null);
+    this.downloading.set(true);
+    try {
+      downloadQuotePdf(this.currentDraft());
+    } catch (err) {
+      console.error('PDF download failed', err);
+      this.downloadError.set('No se pudo generar el PDF. Intenta de nuevo.');
+    } finally {
+      this.downloading.set(false);
     }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
   }
 
   close(): void {
     this.closed.emit();
   }
-}
-
-function escapeHtml(value: string): string {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }

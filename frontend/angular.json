@@ -43,7 +43,8 @@
               "src/styles/soft-motion.css",
               "src/styles/theme-transitions.css",
               "src/styles/visual-polish-v6-noticeable.css",
-              "src/styles/visual-polish-v7-BOLD.css"
+              "src/styles/visual-polish-v7-BOLD.css",
+              "src/styles/visual-polish-v8-fluid.css"
             ],
             "stylePreprocessorOptions": {
               "includePaths": [

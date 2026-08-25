@@ -1,10 +1,11 @@
-import { Component, inject, HostListener } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component, HostListener, inject, signal } from '@angular/core';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { map } from 'rxjs';
+import { filter, map } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SidebarComponent } from './sidebar/sidebar.component';
 import { TopbarComponent } from './topbar/topbar.component';
 import { LiveSyncService } from '../../core/services/live-sync.service';
@@ -27,10 +28,10 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
         <eas-sidebar (navigate)="isMobile() && drawer.close()"></eas-sidebar>
       </mat-sidenav>
 
-      <mat-sidenav-content class="shell__content">
+      <mat-sidenav-content class="shell__content" #content>
         <eas-topbar (menuToggle)="drawer.toggle()" (openCommand)="openCommandPalette()"></eas-topbar>
         <main class="shell__main">
-          <div class="shell__canvas">
+          <div class="shell__canvas" [attr.data-nav]="navTick()">
             <router-outlet></router-outlet>
           </div>
         </main>
@@ -49,6 +50,7 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
 
       .shell {
         height: 100vh;
+        height: 100dvh;
         width: 100%;
         max-width: 100%;
         overflow: hidden;
@@ -70,12 +72,14 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
         flex-direction: column;
         height: 100%;
         max-height: 100vh;
+        max-height: 100dvh;
         min-width: 0 !important;
         max-width: 100%;
         overflow-x: clip;
         overflow-y: auto;
         background: transparent;
         box-sizing: border-box;
+        scroll-behavior: smooth;
       }
 
       .shell__main {
@@ -99,7 +103,21 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
         min-width: 0;
         margin: 0 auto;
         box-sizing: border-box;
-        animation: eas-rise-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      .shell__canvas[data-nav] {
+        animation: eas-page-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+
+      @keyframes eas-page-enter {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
 
       .shell__canvas > *:not(router-outlet) {
@@ -109,6 +127,16 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
         min-width: 0;
         box-sizing: border-box;
       }
+
+      @media (prefers-reduced-motion: reduce) {
+        .shell__content {
+          scroll-behavior: auto;
+        }
+
+        .shell__canvas[data-nav] {
+          animation: none;
+        }
+      }
     `
   ]
 })
@@ -116,7 +144,10 @@ export class ShellComponent {
   private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly liveSync = inject(LiveSyncService);
   private readonly dialog = inject(MatDialog);
+  private readonly router = inject(Router);
   private commandOpen = false;
+
+  readonly navTick = signal(0);
 
   readonly isMobile = toSignal(
     this.breakpointObserver.observe('(max-width: 1023px)').pipe(map((state) => state.matches)),
@@ -125,6 +156,17 @@ export class ShellComponent {
 
   constructor() {
     this.liveSync.start();
+
+    this.router.events
+      .pipe(
+        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+        takeUntilDestroyed()
+      )
+      .subscribe(() => {
+        this.navTick.update((n) => n + 1);
+        const content = document.querySelector('.shell__content') as HTMLElement | null;
+        content?.scrollTo({ top: 0, behavior: 'smooth' });
+      });
   }
 
   @HostListener('document:keydown', ['$event'])

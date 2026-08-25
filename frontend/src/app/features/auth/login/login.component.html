@@ -1,34 +1,23 @@
-<div class="login-page">
-  <aside class="login-hero">
+<div class="login-page" [class.login-page--success]="success()">
+  <aside class="login-hero" aria-hidden="false">
     <div class="login-hero__photo" role="img" aria-label="Valle de Cócora al atardecer, Salento Quindío"></div>
     <div class="login-hero__veil"></div>
     <div class="login-hero__glow login-hero__glow--sun"></div>
     <div class="login-hero__glow login-hero__glow--leaf"></div>
-    <div class="login-hero__mist login-hero__mist--a"></div>
-    <div class="login-hero__mist login-hero__mist--b"></div>
-    <div class="login-hero__particles" aria-hidden="true">
-      <span></span><span></span><span></span><span></span><span></span><span></span>
-    </div>
+    <div class="login-hero__grain" aria-hidden="true"></div>
 
     <div class="login-hero__inner">
-      <eas-brand-logo variant="lockup-light" [height]="44" subtitle="Sistema Inteligente de Gestión"></eas-brand-logo>
+      <eas-brand-logo variant="lockup-light" [height]="40" subtitle="Sistema Inteligente de Gestión"></eas-brand-logo>
 
       <div class="login-hero__copy">
         <p class="login-hero__eyebrow">Escuela Aves Salento</p>
         <h1 class="login-hero__brand" aria-label="EAS">
           <span class="login-hero__brand-letter login-hero__brand-letter--e">E</span><span class="login-hero__brand-letter login-hero__brand-letter--a">A</span><span class="login-hero__brand-letter login-hero__brand-letter--s">S</span>
         </h1>
-        <p class="login-hero__tagline">SIG · Operación que vuela alto</p>
+        <p class="login-hero__tagline">Operación que vuela alto</p>
         <p class="login-hero__lead">
-          Del Valle de Cócora a tu operación diaria:
-          conversaciones, clientes e indicadores en un solo lugar.
+          Conversaciones, clientes e indicadores — un solo sistema para el equipo.
         </p>
-
-        <ul class="login-hero__points">
-          <li><mat-icon>forum</mat-icon> Inbox unificado de WhatsApp</li>
-          <li><mat-icon>diversity_3</mat-icon> CRM con historial 360°</li>
-          <li><mat-icon>insights</mat-icon> Indicadores en tiempo real</li>
-        </ul>
       </div>
 
       <p class="login-hero__place">Valle de Cócora · Salento, Quindío</p>
@@ -36,36 +25,47 @@
   </aside>
 
   <main class="login-main">
+    <div class="login-main__mesh" aria-hidden="true"></div>
     <div class="login-main__orb login-main__orb--a" aria-hidden="true"></div>
     <div class="login-main__orb login-main__orb--b" aria-hidden="true"></div>
-    <div class="login-main__orb login-main__orb--c" aria-hidden="true"></div>
 
-    <div class="login-card eas-animate-rise">
-      <div class="login-card__shine" aria-hidden="true"></div>
-
-      <div class="login-card__head">
-        <eas-brand-logo variant="full" [height]="58"></eas-brand-logo>
-        <div class="login-card__titles">
-          <p class="login-card__eyebrow">Acceso al equipo</p>
-          <h2>Bienvenido de nuevo</h2>
-          <p class="login-card__sub">Ingresa con tu usuario del SIG o con tu cuenta de Google autorizada.</p>
+    @if (success()) {
+      <div class="login-success" role="status" aria-live="polite">
+        <div class="login-success__ring" aria-hidden="true"></div>
+        <div class="login-success__mark">
+          <mat-icon>check</mat-icon>
         </div>
+        <h2>Bienvenido</h2>
+        <p>Entrando al SIG…</p>
       </div>
+    } @else {
+      <div class="login-panel eas-animate-rise">
+        <header class="login-panel__head">
+          <eas-brand-logo variant="mark" [height]="42" class="login-panel__mark"></eas-brand-logo>
+          <div>
+            <p class="login-panel__eyebrow">Acceso seguro</p>
+            <h2>Inicia sesión</h2>
+            <p class="login-panel__sub">Usa tu usuario del equipo o Google autorizado.</p>
+          </div>
+        </header>
 
-      @if (errorMessage()) {
-        <div class="login-alert" role="alert" aria-live="assertive">
-          <mat-icon>error</mat-icon>
-          <span>{{ errorMessage() }}</span>
-        </div>
-      }
+        @if (errorMessage()) {
+          <div class="login-alert" role="alert" aria-live="assertive">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ errorMessage() }}</span>
+            <button type="button" class="login-alert__dismiss" (click)="errorMessage.set(null)" aria-label="Cerrar">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        }
 
-      <form class="login-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
-        <div class="login-form__fields">
+        <form class="login-form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
           <label class="field">
             <span>Usuario o correo</span>
             <div class="field__control">
-              <mat-icon>person</mat-icon>
+              <mat-icon>person_outline</mat-icon>
               <input
+                #userInput
                 class="eas-input"
                 type="text"
                 formControlName="username"
@@ -86,7 +86,7 @@
           <label class="field">
             <span>Contraseña</span>
             <div class="field__control">
-              <mat-icon>lock</mat-icon>
+              <mat-icon>lock_outline</mat-icon>
               <input
                 class="eas-input"
                 [type]="showPassword() ? 'text' : 'password'"
@@ -112,69 +112,67 @@
               <small>Debe tener al menos 4 caracteres.</small>
             }
             @if (capsLockOn()) {
-              <small class="field__warn"><mat-icon>keyboard_capslock</mat-icon> Bloq Mayús está activado.</small>
+              <small class="field__warn"><mat-icon>keyboard_capslock</mat-icon> Bloq Mayús activado</small>
             }
           </label>
-        </div>
 
-        <div class="login-form__row">
-          <label class="login-remember">
-            <input type="checkbox" formControlName="rememberMe" />
-            <span>Recordarme</span>
-          </label>
-          <a routerLink="/forgot-password">¿Olvidaste tu contraseña?</a>
-        </div>
+          <div class="login-form__row">
+            <label class="login-remember">
+              <input type="checkbox" formControlName="rememberMe" />
+              <span>Recordarme en este equipo</span>
+            </label>
+            <a routerLink="/forgot-password">¿Olvidaste tu contraseña?</a>
+          </div>
 
-        <button type="submit" class="eas-btn-primary login-submit" [disabled]="loading()">
-          @if (loading()) {
+          <button type="submit" class="eas-btn-primary login-submit" [disabled]="loading() || googleLoading()">
+            @if (loading()) {
+              <mat-spinner diameter="18" strokeWidth="2"></mat-spinner>
+              Verificando…
+            } @else {
+              Entrar al SIG
+              <mat-icon>arrow_forward</mat-icon>
+            }
+          </button>
+        </form>
+
+        <div class="login-divider"><span>o</span></div>
+
+        <button
+          type="button"
+          class="login-google-btn"
+          (click)="signInWithGoogle()"
+          [disabled]="googleLoading() || loading()"
+        >
+          @if (googleLoading()) {
             <mat-spinner diameter="18" strokeWidth="2"></mat-spinner>
-            Verificando…
+            Conectando con Google…
           } @else {
-            <mat-icon>login</mat-icon>
-            Iniciar sesión
+            <span class="login-google-btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 48 48" width="18" height="18">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                <path fill="none" d="M0 0h48v48H0z"/>
+              </svg>
+            </span>
+            Continuar con Google
           }
         </button>
-      </form>
 
-      <div class="login-divider">o continúa con</div>
-
-      <button
-        type="button"
-        class="login-google-btn"
-        (click)="signInWithGoogle()"
-        [disabled]="googleLoading()"
-      >
-        @if (googleLoading()) {
-          <mat-spinner diameter="18" strokeWidth="2"></mat-spinner>
-          Abriendo Google…
+        @if (!googleEnabled()) {
+          <p class="login-google__hint">Google pendiente de configuración en este entorno.</p>
+        } @else if (!googleReady()) {
+          <p class="login-google__hint">Preparando acceso con Google…</p>
         } @else {
-          <span class="login-google-btn__icon" aria-hidden="true">
-            <svg viewBox="0 0 48 48" width="20" height="20">
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-              <path fill="none" d="M0 0h48v48H0z"/>
-            </svg>
-          </span>
-          Iniciar sesión con Google
+          <p class="login-google__hint">Solo cuentas autorizadas del equipo.</p>
         }
-      </button>
 
-      @if (!googleEnabled()) {
-        <p class="login-google__hint">
-          Para activar Google, configura <code>googleClientId</code> (ver guía en documentos).
-        </p>
-      } @else if (!googleReady()) {
-        <p class="login-google__hint">Preparando acceso con Google…</p>
-      } @else {
-        <p class="login-google__hint">Solo cuentas autorizadas del equipo pueden ingresar.</p>
-      }
-
-      <div class="login-foot">
-        <mat-icon>shield</mat-icon>
-        Conexión cifrada · Escuela Aves Salento
+        <footer class="login-foot">
+          <mat-icon>verified_user</mat-icon>
+          Conexión cifrada · Escuela Aves Salento
+        </footer>
       </div>
-    </div>
+    }
   </main>
 </div>

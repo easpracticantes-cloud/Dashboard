@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, NgZone, inject, signal, ViewEncapsulation } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, NgZone, ViewChild, inject, signal, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -35,8 +35,11 @@ export class LoginComponent implements AfterViewInit {
 
   private googleTokenClient: GoogleTokenClient | null = null;
 
+  @ViewChild('userInput') private userInput?: ElementRef<HTMLInputElement>;
+
   readonly loading = signal(false);
   readonly googleLoading = signal(false);
+  readonly success = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly showPassword = signal(false);
   readonly capsLockOn = signal(false);
@@ -58,6 +61,7 @@ export class LoginComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
+    queueMicrotask(() => this.userInput?.nativeElement?.focus());
     if (this.googleEnabled()) {
       this.initGoogleSignIn();
     }
@@ -72,7 +76,7 @@ export class LoginComponent implements AfterViewInit {
   }
 
   submit(): void {
-    if (this.loading()) {
+    if (this.loading() || this.success()) {
       return;
     }
     if (this.form.invalid) {
@@ -92,7 +96,7 @@ export class LoginComponent implements AfterViewInit {
         } else {
           localStorage.removeItem(LAST_USER_KEY);
         }
-        void this.router.navigate(['/app/dashboard']);
+        this.enterApp();
       },
       error: (err) => {
         this.loading.set(false);
@@ -100,6 +104,13 @@ export class LoginComponent implements AfterViewInit {
         this.errorMessage.set(this.describeLoginError(err));
       }
     });
+  }
+
+  private enterApp(): void {
+    this.success.set(true);
+    setTimeout(() => {
+      void this.router.navigate(['/app/dashboard']);
+    }, 650);
   }
 
   private describeLoginError(err: { status?: number; error?: { message?: string } }): string {
@@ -116,11 +127,8 @@ export class LoginComponent implements AfterViewInit {
     return backendMsg ?? 'No se pudo iniciar sesión. Intenta de nuevo en unos segundos.';
   }
 
-  /**
-   * Abre el popup de Google para elegir el correo autorizado.
-   */
   signInWithGoogle(): void {
-    if (this.googleLoading()) {
+    if (this.googleLoading() || this.success()) {
       return;
     }
     if (!this.googleEnabled()) {
@@ -188,7 +196,7 @@ export class LoginComponent implements AfterViewInit {
       this.auth.googleLogin({ accessToken: response.access_token }).subscribe({
         next: () => {
           this.googleLoading.set(false);
-          void this.router.navigate(['/app/dashboard']);
+          this.enterApp();
         },
         error: (err) => {
           this.googleLoading.set(false);

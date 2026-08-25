@@ -165,7 +165,7 @@ function createTextPdf(lines: string[]): Blob {
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\n`;
   pdf += `startxref\n${xrefStart}\n%%EOF`;
 
-  return new Blob([latin1Bytes(pdf)], { type: 'application/pdf' });
+  return new Blob([latin1Bytes(pdf) as BlobPart], { type: 'application/pdf' });
 }
 
 function pdfEscape(value: string): string {
