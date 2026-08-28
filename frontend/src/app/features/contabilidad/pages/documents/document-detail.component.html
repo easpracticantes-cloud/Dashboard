@@ -1,0 +1,162 @@
+@if (cargando) {
+  <div class="loading">
+    <mat-spinner diameter="36"></mat-spinner>
+    <span>Cargando documento…</span>
+  </div>
+} @else if (error && !doc) {
+  <div class="alert error">{{ error }}</div>
+} @else if (doc) {
+  <div class="viewer cosmos-page">
+    <header class="viewer-hero sheet">
+      <div class="viewer-hero-top">
+        <a routerLink="/app/contabilidad/documentos" class="back">
+          <mat-icon>arrow_back</mat-icon>
+          Documentos
+        </a>
+        <button type="button" class="btn btn-primary btn-lg" [disabled]="procesando" (click)="procesar()">
+          @if (procesando) {
+            <mat-spinner diameter="18"></mat-spinner>
+            Procesando…
+          } @else {
+            <mat-icon>auto_fix_high</mat-icon>
+            Procesar
+          }
+        </button>
+      </div>
+      <div class="viewer-meta">
+        <h1 class="page-title">{{ doc.filename }}</h1>
+        <div class="meta-row">
+          <span class="status" [class]="estadoClass(doc.estado)">{{ doc.estado }}</span>
+          <span class="meta-chip">#{{ doc.id }}</span>
+          @if (doc.confidence.global != null) {
+            <span class="meta-chip gold" [class.low]="doc.confidence.global < 75">
+              {{ doc.confidence.global }}% confianza
+            </span>
+          }
+        </div>
+      </div>
+    </header>
+
+    @if (procesando) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
+
+    @if (error) {
+      <div class="alert error">{{ error }}</div>
+    }
+
+    <div class="viewer-body">
+      <section class="doc-pane sheet">
+        <div class="pane-head">
+          <mat-icon>image</mat-icon>
+          <span>Documento original</span>
+        </div>
+        <div class="doc-canvas">
+          @if (doc.preview_url) {
+            <img [src]="doc.preview_url" [alt]="doc.filename" />
+          } @else {
+            <div class="doc-empty">
+              <mat-icon>broken_image</mat-icon>
+              <p>Vista previa no disponible</p>
+              <span>PDF u otro formato sin imagen</span>
+            </div>
+          }
+        </div>
+      </section>
+
+      <section class="extract-pane">
+        <div class="sheet extract-sheet">
+          <div class="pane-head">
+            <mat-icon>data_object</mat-icon>
+            <span>Datos extraídos</span>
+          </div>
+
+          <div class="field-grid">
+            <div class="field-cell">
+              <span class="field-label">Proveedor</span>
+              <span class="field-value">{{ doc.provider?.nombre || '—' }}</span>
+            </div>
+            <div class="field-cell">
+              <span class="field-label">NIT</span>
+              <span class="field-value mono">{{ doc.provider?.nit || '—' }}</span>
+            </div>
+            <div class="field-cell">
+              <span class="field-label">Número</span>
+              <span class="field-value mono">{{ doc.numero_documento || '—' }}</span>
+            </div>
+            <div class="field-cell">
+              <span class="field-label">Fecha emisión</span>
+              <span class="field-value">{{ doc.fecha_emision || '—' }}</span>
+            </div>
+            <div class="field-cell">
+              <span class="field-label">Subtotal</span>
+              <span class="field-value mono">{{ doc.subtotal ?? '—' }}</span>
+            </div>
+            <div class="field-cell">
+              <span class="field-label">IVA</span>
+              <span class="field-value mono">{{ doc.iva ?? '—' }}</span>
+            </div>
+            <div class="field-cell highlight">
+              <span class="field-label">Total</span>
+              <span class="field-value total">{{ doc.total ?? '—' }}</span>
+            </div>
+            <div class="field-cell">
+              <span class="field-label">Moneda</span>
+              <span class="field-value">{{ doc.moneda || '—' }}</span>
+            </div>
+            <div class="field-cell full">
+              <span class="field-label">Método OCR</span>
+              <span class="field-value">{{ doc.metodo_ocr || '—' }}</span>
+            </div>
+          </div>
+
+          @if (doc.confidence.global != null) {
+            <div class="conf-meter">
+              <div class="conf-header">
+                <span class="label-caps">Confianza por campo</span>
+                <strong class="conf-total" [class.low]="doc.confidence.global < 75">{{ doc.confidence.global }}%</strong>
+              </div>
+              @for (item of confidenceEntries(); track item[0]) {
+                <div class="conf-row">
+                  <span>{{ item[0] }}</span>
+                  <div class="conf-track">
+                    <div
+                      class="conf-fill"
+                      [class.low]="item[1] < 65"
+                      [class.mid]="item[1] >= 65 && item[1] < 85"
+                      [style.width.%]="item[1]"
+                    ></div>
+                  </div>
+                  <span>{{ item[1] }}%</span>
+                </div>
+              }
+            </div>
+          }
+
+          @if (doc.observaciones) {
+            <div class="note">{{ doc.observaciones }}</div>
+          }
+        </div>
+
+        <div class="sheet sheet-pad prompt-sheet">
+          <span class="label-caps">Instrucción de extracción</span>
+          <textarea class="textarea" rows="3" [(ngModel)]="solicitud"></textarea>
+        </div>
+
+        @if (doc.extracted && (doc.extracted | json) !== '{}') {
+          <details class="sheet raw-block">
+            <summary>JSON extraído</summary>
+            <pre>{{ doc.extracted | json }}</pre>
+          </details>
+        }
+
+        @if (doc.ocr_preview) {
+          <details class="sheet raw-block">
+            <summary>Texto OCR</summary>
+            <pre class="ocr">{{ doc.ocr_preview }}</pre>
+          </details>
+        }
+      </section>
+    </div>
+  </div>
+}

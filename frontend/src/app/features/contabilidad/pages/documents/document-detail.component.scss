@@ -1,0 +1,230 @@
+.viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 1400px;
+}
+
+.viewer-hero {
+  padding: 1.5rem 1.75rem;
+}
+
+.viewer-hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  font-weight: 300;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.25s;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    color: var(--gold-core);
+  }
+}
+
+.viewer-meta .page-title {
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.meta-chip {
+  padding: 0.25rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 300;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+
+  &.gold {
+    color: var(--gold-core);
+    border-color: rgba(232, 200, 138, 0.25);
+    background: rgba(232, 200, 138, 0.08);
+
+    &.low {
+      color: var(--gold-warm);
+    }
+  }
+}
+
+.viewer-body {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  border-bottom: 1px solid var(--border);
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--gold-core);
+    opacity: 0.7;
+  }
+}
+
+.doc-canvas {
+  padding: 1.25rem;
+  min-height: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 30%, rgba(232, 200, 138, 0.04), transparent),
+    rgba(0, 0, 0, 0.45);
+  margin: 0;
+
+  img {
+    max-width: 100%;
+    max-height: 75vh;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(232, 200, 138, 0.08);
+  }
+}
+
+.doc-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 2rem;
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    opacity: 0.35;
+    margin-bottom: 0.75rem;
+  }
+
+  p {
+    margin: 0 0 0.25rem;
+    color: var(--text-secondary);
+    font-size: 1rem;
+  }
+
+  span {
+    font-size: 0.8rem;
+  }
+}
+
+.extract-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.extract-sheet {
+  padding-bottom: 0.5rem;
+}
+
+.note {
+  margin: 1rem 1.25rem 1.25rem;
+  padding: 0.85rem 1rem;
+  background: rgba(201, 160, 92, 0.1);
+  border-left: 3px solid var(--gold-warm);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 0.84rem;
+  font-weight: 300;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.prompt-sheet .textarea {
+  margin-top: 0.5rem;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.conf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.85rem;
+}
+
+.conf-total {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--gold-bright);
+
+  &.low {
+    color: var(--gold-warm);
+  }
+}
+
+.raw-block {
+  padding: 0;
+
+  summary {
+    padding: 0.85rem 1.15rem;
+    font-size: 0.84rem;
+    font-weight: 300;
+    color: var(--gold-dim);
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  pre {
+    margin: 0;
+    padding: 1rem 1.15rem 1.15rem;
+    font-size: 0.72rem;
+    font-weight: 300;
+    line-height: 1.55;
+    color: var(--mist);
+    background: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid var(--border);
+    max-height: 220px;
+    overflow: auto;
+    white-space: pre-wrap;
+  }
+}
+
+@media (max-width: 960px) {
+  .viewer-body {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-canvas {
+    min-height: 320px;
+  }
+}

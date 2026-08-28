@@ -1,0 +1,165 @@
+<div class="page cosmos-module cosmos-page">
+  <header class="page-hero sheet">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="hero-row">
+      <div>
+        <span class="label-caps">Control de errores</span>
+        <h1 class="page-title">Subsanaciones</h1>
+        <p class="page-lead">
+          {{ total }} caso(s) registrado(s) — documentos por corregir con el proveedor.
+        </p>
+      </div>
+      <button type="button" class="btn btn-primary" (click)="abrirNueva()">
+        <mat-icon>add</mat-icon>
+        Nueva subsanación
+      </button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <input
+      type="search"
+      placeholder="Buscar proveedor, descripción…"
+      [(ngModel)]="filtroBusqueda"
+      (keyup.enter)="cargar()"
+    />
+    <select [(ngModel)]="filtroEstado" (change)="cargar()">
+      <option value="">Todos los estados</option>
+      @for (e of estados; track e) {
+        <option [value]="e">{{ e }}</option>
+      }
+    </select>
+    <select [(ngModel)]="filtroTipo" (change)="cargar()">
+      <option value="">Todos los tipos</option>
+      @for (t of tipos; track t.key) {
+        <option [value]="t.key">{{ t.label }}</option>
+      }
+    </select>
+    <button type="button" class="btn btn-secondary" (click)="cargar()">Filtrar</button>
+  </div>
+
+  @if (mostrarFormulario) {
+    <section class="card card-pad form-panel">
+      <h3>{{ editando ? 'Editar subsanación #' + editando.id : 'Nueva subsanación' }}</h3>
+      <div class="form-grid">
+        @if (!editando) {
+          <label>
+            ID documento
+            <input type="number" [(ngModel)]="form.document_id" placeholder="Ej. 1" />
+          </label>
+        } @else {
+          <label>
+            Documento
+            <span class="readonly">
+              <a [routerLink]="['/app/contabilidad/documentos', editando.document_id]">
+                {{ editando.document_filename || 'Doc #' + editando.document_id }}
+              </a>
+            </span>
+          </label>
+        }
+        <label>
+          Tipo de problema
+          <select [(ngModel)]="form.tipo_problema">
+            @for (t of tipos; track t.key) {
+              <option [value]="t.key">{{ t.label }}</option>
+            }
+          </select>
+        </label>
+        <label class="full">
+          Descripción
+          <textarea [(ngModel)]="form.descripcion" rows="2"></textarea>
+        </label>
+        <label>
+          Proveedor
+          <input type="text" [(ngModel)]="form.proveedor" />
+        </label>
+        <label>
+          Valor involucrado
+          <input type="number" [(ngModel)]="form.valor_involucrado" />
+        </label>
+        <label>
+          Responsable
+          <input type="text" [(ngModel)]="form.responsable" />
+        </label>
+        <label>
+          Fecha límite
+          <input type="date" [(ngModel)]="form.fecha_limite" />
+        </label>
+        <label class="full">
+          Observaciones
+          <textarea [(ngModel)]="form.observaciones" rows="2"></textarea>
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" (click)="cancelarFormulario()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="guardar()" [disabled]="guardando">
+          {{ guardando ? 'Guardando…' : 'Guardar' }}
+        </button>
+      </div>
+    </section>
+  }
+
+  @if (cargando) {
+    <div class="loading"><div class="spinner"></div><p>Cargando…</p></div>
+  } @else if (error) {
+    <div class="alert alert-error">{{ error }}</div>
+  } @else if (!items.length) {
+    <div class="sheet empty-state">
+      <div class="empty-icon"><mat-icon>rule</mat-icon></div>
+      <h2>Sin subsanaciones</h2>
+      <p>Se crean al cruzar documentos, o puede añadir una manualmente.</p>
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Documento</th>
+            <th>Proveedor</th>
+            <th>Tipo</th>
+            <th>Descripción</th>
+            <th>Valor</th>
+            <th>Responsable</th>
+            <th>Límite</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of items; track item.id) {
+            <tr>
+              <td>#{{ item.id }}</td>
+              <td>
+                <a [routerLink]="['/app/contabilidad/documentos', item.document_id]" class="link">
+                  {{ item.document_filename || 'Doc ' + item.document_id }}
+                </a>
+              </td>
+              <td>{{ item.proveedor || '—' }}</td>
+              <td><span class="tipo">{{ item.tipo_problema_label }}</span></td>
+              <td class="desc">{{ item.descripcion }}</td>
+              <td>{{ item.valor_involucrado != null ? (item.valor_involucrado | number:'1.0-0') : '—' }}</td>
+              <td>{{ item.responsable || '—' }}</td>
+              <td>{{ item.fecha_limite || '—' }}</td>
+              <td>
+                <select
+                  class="estado-select"
+                  [ngModel]="item.estado"
+                  (ngModelChange)="cambiarEstado(item, $event)"
+                >
+                  @for (e of estados; track e) {
+                    <option [value]="e">{{ e }}</option>
+                  }
+                </select>
+              </td>
+              <td class="actions">
+                <button type="button" class="btn-link" (click)="abrirEditar(item)">Editar</button>
+                <button type="button" class="btn-link btn-danger" (click)="eliminar(item)">Eliminar</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

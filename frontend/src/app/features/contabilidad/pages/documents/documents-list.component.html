@@ -1,0 +1,126 @@
+<div class="docs cosmos-page">
+  <header class="page-hero sheet">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="docs-head-inner">
+      <div>
+        <span class="label-caps">Documentos</span>
+        <h1 class="page-title">Archivo</h1>
+        <p class="page-lead">{{ total }} documento{{ total === 1 ? '' : 's' }} registrado{{ total === 1 ? '' : 's' }} en el sistema</p>
+      </div>
+      <label class="btn btn-primary btn-lg upload-head">
+        @if (subiendo) {
+          <mat-spinner diameter="18"></mat-spinner>
+          Subiendo…
+        } @else {
+          <mat-icon>upload_file</mat-icon>
+          Subir factura
+        }
+        <input
+          type="file"
+          accept=".jpg,.jpeg,.png,.pdf"
+          (change)="onFileSelected($event)"
+          [disabled]="subiendo"
+        />
+      </label>
+    </div>
+  </header>
+
+  <label class="sheet upload-hero">
+    <div class="upload-icon">
+      <mat-icon>cloud_upload</mat-icon>
+    </div>
+    <h2>Arrastra tus facturas aquí</h2>
+    <p>JPG, PNG o PDF — se procesarán automáticamente</p>
+    <span class="btn btn-primary btn-lg">Seleccionar archivos</span>
+    <input
+      type="file"
+      accept=".jpg,.jpeg,.png,.pdf"
+      (change)="onFileSelected($event)"
+      [disabled]="subiendo"
+    />
+  </label>
+
+  <div class="filters-bar sheet">
+    <input
+      class="input search"
+      type="search"
+      placeholder="Buscar por nombre, número, proveedor…"
+      [(ngModel)]="filtroBusqueda"
+      (keyup.enter)="cargar()"
+    />
+    <select class="select" [(ngModel)]="filtroEstado" (change)="cargar()">
+      @for (e of estados; track e) {
+        <option [value]="e">{{ e || 'Todos los estados' }}</option>
+      }
+    </select>
+    <button type="button" class="btn btn-secondary" (click)="cargar()">Filtrar</button>
+  </div>
+
+  @if (error) {
+    <div class="alert error">{{ error }}</div>
+  }
+
+  @if (cargando) {
+    <div class="loading">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Cargando documentos…</span>
+    </div>
+  } @else if (!documentos.length) {
+    <div class="sheet empty-state">
+      <div class="empty-icon"><mat-icon>folder_open</mat-icon></div>
+      <h2>Sin documentos</h2>
+      <p>Sube una factura para comenzar el archivo.</p>
+    </div>
+  } @else {
+    <div class="sheet table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Archivo</th>
+            <th>Proveedor</th>
+            <th>Número</th>
+            <th>Total</th>
+            <th>Confianza</th>
+            <th>Estado</th>
+            <th>Recibido</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (doc of documentos; track doc.id) {
+            <tr>
+              <td class="name">
+                <a [routerLink]="['/app/contabilidad/documentos', doc.id]">{{ doc.filename }}</a>
+              </td>
+              <td>{{ doc.proveedor_nombre || '—' }}</td>
+              <td class="mono">{{ doc.numero_documento || '—' }}</td>
+              <td class="num">
+                @if (doc.total != null) {
+                  {{ doc.total | number:'1.0-0' }}
+                } @else {
+                  —
+                }
+              </td>
+              <td>
+                @if (doc.confidence_global != null) {
+                  <span class="conf-pill" [class.low]="doc.confidence_global < 75">
+                    {{ doc.confidence_global }}%
+                  </span>
+                } @else {
+                  —
+                }
+              </td>
+              <td>
+                <span class="status" [class]="estadoClass(doc.estado)">{{ doc.estado }}</span>
+              </td>
+              <td class="date">{{ doc.received_at | date:'dd/MM/yy HH:mm' }}</td>
+              <td>
+                <a class="btn btn-secondary btn-sm" [routerLink]="['/app/contabilidad/documentos', doc.id]">Abrir</a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

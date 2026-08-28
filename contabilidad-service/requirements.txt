@@ -1,0 +1,12 @@
+requests
+pytesseract
+Pillow
+opencv-python
+fastapi
+uvicorn[standard]
+python-multipart
+sqlalchemy
+pydantic-settings
+pytest
+httpx
+openpyxl

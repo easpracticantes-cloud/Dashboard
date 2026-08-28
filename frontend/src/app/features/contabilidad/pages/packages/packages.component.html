@@ -1,0 +1,90 @@
+<div class="page cosmos-module cosmos-page">
+  <header class="page-hero sheet">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <span class="label-caps">Entrega a Katherine</span>
+    <h1 class="page-title">Paquetes digitales</h1>
+    <p class="page-lead">
+      {{ total }} paquete(s) — se entregan para digitalizar en Word Office.
+      @if (storageInfo) {
+        Almacenamiento: {{ storageInfo.active_provider }}.
+      }
+    </p>
+  </header>
+
+  <section class="card card-pad">
+    <h3>Crear paquete</h3>
+    <div class="create-row">
+      <input class="input" type="number" placeholder="ID documento" [(ngModel)]="documentIdNuevo" />
+      <button type="button" class="btn btn-primary" (click)="crearPaquete()">Crear paquete</button>
+    </div>
+  </section>
+
+  <div class="filters">
+    <select [(ngModel)]="filtroEstado" (change)="cargar()">
+      @for (e of estados; track e) {
+        <option [value]="e">{{ e || 'Todos los estados' }}</option>
+      }
+    </select>
+    <button type="button" class="btn btn-secondary" (click)="cargar()">Filtrar</button>
+  </div>
+
+  @if (cargando) {
+    <div class="loading"><div class="spinner"></div><p>Cargando…</p></div>
+  } @else if (error) {
+    <div class="alert alert-error">{{ error }}</div>
+  } @else if (!paquetes.length) {
+    <div class="sheet empty-state">
+      <div class="empty-icon"><mat-icon>inventory_2</mat-icon></div>
+      <h2>Sin paquetes digitales</h2>
+      <p>Cree un paquete cuando el documento tenga pago y comprobante listos.</p>
+    </div>
+  } @else {
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Documento</th>
+            <th>Proveedor</th>
+            <th>Responsable</th>
+            <th>Estado</th>
+            <th>ZIP</th>
+            <th>Fecha</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of paquetes; track p.id) {
+            <tr>
+              <td>
+                <a [routerLink]="['/app/contabilidad/documentos', p.document_id]" class="link">
+                  {{ p.document_filename || 'Doc ' + p.document_id }}
+                </a>
+              </td>
+              <td>{{ p.proveedor || '—' }}</td>
+              <td>{{ p.responsable }}</td>
+              <td>
+                <span class="badge" [class]="estadoClass(p.estado)">{{ p.estado }}</span>
+              </td>
+              <td>{{ p.has_zip ? '✓' : '—' }}</td>
+              <td class="date">{{ p.created_at | date:'short' }}</td>
+              <td class="actions">
+                @if (p.estado === 'PENDIENTE') {
+                  <button type="button" class="btn-link" (click)="generar(p)">Generar ZIP</button>
+                }
+                @if (p.has_zip) {
+                  <button type="button" class="btn-link" (click)="descargar(p)">Descargar</button>
+                }
+                @if (p.estado === 'GENERADO') {
+                  <button type="button" class="btn-link" (click)="entregar(p)">Entregar</button>
+                }
+                @if (p.estado === 'ENTREGADO' || p.estado === 'DIGITALIZADO') {
+                  <button type="button" class="btn-link" (click)="cerrar(p)">Cerrar</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

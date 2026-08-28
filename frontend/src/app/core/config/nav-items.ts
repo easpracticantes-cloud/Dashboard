@@ -28,6 +28,12 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Cotizaciones', icon: 'request_quote', route: '/app/quotes', roles: ALL_ROLES },
   { label: 'Reservas', icon: 'event_available', route: '/app/reservations', roles: ALL_ROLES },
   { label: 'Ventas', icon: 'payments', route: '/app/sales', roles: ALL_ROLES },
+  {
+    label: 'Contabilidad',
+    icon: 'account_balance',
+    route: '/app/contabilidad',
+    roles: ['ADMINISTRADOR', 'GERENCIA', 'CONTABILIDAD', 'SUPERVISOR']
+  },
   { label: 'Analítica', icon: 'monitoring', route: '/app/analytics', roles: ALL_ROLES },
   { label: 'Consola IA', icon: 'tune', route: '/app/ai', roles: ['ADMINISTRADOR', 'GERENCIA', 'SUPERVISOR'] },
   { label: 'Reportes', icon: 'summarize', route: '/app/reports', roles: ALL_ROLES },

@@ -8,6 +8,7 @@ import { registerLocaleData } from '@angular/common';
 import localeEs from '@angular/common/locales/es';
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
+import { contabilidadInterceptor } from './core/interceptors/contabilidad.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { CriticalModulesPreloadStrategy } from './core/routing/critical-modules-preload.strategy';
 import { AppConfigService } from './core/services/app-config.service';
@@ -27,7 +28,7 @@ export const appConfig: ApplicationConfig = {
       withPreloading(CriticalModulesPreloadStrategy),
       withViewTransitions({ skipInitialTransition: true })
     ),
-    provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),
+    provideHttpClient(withInterceptors([contabilidadInterceptor, authInterceptor, errorInterceptor])),
     provideAnimationsAsync(),
     provideNativeDateAdapter(),
     { provide: APP_INITIALIZER, multi: true, useFactory: initAppConfig },

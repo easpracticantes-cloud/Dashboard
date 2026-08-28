@@ -62,6 +62,8 @@ app:
     webapp-url: ${GOOGLE_SHEETS_WEBAPP_URL:https://script.google.com/macros/s/AKfycbzMkCg7PfddRA048GAZBc5jz_2lKpmtJg13589XteWmONKBiQBQLKZxw-eBeEwa0uDslw/exec}
     sync-interval-ms: ${SHEETS_SYNC_INTERVAL_MS:300000}
     write-token: ${GOOGLE_SHEETS_WRITE_TOKEN:}
+  contabilidad:
+    api-base: ${CONTABLE_API_BASE:http://localhost:8787}
   ai:
     provider: ${APP_AI_PROVIDER:gemini}
     quote:

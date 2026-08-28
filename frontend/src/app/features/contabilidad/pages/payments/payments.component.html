@@ -1,0 +1,173 @@
+<div class="pagos cosmos-page">
+  <header class="page-hero sheet">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="hero-row">
+      <div>
+        <span class="label-caps">Ejecución manual · Bancolombia</span>
+        <h1 class="page-title">Pagos</h1>
+        <p class="page-lead">
+          Apruebe, marque como pagado y adjunte el comprobante contramarcado de cada proveedor.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button type="button" class="btn btn-primary" (click)="exportarPendientes()">
+          <mat-icon>download</mat-icon>
+          Reporte de pagos
+        </button>
+        <a routerLink="/app/contabilidad/cruce" class="btn btn-secondary">
+          <mat-icon>compare_arrows</mat-icon>
+          Ver cruce
+        </a>
+      </div>
+    </div>
+  </header>
+
+  @if (pagos.length) {
+    <div class="pay-stats">
+      @for (s of resumen; track s.label) {
+        <div class="pay-stat" [class]="s.cls">
+          <span class="pay-num">{{ s.val }}</span>
+          <span class="pay-lbl">{{ s.label }}</span>
+        </div>
+      }
+      <div class="pay-stat total">
+        <span class="pay-num">{{ totalValor | number:'1.0-0' }}</span>
+        <span class="pay-lbl">Valor total (COP)</span>
+      </div>
+    </div>
+  }
+
+  <div class="filters-bar sheet">
+    <input
+      class="input search"
+      type="search"
+      placeholder="Buscar proveedor, orden de compra…"
+      [(ngModel)]="filtroBusqueda"
+      (keyup.enter)="cargar()"
+    />
+    <select class="select" [(ngModel)]="filtroEstado" (change)="cargar()">
+      @for (e of estados; track e) {
+        <option [value]="e">{{ e || 'Todos los estados' }}</option>
+      }
+    </select>
+    <button type="button" class="btn btn-secondary" (click)="cargar()">Filtrar</button>
+  </div>
+
+  <details class="sheet manual-panel">
+    <summary>
+      <mat-icon>add_circle_outline</mat-icon>
+      Crear pago manual desde un cruce aprobado
+    </summary>
+    <div class="manual-body">
+      <p>
+        Normalmente los pagos se generan en bloque desde la página de
+        <a routerLink="/app/contabilidad/cruce">cruce</a>. Use esto solo para un cruce puntual.
+      </p>
+      <div class="manual-row">
+        <input
+          class="input"
+          type="number"
+          placeholder="ID del cruce aprobado"
+          [(ngModel)]="crossingIdNuevo"
+        />
+        <button type="button" class="btn btn-primary" (click)="crearDesdeCruce()">
+          Crear pago
+        </button>
+      </div>
+    </div>
+  </details>
+
+  @if (error) {
+    <div class="alert alert-error">{{ error }}</div>
+  }
+
+  @if (cargando) {
+    <div class="loading">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Cargando pagos…</span>
+    </div>
+  } @else if (!pagos.length) {
+    <div class="sheet empty-state">
+      <div class="empty-icon"><mat-icon>payments</mat-icon></div>
+      <h2>Sin pagos registrados</h2>
+      <p>Complete factura/CDC en el cruce y pulse «Generar pagos».</p>
+      <a routerLink="/app/contabilidad/cruce" class="btn btn-primary">Ir al cruce</a>
+    </div>
+  } @else {
+    <div class="sheet table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Proveedor</th>
+            <th>Compra</th>
+            <th>Reserva</th>
+            <th>Documento</th>
+            <th>Valor</th>
+            <th>Estado</th>
+            <th>Comprobante</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of pagos; track p.id) {
+            <tr>
+              <td class="strong">{{ p.proveedor || '—' }}</td>
+              <td class="mono">{{ p.numero_compra || '—' }}</td>
+              <td class="mono">{{ p.numero_reserva || '—' }}</td>
+              <td>
+                @if (p.document_id) {
+                  <a [routerLink]="['/app/contabilidad/documentos', p.document_id]">
+                    {{ p.document_filename || 'Doc ' + p.document_id }}
+                  </a>
+                } @else {
+                  <span class="mono">{{ p.numero_documento || '—' }}</span>
+                }
+              </td>
+              <td class="num">{{ p.valor != null ? (p.valor | number:'1.0-0') : '—' }}</td>
+              <td>
+                <span class="status" [class]="estadoClass(p.estado)">{{ p.estado }}</span>
+              </td>
+              <td>
+                @if (p.has_receipt) {
+                  <span class="receipt ok">
+                    <mat-icon>check_circle</mat-icon>
+                    Subido
+                  </span>
+                } @else {
+                  <span class="receipt">
+                    <mat-icon>pending</mat-icon>
+                    Pendiente
+                  </span>
+                }
+              </td>
+              <td class="actions">
+                @if (p.estado === 'PENDIENTE_APROBACION') {
+                  <button type="button" class="btn btn-primary btn-sm" (click)="aprobar(p)">
+                    Aprobar
+                  </button>
+                }
+                @if (p.estado === 'PENDIENTE_PAGO') {
+                  <button type="button" class="btn btn-primary btn-sm" (click)="marcarPagado(p)">
+                    Marcar pagado
+                  </button>
+                }
+                @if (p.estado === 'PAGADO' || p.estado === 'COMPROBANTE_PENDIENTE' || p.estado === 'PENDIENTE_PAGO') {
+                  <label class="btn btn-secondary btn-sm upload-receipt">
+                    <mat-icon>attach_file</mat-icon>
+                    Comprobante
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.pdf"
+                      (change)="onReceiptSelected(p, $event)"
+                      [disabled]="subiendo"
+                    />
+                  </label>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

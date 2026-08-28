@@ -12,4 +12,10 @@ desktop.ini
 # Build artifacts and local patching workdirs
 BOOT-INF/
 tmp_*/
+_tmp_contable/
 tmp_running_backend*.jar
+contabilidad-service/venv/
+contabilidad-service/data/*.db
+contabilidad-service/storage/**
+!contabilidad-service/storage/.gitkeep
+

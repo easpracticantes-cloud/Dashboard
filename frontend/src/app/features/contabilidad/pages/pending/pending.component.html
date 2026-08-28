@@ -1,0 +1,247 @@
+<div class="pend cosmos-page">
+  <header class="page-hero sheet">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="hero-row">
+      <div>
+        <span class="label-caps">Revisión del cruce</span>
+        <h1 class="page-title">Qué falta por llenar</h1>
+        <p class="page-lead">
+          Adjunte el Excel de CRUCE DE CUENTAS. Se compara contra el reporte de Autobits
+          de la semana y el sistema le dice exactamente qué queda pendiente.
+        </p>
+      </div>
+      <div class="hero-actions">
+        @if (pendientes?.total) {
+          <button type="button" class="btn btn-secondary" (click)="exportar()">
+            <mat-icon>download</mat-icon>
+            Exportar CSV
+          </button>
+        }
+        <a routerLink="/app/contabilidad/cruce" class="btn btn-ghost">
+          <mat-icon>compare_arrows</mat-icon>
+          Ir al cruce
+        </a>
+      </div>
+    </div>
+  </header>
+
+  @if (!hasAutobits) {
+    <section class="sheet empty-banner">
+      <mat-icon>info</mat-icon>
+      <div>
+        <strong>Falta el Excel de Autobits</strong>
+        <p>
+          El cruce de cuentas se compara contra el reporte semanal.
+          Súbalo primero en <a routerLink="/app/contabilidad/autobits">Autobits</a>.
+        </p>
+      </div>
+    </section>
+  } @else if (batch) {
+    <section class="sheet base-banner">
+      <div class="base-icon"><mat-icon>table_chart</mat-icon></div>
+      <div class="base-info">
+        <span class="label-caps">Se compara contra</span>
+        <strong>{{ batch.filename }}</strong>
+        @if (periodoLabel()) {
+          <span class="base-period">Semana {{ periodoLabel() }}</span>
+        }
+        <span class="base-meta">{{ batch.imported_rows }} filas de Autobits</span>
+      </div>
+      @if (pendientes) {
+        <div class="base-total">
+          <span class="base-num">{{ pendientes.total }}</span>
+          <span class="base-lbl">Pendientes</span>
+        </div>
+      }
+    </section>
+  }
+
+  <div class="upload-row">
+    <label class="sheet upload-hero" [class.busy]="subiendo">
+      <div class="upload-icon">
+        @if (subiendo) {
+          <mat-spinner diameter="28"></mat-spinner>
+        } @else {
+          <mat-icon>fact_check</mat-icon>
+        }
+      </div>
+      <h2>{{ subiendo ? 'Comparando con Autobits…' : 'Adjuntar CRUCE DE CUENTAS' }}</h2>
+      <p>
+        Se copian FACTURA/CDC y FECHA DE PAGO a las filas que coincidan.
+        Lo que usted ya digitó aquí no se sobreescribe.
+      </p>
+      <span class="btn btn-primary btn-lg">Aplicar al cruce</span>
+      <input
+        type="file"
+        accept=".xlsx,.xlsm"
+        (change)="onFileSelected($event, true)"
+        [disabled]="subiendo || !hasAutobits"
+      />
+    </label>
+
+    <label class="sheet upload-alt" [class.busy]="subiendo">
+      <mat-icon>visibility</mat-icon>
+      <strong>Solo revisar</strong>
+      <span>Compara y muestra el reporte sin modificar nada.</span>
+      <input
+        type="file"
+        accept=".xlsx,.xlsm"
+        (change)="onFileSelected($event, false)"
+        [disabled]="subiendo || !hasAutobits"
+      />
+    </label>
+  </div>
+
+  @if (mensajeOk) {
+    <div class="alert alert-success">{{ mensajeOk }}</div>
+  }
+  @if (error) {
+    <div class="alert alert-error">{{ error }}</div>
+  }
+
+  @if (ultimaCarga) {
+    <section class="sheet sheet-pad read-result">
+      <h2 class="section-head">Lectura del archivo</h2>
+      <div class="read-stats">
+        <div class="rstat">
+          <span class="rstat-num">{{ ultimaCarga.lectura.filas_leidas }}</span>
+          <span class="rstat-lbl">Filas leídas</span>
+        </div>
+        <div class="rstat ok">
+          <span class="rstat-num">{{ ultimaCarga.conciliacion.emparejadas }}</span>
+          <span class="rstat-lbl">Coinciden</span>
+        </div>
+        <div class="rstat gold">
+          <span class="rstat-num">{{ ultimaCarga.conciliacion.actualizadas }}</span>
+          <span class="rstat-lbl">Actualizadas</span>
+        </div>
+        <div class="rstat warn">
+          <span class="rstat-num">{{ ultimaCarga.conciliacion.sin_correspondencia }}</span>
+          <span class="rstat-lbl">Sin match</span>
+        </div>
+      </div>
+
+      <p class="read-note">
+        {{ ultimaCarga.conciliacion.fuera_de_periodo }} fila(s) de otras semanas y
+        {{ ultimaCarga.conciliacion.sin_fecha }} sin fecha quedaron fuera del reporte:
+        el cruce histórico no se reclama.
+      </p>
+
+      <div class="read-sheets">
+        @for (hoja of ultimaCarga.lectura.hojas; track hoja.nombre) {
+          <span class="sheet-chip" [class.vacia]="!hoja.filas">
+            {{ hoja.nombre }}
+            <em>{{ hoja.filas }}</em>
+          </span>
+        }
+      </div>
+
+      @if (ultimaCarga.conciliacion.conflictos.length) {
+        <div class="conflictos">
+          <h3>
+            <mat-icon>warning</mat-icon>
+            {{ ultimaCarga.conciliacion.conflictos.length }} dato(s) distintos al Excel
+          </h3>
+          <p>No se sobreescribieron. Revise cuál es el correcto.</p>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Proveedor</th>
+                <th>Compra</th>
+                <th>Campo</th>
+                <th>En el sistema</th>
+                <th>En el Excel</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of ultimaCarga.conciliacion.conflictos; track c.crossing_id + c.campo) {
+                <tr>
+                  <td>{{ c.proveedor || '—' }}</td>
+                  <td class="mono">{{ c.numero_compra || '—' }}</td>
+                  <td>{{ c.campo === 'factura_cdc' ? 'FACTURA/CDC' : 'FECHA DE PAGO' }}</td>
+                  <td class="mono">{{ c.en_sistema }}</td>
+                  <td class="mono gold">{{ c.en_excel }}</td>
+                  <td><a routerLink="/app/contabilidad/cruce">Abrir cruce</a></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  }
+
+  @if (cargando) {
+    <div class="loading">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Revisando el cruce…</span>
+    </div>
+  } @else if (hasAutobits && pendientes && !pendientes.total) {
+    <div class="sheet empty-state ok">
+      <div class="empty-icon"><mat-icon>verified</mat-icon></div>
+      <h2>No falta nada</h2>
+      <p>Todas las filas de la semana tienen factura, fecha de pago y soporte.</p>
+      <a routerLink="/app/contabilidad/pagos" class="btn btn-primary">Ir a pagos</a>
+    </div>
+  } @else if (pendientes?.total) {
+    <section class="tipos">
+      @for (t of tipos; track t.tipo) {
+        <button
+          type="button"
+          class="tipo-card sheet"
+          [class.activo]="tipoActivo === t.tipo"
+          (click)="filtrar(t.tipo)"
+        >
+          <span class="tipo-icon"><mat-icon>{{ t.icono }}</mat-icon></span>
+          <span class="tipo-num">{{ t.cantidad }}</span>
+          <span class="tipo-lbl">{{ t.etiqueta }}</span>
+        </button>
+      }
+    </section>
+
+    @for (grupo of itemsVisibles; track grupo.tipo) {
+      <section class="grupo">
+        <h2 class="section-head">
+          <mat-icon>{{ grupo.icono }}</mat-icon>
+          {{ grupo.etiqueta }}
+          <span class="grupo-count">{{ grupo.items.length }}</span>
+        </h2>
+        <div class="sheet table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Proveedor</th>
+                <th>Compra</th>
+                <th>Reserva</th>
+                <th>Valor</th>
+                <th>Qué pasa</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (item of grupo.items; track $index) {
+                <tr>
+                  <td class="strong">{{ item.proveedor || '—' }}</td>
+                  <td class="mono">{{ item.numero_compra || '—' }}</td>
+                  <td class="mono">{{ item.numero_reserva || '—' }}</td>
+                  <td class="num">
+                    {{ item.valor != null ? (item.valor | number:'1.0-0') : '—' }}
+                  </td>
+                  <td class="detalle">{{ item.detalle }}</td>
+                  <td>
+                    @if (item.crossing_id) {
+                      <a routerLink="/app/contabilidad/cruce">Completar</a>
+                    } @else {
+                      <span class="muted-sm">Revisar en el Excel</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+</div>

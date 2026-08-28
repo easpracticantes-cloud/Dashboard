@@ -1,0 +1,360 @@
+<div class="cruce cosmos-module cosmos-page">
+  <header class="cruce-hero">
+    <div class="cruce-hero-text">
+      <span class="label-caps">Cruce de cuentas</span>
+      <h1 class="page-title">Reporte de pagos</h1>
+      <p class="page-lead">
+        Suba el Excel de Autobits y luego adjunte su CRUCE DE CUENTAS: el sistema compara ambos
+        y le dice qué falta por llenar (factura/CDC, fecha de pago, filas sin digitar).
+      </p>
+    </div>
+    <div class="cruce-actions">
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="sincronizarDesdeUltimoExcel()"
+        [disabled]="ejecutando"
+      >
+        @if (ejecutando) {
+          <mat-spinner diameter="16"></mat-spinner>
+        } @else {
+          <mat-icon>sync</mat-icon>
+        }
+        Sincronizar Excel
+      </button>
+      <button
+        type="button"
+        class="btn btn-secondary"
+        (click)="generarPagos()"
+        [disabled]="ejecutando || !context?.counts?.['APROBADO']"
+      >
+        <mat-icon>payments</mat-icon>
+        Generar pagos
+      </button>
+      <a routerLink="/app/contabilidad/autobits" class="btn btn-ghost">
+        <mat-icon>upload_file</mat-icon>
+        Subir Autobits
+      </a>
+    </div>
+  </header>
+
+  @if (context?.has_autobits && context?.batch) {
+    <section class="dual-excel">
+      <article class="sheet excel-step done">
+        <span class="step-badge">1</span>
+        <div class="excel-icon"><mat-icon>table_chart</mat-icon></div>
+        <div class="excel-info">
+          <span class="excel-label">Excel Autobits (semana)</span>
+          <strong>{{ context!.batch!.filename }}</strong>
+          @if (periodoLabel()) {
+            <span class="excel-period">Semana {{ periodoLabel() }}</span>
+          }
+          <span class="excel-meta">
+            {{ context!.batch!.imported_rows }} filas ·
+            {{ context!.batch!.imported_at | date:'dd/MM/yy HH:mm' }}
+          </span>
+        </div>
+        <a routerLink="/app/contabilidad/autobits" class="btn btn-ghost btn-sm">Cambiar</a>
+      </article>
+
+      <article class="sheet excel-step upload-step" [class.busy]="subiendoCruce">
+        <span class="step-badge">2</span>
+        <label class="cruce-upload">
+          <div class="upload-icon">
+            @if (subiendoCruce) {
+              <mat-spinner diameter="28"></mat-spinner>
+            } @else {
+              <mat-icon>fact_check</mat-icon>
+            }
+          </div>
+          <div class="upload-copy">
+            <span class="excel-label">Excel CRUCE DE CUENTAS</span>
+            <strong>{{ subiendoCruce ? 'Comparando con Autobits…' : 'Adjuntar su hoja de cruce' }}</strong>
+            <span class="upload-hint">
+              Copia FACTURA/CDC y FECHA DE PAGO a las filas que coincidan. Lo que ya digitó no se borra.
+            </span>
+          </div>
+          <span class="btn btn-primary">Seleccionar .xlsx</span>
+          <input
+            type="file"
+            accept=".xlsx,.xlsm"
+            (change)="onCruceExcelSelected($event, true)"
+            [disabled]="subiendoCruce"
+          />
+        </label>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm solo-revisar"
+          (click)="cruceSoloRevisar.click()"
+          [disabled]="subiendoCruce"
+        >
+          Solo revisar
+        </button>
+        <input
+          #cruceSoloRevisar
+          type="file"
+          accept=".xlsx,.xlsm"
+          class="hidden-input"
+          (change)="onCruceExcelSelected($event, false)"
+          [disabled]="subiendoCruce"
+        />
+      </article>
+    </section>
+
+    <section class="excel-banner sheet">
+      <div class="excel-stats">
+        @for (s of resumenEstados; track s.label) {
+          <div class="stat-pill" [class]="s.cls">
+            <span class="stat-num">{{ s.val }}</span>
+            <span class="stat-lbl">{{ s.label }}</span>
+          </div>
+        }
+      </div>
+    </section>
+
+    @if (ultimaCargaCruce) {
+      <section class="sheet conciliacion-panel">
+        <h2 class="section-head">Resultado de la comparación</h2>
+        <div class="conc-stats">
+          <div class="cstat">
+            <span class="cstat-num">{{ ultimaCargaCruce.lectura.filas_leidas }}</span>
+            <span class="cstat-lbl">Filas leídas del cruce</span>
+          </div>
+          <div class="cstat ok">
+            <span class="cstat-num">{{ ultimaCargaCruce.conciliacion.emparejadas }}</span>
+            <span class="cstat-lbl">Coinciden con Autobits</span>
+          </div>
+          <div class="cstat gold">
+            <span class="cstat-num">{{ ultimaCargaCruce.conciliacion.actualizadas }}</span>
+            <span class="cstat-lbl">Actualizadas</span>
+          </div>
+          <div class="cstat warn">
+            <span class="cstat-num">{{ ultimaCargaCruce.pendientes.total }}</span>
+            <span class="cstat-lbl">Pendientes por llenar</span>
+          </div>
+        </div>
+        @if (ultimaCargaCruce.conciliacion.conflictos.length) {
+          <p class="conc-warn">
+            {{ ultimaCargaCruce.conciliacion.conflictos.length }} dato(s) distintos al Excel
+            (no se sobreescribieron).
+          </p>
+        }
+      </section>
+    }
+
+    @if (pendientes?.total) {
+      <section class="pendientes-panel">
+        <header class="pendientes-head">
+          <div>
+            <h2 class="section-head">Qué falta por llenar</h2>
+            <p class="pendientes-lead">
+              Comparación entre Autobits y su Excel de cruce de cuentas.
+            </p>
+          </div>
+          <div class="pendientes-actions">
+            <button
+              type="button"
+              class="btn btn-secondary btn-sm"
+              [class.active]="verSoloPendientes"
+              (click)="toggleSoloPendientes()"
+            >
+              {{ verSoloPendientes ? 'Ver todas las filas' : 'Ver solo pendientes' }}
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="exportarPendientes()">
+              <mat-icon>download</mat-icon>
+              CSV
+            </button>
+          </div>
+        </header>
+
+        <div class="tipos-grid">
+          @for (t of resumenPendientes; track t.tipo) {
+            <button
+              type="button"
+              class="tipo-chip sheet"
+              [class.activo]="tipoPendienteActivo === t.tipo"
+              (click)="filtrarPendiente(t.tipo)"
+            >
+              <mat-icon>{{ t.icono }}</mat-icon>
+              <span class="tipo-num">{{ t.cantidad }}</span>
+              <span class="tipo-lbl">{{ t.etiqueta }}</span>
+            </button>
+          }
+        </div>
+
+        @for (grupo of pendientesVisibles; track grupo.tipo) {
+          <div class="pendiente-grupo sheet">
+            <h3>
+              <mat-icon>{{ grupo.icono }}</mat-icon>
+              {{ grupo.etiqueta }}
+              <span class="grupo-count">{{ grupo.items.length }}</span>
+            </h3>
+            <table class="data-table compact">
+              <thead>
+                <tr>
+                  <th>Proveedor</th>
+                  <th>Compra</th>
+                  <th>Reserva</th>
+                  <th>Valor</th>
+                  <th>Detalle</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of grupo.items; track $index) {
+                  <tr>
+                    <td>{{ p.proveedor || '—' }}</td>
+                    <td class="mono">{{ p.numero_compra || '—' }}</td>
+                    <td class="mono">{{ p.numero_reserva || '—' }}</td>
+                    <td class="num">
+                      {{ p.valor != null ? (p.valor | number:'1.0-0') : '—' }}
+                    </td>
+                    <td class="detalle">{{ p.detalle }}</td>
+                    <td>
+                      @if (p.crossing_id) {
+                        <button type="button" class="btn btn-secondary btn-sm" (click)="empezarEdicionPorId(p.crossing_id)">
+                          Completar
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+
+    <section class="workflow-strip">
+      @for (step of context!.workflow; track step.step) {
+        <div class="wf-step">
+          <span class="wf-num">{{ step.step }}</span>
+          <div>
+            <strong>{{ step.title }}</strong>
+            <span>{{ step.hint }}</span>
+          </div>
+        </div>
+      }
+    </section>
+  } @else {
+    <section class="sheet empty-banner">
+      <mat-icon>info</mat-icon>
+      <div>
+        <strong>Sin Excel Autobits</strong>
+        <p>Suba el reporte semanal (sábado a viernes) en <a routerLink="/app/contabilidad/autobits">Autobits</a> para armar el cruce.</p>
+      </div>
+    </section>
+  }
+
+  <div class="filters-bar sheet">
+    <select class="select" [(ngModel)]="filtroProveedor" (change)="cargar()">
+      <option value="">Todos los proveedores</option>
+      @for (p of proveedores; track p) {
+        <option [value]="p">{{ p }}</option>
+      }
+    </select>
+    <select class="select" [(ngModel)]="filtroEstado" (change)="cargar()">
+      @for (e of estados; track e) {
+        <option [value]="e">{{ e || 'Todos los estados' }}</option>
+      }
+    </select>
+    <label class="toggle-arch">
+      <input type="checkbox" [(ngModel)]="verArchivados" (change)="cargar()" />
+      Ver archivados
+    </label>
+    <button type="button" class="btn btn-secondary" (click)="cargar()">Actualizar</button>
+  </div>
+
+  @if (mensajeOk) {
+    <div class="alert alert-success">{{ mensajeOk }}</div>
+  }
+  @if (error) {
+    <div class="alert alert-error">{{ error }}</div>
+  }
+
+  @if (cargando) {
+    <div class="loading">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Cargando cruce…</span>
+    </div>
+  } @else if (!cruces.length) {
+    <div class="sheet empty-state">
+      <div class="empty-icon"><mat-icon>compare_arrows</mat-icon></div>
+      <h2>Sin filas de cruce</h2>
+      <p>Suba el Excel de Autobits y pulse «Sincronizar Excel», luego adjunte su CRUCE DE CUENTAS.</p>
+    </div>
+  } @else {
+    <p class="count">{{ total }} fila(s) del Excel vigente</p>
+
+    @for (grupo of grupos; track grupo.proveedor) {
+      <section class="provider-card sheet">
+        <header class="provider-head">
+          <h3>{{ grupo.proveedor }}</h3>
+          <span>{{ grupo.items.length }} fila(s)</span>
+        </header>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Compra</th>
+                <th>Reserva</th>
+                <th>Valor</th>
+                <th>Factura / CDC</th>
+                <th>Fecha pago</th>
+                <th>Observaciones</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (c of grupo.items; track c.id) {
+                <tr [class.editing]="editId === c.id">
+                  <td>{{ c.fecha_ejecucion || '—' }}</td>
+                  <td class="mono">{{ c.numero_compra || '—' }}</td>
+                  <td class="mono">{{ c.numero_reserva || '—' }}</td>
+                  <td class="num">
+                    @if (c.valor_autobits != null) {
+                      {{ c.valor_autobits | number: '1.0-0' }}
+                    } @else {
+                      —
+                    }
+                  </td>
+                  <td>
+                    @if (editId === c.id) {
+                      <input class="input" type="text" [(ngModel)]="editFactura" placeholder="FV POS / CDC…" />
+                    } @else {
+                      {{ c.factura_cdc || '—' }}
+                    }
+                  </td>
+                  <td>
+                    @if (editId === c.id) {
+                      <input class="input" type="date" [(ngModel)]="editFechaPago" />
+                    } @else {
+                      {{ c.fecha_pago || '—' }}
+                    }
+                  </td>
+                  <td class="obs" [title]="c.observaciones || ''">{{ c.observaciones || '—' }}</td>
+                  <td>
+                    <span class="status" [class]="estadoClass(c.estado)">{{ c.estado }}</span>
+                  </td>
+                  <td class="actions">
+                    @if (editId === c.id) {
+                      <button type="button" class="btn btn-primary btn-sm" (click)="guardar(c)">Guardar</button>
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="cancelarEdicion()">×</button>
+                    } @else {
+                      <button type="button" class="btn btn-secondary btn-sm" (click)="empezarEdicion(c)">
+                        Editar
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+  }
+</div>

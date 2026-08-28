@@ -41,6 +41,12 @@ export const routes: Routes = [
         loadChildren: () => import('./features/sales/sales.routes').then((m) => m.SALES_ROUTES)
       },
       {
+        path: 'contabilidad',
+        canActivate: [roleGuard(['ADMINISTRADOR', 'GERENCIA', 'CONTABILIDAD', 'SUPERVISOR'])],
+        loadChildren: () =>
+          import('./features/contabilidad/contabilidad.routes').then((m) => m.CONTABILIDAD_ROUTES)
+      },
+      {
         path: 'analytics',
         loadChildren: () => import('./features/analytics/analytics.routes').then((m) => m.ANALYTICS_ROUTES)
       },

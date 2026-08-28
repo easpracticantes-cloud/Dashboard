@@ -1,0 +1,186 @@
+<div class="dash cosmos-page">
+  <header class="page-hero sheet">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <span class="label-caps">Panel de control</span>
+    <h1 class="page-title">Resumen</h1>
+    @if (kpis) {
+      <p class="page-lead">{{ kpis.periodo.etiqueta }} — indicadores del periodo seleccionado</p>
+    } @else {
+      <p class="page-lead">Indicadores y totales de facturación</p>
+    }
+  </header>
+
+  <div class="filters-bar sheet">
+    <select class="select" [(ngModel)]="filtroModo" (change)="cargar()">
+      <option value="semana">Semana</option>
+      <option value="mes">Mes</option>
+      <option value="anio">Año</option>
+    </select>
+
+    @if (filtroModo === 'semana') {
+      <select class="select" [(ngModel)]="weekRef" (change)="cargar()">
+        @for (w of weeks; track w.start) {
+          <option [value]="w.start">{{ w.label }}</option>
+        }
+      </select>
+    }
+
+    @if (filtroModo === 'mes') {
+      <input class="input" type="number" min="1" max="12" [(ngModel)]="mes" (change)="cargar()" />
+      <input class="input" type="number" [(ngModel)]="anio" (change)="cargar()" />
+    }
+
+    @if (filtroModo === 'anio') {
+      <input class="input" type="number" [(ngModel)]="anio" (change)="cargar()" />
+    }
+
+    <input
+      class="input"
+      type="search"
+      placeholder="Filtrar proveedor…"
+      [(ngModel)]="filtroProveedor"
+      (keyup.enter)="cargar()"
+    />
+    <button type="button" class="btn btn-primary" (click)="cargar()">Aplicar filtros</button>
+  </div>
+
+  @if (cargando) {
+    <div class="loading">
+      <mat-spinner diameter="36"></mat-spinner>
+      <span>Cargando indicadores…</span>
+    </div>
+  } @else if (error) {
+    <div class="alert error">{{ error }}</div>
+  } @else if (kpis) {
+    @if (sinDatos) {
+      <section class="sheet start-panel">
+        <div class="start-glow" aria-hidden="true"></div>
+        <div class="start-head">
+          <span class="label-caps">Semana en blanco</span>
+          <h2>Empiece por aquí</h2>
+          <p>No hay información cargada en {{ kpis.periodo.etiqueta }}. Siga el orden del proceso contable.</p>
+        </div>
+        <ol class="start-steps">
+          @for (paso of arranque; track paso.path) {
+            <li>
+              <a [routerLink]="paso.path">
+                <span class="step-num">{{ paso.step }}</span>
+                <span class="step-icon"><mat-icon>{{ paso.icon }}</mat-icon></span>
+                <span class="step-text">
+                  <strong>{{ paso.label }}</strong>
+                  <em>{{ paso.hint }}</em>
+                </span>
+                <mat-icon class="step-go">chevron_right</mat-icon>
+              </a>
+            </li>
+          }
+        </ol>
+      </section>
+    }
+
+    <div class="kpi-grid">
+      <article class="kpi-card sheet sheet-hover">
+        <div class="kpi-top">
+          <div class="kpi-icon"><mat-icon>inbox</mat-icon></div>
+        </div>
+        <span class="kpi-val">{{ kpis.conteos.documentos_recibidos }}</span>
+        <span class="kpi-lbl">Recibidos</span>
+      </article>
+      <article class="kpi-card sheet sheet-hover">
+        <div class="kpi-top">
+          <div class="kpi-icon"><mat-icon>task_alt</mat-icon></div>
+        </div>
+        <span class="kpi-val">{{ kpis.conteos.documentos_procesados }}</span>
+        <span class="kpi-lbl">Procesados</span>
+      </article>
+      <article class="kpi-card sheet sheet-hover warn">
+        <div class="kpi-top">
+          <div class="kpi-icon"><mat-icon>rate_review</mat-icon></div>
+        </div>
+        <span class="kpi-val">{{ kpis.conteos.pendientes_revision }}</span>
+        <span class="kpi-lbl">En revisión</span>
+      </article>
+      <article class="kpi-card sheet sheet-hover ok">
+        <div class="kpi-top">
+          <div class="kpi-icon"><mat-icon>verified</mat-icon></div>
+        </div>
+        <span class="kpi-val">{{ kpis.conteos.aprobados }}</span>
+        <span class="kpi-lbl">Aprobados</span>
+      </article>
+    </div>
+
+    <div class="kpi-grid secondary">
+      <article class="kpi-card sheet compact sheet-hover">
+        <div class="kpi-top"><div class="kpi-icon"><mat-icon>build</mat-icon></div></div>
+        <span class="kpi-val">{{ kpis.conteos.subsanaciones_pendientes }}</span>
+        <span class="kpi-lbl">Subsanaciones</span>
+      </article>
+      <article class="kpi-card sheet compact sheet-hover">
+        <div class="kpi-top"><div class="kpi-icon"><mat-icon>schedule</mat-icon></div></div>
+        <span class="kpi-val">{{ kpis.conteos.pagos_pendientes }}</span>
+        <span class="kpi-lbl">Pagos pend.</span>
+      </article>
+      <article class="kpi-card sheet compact sheet-hover ok">
+        <div class="kpi-top"><div class="kpi-icon"><mat-icon>check_circle</mat-icon></div></div>
+        <span class="kpi-val">{{ kpis.conteos.pagos_realizados }}</span>
+        <span class="kpi-lbl">Pagos hechos</span>
+      </article>
+      <article class="kpi-card sheet compact sheet-hover">
+        <div class="kpi-top"><div class="kpi-icon"><mat-icon>inventory_2</mat-icon></div></div>
+        <span class="kpi-val">{{ kpis.conteos.paquetes_pendientes }}</span>
+        <span class="kpi-lbl">Paquetes pend.</span>
+      </article>
+    </div>
+
+    <section class="sheet sheet-pad money-panel">
+      <h2 class="section-head">Totales en COP</h2>
+      <div class="money-grid">
+        <div class="money-item">
+          <span>Documentos</span>
+          <strong>{{ kpis.totales.valor_documentos | number:'1.0-0' }}</strong>
+        </div>
+        <div class="money-item">
+          <span>Aprobado</span>
+          <strong class="ok">{{ kpis.totales.valor_aprobado | number:'1.0-0' }}</strong>
+        </div>
+        <div class="money-item">
+          <span>Pendiente pago</span>
+          <strong>{{ kpis.totales.valor_pendiente_pago | number:'1.0-0' }}</strong>
+        </div>
+        <div class="money-item">
+          <span>Pagado</span>
+          <strong>{{ kpis.totales.valor_pagado | number:'1.0-0' }}</strong>
+        </div>
+        <div class="money-item">
+          <span>Por subsanar</span>
+          <strong>{{ kpis.totales.valor_por_subsanar | number:'1.0-0' }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <div class="dash-bottom">
+      <section class="sheet sheet-pad">
+        <h2 class="section-head">Accesos rápidos</h2>
+        <nav class="link-grid">
+          @for (link of quickLinks; track link.path) {
+            <a [routerLink]="link.path">
+              <mat-icon>arrow_forward</mat-icon>
+              {{ link.label }}
+            </a>
+          }
+        </nav>
+      </section>
+
+      <section class="sheet sheet-pad">
+        <h2 class="section-head">Exportar reportes</h2>
+        <div class="exports">
+          <button type="button" class="btn btn-primary" (click)="exportReport('semanal')">Reporte semanal</button>
+          <button type="button" class="btn btn-secondary" (click)="exportReport('documents')">Documentos</button>
+          <button type="button" class="btn btn-secondary" (click)="exportReport('payments')">Pagos</button>
+          <button type="button" class="btn btn-ghost" (click)="exportReport('crossings')">Cruces</button>
+          <button type="button" class="btn btn-ghost" (click)="exportReport('remediations')">Subsanaciones</button>
+        </div>
+      </section>
+    </div>
+  }
+</div>

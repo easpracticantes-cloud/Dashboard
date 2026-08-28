@@ -1,0 +1,184 @@
+/**
+ * Adaptación visual del módulo Contabilidad al design system SIG (EAS).
+ * Las pantallas originales usaban tema oscuro "cosmos"; aquí se remapean a tokens del shell.
+ */
+
+.contab .page-hero,
+.contab .hero-glow,
+.contab .label-caps {
+  display: none !important;
+}
+
+.contab .page-title {
+  display: none !important;
+}
+
+.contab .page-lead {
+  display: none !important;
+}
+
+.contab .cosmos-page,
+.contab .dash,
+.contab .docs-page,
+.contab .autobits-page,
+.contab .crossings-page,
+.contab .payments-page,
+.contab .packages-page,
+.contab .remediations-page,
+.contab .processing-page {
+  color: var(--eas-ink);
+  font-family: inherit;
+}
+
+.contab .sheet,
+.contab .card,
+.contab .panel,
+.contab .start-panel,
+.contab .kpi-card,
+.contab .filters-bar {
+  background: color-mix(in srgb, var(--eas-surface) 92%, #fff) !important;
+  border: 1px solid var(--eas-line-soft) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 24px rgba(20, 38, 28, 0.06) !important;
+  color: var(--eas-ink) !important;
+}
+
+.contab .filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.contab .select,
+.contab .input,
+.contab input,
+.contab select,
+.contab textarea {
+  height: 40px;
+  padding: 0.45rem 0.75rem;
+  border-radius: 11px !important;
+  border: 1px solid rgba(20, 38, 28, 0.14) !important;
+  background: #fbfcfb !important;
+  color: var(--eas-ink) !important;
+  font: inherit;
+}
+
+.contab textarea {
+  height: auto;
+  min-height: 88px;
+}
+
+.contab .btn,
+.contab button.btn,
+.contab .btn-primary,
+.contab .primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 40px;
+  padding: 0.45rem 0.95rem;
+  border-radius: 11px !important;
+  border: none !important;
+  background: linear-gradient(180deg, #1a3d2c, #122018) !important;
+  color: #fff !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.contab .btn-ghost,
+.contab .btn-secondary,
+.contab .secondary {
+  background: var(--eas-surface) !important;
+  color: var(--eas-forest) !important;
+  border: 1px solid var(--eas-line-soft) !important;
+}
+
+.contab table,
+.contab .data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.contab th,
+.contab td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--eas-line-soft);
+  text-align: left;
+  font-size: 0.86rem;
+}
+
+.contab th {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--eas-muted);
+}
+
+.contab .kpi-grid,
+.contab .kpis,
+.contab .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.contab .kpi-card h3,
+.contab .kpi-value {
+  font-family: 'Montserrat', 'Sora', sans-serif;
+  font-weight: 750;
+  color: var(--eas-ink);
+}
+
+.contab a {
+  color: var(--eas-leaf);
+}
+
+.contab .muted,
+.contab .hint,
+.contab .page-lead {
+  color: var(--eas-muted) !important;
+}
+
+.contab .badge,
+.contab .chip,
+.contab .tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--eas-leaf) 12%, transparent);
+  color: var(--eas-forest);
+}
+
+.contab .error,
+.contab .alert-error {
+  color: var(--eas-danger);
+  background: #fdf2f0;
+  border: 1px solid #f0c9c4;
+  border-radius: 10px;
+  padding: 0.65rem 0.8rem;
+}
+
+html[data-theme='dark'] .contab .sheet,
+html[data-theme='dark'] .contab .card,
+html[data-theme='dark'] .contab .panel,
+html[data-theme='dark'] .contab .filters-bar,
+html[data-theme='dark'] .contab .kpi-card {
+  background: color-mix(in srgb, var(--eas-surface) 100%, #000) !important;
+}
+
+html[data-theme='dark'] .contab .select,
+html[data-theme='dark'] .contab .input,
+html[data-theme='dark'] .contab input,
+html[data-theme='dark'] .contab select,
+html[data-theme='dark'] .contab textarea {
+  background: rgba(238, 244, 240, 0.05) !important;
+  border-color: rgba(238, 244, 240, 0.14) !important;
+  color: var(--eas-ink) !important;
+}

@@ -1,0 +1,9 @@
+# Contabilidad service — local data / secrets
+.env
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/*.db-journal
+storage/**
+!storage/.gitkeep

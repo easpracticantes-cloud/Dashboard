@@ -1,0 +1,125 @@
+<div class="proc cosmos-page">
+  <header class="page-hero sheet">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="proc-head-inner">
+      <div>
+        <span class="label-caps">Análisis rápido</span>
+        <h1 class="page-title">Procesamiento</h1>
+        <p class="page-lead">Extracción inmediata sin guardar en el sistema — ideal para pruebas.</p>
+      </div>
+      @if (health) {
+        <div class="health-chips">
+          <span class="status" [class.ok]="health.tesseract" [class.bad]="!health.tesseract">
+            <mat-icon>document_scanner</mat-icon>
+            OCR
+          </span>
+          <span class="status" [class.ok]="health.ollama" [class.bad]="!health.ollama">
+            <mat-icon>psychology</mat-icon>
+            Motor IA
+          </span>
+        </div>
+      }
+    </div>
+  </header>
+
+  <div class="proc-grid">
+    <div class="sheet composer" [class.drag]="arrastrando">
+      <div
+        class="drop-zone"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave($event)"
+        (drop)="onDrop($event)"
+      >
+        <div class="drop-icon"><mat-icon>upload_file</mat-icon></div>
+        <p class="drop-title">Suelta las facturas aquí</p>
+        <p class="drop-hint">JPG o PNG · varios archivos a la vez</p>
+        <label class="btn btn-primary btn-lg">
+          Seleccionar archivos
+          <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple (change)="onFileInput($event)" />
+        </label>
+      </div>
+
+      @if (archivos.length) {
+        <div class="files">
+          @for (item of archivos; track item.file.name; let i = $index) {
+            <button
+              type="button"
+              class="file-tag"
+              [class.active]="i === seleccionIndex"
+              (click)="seleccionar(i)"
+            >
+              <mat-icon>description</mat-icon>
+              {{ item.file.name }}
+              <span class="remove" (click)="quitar(i, $event)">×</span>
+            </button>
+          }
+          <button type="button" class="btn btn-ghost" (click)="limpiar()">Limpiar todo</button>
+        </div>
+      }
+
+      <div class="prompt">
+        <label class="label-caps">Instrucción personalizada</label>
+        <textarea class="textarea" [(ngModel)]="solicitud" rows="4" placeholder="Opcional: indica qué campos extraer…"></textarea>
+        <div class="prompt-actions">
+          <button type="button" class="btn btn-primary btn-lg" [disabled]="procesando" (click)="procesar()">
+            @if (procesando) {
+              <mat-spinner diameter="18"></mat-spinner>
+              Procesando…
+            } @else {
+              <mat-icon>auto_fix_high</mat-icon>
+              Analizar
+            }
+          </button>
+          <span class="status-text">{{ estado }}</span>
+        </div>
+        @if (procesando || progreso === 100) {
+          <mat-progress-bar mode="determinate" [value]="progreso"></mat-progress-bar>
+        }
+        @if (errorGlobal) {
+          <div class="alert error">{{ errorGlobal }}</div>
+        }
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="sheet sheet-pad preview-panel">
+        <h2 class="section-head">Vista previa</h2>
+        @if (archivoActivo) {
+          <p class="file-name">{{ archivoActivo.file.name }}</p>
+          <div class="preview">
+            <img [src]="archivoActivo.previewUrl" [alt]="archivoActivo.file.name" />
+          </div>
+        } @else {
+          <div class="empty-state compact">
+            <div class="empty-icon"><mat-icon>image</mat-icon></div>
+            <p>Sin archivo seleccionado</p>
+          </div>
+        }
+      </div>
+
+      <div class="sheet sheet-pad result-panel">
+        <div class="result-head">
+          <h2 class="section-head">Respuesta</h2>
+          @if (resultadoActivo) {
+            <span class="status" [class.ok]="resultadoActivo.ok" [class.bad]="!resultadoActivo.ok">
+              {{ resultadoActivo.ok ? 'Completado' : 'Error' }}
+            </span>
+          }
+        </div>
+        @if (resultadoActivo) {
+          @if (resultadoActivo.ok) {
+            <p class="meta">{{ resultadoActivo.metodo_ocr }} · {{ resultadoActivo.caracteres_ocr }} caracteres</p>
+            <pre class="result">{{ resultadoActivo.respuesta_ia }}</pre>
+          } @else {
+            <div class="alert error">{{ resultadoActivo.error }}</div>
+          }
+        } @else {
+          <div class="empty-state compact">
+            <div class="empty-icon"><mat-icon>text_snippet</mat-icon></div>
+            <p>El resultado aparecerá aquí</p>
+          </div>
+        }
+      </div>
+    </aside>
+  </div>
+</div>

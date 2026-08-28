@@ -44,7 +44,8 @@
               "src/styles/theme-transitions.css",
               "src/styles/visual-polish-v6-noticeable.css",
               "src/styles/visual-polish-v7-BOLD.css",
-              "src/styles/visual-polish-v8-fluid.css"
+              "src/styles/visual-polish-v8-fluid.css",
+              "src/styles/contabilidad-sig.css"
             ],
             "stylePreprocessorOptions": {
               "includePaths": [

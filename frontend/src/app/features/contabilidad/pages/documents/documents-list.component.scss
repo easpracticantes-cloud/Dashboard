@@ -1,0 +1,85 @@
+.docs-head-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.25rem;
+  position: relative;
+  z-index: 1;
+}
+
+.upload-head {
+  position: relative;
+  cursor: pointer;
+
+  input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.search {
+  flex: 1;
+  min-width: 220px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  padding: 0;
+}
+
+.name a {
+  font-weight: 400;
+  color: var(--text);
+  text-decoration: none;
+  transition: color 0.25s;
+
+  &:hover {
+    color: var(--gold-bright);
+  }
+}
+
+.mono {
+  font-size: 0.8rem;
+  font-weight: 300;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+}
+
+.num {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--gold-bright);
+}
+
+.conf-pill {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 400;
+  border-radius: 999px;
+  background: var(--positive-soft);
+  color: var(--positive);
+  border: 1px solid rgba(159, 212, 176, 0.25);
+
+  &.low {
+    background: var(--caution-soft);
+    color: var(--gold-warm);
+    border-color: rgba(201, 160, 92, 0.3);
+  }
+}
+
+.date {
+  font-size: 0.75rem;
+  font-weight: 300;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.btn-sm {
+  padding: 0.38rem 0.75rem;
+  font-size: 0.75rem;
+}
