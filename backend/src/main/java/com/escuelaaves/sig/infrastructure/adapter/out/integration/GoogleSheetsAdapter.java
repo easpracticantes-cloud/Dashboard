@@ -1,6 +1,8 @@
 package com.escuelaaves.sig.infrastructure.adapter.out.integration;
 
 import com.escuelaaves.sig.application.dto.integration.SheetConversationRowDto;
+import com.escuelaaves.sig.application.dto.integration.SheetRowWriteRequest;
+import com.escuelaaves.sig.application.dto.integration.SheetRowWriteResultDto;
 import com.escuelaaves.sig.domain.model.IntegrationCode;
 import com.escuelaaves.sig.domain.model.IntegrationStatus;
 import com.escuelaaves.sig.domain.port.out.SystemSettingRepositoryPort;
@@ -9,18 +11,26 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
- * Adaptador real de Google Sheets vía Apps Script Web App.
+ * Adaptador real de Google Sheets vía Apps Script Web App (lectura + escritura).
  */
 @Slf4j
 @Primary
@@ -31,6 +41,14 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
     private final SystemSettingRepositoryPort systemSettingRepositoryPort;
     private final RestClient.Builder restClientBuilder;
     private final ObjectMapper objectMapper;
+
+    @Value("${app.sheets.write-token:}")
+    private String writeTokenFromEnv;
+
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(20))
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
 
     @Override
     public IntegrationCode code() {
@@ -48,8 +66,19 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
 
     @Override
     public boolean exportRows(String sheetName, Object rows) {
-        log.info("[GoogleSheets] Exportacion hacia hoja '{}' no implementada via Web App (solo lectura dashboard).", sheetName);
-        return isEnabled();
+        if (!(rows instanceof Map<?, ?> map)) {
+            log.info("[GoogleSheets] exportRows requiere Map fields; hoja='{}'", sheetName);
+            return false;
+        }
+        Map<String, Object> fields = new LinkedHashMap<>();
+        map.forEach((k, v) -> fields.put(String.valueOf(k), v));
+        SheetRowWriteResultDto result = writeRow(new SheetRowWriteRequest(
+                "appendrow",
+                sheetName,
+                Map.of(),
+                fields
+        ));
+        return result.success();
     }
 
     @Override
@@ -124,6 +153,109 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
         }
     }
 
+    @Override
+    public SheetRowWriteResultDto writeRow(SheetRowWriteRequest request) {
+        String url = webAppUrl();
+        if (url.isBlank()) {
+            return new SheetRowWriteResultDto(false, "Web App URL no configurada", request.sheetName(), null, List.of());
+        }
+        if (!isEnabled()) {
+            return new SheetRowWriteResultDto(false, "Google Sheets deshabilitado", request.sheetName(), null, List.of());
+        }
+
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("action", request.action());
+            payload.put("sheetName", request.sheetName());
+            payload.put("match", request.match() == null ? Map.of() : request.match());
+            payload.put("fields", request.fields() == null ? Map.of() : request.fields());
+            String token = resolveWriteToken();
+            if (!token.isBlank()) {
+                payload.put("token", token);
+            }
+
+            String json = objectMapper.writeValueAsString(payload);
+            String responseBody = postFollowingAppsScriptRedirect(url.trim(), json);
+            if (responseBody == null || responseBody.isBlank()) {
+                return new SheetRowWriteResultDto(
+                        false,
+                        "Respuesta vacía del Web App. ¿Desplegaste doPost? Ver documentos/google_sheets_webapp_write.gs",
+                        request.sheetName(),
+                        null,
+                        List.of()
+                );
+            }
+
+            JsonNode node = objectMapper.readTree(responseBody);
+            boolean ok = node.path("ok").asBoolean(false);
+            String error = text(node, "error");
+            String message = ok ? text(node, "message") : error;
+            if (message.isBlank()) {
+                message = ok ? "Fila actualizada en Google Sheets" : "Escritura fallida en Google Sheets";
+            }
+            Integer rowNumber = node.has("rowNumber") && node.get("rowNumber").canConvertToInt()
+                    ? node.get("rowNumber").asInt()
+                    : null;
+            List<String> updated = new ArrayList<>();
+            if (node.path("updatedFields").isArray()) {
+                node.path("updatedFields").forEach(n -> updated.add(n.asText()));
+            }
+            log.info("[GoogleSheets] writeRow action={} sheet={} ok={} row={}", request.action(), request.sheetName(), ok, rowNumber);
+            return new SheetRowWriteResultDto(ok, message, request.sheetName(), rowNumber, updated);
+        } catch (Exception ex) {
+            log.error("[GoogleSheets] writeRow error: {}", ex.getMessage());
+            return new SheetRowWriteResultDto(
+                    false,
+                    "Error escribiendo en Sheets: " + ex.getMessage()
+                            + ". Si el Web App aún no tiene doPost, despliega documentos/google_sheets_webapp_write.gs",
+                    request.sheetName(),
+                    null,
+                    List.of()
+            );
+        }
+    }
+
+    /**
+     * Apps Script responde 302; hay que re-POST al Location (no convertir a GET).
+     */
+    private String postFollowingAppsScriptRedirect(String url, String jsonBody) throws Exception {
+        HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(jsonBody);
+        HttpRequest first = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(60))
+                .header("Content-Type", "application/json; charset=UTF-8")
+                .header("Accept", "application/json, text/plain, */*")
+                .POST(body)
+                .build();
+
+        HttpResponse<String> response = httpClient.send(first, HttpResponse.BodyHandlers.ofString());
+        int code = response.statusCode();
+        if (code >= 200 && code < 300) {
+            return response.body();
+        }
+        if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+            String location = response.headers().firstValue("location").orElse("");
+            if (location.isBlank()) {
+                throw new IllegalStateException("Redirect sin Location (HTTP " + code + ")");
+            }
+            URI next = URI.create(url).resolve(location);
+            HttpRequest second = HttpRequest.newBuilder(next)
+                    .timeout(Duration.ofSeconds(60))
+                    .header("Content-Type", "application/json; charset=UTF-8")
+                    .header("Accept", "application/json, text/plain, */*")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .build();
+            HttpResponse<String> redirected = httpClient.send(second, HttpResponse.BodyHandlers.ofString());
+            if (redirected.statusCode() >= 200 && redirected.statusCode() < 300) {
+                return redirected.body();
+            }
+            throw new IllegalStateException(
+                    "Web App respondió HTTP " + redirected.statusCode() + " tras redirect: "
+                            + truncate(redirected.body(), 240)
+            );
+        }
+        throw new IllegalStateException("Web App respondió HTTP " + code + ": " + truncate(response.body(), 240));
+    }
+
     private List<SheetConversationRowDto> mapSeguimientoToRows(JsonNode root) {
         JsonNode array = root.path("seguimientoWhatsapp");
         if (!array.isArray()) {
@@ -167,6 +299,11 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
         return value.asText("").trim();
     }
 
+    private static String truncate(String value, int max) {
+        if (value == null) return "";
+        return value.length() <= max ? value : value.substring(0, max);
+    }
+
     private boolean isEnabled() {
         return systemSettingRepositoryPort.findBySettingKey("integrations.googleSheetsEnabled")
                 .map(s -> "true".equalsIgnoreCase(s.getSettingValue()))
@@ -177,5 +314,15 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
         return systemSettingRepositoryPort.findBySettingKey("integrations.googleSheets.webAppUrl")
                 .map(s -> s.getSettingValue() != null ? s.getSettingValue() : "")
                 .orElse("");
+    }
+
+    private String resolveWriteToken() {
+        String fromSetting = systemSettingRepositoryPort.findBySettingKey("integrations.googleSheets.writeToken")
+                .map(s -> s.getSettingValue() != null ? s.getSettingValue() : "")
+                .orElse("");
+        if (!fromSetting.isBlank()) {
+            return fromSetting.trim();
+        }
+        return writeTokenFromEnv == null ? "" : writeTokenFromEnv.trim();
     }
 }

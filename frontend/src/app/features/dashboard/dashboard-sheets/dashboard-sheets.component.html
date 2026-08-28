@@ -1,7 +1,7 @@
 <section class="sheets-dash">
   <header class="sheets-dash__head">
     <div>
-      <p class="sheets-dash__eyebrow">Google Sheets · workbook completo</p>
+      <p class="sheets-dash__eyebrow">Google Sheets · lectura y escritura</p>
       <h2>Dashboard operativo desde hojas</h2>
       <p class="sheets-dash__meta">
         @if (data()?.meta?.totalHojas) {
@@ -276,6 +276,14 @@
 
           <div class="sheets-table-wrap">
             <table mat-table [dataSource]="table" matSort class="sheets-table mat-elevation-z0">
+              <ng-container matColumnDef="acciones">
+                <th mat-header-cell *matHeaderCellDef></th>
+                <td mat-cell *matCellDef="let row">
+                  <button type="button" class="sheets-edit-btn" (click)="openSeguimientoEditor(row)" title="Editar y guardar en Sheets">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
               <ng-container matColumnDef="fecha">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
                 <td mat-cell *matCellDef="let row">{{ row.fecha | date: 'mediumDate' }}</td>
@@ -382,6 +390,14 @@
           } @else {
             <div class="sheets-table-wrap">
               <table mat-table [dataSource]="ventasTable" class="sheets-table mat-elevation-z0">
+                <ng-container matColumnDef="acciones">
+                  <th mat-header-cell *matHeaderCellDef></th>
+                  <td mat-cell *matCellDef="let row">
+                    <button type="button" class="sheets-edit-btn" (click)="openVentaEditor(row)" title="Editar y guardar en Sheets">
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                  </td>
+                </ng-container>
                 <ng-container matColumnDef="fechaCot">
                   <th mat-header-cell *matHeaderCellDef>Fecha cot</th>
                   <td mat-cell *matCellDef="let row">{{ row.fechaCot }}</td>
@@ -803,3 +819,159 @@
     }
   }
 </section>
+
+@if (editingSeguimiento() || editingVenta()) {
+  <div class="sheets-editor-backdrop" (click)="closeEditor()"></div>
+  <aside class="sheets-editor" role="dialog" aria-modal="true" aria-label="Editar fila de Google Sheets">
+    <header class="sheets-editor__head">
+      <div>
+        <p class="sheets-editor__eyebrow">Guardar en Google Sheets</p>
+        <h3>{{ editingSeguimiento() ? 'Editar seguimiento' : 'Editar venta' }}</h3>
+      </div>
+      <button type="button" class="sheets-editor__close" (click)="closeEditor()" aria-label="Cerrar">
+        <mat-icon>close</mat-icon>
+      </button>
+    </header>
+
+    @if (editError()) {
+      <p class="sheets-editor__error" role="alert">{{ editError() }}</p>
+    }
+    @if (editSuccess()) {
+      <p class="sheets-editor__ok" role="status">{{ editSuccess() }}</p>
+    }
+
+    <div class="sheets-editor__body">
+      @if (editingSeguimiento(); as row) {
+        <label class="sheets-editor__field">
+          <span>Cliente</span>
+          <input class="eas-input" [ngModel]="editDraft()['cliente']" (ngModelChange)="patchDraft('cliente', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Celular</span>
+          <input class="eas-input" [ngModel]="editDraft()['celular']" (ngModelChange)="patchDraft('celular', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Semáforo</span>
+          <select class="eas-select" [ngModel]="editDraft()['semaforo']" (ngModelChange)="patchDraft('semaforo', $event)">
+            @for (opt of semaforoChoices; track opt) {
+              <option [value]="opt">{{ opt }}</option>
+            }
+          </select>
+        </label>
+        <label class="sheets-editor__field">
+          <span>Canal</span>
+          <input class="eas-input" [ngModel]="editDraft()['canal']" (ngModelChange)="patchDraft('canal', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Tipo</span>
+          <input class="eas-input" [ngModel]="editDraft()['tipo']" (ngModelChange)="patchDraft('tipo', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Asignado</span>
+          <input class="eas-input" [ngModel]="editDraft()['asignado']" (ngModelChange)="patchDraft('asignado', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Solicitud</span>
+          <textarea class="eas-input sheets-editor__area" rows="3" [ngModel]="editDraft()['solicitud']" (ngModelChange)="patchDraft('solicitud', $event)"></textarea>
+        </label>
+        <label class="sheets-editor__field">
+          <span>Respuesta</span>
+          <textarea class="eas-input sheets-editor__area" rows="3" [ngModel]="editDraft()['respuesta']" (ngModelChange)="patchDraft('respuesta', $event)"></textarea>
+        </label>
+        <label class="sheets-editor__field">
+          <span>Notas</span>
+          <textarea class="eas-input sheets-editor__area" rows="3" [ngModel]="editDraft()['notas']" (ngModelChange)="patchDraft('notas', $event)"></textarea>
+        </label>
+        <label class="sheets-editor__field">
+          <span>Objeción</span>
+          <input class="eas-input" [ngModel]="editDraft()['objecion']" (ngModelChange)="patchDraft('objecion', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Priorizar</span>
+          <input class="eas-input" [ngModel]="editDraft()['priorizar']" (ngModelChange)="patchDraft('priorizar', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Pendiente</span>
+          <input class="eas-input" [ngModel]="editDraft()['pendiente']" (ngModelChange)="patchDraft('pendiente', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Fecha servicio</span>
+          <input class="eas-input" [ngModel]="editDraft()['fechaServicio']" (ngModelChange)="patchDraft('fechaServicio', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Próximo seguimiento</span>
+          <input class="eas-input" [ngModel]="editDraft()['proximoSeguimiento']" (ngModelChange)="patchDraft('proximoSeguimiento', $event)" />
+        </label>
+        <label class="sheets-editor__check">
+          <input type="checkbox" [ngModel]="!!editDraft()['cotizado']" (ngModelChange)="patchDraft('cotizado', $event)" />
+          <span>Cotizado</span>
+        </label>
+        <label class="sheets-editor__check">
+          <input type="checkbox" [ngModel]="!!editDraft()['encuesta']" (ngModelChange)="patchDraft('encuesta', $event)" />
+          <span>Encuesta</span>
+        </label>
+        <p class="sheets-editor__hint">Hoja: <strong>{{ row.hojaOrigen || '—' }}</strong> · Fecha: {{ row.fecha }}</p>
+      }
+
+      @if (editingVenta(); as venta) {
+        <label class="sheets-editor__field">
+          <span>Nombre</span>
+          <input class="eas-input" [ngModel]="editDraft()['nombre']" (ngModelChange)="patchDraft('nombre', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Celular</span>
+          <input class="eas-input" [ngModel]="editDraft()['celular']" (ngModelChange)="patchDraft('celular', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Tipo cliente</span>
+          <input class="eas-input" [ngModel]="editDraft()['tipoCliente']" (ngModelChange)="patchDraft('tipoCliente', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Servicio</span>
+          <input class="eas-input" [ngModel]="editDraft()['servicio']" (ngModelChange)="patchDraft('servicio', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Venta</span>
+          <input class="eas-input" [ngModel]="editDraft()['venta']" (ngModelChange)="patchDraft('venta', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Código</span>
+          <input class="eas-input" [ngModel]="editDraft()['codigo']" (ngModelChange)="patchDraft('codigo', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Fecha servicio</span>
+          <input class="eas-input" [ngModel]="editDraft()['fechaServicio']" (ngModelChange)="patchDraft('fechaServicio', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Realizado</span>
+          <input class="eas-input" [ngModel]="editDraft()['realizado']" (ngModelChange)="patchDraft('realizado', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Envío reserva</span>
+          <input class="eas-input" [ngModel]="editDraft()['envioReserva']" (ngModelChange)="patchDraft('envioReserva', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Pago Autobits</span>
+          <input class="eas-input" [ngModel]="editDraft()['pagoAutobits']" (ngModelChange)="patchDraft('pagoAutobits', $event)" />
+        </label>
+        <label class="sheets-editor__field">
+          <span>Soporte Drive</span>
+          <input class="eas-input" [ngModel]="editDraft()['soporteDrive']" (ngModelChange)="patchDraft('soporteDrive', $event)" />
+        </label>
+        <p class="sheets-editor__hint">Hoja: <strong>{{ venta.hojaOrigen || 'VENTAS' }}</strong></p>
+      }
+    </div>
+
+    <footer class="sheets-editor__foot">
+      <button type="button" class="eas-btn-ghost" (click)="closeEditor()" [disabled]="savingEdit()">Cancelar</button>
+      <button type="button" class="eas-btn-primary" (click)="saveEditor()" [disabled]="savingEdit()">
+        @if (savingEdit()) {
+          Guardando en Sheets…
+        } @else {
+          <mat-icon>cloud_upload</mat-icon>
+          Guardar en Google Sheets
+        }
+      </button>
+    </footer>
+  </aside>
+}

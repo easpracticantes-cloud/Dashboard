@@ -3,6 +3,7 @@ package com.escuelaaves.sig.application.service;
 import com.escuelaaves.sig.application.dto.dashboard.sheets.SeguimientoWhatsappDto;
 import com.escuelaaves.sig.application.dto.dashboard.sheets.SheetsDashboardDto;
 import com.escuelaaves.sig.application.dto.dashboard.sheets.ToqueDto;
+import com.escuelaaves.sig.application.dto.dashboard.sheets.VentaDto;
 import com.escuelaaves.sig.application.dto.integration.SheetsSyncResultDto;
 import com.escuelaaves.sig.application.service.sheets.SheetsPayloadMapper;
 import com.escuelaaves.sig.domain.model.ChannelType;
@@ -1188,6 +1189,159 @@ public class SheetsSyncService {
         return systemSettingRepositoryPort.findBySettingKey(key)
                 .map(s -> s.getSettingValue() != null ? s.getSettingValue() : fallback)
                 .orElse(fallback);
+    }
+
+    /**
+     * Actualiza una fila de seguimiento en el cache local tras escritura exitosa a Sheets.
+     */
+    public void patchSeguimientoRow(String hojaOrigen, String celular, String fecha, Map<String, Object> fields) {
+        CacheEntry cached = dashboardCache.get();
+        if (cached == null || cached.dto() == null || cached.dto().seguimientoWhatsapp() == null) {
+            return;
+        }
+        String wantCel = digits(celular);
+        String wantFecha = fecha == null ? "" : fecha.trim();
+        if (wantFecha.length() > 10) wantFecha = wantFecha.substring(0, 10);
+        String wantHoja = hojaOrigen == null ? "" : hojaOrigen.trim();
+
+        List<SeguimientoWhatsappDto> next = new ArrayList<>(cached.dto().seguimientoWhatsapp().size());
+        boolean found = false;
+        for (SeguimientoWhatsappDto row : cached.dto().seguimientoWhatsapp()) {
+            boolean matchCel = wantCel.isEmpty() || digits(row.celular()).equals(wantCel)
+                    || digits(row.celular()).endsWith(wantCel) || wantCel.endsWith(digits(row.celular()));
+            String rowFecha = row.fecha() == null ? "" : (row.fecha().length() >= 10 ? row.fecha().substring(0, 10) : row.fecha());
+            boolean matchFecha = wantFecha.isEmpty() || rowFecha.equals(wantFecha) || rowFecha.startsWith(wantFecha);
+            boolean matchHoja = wantHoja.isEmpty() || wantHoja.equalsIgnoreCase(nullToEmpty(row.hojaOrigen()));
+            if (!found && matchCel && matchFecha && matchHoja) {
+                next.add(mergeSeguimiento(row, fields));
+                found = true;
+            } else {
+                next.add(row);
+            }
+        }
+        if (!found) {
+            return;
+        }
+        SheetsDashboardDto d = cached.dto();
+        SheetsDashboardDto patched = new SheetsDashboardDto(
+                d.meta(), d.kpis(), d.porSemaforo(), d.porCanal(), d.porHoja(), d.porMes(), d.evolucionMensual(),
+                List.copyOf(next), d.ventas(), d.resumenPaises(), d.paisesDetalle(), d.hojas(), d.toques(),
+                d.piezasPub(), d.b2bAgencias(), d.b2bTabla(), d.estadisticas(), d.despliegueSemanal(),
+                d.planComercial(), d.rawSheets(), d.b2bStatus(), d.b2bMensaje(), d.success(), d.message()
+        );
+        dashboardCache.set(new CacheEntry(patched, cached.loadedAt()));
+    }
+
+    public void patchVentaRow(String hojaOrigen, String celular, String fechaCot, Map<String, Object> fields) {
+        CacheEntry cached = dashboardCache.get();
+        if (cached == null || cached.dto() == null || cached.dto().ventas() == null) {
+            return;
+        }
+        String wantCel = digits(celular);
+        String wantFecha = fechaCot == null ? "" : fechaCot.trim();
+        if (wantFecha.length() > 10) wantFecha = wantFecha.substring(0, 10);
+
+        List<VentaDto> next = new ArrayList<>(cached.dto().ventas().size());
+        boolean found = false;
+        for (VentaDto row : cached.dto().ventas()) {
+            boolean matchCel = wantCel.isEmpty() || digits(row.celular()).equals(wantCel)
+                    || digits(row.celular()).endsWith(wantCel) || wantCel.endsWith(digits(row.celular()));
+            String rowFecha = row.fechaCot() == null ? "" : (row.fechaCot().length() >= 10 ? row.fechaCot().substring(0, 10) : row.fechaCot());
+            boolean matchFecha = wantFecha.isEmpty() || rowFecha.equals(wantFecha);
+            if (!found && matchCel && matchFecha) {
+                next.add(mergeVenta(row, fields));
+                found = true;
+            } else {
+                next.add(row);
+            }
+        }
+        if (!found) {
+            return;
+        }
+        SheetsDashboardDto d = cached.dto();
+        SheetsDashboardDto patched = new SheetsDashboardDto(
+                d.meta(), d.kpis(), d.porSemaforo(), d.porCanal(), d.porHoja(), d.porMes(), d.evolucionMensual(),
+                d.seguimientoWhatsapp(), List.copyOf(next), d.resumenPaises(), d.paisesDetalle(), d.hojas(), d.toques(),
+                d.piezasPub(), d.b2bAgencias(), d.b2bTabla(), d.estadisticas(), d.despliegueSemanal(),
+                d.planComercial(), d.rawSheets(), d.b2bStatus(), d.b2bMensaje(), d.success(), d.message()
+        );
+        dashboardCache.set(new CacheEntry(patched, cached.loadedAt()));
+    }
+
+    private static SeguimientoWhatsappDto mergeSeguimiento(SeguimientoWhatsappDto row, Map<String, Object> fields) {
+        return new SeguimientoWhatsappDto(
+                pickStr(fields, "fecha", row.fecha()),
+                pickStr(fields, "tipo", row.tipo()),
+                pickStr(fields, "canal", row.canal()),
+                pickStr(fields, "cliente", row.cliente()),
+                pickStr(fields, "celular", row.celular()),
+                pickStr(fields, "solicitud", row.solicitud()),
+                pickStr(fields, "respuesta", row.respuesta()),
+                pickStr(fields, "semaforo", row.semaforo()),
+                pickBool(fields, "cotizado", row.cotizado()),
+                pickStr(fields, "notas", row.notas()),
+                pickStr(fields, "fechaServicio", row.fechaServicio()),
+                pickBool(fields, "encuesta", row.encuesta()),
+                pickStr(fields, "asignado", row.asignado()),
+                pickStr(fields, "proximoSeguimiento", row.proximoSeguimiento()),
+                pickStr(fields, "hojaOrigen", row.hojaOrigen()),
+                pickStr(fields, "disc", row.disc()),
+                pickStr(fields, "priorizar", row.priorizar()),
+                pickStr(fields, "pendiente", row.pendiente()),
+                pickStr(fields, "objecion", row.objecion()),
+                pickStr(fields, "excelente", row.excelente()),
+                pickStr(fields, "buena", row.buena()),
+                pickStr(fields, "regular", row.regular()),
+                pickStr(fields, "registrado", row.registrado()),
+                pickStr(fields, "fechaCotizado", row.fechaCotizado()),
+                row.monto()
+        );
+    }
+
+    private static VentaDto mergeVenta(VentaDto row, Map<String, Object> fields) {
+        return new VentaDto(
+                pickStr(fields, "fechaCot", row.fechaCot()),
+                pickStr(fields, "tipoCliente", row.tipoCliente()),
+                pickStr(fields, "nombre", row.nombre()),
+                pickStr(fields, "celular", row.celular()),
+                pickStr(fields, "servicio", row.servicio()),
+                pickStr(fields, "venta", row.venta()),
+                pickStr(fields, "codigo", row.codigo()),
+                pickStr(fields, "fechaServicio", row.fechaServicio()),
+                pickStr(fields, "realizado", row.realizado()),
+                pickStr(fields, "envioReserva", row.envioReserva()),
+                pickStr(fields, "pagoAutobits", row.pagoAutobits()),
+                pickStr(fields, "soporteDrive", row.soporteDrive()),
+                pickStr(fields, "hojaOrigen", row.hojaOrigen())
+        );
+    }
+
+    private static String pickStr(Map<String, Object> fields, String key, String fallback) {
+        if (fields == null || !fields.containsKey(key) || fields.get(key) == null) {
+            return fallback;
+        }
+        return String.valueOf(fields.get(key));
+    }
+
+    private static boolean pickBool(Map<String, Object> fields, String key, boolean fallback) {
+        if (fields == null || !fields.containsKey(key) || fields.get(key) == null) {
+            return fallback;
+        }
+        Object v = fields.get(key);
+        if (v instanceof Boolean b) return b;
+        String s = String.valueOf(v).trim().toLowerCase(Locale.ROOT);
+        if (s.equals("true") || s.equals("si") || s.equals("sí") || s.equals("1") || s.equals("yes")) return true;
+        if (s.equals("false") || s.equals("no") || s.equals("0")) return false;
+        return fallback;
+    }
+
+    private static String digits(String value) {
+        if (value == null) return "";
+        return value.replaceAll("\\D+", "");
+    }
+
+    private static String nullToEmpty(String v) {
+        return v == null ? "" : v;
     }
 
     private record CacheEntry(SheetsDashboardDto dto, Instant loadedAt) {

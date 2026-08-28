@@ -30,6 +30,7 @@ import {
 } from 'ng-apexcharts';
 import { interval } from 'rxjs';
 import { DashboardService } from '../../../core/services/dashboard.service';
+import { IntegrationsService } from '../../../core/services/integrations.service';
 import { ThemeService } from '../../../core/services/theme.service';
 import {
   SeguimientoWhatsapp,
@@ -53,6 +54,7 @@ import {
 
 const FONT = 'Sora, sans-serif';
 const REFRESH_MS = 8 * 60 * 1000;
+const SEMAFORO_OPTIONS = ['FRIO', 'TIBIO', 'CALIENTE', 'VENTA', 'SIN_DATO'];
 const SEMAFORO_COLORS: Record<string, string> = {
   FRIO: '#5B8DEF',
   TIBIO: '#E4A01A',
@@ -109,6 +111,7 @@ type Section =
 })
 export class DashboardSheetsComponent implements AfterViewInit {
   private readonly dashboardService = inject(DashboardService);
+  private readonly integrations = inject(IntegrationsService);
   private readonly theme = inject(ThemeService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -124,6 +127,14 @@ export class DashboardSheetsComponent implements AfterViewInit {
   readonly selectedRawSheet = signal('');
   readonly nextRefreshAt = signal<number>(Date.now() + REFRESH_MS);
   readonly nowTick = signal(Date.now());
+
+  readonly editingSeguimiento = signal<SeguimientoWhatsapp | null>(null);
+  readonly editingVenta = signal<VentaSheet | null>(null);
+  readonly editDraft = signal<Record<string, unknown>>({});
+  readonly savingEdit = signal(false);
+  readonly editError = signal<string | null>(null);
+  readonly editSuccess = signal<string | null>(null);
+  readonly semaforoChoices = SEMAFORO_OPTIONS;
 
   readonly months = MONTH_LABELS;
   readonly years = computed(() => {
@@ -143,6 +154,7 @@ export class DashboardSheetsComponent implements AfterViewInit {
   readonly table = new MatTableDataSource<SeguimientoWhatsapp>([]);
   readonly ventasTable = new MatTableDataSource<VentaSheet>([]);
   readonly displayedColumns = [
+    'acciones',
     'fecha',
     'hojaOrigen',
     'cliente',
@@ -164,6 +176,7 @@ export class DashboardSheetsComponent implements AfterViewInit {
     'notas'
   ];
   readonly ventasColumns = [
+    'acciones',
     'fechaCot',
     'tipoCliente',
     'nombre',
@@ -401,6 +414,98 @@ export class DashboardSheetsComponent implements AfterViewInit {
   clearFilters(): void {
     this.filters.set(emptyFilters());
     if (this.paginator) this.paginator.firstPage();
+  }
+
+  openSeguimientoEditor(row: SeguimientoWhatsapp): void {
+    this.editingVenta.set(null);
+    this.editError.set(null);
+    this.editSuccess.set(null);
+    this.editingSeguimiento.set(row);
+    this.editDraft.set({ ...row });
+  }
+
+  openVentaEditor(row: VentaSheet): void {
+    this.editingSeguimiento.set(null);
+    this.editError.set(null);
+    this.editSuccess.set(null);
+    this.editingVenta.set(row);
+    this.editDraft.set({ ...row });
+  }
+
+  closeEditor(): void {
+    this.editingSeguimiento.set(null);
+    this.editingVenta.set(null);
+    this.editDraft.set({});
+    this.editError.set(null);
+    this.savingEdit.set(false);
+  }
+
+  patchDraft(key: string, value: unknown): void {
+    this.editDraft.update((d) => ({ ...d, [key]: value }));
+  }
+
+  saveEditor(): void {
+    if (this.savingEdit()) return;
+    this.editError.set(null);
+    this.editSuccess.set(null);
+    this.savingEdit.set(true);
+    const draft = this.editDraft();
+
+    if (this.editingSeguimiento()) {
+      this.integrations.updateSeguimiento(draft).subscribe({
+        next: (res) => {
+          this.savingEdit.set(false);
+          this.applySeguimientoLocal(draft as unknown as SeguimientoWhatsapp);
+          this.editSuccess.set(res.message || 'Guardado en Google Sheets');
+          setTimeout(() => this.closeEditor(), 700);
+        },
+        error: (err) => {
+          this.savingEdit.set(false);
+          this.editError.set(err?.message || 'No se pudo guardar en Google Sheets');
+        }
+      });
+      return;
+    }
+
+    if (this.editingVenta()) {
+      this.integrations.updateVenta(draft).subscribe({
+        next: (res) => {
+          this.savingEdit.set(false);
+          this.applyVentaLocal(draft as unknown as VentaSheet);
+          this.editSuccess.set(res.message || 'Venta guardada en Google Sheets');
+          setTimeout(() => this.closeEditor(), 700);
+        },
+        error: (err) => {
+          this.savingEdit.set(false);
+          this.editError.set(err?.message || 'No se pudo guardar la venta en Google Sheets');
+        }
+      });
+    }
+  }
+
+  private applySeguimientoLocal(updated: SeguimientoWhatsapp): void {
+    const current = this.data();
+    if (!current?.seguimientoWhatsapp) return;
+    const list = current.seguimientoWhatsapp.map((r) => {
+      const sameCel = (r.celular || '') === (updated.celular || '');
+      const sameFecha = (r.fecha || '').slice(0, 10) === (updated.fecha || '').slice(0, 10);
+      const sameHoja = (r.hojaOrigen || '') === (updated.hojaOrigen || '');
+      return sameCel && sameFecha && sameHoja ? { ...r, ...updated } : r;
+    });
+    this.data.set({ ...current, seguimientoWhatsapp: list });
+    this.dashboardService.invalidateCache();
+  }
+
+  private applyVentaLocal(updated: VentaSheet): void {
+    const current = this.data();
+    if (!current?.ventas) return;
+    const list = current.ventas.map((r) => {
+      const sameCel = (r.celular || '') === (updated.celular || '');
+      const sameFecha = (r.fechaCot || '').slice(0, 10) === (updated.fechaCot || '').slice(0, 10);
+      return sameCel && sameFecha ? { ...r, ...updated } : r;
+    });
+    this.data.set({ ...current, ventas: list });
+    this.dashboardService.invalidateCache();
   }
 
   refresh(): void {

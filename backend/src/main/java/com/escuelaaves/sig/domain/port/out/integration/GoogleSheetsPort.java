@@ -1,6 +1,8 @@
 package com.escuelaaves.sig.domain.port.out.integration;
 
 import com.escuelaaves.sig.application.dto.integration.SheetConversationRowDto;
+import com.escuelaaves.sig.application.dto.integration.SheetRowWriteRequest;
+import com.escuelaaves.sig.application.dto.integration.SheetRowWriteResultDto;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.List;
@@ -19,4 +21,9 @@ public interface GoogleSheetsPort extends IntegrationPort {
      * Obtiene el JSON del Web App de Apps Script (dashboard operativo).
      */
     Optional<JsonNode> fetchDashboardRaw(String webAppUrl);
+
+    /**
+     * Escribe (update/append) una fila en el spreadsheet vía doPost del Web App.
+     */
+    SheetRowWriteResultDto writeRow(SheetRowWriteRequest request);
 }

@@ -1,6 +1,8 @@
 package com.escuelaaves.sig.infrastructure.adapter.out.integration;
 
 import com.escuelaaves.sig.application.dto.integration.SheetConversationRowDto;
+import com.escuelaaves.sig.application.dto.integration.SheetRowWriteRequest;
+import com.escuelaaves.sig.application.dto.integration.SheetRowWriteResultDto;
 import com.escuelaaves.sig.domain.model.IntegrationCode;
 import com.escuelaaves.sig.domain.model.IntegrationStatus;
 import com.escuelaaves.sig.domain.port.out.SystemSettingRepositoryPort;
@@ -51,6 +53,12 @@ public class GoogleSheetsStubAdapter implements GoogleSheetsPort {
     public Optional<JsonNode> fetchDashboardRaw(String webAppUrl) {
         log.info("[GoogleSheets-STUB] fetchDashboardRaw url='{}'", webAppUrl);
         return Optional.empty();
+    }
+
+    @Override
+    public SheetRowWriteResultDto writeRow(SheetRowWriteRequest request) {
+        log.info("[GoogleSheets-STUB] writeRow action={} sheet={}", request.action(), request.sheetName());
+        return new SheetRowWriteResultDto(true, "STUB write OK", request.sheetName(), 1, List.of());
     }
 
     private boolean isEnabled() {
