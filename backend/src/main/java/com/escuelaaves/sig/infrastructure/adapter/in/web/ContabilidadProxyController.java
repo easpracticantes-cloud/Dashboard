@@ -26,9 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * BFF / proxy hacia el microservicio Contabilidad (FastAPI).
- * El frontend SIG llama {@code /api/v1/contabilidad/**} con JWT;
- * este controlador reenvía a {@code CONTABLE_API_BASE/api/**}.
+ * BFF / proxy hacia el microservicio Contabilidad (FastAPI) en Render o local.
+ * Frontend → {@code /api/v1/contabilidad/**} (JWT SIG) → {@code CONTABLE_API_BASE/api/**}.
  */
 @Slf4j
 @RestController
@@ -44,6 +43,7 @@ public class ContabilidadProxyController {
     ) {
         this.restClientBuilder = restClientBuilder;
         this.contableBase = contableBase.replaceAll("/$", "");
+        log.info("[ContabilidadProxy] api-base={}", this.contableBase);
     }
 
     @RequestMapping(value = "/**", method = {
@@ -68,18 +68,16 @@ public class ContabilidadProxyController {
             }
 
             byte[] payload = StreamUtils.copyToByteArray(request.getInputStream());
-
-            RestClient.RequestBodySpec spec = restClientBuilder.build()
+            RestClient client = restClientBuilder.build();
+            RestClient.RequestBodySpec spec = client
                     .method(method)
                     .uri(URI.create(target))
                     .headers(h -> h.addAll(headers));
 
-            ResponseEntity<byte[]> upstream;
-            if (payload.length > 0) {
-                upstream = spec.body(payload).retrieve().toEntity(byte[].class);
-            } else {
-                upstream = spec.retrieve().toEntity(byte[].class);
-            }
+            ResponseEntity<byte[]> upstream = payload.length > 0
+                    ? spec.body(payload).retrieve().toEntity(byte[].class)
+                    : spec.retrieve().toEntity(byte[].class);
+
             return ResponseEntity.status(upstream.getStatusCode())
                     .headers(filterResponseHeaders(upstream.getHeaders()))
                     .body(upstream.getBody());
@@ -90,7 +88,10 @@ public class ContabilidadProxyController {
                     .body(ex.getResponseBodyAsByteArray());
         } catch (Exception ex) {
             log.error("[ContabilidadProxy] Error llamando {}: {}", target, ex.getMessage());
-            String msg = "{\"message\":\"Servicio Contabilidad no disponible. Arranca contabilidad-service (puerto 8787).\"}";
+            String hint = contableBase.contains("localhost")
+                    ? " En producción define CONTABLE_API_BASE=https://<servicio-contabilidad>.onrender.com en el backend."
+                    : " Si el servicio Contabilidad está en free plan, espera el cold start (~1 min) y reintenta.";
+            String msg = "{\"message\":\"Servicio Contabilidad no disponible." + hint + "\"}";
             return ResponseEntity.status(502)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(msg.getBytes(StandardCharsets.UTF_8));

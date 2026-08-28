@@ -1,46 +1,69 @@
-# Contabilidad IA — integración en SIG
+# Contabilidad IA — integración en SIG (local + Render)
 
 El módulo **Contabilidad** del SIG monta el Sistema Contable IA (OCR + Autobits + cruce + pagos + paquetes).
 
 ## Arquitectura
 
 ```text
-Angular SIG (/app/contabilidad)
+Angular SIG (/app/contabilidad)  [ya en Static Site]
    → JWT → Spring Boot /api/v1/contabilidad/**
-        → proxy → FastAPI contabilidad-service :8787 /api/**
+        → CONTABLE_API_BASE → FastAPI Contabilidad (Render o local)
 ```
 
-- UI: Angular 21 + Material + tokens EAS (mismo frontend del SIG)
-- Backend contable: Python FastAPI (OCR Tesseract + Ollama + Excel)
-- Auth: solo vía JWT del SIG (el proxy no reenvía Authorization al FastAPI)
+## Producción (Render) — obligatorio
 
-## Arranque local
+### 1) Desplegar el servicio Contabilidad
 
-### 1) Servicio contable
+Opción A — Blueprint (`render.yaml`):
+1. En Render → **Blueprints** → sincroniza el repo (incluye `sig-contabilidad`).
+2. Espera a que el servicio quede **Live**.
+3. Copia la URL pública, ej. `https://sig-contabilidad.onrender.com`.
+
+Opción B — Manual:
+1. **New → Web Service**
+2. Root / Docker: `contabilidad-service`
+3. Dockerfile path: `./contabilidad-service/Dockerfile`
+4. Health check: `/api/health`
+5. Env:
+   - `APP_HOST=0.0.0.0`
+   - `APP_OPEN_BROWSER=0`
+   - `DATABASE_URL=sqlite:////app/data/contable.db`
+   - `STORAGE_ROOT=/app/storage`
+
+### 2) Conectar el backend Java (`dashboard-7spt`)
+
+En **Environment** del backend agrega:
+
+```text
+CONTABLE_API_BASE=https://sig-contabilidad.onrender.com
+```
+
+(sin `/` al final; usa la URL real de tu servicio).
+
+Redeploy del backend.
+
+### 3) Frontend
+
+No requiere variable extra: ya llama a `…/api/v1/contabilidad/**` en el mismo backend.
+Tras el deploy del front con el módulo Contabilidad, entra a **Contabilidad** en el menú.
+
+### Notas free plan
+
+- Cold start: la primera petición tras inactividad puede tardar ~30–60 s.
+- SQLite en disco efímero: los datos se pierden al redeploy. Para persistir, agrega un **Persistent Disk** en `/app/data` y `/app/storage` (plan pago).
+
+## Local
 
 ```powershell
 cd contabilidad-service
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env
 python run_web.py
 ```
 
-Requisitos opcionales: Tesseract OCR + Ollama (`llama3.2`).
-
-### 2) Backend / Frontend SIG
-
-Con `CONTABLE_API_BASE=http://localhost:8787` (default en `application.yml`).
-
-### Docker Compose
-
-Incluye el servicio `contabilidad` y el backend lo apunta con `CONTABLE_API_BASE=http://contabilidad:8787`.
+Backend con `CONTABLE_API_BASE=http://localhost:8787` (default).
 
 ## Roles
 
-Visible para: `ADMINISTRADOR`, `GERENCIA`, `CONTABILIDAD`, `SUPERVISOR`.
-
-## Código fuente original
-
-Paquete en `contabilidad-service/` (sin el Angular 19 original; la UI vive en `frontend/src/app/features/contabilidad`).
+`ADMINISTRADOR`, `GERENCIA`, `CONTABILIDAD`, `SUPERVISOR`.

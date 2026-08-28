@@ -76,7 +76,8 @@ def main() -> int:
     os.chdir(SRC)
 
     host = os.environ.get("APP_HOST", "127.0.0.1").strip() or "127.0.0.1"
-    port = int(os.environ.get("APP_PORT", "8787"))
+    # Render inyecta PORT; APP_PORT queda para local / Docker Compose
+    port = int(os.environ.get("PORT") or os.environ.get("APP_PORT", "8787"))
     reload_mode = _bool_env("APP_RELOAD", False)
 
     url_local = f"http://{'127.0.0.1' if host in {'0.0.0.0', '::'} else host}:{port}"

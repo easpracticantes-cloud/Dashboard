@@ -64,6 +64,8 @@ app:
     write-token: ${GOOGLE_SHEETS_WRITE_TOKEN:}
   contabilidad:
     api-base: ${CONTABLE_API_BASE:http://localhost:8787}
+    connect-timeout-seconds: ${CONTABLE_CONNECT_TIMEOUT_SECONDS:20}
+    read-timeout-seconds: ${CONTABLE_READ_TIMEOUT_SECONDS:120}
   ai:
     provider: ${APP_AI_PROVIDER:gemini}
     quote:
