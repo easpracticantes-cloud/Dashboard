@@ -1,4 +1,4 @@
-"""Análisis de Excel Autobits con Ollama — la IA deduce columnas y campos."""
+"""Análisis de Excel Autobits con IA (Gemini u Ollama)."""
 
 from __future__ import annotations
 
@@ -7,11 +7,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-import requests
-
 from config.settings import get_settings
 from domain.autobits.fields import AUTOBITS_FIELDS, suggest_mapping
+from infrastructure.ai.ai_factory import resolve_ai_provider_name
+from infrastructure.ai.gemini_client import GeminiClient, GeminiClientError
 from ia_ollama import URL_OLLAMA, verificar_ollama
+
+import requests
 
 
 @dataclass
@@ -58,15 +60,18 @@ def _extract_json(text: str) -> dict:
 
 
 class ExcelAIAnalyzer:
-    """Usa Ollama para entender cualquier estructura de Excel Autobits."""
+    """Usa Gemini u Ollama para entender cualquier estructura de Excel Autobits."""
 
     def __init__(self):
         settings = get_settings()
         self.model = settings.ollama_model
         self.timeout = max(settings.ollama_timeout, 90)
         self.url = URL_OLLAMA
+        self.provider_name = resolve_ai_provider_name()
 
     def available(self) -> bool:
+        if self.provider_name == "gemini":
+            return GeminiClient().verify()
         return verificar_ollama()
 
     def analyze(
@@ -87,7 +92,7 @@ class ExcelAIAnalyzer:
 
         if self.available():
             try:
-                return self._analyze_with_ollama(columns, sample_rows, total_rows, filename)
+                return self._analyze_with_ai(columns, sample_rows, total_rows, filename)
             except ExcelAIAnalyzerError:
                 if not allow_fallback:
                     raise
@@ -97,30 +102,31 @@ class ExcelAIAnalyzer:
 
         if not allow_fallback:
             raise ExcelAIAnalyzerError(
-                "Ollama no está disponible para analizar el Excel. Inicie Ollama e intente de nuevo.",
-                "OLLAMA_UNAVAILABLE",
+                "La IA no está disponible para analizar el Excel. "
+                "Configure GEMINI_API_KEY (Render) o inicie Ollama (local).",
+                "AI_UNAVAILABLE",
             )
 
         mapping = suggest_mapping(columns)
         return ExcelAIAnalysis(
             mapping=mapping,
-            sheet_notes="Análisis heurístico (Ollama no disponible).",
+            sheet_notes="Análisis heurístico (IA no disponible).",
             mode="heuristico",
         )
 
-    def _analyze_with_ollama(
+    def _build_prompt(
         self,
         columns: list[str],
         sample_rows: list[dict],
         total_rows: int,
         filename: str,
-    ) -> ExcelAIAnalysis:
+    ) -> str:
         sample_clean = [
             {str(k): _serialize_for_prompt(v) for k, v in row.items()}
             for row in sample_rows[:8]
         ]
 
-        prompt = f"""
+        return f"""
 Eres un asistente contable. Analizas un reporte Excel exportado desde Autobits (Colombia).
 Debes ENTENDER la hoja aunque el orden o nombres varíen ligeramente.
 Deduce el significado por encabezados y valores de ejemplo.
@@ -187,25 +193,42 @@ Reglas:
 - Prioriza Total → valor, Nombre Proveedor → proveedor, NIT/CC → nit.
 """
 
-        payload = {
-            "model": self.model,
-            "prompt": prompt,
-            "stream": False,
-            "format": "json",
-            "options": {"temperature": 0.1},
-        }
+    def _analyze_with_ai(
+        self,
+        columns: list[str],
+        sample_rows: list[dict],
+        total_rows: int,
+        filename: str,
+    ) -> ExcelAIAnalysis:
+        prompt = self._build_prompt(columns, sample_rows, total_rows, filename)
 
-        try:
-            response = requests.post(self.url, json=payload, timeout=self.timeout)
-            response.raise_for_status()
-            content = response.json().get("response", "")
-        except Exception as exc:
-            raise ExcelAIAnalyzerError(
-                f"Error al consultar Ollama para el Excel: {exc}",
-                "OLLAMA_ERROR",
-            ) from exc
+        if self.provider_name == "gemini":
+            try:
+                data = GeminiClient().generate_json(prompt)
+            except GeminiClientError as exc:
+                raise ExcelAIAnalyzerError(
+                    f"Error al consultar Gemini para el Excel: {exc.message}",
+                    "GEMINI_ERROR",
+                ) from exc
+        else:
+            payload = {
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False,
+                "format": "json",
+                "options": {"temperature": 0.1},
+            }
+            try:
+                response = requests.post(self.url, json=payload, timeout=self.timeout)
+                response.raise_for_status()
+                content = response.json().get("response", "")
+            except Exception as exc:
+                raise ExcelAIAnalyzerError(
+                    f"Error al consultar Ollama para el Excel: {exc}",
+                    "OLLAMA_ERROR",
+                ) from exc
+            data = _extract_json(content)
 
-        data = _extract_json(content)
         if not data:
             raise ExcelAIAnalyzerError(
                 "La IA no devolvió un análisis JSON válido del Excel.",
@@ -225,7 +248,6 @@ Reglas:
             if value_str in col_set:
                 mapping[field] = value_str
             else:
-                # Match case-insensitive
                 match = next((c for c in columns if c.lower() == value_str.lower()), None)
                 mapping[field] = match
 

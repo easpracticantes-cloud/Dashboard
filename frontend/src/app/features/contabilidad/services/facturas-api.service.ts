@@ -6,7 +6,11 @@ export interface HealthResponse {
   ok: boolean;
   errores: string[];
   tesseract: boolean;
+  /** Motor IA disponible (Gemini u Ollama). Compat: se llama ollama. */
   ollama: boolean;
+  ai?: boolean;
+  ai_provider?: string;
+  gemini?: boolean;
 }
 
 export interface ResultadoFactura {

@@ -51,7 +51,11 @@ services:
         value: /app/storage
       - key: STORAGE_PROVIDER
         value: local
-      - key: OLLAMA_URL
-        value: ""
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
       - key: LOG_LEVEL
         value: INFO

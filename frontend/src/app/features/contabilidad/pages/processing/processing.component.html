@@ -13,9 +13,9 @@
             <mat-icon>document_scanner</mat-icon>
             OCR
           </span>
-          <span class="status" [class.ok]="health.ollama" [class.bad]="!health.ollama">
+          <span class="status" [class.ok]="health.ai ?? health.ollama" [class.bad]="!(health.ai ?? health.ollama)">
             <mat-icon>psychology</mat-icon>
-            Motor IA
+            {{ health.ai_provider === 'gemini' ? 'Gemini' : 'Motor IA' }}
           </span>
         </div>
       }

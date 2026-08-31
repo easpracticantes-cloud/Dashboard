@@ -11,7 +11,8 @@ from domain.rules.rule_engine import RuleEngine
 from domain.services.confidence_scorer import score_invoice_extraction
 from domain.services.duplicate_detector import DuplicateDetector
 from exportador import guardar_texto
-from infrastructure.ai.ollama_provider import OllamaAIProvider
+from infrastructure.ai.ai_factory import ai_unavailable_message, create_ai_provider
+from infrastructure.ai.ollama_provider import AIProvider
 from infrastructure.ocr.tesseract_provider import TesseractOCRProvider
 from infrastructure.persistence.database import SessionLocal, init_db
 from infrastructure.persistence.repositories import (
@@ -30,11 +31,11 @@ class DocumentProcessingService:
     def __init__(
         self,
         ocr: TesseractOCRProvider | None = None,
-        ai: OllamaAIProvider | None = None,
+        ai: AIProvider | None = None,
         rules: RuleEngine | None = None,
     ):
         self.ocr = ocr or TesseractOCRProvider()
-        self.ai = ai or OllamaAIProvider()
+        self.ai = ai or create_ai_provider()
         self.rules = rules or RuleEngine()
         self.proyecto_raiz = PROYECTO_RAIZ
         self.carpeta_salidas_app = self.proyecto_raiz / "salidas" / "app"
@@ -47,7 +48,7 @@ class DocumentProcessingService:
         if not self.ocr.verify():
             errores.append("Tesseract OCR no esta disponible.")
         if not self.ai.verify():
-            errores.append("Ollama no responde en http://localhost:11434.")
+            errores.append(ai_unavailable_message())
         return errores
 
     def _ensure_output_dirs(self) -> None:
@@ -378,3 +379,9 @@ def get_document_processing_service() -> DocumentProcessingService:
     if _service is None:
         _service = DocumentProcessingService()
     return _service
+
+
+def reset_document_processing_service() -> None:
+    """Útil en tests / recarga de env."""
+    global _service
+    _service = None

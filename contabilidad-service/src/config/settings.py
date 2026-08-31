@@ -20,9 +20,15 @@ class Settings(BaseSettings):
 
     app_name: str = "Sistema Contable IA"
     database_url: str = f"sqlite:///{(PROYECTO_RAIZ / 'data' / 'contable.db').as_posix()}"
+    # auto | gemini | ollama — en Render usar gemini (o auto + GEMINI_API_KEY)
+    ai_provider: str = "auto"
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
     ollama_timeout: int = 90
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.0-flash"
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    gemini_timeout: int = 90
     tesseract_cmd: str | None = None
     storage_provider: str = "local"
     storage_root: Path = PROYECTO_RAIZ / "storage"

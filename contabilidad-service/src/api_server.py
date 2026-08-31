@@ -82,13 +82,21 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health():
-    """Estado de Tesseract y Ollama."""
+    """Estado de Tesseract y del motor IA (Gemini u Ollama)."""
+    from infrastructure.ai.ai_factory import resolve_ai_provider_name
+
     errores = verificar_dependencias()
+    provider = resolve_ai_provider_name()
+    ai_ok = not any("Gemini" in e or "Ollama" in e for e in errores)
     return {
         "ok": len(errores) == 0,
         "errores": errores,
         "tesseract": "Tesseract OCR no esta disponible." not in errores,
-        "ollama": "Ollama no responde en http://localhost:11434." not in errores,
+        "ai_provider": provider,
+        "ai": ai_ok,
+        # Compat UI antigua: "ollama" = motor IA disponible (Gemini u Ollama)
+        "ollama": ai_ok,
+        "gemini": provider == "gemini" and ai_ok,
     }
 
 
