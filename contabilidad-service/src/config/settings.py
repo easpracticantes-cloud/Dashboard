@@ -20,8 +20,8 @@ class Settings(BaseSettings):
 
     app_name: str = "Sistema Contable IA"
     database_url: str = f"sqlite:///{(PROYECTO_RAIZ / 'data' / 'contable.db').as_posix()}"
-    # auto | gemini | ollama — en Render: ollama+OLLAMA_API_KEY o gemini+GEMINI_API_KEY
-    ai_provider: str = "auto"
+    # gemini | ollama | auto — en Render: gemini + GEMINI_API_KEY
+    ai_provider: str = "gemini"
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
     ollama_timeout: int = 90

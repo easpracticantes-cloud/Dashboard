@@ -29,11 +29,11 @@ Opción B — Manual:
    - `APP_OPEN_BROWSER=0`
    - `DATABASE_URL=sqlite:////app/data/contable.db`
    - `STORAGE_ROOT=/app/storage`
-   - `AI_PROVIDER=ollama` (o `gemini`)
-   - Para Ollama Cloud: `OLLAMA_URL=https://ollama.com`, `OLLAMA_API_KEY=…`, `OLLAMA_MODEL=llama3.2`
-   - Para Gemini: `GEMINI_API_KEY=…`, `GEMINI_MODEL=gemini-2.0-flash`
+   - `AI_PROVIDER=gemini`
+   - `GEMINI_API_KEY=` (misma key que el backend SIG)
+   - `GEMINI_MODEL=gemini-2.0-flash` (o el modelo del SIG)
 
-**Importante:** no hace falta instalar Ollama en el PC de la jefa. Usa [Ollama Cloud](https://ollama.com/settings/keys) o Gemini.
+**Importante:** la jefa no instala Ollama. En Render usa **Gemini**. Ollama Cloud es opcional y de pago.
 
 ### 2) Conectar el backend Java (`dashboard-7spt`)
 

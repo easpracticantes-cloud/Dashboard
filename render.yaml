@@ -52,13 +52,13 @@ services:
       - key: STORAGE_PROVIDER
         value: local
       - key: AI_PROVIDER
-        value: ollama
+        value: gemini
       - key: OLLAMA_URL
         value: https://ollama.com
       - key: OLLAMA_API_KEY
         sync: false
       - key: OLLAMA_MODEL
-        value: gpt-oss:120b
+        value: gpt-oss:20b
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL

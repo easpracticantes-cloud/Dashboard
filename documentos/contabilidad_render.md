@@ -25,32 +25,32 @@ Para que **Contabilidad** funcione en la página pública (no solo local):
 
 ## IA en la nube (sin instalar Ollama en el PC)
 
-### Opción A — Ollama Cloud (recomendada si localmente te gusta Ollama)
+### Opción A — Google Gemini (recomendada en Render)
 
-1. Crea API key en https://ollama.com/settings/keys
-2. En Render → `sig-contabilidad` → Environment:
+```text
+AI_PROVIDER=gemini
+GEMINI_API_KEY=<la misma key del backend SIG>
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+(o el mismo `GEMINI_MODEL` que el backend, p. ej. `gemini-3.5-flash`)
+
+### Opción B — Ollama Cloud (de pago)
+
+1. API key + créditos en https://ollama.com/settings/keys
+2. Env:
 
 ```text
 AI_PROVIDER=ollama
 OLLAMA_URL=https://ollama.com
 OLLAMA_API_KEY=<tu_key>
-OLLAMA_MODEL=gpt-oss:120b
+OLLAMA_MODEL=gpt-oss:20b
 ```
 
-Lista modelos disponibles:
+Lista modelos:
 
 ```bash
 curl https://ollama.com/api/tags -H "Authorization: Bearer TU_KEY"
-```
-
-(No uses solo `llama3.2` local si ese modelo no está en cloud.)
-
-### Opción B — Google Gemini
-
-```text
-AI_PROVIDER=gemini
-GEMINI_API_KEY=<key>
-GEMINI_MODEL=gemini-2.0-flash
 ```
 
 ### OCR en Render
@@ -58,10 +58,10 @@ GEMINI_MODEL=gemini-2.0-flash
 El mensaje `OCR debil (0 caracteres)` es de **Tesseract**, no de la IA.
 La imagen debe ser JPG/PNG legible. El contenedor incluye `spa` + `eng`.
 
-Health esperado con Ollama Cloud:
+Health esperado con Gemini:
 
 ```json
-{"ok":true,"tesseract":true,"ai_provider":"ollama","ai":true}
+{"ok":true,"tesseract":true,"ai_provider":"gemini","ai":true,"gemini":true}
 ```
 
 Detalle completo: [`contabilidad_integracion.md`](./contabilidad_integracion.md)
