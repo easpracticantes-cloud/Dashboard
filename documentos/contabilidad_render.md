@@ -34,10 +34,16 @@ Para que **Contabilidad** funcione en la página pública (no solo local):
 AI_PROVIDER=ollama
 OLLAMA_URL=https://ollama.com
 OLLAMA_API_KEY=<tu_key>
-OLLAMA_MODEL=llama3.2
+OLLAMA_MODEL=gpt-oss:120b
 ```
 
-(Usa un modelo disponible en ollama.com; puede ser `llama3.2` u otro cloud.)
+Lista modelos disponibles:
+
+```bash
+curl https://ollama.com/api/tags -H "Authorization: Bearer TU_KEY"
+```
+
+(No uses solo `llama3.2` local si ese modelo no está en cloud.)
 
 ### Opción B — Google Gemini
 

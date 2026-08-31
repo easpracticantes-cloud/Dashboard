@@ -21,8 +21,8 @@ def ollama_timeout() -> int:
     return max(int(get_settings().ollama_timeout or 90), 25)
 
 
-def ollama_generate_url() -> str:
-    return f"{ollama_base_url()}/api/generate"
+def ollama_chat_url() -> str:
+    return f"{ollama_base_url()}/api/chat"
 
 
 def ollama_tags_url() -> str:

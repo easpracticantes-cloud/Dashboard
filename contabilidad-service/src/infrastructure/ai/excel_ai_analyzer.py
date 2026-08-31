@@ -7,19 +7,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from config.settings import get_settings
 from domain.autobits.fields import AUTOBITS_FIELDS, suggest_mapping
 from infrastructure.ai.ai_factory import resolve_ai_provider_name
 from infrastructure.ai.gemini_client import GeminiClient, GeminiClientError
-from infrastructure.ai.ollama_config import (
-    ollama_generate_url,
-    ollama_headers,
-    ollama_model,
-    ollama_timeout,
-)
-from ia_ollama import verificar_ollama
-
-import requests
+from infrastructure.ai.ollama_client import chat, verificar_ollama
+from infrastructure.ai.ollama_config import ollama_model, ollama_timeout
 
 
 @dataclass
@@ -72,7 +64,6 @@ class ExcelAIAnalyzer:
         self.provider_name = resolve_ai_provider_name()
         self.timeout = ollama_timeout()
         self.model = ollama_model()
-        self.url = ollama_generate_url()
 
     def available(self) -> bool:
         if self.provider_name == "gemini":
@@ -216,22 +207,8 @@ Reglas:
                     "GEMINI_ERROR",
                 ) from exc
         else:
-            payload = {
-                "model": self.model,
-                "prompt": prompt,
-                "stream": False,
-                "format": "json",
-                "options": {"temperature": 0.1},
-            }
             try:
-                response = requests.post(
-                    self.url,
-                    json=payload,
-                    headers=ollama_headers(),
-                    timeout=self.timeout,
-                )
-                response.raise_for_status()
-                content = response.json().get("response", "")
+                content = chat(prompt, json_mode=True)
             except Exception as exc:
                 raise ExcelAIAnalyzerError(
                     f"Error al consultar Ollama para el Excel: {exc}",

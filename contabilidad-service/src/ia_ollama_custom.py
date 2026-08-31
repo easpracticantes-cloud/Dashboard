@@ -1,19 +1,12 @@
 """Analisis con Ollama usando solicitudes personalizadas del usuario."""
 
-from infrastructure.ai.ollama_config import (
-    ollama_generate_url,
-    ollama_headers,
-    ollama_model,
-    ollama_timeout,
-)
+from infrastructure.ai.ollama_client import chat
 
 
 def analizar_con_solicitud(texto_ocr, solicitud_usuario):
     """Envia texto OCR y la solicitud del usuario a Ollama (local o cloud)."""
     try:
-        import requests
-
-        solicitud = solicitud_usuario.strip()
+        solicitud = (solicitud_usuario or "").strip()
         if not solicitud:
             return {
                 "ok": False,
@@ -37,31 +30,7 @@ Reglas:
 Texto OCR:
 {texto_ocr}
 """
-
-        datos = {
-            "model": ollama_model(),
-            "prompt": prompt,
-            "stream": False,
-        }
-
-        respuesta = requests.post(
-            ollama_generate_url(),
-            json=datos,
-            headers=ollama_headers(),
-            timeout=max(ollama_timeout(), 90),
-        )
-        respuesta.raise_for_status()
-
-        contenido = respuesta.json()
-        texto_respuesta = contenido.get("response", "").strip()
-
-        if not texto_respuesta:
-            return {
-                "ok": False,
-                "respuesta": "",
-                "error": "Ollama devolvio una respuesta vacia.",
-            }
-
+        texto_respuesta = chat(prompt)
         return {
             "ok": True,
             "respuesta": texto_respuesta,

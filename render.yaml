@@ -58,7 +58,7 @@ services:
       - key: OLLAMA_API_KEY
         sync: false
       - key: OLLAMA_MODEL
-        value: llama3.2
+        value: gpt-oss:120b
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
