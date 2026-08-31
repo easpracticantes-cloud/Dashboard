@@ -4,13 +4,14 @@ import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
 import { AuthUser, LoginRequest, LoginResponse, UserDto, mapUserDtoToAuthUser } from '../models/user.model';
 import { RoleCode } from '../models/role.model';
 import { ApiService } from './api.service';
+import { environment } from '../../../environments/environment';
 
 const TOKEN_KEY = 'sig_token';
 const REFRESH_TOKEN_KEY = 'sig_refresh_token';
 const USER_KEY = 'sig_user';
 const REMEMBER_KEY = 'sig_remember';
 
-/** Demo account used only when the backend is completely unreachable (network error), so the UI stays explorable. */
+/** Solo en desarrollo local si el backend no responde. Nunca en producción (token falso → 401). */
 const DEMO_USER_DTO: UserDto = {
   id: 'demo-user',
   username: 'demo',
@@ -43,7 +44,8 @@ export class AuthService {
       .pipe(
         tap((response) => this.persistSession(response, !!request.rememberMe)),
         catchError((err) => {
-          if (this.isNetworkError(err)) {
+          // En Render/producción nunca inventar sesión: el token demo causa 401 en Contabilidad y el resto de APIs.
+          if (!environment.production && this.isNetworkError(err)) {
             const demo: LoginResponse = {
               token: `demo.${Date.now()}`,
               tokenType: 'Bearer',
