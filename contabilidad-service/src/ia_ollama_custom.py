@@ -1,14 +1,15 @@
 """Analisis con Ollama usando solicitudes personalizadas del usuario."""
 
-from ia_ollama import MODELO_OLLAMA, TIMEOUT_OLLAMA, URL_OLLAMA
-
-
-# Mas tiempo para respuestas interactivas (el modelo puede tardar al cargar).
-TIMEOUT_OLLAMA_CUSTOM = 90
+from infrastructure.ai.ollama_config import (
+    ollama_generate_url,
+    ollama_headers,
+    ollama_model,
+    ollama_timeout,
+)
 
 
 def analizar_con_solicitud(texto_ocr, solicitud_usuario):
-    """Envia texto OCR y la solicitud del usuario a Ollama."""
+    """Envia texto OCR y la solicitud del usuario a Ollama (local o cloud)."""
     try:
         import requests
 
@@ -38,15 +39,16 @@ Texto OCR:
 """
 
         datos = {
-            "model": MODELO_OLLAMA,
+            "model": ollama_model(),
             "prompt": prompt,
             "stream": False,
         }
 
         respuesta = requests.post(
-            URL_OLLAMA,
+            ollama_generate_url(),
             json=datos,
-            timeout=TIMEOUT_OLLAMA_CUSTOM,
+            headers=ollama_headers(),
+            timeout=max(ollama_timeout(), 90),
         )
         respuesta.raise_for_status()
 

@@ -66,22 +66,30 @@ def verificar_tesseract():
 def extraer_texto_imagen(ruta_imagen):
     """Extrae texto de una imagen usando pytesseract."""
     try:
-        # Importamos aqui para que el error quede controlado si falta instalar algo.
         import pytesseract
         from PIL import Image
 
+        from config.settings import get_settings
+
         configurar_tesseract()
 
-        # Abrimos la imagen recibida por ruta.
         imagen = Image.open(ruta_imagen)
+        if imagen.mode not in ("RGB", "L"):
+            imagen = imagen.convert("RGB")
 
-        # pytesseract intenta leer el texto presente en la imagen.
-        # El timeout evita que una imagen dificil bloquee todo el lote.
-        texto = pytesseract.image_to_string(imagen, timeout=TIMEOUT_OCR)
+        lang = (get_settings().tesseract_lang or "spa").strip() or "spa"
+        # En Docker suele haber solo spa; spa+eng falla si falta eng.
+        try:
+            texto = pytesseract.image_to_string(
+                imagen, lang=lang, timeout=max(TIMEOUT_OCR, 30)
+            )
+        except Exception:
+            texto = pytesseract.image_to_string(
+                imagen, lang="spa", timeout=max(TIMEOUT_OCR, 30)
+            )
 
         return texto
     except Exception as error:
-        # No imprimimos el texto completo para mantener limpia la consola.
         print(f"ERROR en OCR: {error}")
         return ""
 

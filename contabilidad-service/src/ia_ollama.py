@@ -1,38 +1,44 @@
-"""Funciones simples para analizar facturas con Ollama local."""
+"""Funciones simples para analizar facturas con Ollama (local o cloud)."""
 
 import json
 
+from infrastructure.ai.ollama_config import (
+    ollama_generate_url,
+    ollama_headers,
+    ollama_model,
+    ollama_tags_url,
+    ollama_timeout,
+)
 
-# Cambia este valor si quieres usar otro modelo instalado en Ollama.
+# Compat exports (otros módulos pueden importar estos nombres)
 MODELO_OLLAMA = "llama3.2"
-
-# Endpoint local de Ollama para generar respuestas.
 URL_OLLAMA = "http://localhost:11434/api/generate"
 URL_OLLAMA_TAGS = "http://localhost:11434/api/tags"
-
-# Tiempo maximo de espera por cada respuesta de Ollama.
 TIMEOUT_OLLAMA = 25
 
 
 def verificar_ollama():
-    """Revisa si Ollama local responde antes de iniciar el lote."""
+    """Revisa si Ollama (local o https://ollama.com) responde."""
     try:
         import requests
 
-        respuesta = requests.get(URL_OLLAMA_TAGS, timeout=5)
+        respuesta = requests.get(
+            ollama_tags_url(),
+            headers=ollama_headers(),
+            timeout=min(ollama_timeout(), 15),
+        )
         respuesta.raise_for_status()
         return True
     except Exception as error:
-        print("ERROR: Ollama no esta respondiendo en http://localhost:11434.")
+        print("ERROR: Ollama no responde.")
         print(f"Detalle: {error}")
-        print("Abre Ollama y confirma que el modelo este instalado.")
+        print("Local: abre Ollama. Cloud: define OLLAMA_URL=https://ollama.com y OLLAMA_API_KEY.")
         return False
 
 
 def analizar_factura_con_ollama(texto_ocr):
     """Envia el texto OCR a Ollama y espera un JSON con datos de factura."""
     try:
-        # Importamos requests aqui para controlar el error si falta instalarlo.
         import requests
 
         prompt = f"""
@@ -67,13 +73,18 @@ Texto OCR:
 """
 
         datos = {
-            "model": MODELO_OLLAMA,
+            "model": ollama_model(),
             "prompt": prompt,
             "stream": False,
             "format": "json",
         }
 
-        respuesta = requests.post(URL_OLLAMA, json=datos, timeout=TIMEOUT_OLLAMA)
+        respuesta = requests.post(
+            ollama_generate_url(),
+            json=datos,
+            headers=ollama_headers(),
+            timeout=ollama_timeout(),
+        )
         respuesta.raise_for_status()
 
         contenido = respuesta.json()

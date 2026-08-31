@@ -12,9 +12,26 @@ from infrastructure.ai.ollama_provider import AIProvider, OllamaAIProvider
 logger = logging.getLogger(__name__)
 
 
+def ai_unavailable_message() -> str:
+    name = resolve_ai_provider_name()
+    if name == "gemini":
+        return (
+            "Gemini no responde. Revisa GEMINI_API_KEY y GEMINI_MODEL "
+            "en el Environment del servicio Contabilidad en Render."
+        )
+    from infrastructure.ai.ollama_config import ollama_api_key, ollama_base_url
+
+    if ollama_api_key() or "ollama.com" in ollama_base_url():
+        return (
+            "Ollama Cloud no responde. Revisa OLLAMA_URL=https://ollama.com, "
+            "OLLAMA_API_KEY y OLLAMA_MODEL en Render."
+        )
+    return "Ollama no responde en http://localhost:11434."
+
+
 def resolve_ai_provider_name() -> str:
     """
-    auto → Gemini si hay GEMINI_API_KEY, si no Ollama.
+    auto → Ollama Cloud si hay OLLAMA_API_KEY; si no Gemini; si no Ollama local.
     gemini | ollama → fuerza ese proveedor.
     """
     settings = get_settings()
@@ -23,7 +40,8 @@ def resolve_ai_provider_name() -> str:
         return "gemini"
     if raw in {"ollama", "local"}:
         return "ollama"
-    # auto
+    if (settings.ollama_api_key or "").strip():
+        return "ollama"
     if (settings.gemini_api_key or "").strip():
         return "gemini"
     return "ollama"
@@ -40,15 +58,12 @@ def create_ai_provider() -> AIProvider:
             return OllamaAIProvider()
         logger.info("Proveedor IA Contabilidad: Gemini (%s)", client.model)
         return GeminiAIProvider(client)
-    logger.info("Proveedor IA Contabilidad: Ollama")
+    from infrastructure.ai.ollama_config import ollama_base_url, ollama_model
+
+    logger.info(
+        "Proveedor IA Contabilidad: Ollama (%s @ %s)",
+        ollama_model(),
+        ollama_base_url(),
+    )
     return OllamaAIProvider()
 
-
-def ai_unavailable_message() -> str:
-    name = resolve_ai_provider_name()
-    if name == "gemini":
-        return (
-            "Gemini no responde. Revisa GEMINI_API_KEY y GEMINI_MODEL "
-            "en el Environment del servicio Contabilidad en Render."
-        )
-    return "Ollama no responde en http://localhost:11434."

@@ -23,25 +23,39 @@ Para que **Contabilidad** funcione en la página pública (no solo local):
    (sin `/` al final)
 4. Redeploy Contabilidad + backend (+ frontend si falta el menú)
 
-## IA en la nube (sin Ollama)
+## IA en la nube (sin instalar Ollama en el PC)
 
-Ollama **no** se instala en Render: es pesado y requiere PC local.
-En producción Contabilidad usa **Google Gemini** vía API:
+### Opción A — Ollama Cloud (recomendada si localmente te gusta Ollama)
 
-| Variable | Valor recomendado |
-|----------|-------------------|
-| `AI_PROVIDER` | `gemini` |
-| `GEMINI_API_KEY` | misma key del backend |
-| `GEMINI_MODEL` | `gemini-2.0-flash` (o el del SIG) |
+1. Crea API key en https://ollama.com/settings/keys
+2. En Render → `sig-contabilidad` → Environment:
 
-Health esperado:
-
-```json
-{"ok":true,"tesseract":true,"ai_provider":"gemini","ai":true,"ollama":true,"gemini":true}
+```text
+AI_PROVIDER=ollama
+OLLAMA_URL=https://ollama.com
+OLLAMA_API_KEY=<tu_key>
+OLLAMA_MODEL=llama3.2
 ```
 
-(`ollama: true` aquí significa “motor IA OK” por compatibilidad con la UI.)
+(Usa un modelo disponible en ollama.com; puede ser `llama3.2` u otro cloud.)
 
-Localmente puedes seguir con Ollama (`AI_PROVIDER=ollama` o `auto` sin key).
+### Opción B — Google Gemini
+
+```text
+AI_PROVIDER=gemini
+GEMINI_API_KEY=<key>
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+### OCR en Render
+
+El mensaje `OCR debil (0 caracteres)` es de **Tesseract**, no de la IA.
+La imagen debe ser JPG/PNG legible. El contenedor incluye `spa` + `eng`.
+
+Health esperado con Ollama Cloud:
+
+```json
+{"ok":true,"tesseract":true,"ai_provider":"ollama","ai":true}
+```
 
 Detalle completo: [`contabilidad_integracion.md`](./contabilidad_integracion.md)

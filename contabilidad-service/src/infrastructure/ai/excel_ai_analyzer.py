@@ -11,7 +11,13 @@ from config.settings import get_settings
 from domain.autobits.fields import AUTOBITS_FIELDS, suggest_mapping
 from infrastructure.ai.ai_factory import resolve_ai_provider_name
 from infrastructure.ai.gemini_client import GeminiClient, GeminiClientError
-from ia_ollama import URL_OLLAMA, verificar_ollama
+from infrastructure.ai.ollama_config import (
+    ollama_generate_url,
+    ollama_headers,
+    ollama_model,
+    ollama_timeout,
+)
+from ia_ollama import verificar_ollama
 
 import requests
 
@@ -63,11 +69,10 @@ class ExcelAIAnalyzer:
     """Usa Gemini u Ollama para entender cualquier estructura de Excel Autobits."""
 
     def __init__(self):
-        settings = get_settings()
-        self.model = settings.ollama_model
-        self.timeout = max(settings.ollama_timeout, 90)
-        self.url = URL_OLLAMA
         self.provider_name = resolve_ai_provider_name()
+        self.timeout = ollama_timeout()
+        self.model = ollama_model()
+        self.url = ollama_generate_url()
 
     def available(self) -> bool:
         if self.provider_name == "gemini":
@@ -219,7 +224,12 @@ Reglas:
                 "options": {"temperature": 0.1},
             }
             try:
-                response = requests.post(self.url, json=payload, timeout=self.timeout)
+                response = requests.post(
+                    self.url,
+                    json=payload,
+                    headers=ollama_headers(),
+                    timeout=self.timeout,
+                )
                 response.raise_for_status()
                 content = response.json().get("response", "")
             except Exception as exc:
