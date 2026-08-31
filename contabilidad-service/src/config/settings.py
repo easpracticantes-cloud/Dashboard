@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     # Cloud: https://ollama.com/settings/keys → OLLAMA_API_KEY + OLLAMA_URL=https://ollama.com
     ollama_api_key: str = ""
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.0-flash"
+    # Misma default que el backend SIG (application.yml)
+    gemini_model: str = "gemini-3.6-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     gemini_timeout: int = 90
     # spa en Docker Render; eng+spa en local Windows típico

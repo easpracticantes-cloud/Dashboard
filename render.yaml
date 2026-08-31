@@ -62,7 +62,7 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-2.0-flash
+        value: gemini-3.6-flash
       - key: TESSERACT_LANG
         value: spa+eng
       - key: LOG_LEVEL

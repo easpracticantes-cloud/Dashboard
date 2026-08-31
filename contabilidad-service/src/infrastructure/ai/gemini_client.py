@@ -76,12 +76,16 @@ class GeminiClient:
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
             "generationConfig": {
                 "temperature": 0.2,
+                "maxOutputTokens": 2048,
             },
         }
         if json_mode:
             body["generationConfig"]["responseMimeType"] = "application/json"
+        else:
+            body["generationConfig"]["responseMimeType"] = "text/plain"
 
         try:
+            logger.info("Gemini Contabilidad POST model=%s json=%s", self.model, json_mode)
             response = requests.post(url, json=body, timeout=self.timeout)
             response.raise_for_status()
         except requests.HTTPError as exc:
@@ -90,6 +94,12 @@ class GeminiClient:
                 detail = response.text[:400]
             except Exception:
                 pass
+            if response.status_code == 403:
+                raise GeminiClientError(
+                    f"Gemini HTTP 403 (modelo={self.model}). "
+                    "Copia en Contabilidad la MISMA GEMINI_API_KEY y GEMINI_MODEL "
+                    f"del backend SIG. Detalle: {detail or exc}"
+                ) from exc
             raise GeminiClientError(f"Gemini HTTP {response.status_code}: {detail or exc}") from exc
         except Exception as exc:
             raise GeminiClientError(f"Error llamando a Gemini: {exc}") from exc
