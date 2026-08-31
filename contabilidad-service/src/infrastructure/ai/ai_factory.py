@@ -31,20 +31,20 @@ def ai_unavailable_message() -> str:
 
 def resolve_ai_provider_name() -> str:
     """
-    auto → Ollama Cloud si hay OLLAMA_API_KEY; si no Gemini; si no Ollama local.
     gemini | ollama → fuerza ese proveedor.
+    auto → Gemini si hay GEMINI_API_KEY; si no Ollama.
     """
     settings = get_settings()
-    raw = (settings.ai_provider or "auto").strip().lower()
+    raw = (settings.ai_provider or "gemini").strip().lower()
     if raw in {"gemini", "google", "google-gemini"}:
         return "gemini"
     if raw in {"ollama", "local"}:
         return "ollama"
-    if (settings.ollama_api_key or "").strip():
-        return "ollama"
     if (settings.gemini_api_key or "").strip():
         return "gemini"
-    return "ollama"
+    if (settings.ollama_api_key or "").strip():
+        return "ollama"
+    return "gemini"
 
 
 def create_ai_provider() -> AIProvider:
