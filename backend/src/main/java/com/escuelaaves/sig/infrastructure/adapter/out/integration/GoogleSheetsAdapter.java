@@ -45,6 +45,9 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
     @Value("${app.sheets.write-token:}")
     private String writeTokenFromEnv;
 
+    @Value("${app.sheets.webapp-url:}")
+    private String webAppUrlFromEnv;
+
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(20))
             .followRedirects(HttpClient.Redirect.NEVER)
@@ -311,6 +314,9 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
     }
 
     private String webAppUrl() {
+        if (webAppUrlFromEnv != null && !webAppUrlFromEnv.isBlank()) {
+            return webAppUrlFromEnv.trim();
+        }
         return systemSettingRepositoryPort.findBySettingKey("integrations.googleSheets.webAppUrl")
                 .map(s -> s.getSettingValue() != null ? s.getSettingValue() : "")
                 .orElse("");

@@ -59,7 +59,7 @@ app:
     allowed-emails: ${GOOGLE_ALLOWED_EMAILS:escuelaavescomercial@gmail.com,easpracticantes@gmail.com,escuelaavesdesalento@gmail.com}
     default-role: ${GOOGLE_DEFAULT_ROLE:GERENCIA}
   sheets:
-    webapp-url: ${GOOGLE_SHEETS_WEBAPP_URL:https://script.google.com/macros/s/AKfycbzMkCg7PfddRA048GAZBc5jz_2lKpmtJg13589XteWmONKBiQBQLKZxw-eBeEwa0uDslw/exec}
+    webapp-url: ${GOOGLE_SHEETS_WEBAPP_URL:https://script.google.com/macros/s/AKfycbxSHKjze5jsBZmMoBX8KI6er59OW80OBycH6Shh5oMXLNhxD77qoWOesFTy9A1KV3pm-g/exec}
     sync-interval-ms: ${SHEETS_SYNC_INTERVAL_MS:300000}
     write-token: ${GOOGLE_SHEETS_WRITE_TOKEN:}
   contabilidad:

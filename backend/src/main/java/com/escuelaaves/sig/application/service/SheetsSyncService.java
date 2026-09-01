@@ -79,7 +79,7 @@ public class SheetsSyncService {
     private static final ZoneId ZONE = ZoneId.of("America/Bogota");
     private static final Duration CACHE_TTL = Duration.ofMinutes(8);
     private static final String DEFAULT_WEBAPP_URL =
-            "https://script.google.com/macros/s/AKfycbzMkCg7PfddRA048GAZBc5jz_2lKpmtJg13589XteWmONKBiQBQLKZxw-eBeEwa0uDslw/exec";
+            "https://script.google.com/macros/s/AKfycbxSHKjze5jsBZmMoBX8KI6er59OW80OBycH6Shh5oMXLNhxD77qoWOesFTy9A1KV3pm-g/exec";
     private static final int MAX_HOT_NOTIFICATIONS = 20;
     private static final int MAX_QUOTE_SUGGESTIONS = 15;
     /** Lotes CRM: balance entre velocidad y presión de memoria/TX en Render. */
@@ -897,12 +897,13 @@ public class SheetsSyncService {
     }
 
     private String resolveWebAppUrl() {
+        // Preferir env Render (GOOGLE_SHEETS_WEBAPP_URL) para que un redeploy de Apps Script no quede atrapado en seed viejo.
+        if (configuredWebAppUrl != null && !configuredWebAppUrl.isBlank()) {
+            return configuredWebAppUrl.trim();
+        }
         String fromSetting = setting("integrations.googleSheets.webAppUrl", "");
         if (!fromSetting.isBlank()) {
             return fromSetting.trim();
-        }
-        if (configuredWebAppUrl != null && !configuredWebAppUrl.isBlank()) {
-            return configuredWebAppUrl.trim();
         }
         return DEFAULT_WEBAPP_URL;
     }

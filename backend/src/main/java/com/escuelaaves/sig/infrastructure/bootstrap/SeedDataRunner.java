@@ -40,7 +40,7 @@ import java.util.Set;
 public class SeedDataRunner implements ApplicationRunner {
 
     private static final String SHEETS_WEBAPP_URL =
-            "https://script.google.com/macros/s/AKfycbzMkCg7PfddRA048GAZBc5jz_2lKpmtJg13589XteWmONKBiQBQLKZxw-eBeEwa0uDslw/exec";
+            "https://script.google.com/macros/s/AKfycbxSHKjze5jsBZmMoBX8KI6er59OW80OBycH6Shh5oMXLNhxD77qoWOesFTy9A1KV3pm-g/exec";
 
     private static final String ADMIN_USERNAME = "admin";
 
@@ -269,7 +269,8 @@ public class SeedDataRunner implements ApplicationRunner {
         upsertSettingIfMissing("integrations.googleSheets.range", "Conversaciones!A2:H", SettingCategory.INTEGRATIONS);
         upsertSettingIfMissing("integrations.googleSheets.pollSeconds", "120", SettingCategory.INTEGRATIONS);
         upsertSettingIfMissing("integrations.googleSheetsEnabled", "true", SettingCategory.INTEGRATIONS);
-        upsertSettingForce("integrations.googleSheets.webAppUrl", SHEETS_WEBAPP_URL, SettingCategory.INTEGRATIONS);
+        // Solo si falta: no pisar una URL nueva que el equipo puso en BD / Settings
+        upsertSettingIfMissing("integrations.googleSheets.webAppUrl", SHEETS_WEBAPP_URL, SettingCategory.INTEGRATIONS);
         systemSettingJpaRepository.findBySettingKey("integrations.googleSheetsEnabled").ifPresent(s -> {
             if (!"true".equalsIgnoreCase(s.getSettingValue())) {
                 s.setSettingValue("true");
