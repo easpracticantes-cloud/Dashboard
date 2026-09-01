@@ -219,44 +219,86 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
     }
 
     /**
-     * Apps Script responde 302; hay que re-POST al Location (no convertir a GET).
+     * Apps Script Web App suele responder 302/303 hacia googleusercontent.com.
+     * Hay que re-enviar POST al Location (nunca convertir a GET: eso provoca HTTP 405 + HTML).
      */
     private String postFollowingAppsScriptRedirect(String url, String jsonBody) throws Exception {
-        HttpRequest.BodyPublisher body = HttpRequest.BodyPublishers.ofString(jsonBody);
-        HttpRequest first = HttpRequest.newBuilder(URI.create(url))
-                .timeout(Duration.ofSeconds(60))
-                .header("Content-Type", "application/json; charset=UTF-8")
-                .header("Accept", "application/json, text/plain, */*")
-                .POST(body)
-                .build();
+        URI current = URI.create(url);
+        String lastBody = "";
+        int lastCode = 0;
 
-        HttpResponse<String> response = httpClient.send(first, HttpResponse.BodyHandlers.ofString());
-        int code = response.statusCode();
-        if (code >= 200 && code < 300) {
-            return response.body();
-        }
-        if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
-            String location = response.headers().firstValue("location").orElse("");
-            if (location.isBlank()) {
-                throw new IllegalStateException("Redirect sin Location (HTTP " + code + ")");
-            }
-            URI next = URI.create(url).resolve(location);
-            HttpRequest second = HttpRequest.newBuilder(next)
-                    .timeout(Duration.ofSeconds(60))
-                    .header("Content-Type", "application/json; charset=UTF-8")
+        for (int hop = 0; hop < 5; hop++) {
+            HttpRequest request = HttpRequest.newBuilder(current)
+                    .timeout(Duration.ofSeconds(90))
+                    // Sin charset extra: Apps Script es más fiable con application/json puro
+                    .header("Content-Type", "application/json")
                     .header("Accept", "application/json, text/plain, */*")
                     .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
                     .build();
-            HttpResponse<String> redirected = httpClient.send(second, HttpResponse.BodyHandlers.ofString());
-            if (redirected.statusCode() >= 200 && redirected.statusCode() < 300) {
-                return redirected.body();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            lastCode = response.statusCode();
+            lastBody = response.body() == null ? "" : response.body();
+
+            if (lastCode >= 200 && lastCode < 300) {
+                if (looksLikeHtml_(lastBody)) {
+                    throw new IllegalStateException(
+                            "Web App devolvió HTML en vez de JSON. Redesplegá la Apps Script "
+                                    + "(Nueva implementación / nueva versión) con doPost y acceso «Cualquiera»."
+                    );
+                }
+                return lastBody;
             }
-            throw new IllegalStateException(
-                    "Web App respondió HTTP " + redirected.statusCode() + " tras redirect: "
-                            + truncate(redirected.body(), 240)
-            );
+
+            if (lastCode == 301 || lastCode == 302 || lastCode == 303 || lastCode == 307 || lastCode == 308) {
+                String location = response.headers().firstValue("location")
+                        .or(() -> response.headers().firstValue("Location"))
+                        .orElse("");
+                if (location.isBlank()) {
+                    throw new IllegalStateException("Redirect HTTP " + lastCode + " sin header Location");
+                }
+                URI next = current.resolve(location);
+                log.info("[GoogleSheets] write redirect hop={} {} → {}", hop, lastCode, sanitizeUrl_(next));
+                if (next.toString().contains("accounts.google.com")) {
+                    throw new IllegalStateException(
+                            "Google pide login en el Web App. En Apps Script: Implementar → "
+                                    + "Ejecutar como «Yo» y Quién tiene acceso «Cualquiera», luego usá la URL /exec nueva."
+                    );
+                }
+                current = next;
+                continue;
+            }
+
+            // 405 típico cuando el redirect se trató mal o el deployment no tiene doPost
+            if (lastCode == 405 || looksLikeHtml_(lastBody)) {
+                throw new IllegalStateException(
+                        "HTTP " + lastCode + " al escribir en Sheets. "
+                                + "Casi siempre falta redesplegar la web app DESPUÉS de pegar doPost: "
+                                + "Implementar → Nueva implementación → Aplicación web → "
+                                + "copiá de nuevo la URL /exec a GOOGLE_SHEETS_WEBAPP_URL. "
+                                + "Detalle: " + truncate(lastBody, 160)
+                );
+            }
+
+            throw new IllegalStateException("Web App respondió HTTP " + lastCode + ": " + truncate(lastBody, 240));
         }
-        throw new IllegalStateException("Web App respondió HTTP " + code + ": " + truncate(response.body(), 240));
+
+        throw new IllegalStateException(
+                "Demasiados redirects al escribir en Sheets (último HTTP " + lastCode + "): "
+                        + truncate(lastBody, 200)
+        );
+    }
+
+    private static boolean looksLikeHtml_(String body) {
+        if (body == null) return false;
+        String t = body.stripLeading();
+        return t.startsWith("<!DOCTYPE") || t.startsWith("<html") || t.contains("window['ppConfig']");
+    }
+
+    private static String sanitizeUrl_(URI uri) {
+        String s = uri.toString();
+        int q = s.indexOf('?');
+        return q > 0 ? s.substring(0, q) + "?…" : s;
     }
 
     private List<SheetConversationRowDto> mapSeguimientoToRows(JsonNode root) {

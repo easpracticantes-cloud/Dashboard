@@ -14,6 +14,15 @@ El dashboard ahora puede **editar seguimientos y ventas** y guardar esos cambios
 
 Sin el `doPost` desplegado, el botón “Guardar en Google Sheets” fallará con un mensaje indicando que falta el script.
 
+## Error HTTP 405 / HTML tras guardar
+
+Eso pasa si la URL `/exec` es de una implementación **anterior** (solo `doGet`) o no se creó **nueva implementación** después de pegar `doPost`.
+
+1. En Apps Script: **Implementar → Nueva implementación** (no solo “Administrar”).
+2. Tipo Aplicación web → Ejecutar como **Yo** → Acceso **Cualquiera**.
+3. Copia la **nueva** URL `/exec` a Render: `GOOGLE_SHEETS_WEBAPP_URL`.
+4. Redeploy del backend.
+
 ## Uso en la app
 
 1. Entra a **Dashboard** → pestaña **Seguimientos** o **Ventas**.
