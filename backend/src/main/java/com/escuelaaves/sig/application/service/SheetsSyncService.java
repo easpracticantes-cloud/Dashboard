@@ -79,7 +79,7 @@ public class SheetsSyncService {
     private static final ZoneId ZONE = ZoneId.of("America/Bogota");
     private static final Duration CACHE_TTL = Duration.ofMinutes(8);
     private static final String DEFAULT_WEBAPP_URL =
-            "https://script.google.com/macros/s/AKfycbxSHKjze5jsBZmMoBX8KI6er59OW80OBycH6Shh5oMXLNhxD77qoWOesFTy9A1KV3pm-g/exec";
+            "https://script.google.com/macros/s/AKfycbwfFkKwgD5lPBGzrP8J477cKBrueQroZ6rW4c7XgU7ebMdRT1xlZFl6XoFgH29ugUObPg/exec";
     private static final int MAX_HOT_NOTIFICATIONS = 20;
     private static final int MAX_QUOTE_SUGGESTIONS = 15;
     /** Lotes CRM: balance entre velocidad y presión de memoria/TX en Render. */
