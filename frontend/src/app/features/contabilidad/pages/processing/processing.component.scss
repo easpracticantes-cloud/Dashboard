@@ -26,6 +26,19 @@
     width: 14px;
     height: 14px;
   }
+
+  .model-tag {
+    opacity: 0.75;
+    font-size: 0.7rem;
+    margin-left: 0.15rem;
+  }
+}
+
+.health-warn {
+  margin: 0.65rem 0 0;
+  font-size: 0.85rem;
+  color: #b45309;
+  max-width: 36rem;
 }
 
 .proc-grid {

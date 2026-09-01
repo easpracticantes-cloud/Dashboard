@@ -16,8 +16,23 @@
           <span class="status" [class.ok]="health.ai ?? health.ollama" [class.bad]="!(health.ai ?? health.ollama)">
             <mat-icon>psychology</mat-icon>
             {{ health.ai_provider === 'gemini' ? 'Gemini' : 'Motor IA' }}
+            @if (health.ai_model) {
+              <small class="model-tag">{{ health.ai_model }}</small>
+            }
           </span>
+          @if (health.vision_fallback) {
+            <span class="status ok">
+              <mat-icon>visibility</mat-icon>
+              Visión
+            </span>
+          }
         </div>
+        @if (health.errores?.length) {
+          <p class="health-warn">{{ health.errores.join(' ') }}</p>
+        }
+        @if (health.hint) {
+          <p class="health-warn">{{ health.hint }}</p>
+        }
       }
     </div>
   </header>

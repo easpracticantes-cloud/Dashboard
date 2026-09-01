@@ -27,6 +27,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.util.List;
+
 /**
  * Adapter hexagonal hacia Google Gemini vía REST (RestClient).
  * Única clase autorizada a hablar con la API de Gemini.
@@ -262,52 +264,69 @@ public class GeminiAdapter implements GenerativeAiPort {
             throw new BadRequestException("El mensaje para Gemini no puede estar vacío");
         }
 
-        String path = "/models/" + properties.model() + ":generateContent";
         GeminiRequest body = GeminiRequest.textPrompt(systemPrompt, userMessage, jsonMode);
-
-        int maxAttempts = 3;
+        List<String> models = properties.modelsToTry();
         RestClientException lastNetwork = null;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            try {
-                log.info("[Gemini] POST {} model={} jsonMode={} chars={} attempt={}/{}",
-                        path, properties.model(), jsonMode, userMessage.length(), attempt, maxAttempts);
+        String lastHttpDetail = null;
 
-                GeminiResponse response = geminiRestClient.post()
-                        .uri(uriBuilder -> uriBuilder
-                                .path(path)
-                                .queryParam("key", properties.apiKey())
-                                .build())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body(body)
-                        .retrieve()
-                        .body(GeminiResponse.class);
+        for (String model : models) {
+            String path = "/models/" + model + ":generateContent";
+            int maxAttempts = 2;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    log.info("[Gemini] POST {} model={} jsonMode={} chars={} attempt={}/{}",
+                            path, model, jsonMode, userMessage.length(), attempt, maxAttempts);
 
-                if (response == null) {
-                    throw new BadRequestException("Gemini devolvió respuesta vacía");
-                }
-                String text = response.firstText();
-                if (text.isBlank()) {
-                    log.warn("[Gemini] Sin texto útil. finish/block info presente={}", response.promptFeedback() != null);
-                    throw new BadRequestException("Gemini no devolvió contenido útil");
-                }
-                log.info("[Gemini] OK chars={}", text.length());
-                return text;
-            } catch (RestClientResponseException ex) {
-                int status = ex.getStatusCode().value();
-                log.error("[Gemini] HTTP {} body={}", status, ex.getResponseBodyAsString());
-                if (attempt < maxAttempts && (status == 429 || status >= 500)) {
-                    sleepBackoff(attempt);
-                    continue;
-                }
-                throw new BadRequestException("Error Gemini HTTP " + status + ": " + truncate(ex.getResponseBodyAsString()));
-            } catch (RestClientException ex) {
-                lastNetwork = ex;
-                log.error("[Gemini] Error de red/timeout attempt={}: {}", attempt, ex.getMessage());
-                if (attempt < maxAttempts) {
-                    sleepBackoff(attempt);
-                    continue;
+                    GeminiResponse response = geminiRestClient.post()
+                            .uri(uriBuilder -> uriBuilder
+                                    .path(path)
+                                    .queryParam("key", properties.apiKey())
+                                    .build())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .body(body)
+                            .retrieve()
+                            .body(GeminiResponse.class);
+
+                    if (response == null) {
+                        throw new BadRequestException("Gemini devolvió respuesta vacía");
+                    }
+                    String text = response.firstText();
+                    if (text.isBlank()) {
+                        log.warn("[Gemini] Sin texto útil model={}. finish/block info presente={}",
+                                model, response.promptFeedback() != null);
+                        throw new BadRequestException("Gemini no devolvió contenido útil");
+                    }
+                    log.info("[Gemini] OK model={} chars={}", model, text.length());
+                    return text;
+                } catch (RestClientResponseException ex) {
+                    int status = ex.getStatusCode().value();
+                    lastHttpDetail = "HTTP " + status + " model=" + model + ": " + truncate(ex.getResponseBodyAsString());
+                    log.error("[Gemini] {}", lastHttpDetail);
+                    // Modelo no disponible / denegado → probar siguiente modelo
+                    if (status == 403 || status == 404) {
+                        break;
+                    }
+                    if (attempt < maxAttempts && (status == 429 || status >= 500)) {
+                        sleepBackoff(attempt);
+                        continue;
+                    }
+                    throw new BadRequestException("Error Gemini " + lastHttpDetail);
+                } catch (RestClientException ex) {
+                    lastNetwork = ex;
+                    log.error("[Gemini] Error de red/timeout model={} attempt={}: {}",
+                            model, attempt, ex.getMessage());
+                    if (attempt < maxAttempts) {
+                        sleepBackoff(attempt);
+                        continue;
+                    }
                 }
             }
+        }
+
+        if (lastHttpDetail != null) {
+            throw new BadRequestException(
+                    "Ningún modelo Gemini respondió. Probados: " + models + ". Último: " + lastHttpDetail
+            );
         }
         throw new BadRequestException("No se pudo contactar Gemini: "
                 + (lastNetwork != null ? lastNetwork.getMessage() : "reintentos agotados"));

@@ -3,6 +3,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,23 +17,41 @@ class Settings(BaseSettings):
         env_file=str(PROYECTO_RAIZ / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     app_name: str = "Sistema Contable IA"
     database_url: str = f"sqlite:///{(PROYECTO_RAIZ / 'data' / 'contable.db').as_posix()}"
-    # gemini | ollama | auto — en Render: gemini + GEMINI_API_KEY
-    ai_provider: str = "gemini"
+
+    # Acepta AI_PROVIDER (Contabilidad) y APP_AI_PROVIDER (mismo nombre que el backend SIG)
+    ai_provider: str = Field(
+        default="gemini",
+        validation_alias=AliasChoices("AI_PROVIDER", "APP_AI_PROVIDER", "ai_provider"),
+    )
+
     ollama_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.2"
     ollama_timeout: int = 90
-    # Cloud: https://ollama.com/settings/keys → OLLAMA_API_KEY + OLLAMA_URL=https://ollama.com
     ollama_api_key: str = ""
-    gemini_api_key: str = ""
-    # Misma default que el backend SIG (application.yml)
-    gemini_model: str = "gemini-3.6-flash"
+
+    gemini_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key"),
+    )
+    gemini_model: str = Field(
+        default="gemini-2.0-flash",
+        validation_alias=AliasChoices("GEMINI_MODEL", "gemini_model"),
+    )
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
     gemini_timeout: int = 90
-    # spa en Docker Render; eng+spa en local Windows típico
+    # Lista separada por comas — se prueban si el modelo principal falla
+    gemini_fallback_models: str = (
+        "gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-latest,gemini-flash-latest"
+    )
+
+    # Si OCR < umbral, Gemini visión analiza la imagen (evita "0 caracteres")
+    gemini_vision_on_weak_ocr: bool = True
+
     tesseract_lang: str = "spa+eng"
     tesseract_cmd: str | None = None
     storage_provider: str = "local"

@@ -74,10 +74,11 @@ app:
     gemini:
       # Nunca hardcodear la key: definir GEMINI_API_KEY en entorno / Render
       api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-3.6-flash}
+      model: ${GEMINI_MODEL:gemini-2.0-flash}
       base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+      fallback-models: ${GEMINI_FALLBACK_MODELS:gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-latest,gemini-flash-latest}
       connect-timeout-seconds: ${GEMINI_CONNECT_TIMEOUT_SECONDS:15}
-      read-timeout-seconds: ${GEMINI_READ_TIMEOUT_SECONDS:60}
+      read-timeout-seconds: ${GEMINI_READ_TIMEOUT_SECONDS:90}
 
 management:
   endpoints:

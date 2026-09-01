@@ -11,7 +11,11 @@ from domain.rules.rule_engine import RuleEngine
 from domain.services.confidence_scorer import score_invoice_extraction
 from domain.services.duplicate_detector import DuplicateDetector
 from exportador import guardar_texto
-from infrastructure.ai.ai_factory import ai_unavailable_message, create_ai_provider
+from infrastructure.ai.ai_factory import (
+    ai_unavailable_message,
+    create_ai_provider,
+    resolve_ai_provider_name,
+)
 from infrastructure.ai.ollama_provider import AIProvider
 from infrastructure.ocr.tesseract_provider import TesseractOCRProvider
 from infrastructure.persistence.database import SessionLocal, init_db
@@ -125,19 +129,47 @@ class DocumentProcessingService:
             resultado["caracteres_ocr"] = len(ocr_result.text.strip())
             guardar_texto(ruta_texto, ocr_result.text)
 
-            if len(ocr_result.text.strip()) < settings.min_caracteres_ocr:
-                error = (
-                    f"OCR debil ({resultado['caracteres_ocr']} caracteres). "
-                    "Prueba con una imagen mas clara."
+            ocr_debil = len(ocr_result.text.strip()) < settings.min_caracteres_ocr
+            if ocr_debil:
+                vision_fn = getattr(self.ai, "extract_custom_from_image", None)
+                use_vision = (
+                    bool(getattr(settings, "gemini_vision_on_weak_ocr", True))
+                    and callable(vision_fn)
+                    and resolve_ai_provider_name() == "gemini"
                 )
-                resultado["error"] = error
-                document.estado = DocumentStatus.REQUIERE_REVISION
-                job_repo.mark_requires_review(job)
-                audit.log("OCR_DEBIL", "Document", str(document.id), valor_nuevo=error)
-                db.commit()
-                return resultado
+                if not use_vision:
+                    error = (
+                        f"OCR debil ({resultado['caracteres_ocr']} caracteres). "
+                        "Prueba con una imagen mas clara (JPG/PNG nitida)."
+                    )
+                    resultado["error"] = error
+                    document.estado = DocumentStatus.REQUIERE_REVISION
+                    job_repo.mark_requires_review(job)
+                    audit.log("OCR_DEBIL", "Document", str(document.id), valor_nuevo=error)
+                    db.commit()
+                    return resultado
 
-            ai_result = self.ai.extract_custom(ocr_result.text, solicitud_usuario)
+                logger.info(
+                    "OCR debil (%s chars) — Gemini vision sobre %s",
+                    resultado["caracteres_ocr"],
+                    nombre_archivo,
+                )
+                ai_result = vision_fn(ruta_imagen, solicitud_usuario)
+                resultado["metodo_ocr"] = "GEMINI_VISION"
+                if not ai_result.ok:
+                    error = (
+                        f"OCR debil ({resultado['caracteres_ocr']} caracteres) y "
+                        f"vision Gemini fallo: {ai_result.error}"
+                    )
+                    resultado["error"] = error
+                    document.estado = DocumentStatus.REQUIERE_REVISION
+                    job_repo.mark_requires_review(job)
+                    audit.log("OCR_VISION_FAIL", "Document", str(document.id), valor_nuevo=error)
+                    db.commit()
+                    return resultado
+            else:
+                ai_result = self.ai.extract_custom(ocr_result.text, solicitud_usuario)
+
             if not ai_result.ok:
                 resultado["error"] = ai_result.error
                 document.estado = DocumentStatus.ERROR
@@ -152,14 +184,14 @@ class DocumentProcessingService:
             ruta_respuesta.write_text(respuesta_ia, encoding="utf-8")
 
             extracted = dict(ai_result.data)
-            conf = score_invoice_extraction(extracted, len(ocr_result.text.strip()))
+            conf = score_invoice_extraction(extracted, max(len(ocr_result.text.strip()), 1))
             extracted["_confidence"] = {"global": conf.global_score, "fields": conf.fields}
 
             doc_repo.update_extraction(
                 document,
                 extracted=extracted,
                 ocr_text=ocr_result.text,
-                metodo_ocr=ocr_result.method,
+                metodo_ocr=resultado["metodo_ocr"],
                 estado=DocumentStatus.EXTRAIDO,
                 requiere_revision=conf.requiere_revision,
                 observaciones=None,
@@ -179,7 +211,7 @@ class DocumentProcessingService:
                 "document_id": document.id,
                 "job_id": job.id,
                 "solicitud_usuario": solicitud_usuario,
-                "metodo_ocr": ocr_result.method,
+                "metodo_ocr": resultado["metodo_ocr"],
                 "caracteres_original": ocr_result.chars_original,
                 "caracteres_preprocesada": ocr_result.chars_preprocessed,
                 "procesado_en": datetime.now().isoformat(timespec="seconds"),
@@ -239,12 +271,37 @@ class DocumentProcessingService:
             )
 
             if len(ocr_result.text.strip()) < settings.min_caracteres_ocr:
-                document.estado = DocumentStatus.REQUIERE_REVISION
-                job_repo.mark_requires_review(job)
-                db.commit()
-                return {"ok": False, "estado": "revisar", "document_id": document.id}
+                vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
+                use_vision = (
+                    bool(getattr(settings, "gemini_vision_on_weak_ocr", True))
+                    and callable(vision_fn)
+                    and resolve_ai_provider_name() == "gemini"
+                )
+                if use_vision:
+                    logger.info("Batch OCR debil — Gemini vision sobre %s", ruta_imagen.name)
+                    ai_result = vision_fn(ruta_imagen)
+                    if ai_result.ok:
+                        # Reusar flujo de éxito batch más abajo
+                        ocr_result = type(ocr_result)(
+                            text=ocr_result.text or "(vision)",
+                            method="GEMINI_VISION",
+                            chars_original=ocr_result.chars_original,
+                            chars_preprocessed=ocr_result.chars_preprocessed,
+                            preprocessed_path=ocr_result.preprocessed_path,
+                        )
+                    else:
+                        document.estado = DocumentStatus.REQUIERE_REVISION
+                        job_repo.mark_requires_review(job)
+                        db.commit()
+                        return {"ok": False, "estado": "revisar", "document_id": document.id}
+                else:
+                    document.estado = DocumentStatus.REQUIERE_REVISION
+                    job_repo.mark_requires_review(job)
+                    db.commit()
+                    return {"ok": False, "estado": "revisar", "document_id": document.id}
 
-            ai_result = self.ai.extract_invoice(ocr_result.text)
+            if ocr_result.method != "GEMINI_VISION":
+                ai_result = self.ai.extract_invoice(ocr_result.text)
             if not ai_result.ok:
                 document.estado = DocumentStatus.ERROR
                 job_repo.mark_failed(job, ai_result.error)

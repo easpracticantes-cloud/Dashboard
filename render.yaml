@@ -53,6 +53,8 @@ services:
         value: local
       - key: AI_PROVIDER
         value: gemini
+      - key: APP_AI_PROVIDER
+        value: gemini
       - key: OLLAMA_URL
         value: https://ollama.com
       - key: OLLAMA_API_KEY
@@ -62,7 +64,9 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-3.6-flash
+        value: gemini-2.0-flash
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-latest,gemini-flash-latest
       - key: TESSERACT_LANG
         value: spa+eng
       - key: LOG_LEVEL

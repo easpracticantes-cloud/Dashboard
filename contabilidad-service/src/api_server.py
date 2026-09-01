@@ -83,20 +83,33 @@ app.add_middleware(
 @app.get("/api/health")
 def health():
     """Estado de Tesseract y del motor IA (Gemini u Ollama)."""
+    from config.settings import get_settings
     from infrastructure.ai.ai_factory import resolve_ai_provider_name
 
+    settings = get_settings()
     errores = verificar_dependencias()
     provider = resolve_ai_provider_name()
     ai_ok = not any("Gemini" in e or "Ollama" in e for e in errores)
+    key_set = bool((settings.gemini_api_key or "").strip()) if provider == "gemini" else bool(
+        (settings.ollama_api_key or "").strip() or "localhost" in (settings.ollama_url or "")
+    )
     return {
         "ok": len(errores) == 0,
         "errores": errores,
         "tesseract": "Tesseract OCR no esta disponible." not in errores,
         "ai_provider": provider,
         "ai": ai_ok,
-        # Compat UI antigua: "ollama" = motor IA disponible (Gemini u Ollama)
+        "ai_key_configured": key_set,
+        "ai_model": settings.gemini_model if provider == "gemini" else settings.ollama_model,
+        "vision_fallback": bool(settings.gemini_vision_on_weak_ocr) and provider == "gemini",
+        # Compat UI antigua: "ollama" = motor IA disponible
         "ollama": ai_ok,
         "gemini": provider == "gemini" and ai_ok,
+        "hint": (
+            None
+            if ai_ok
+            else "En Contabilidad usa AI_PROVIDER=gemini (o APP_AI_PROVIDER) y la misma GEMINI_API_KEY/GEMINI_MODEL del backend."
+        ),
     }
 
 

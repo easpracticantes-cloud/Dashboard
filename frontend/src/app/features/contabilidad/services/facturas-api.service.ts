@@ -10,7 +10,11 @@ export interface HealthResponse {
   ollama: boolean;
   ai?: boolean;
   ai_provider?: string;
+  ai_model?: string;
+  ai_key_configured?: boolean;
+  vision_fallback?: boolean;
   gemini?: boolean;
+  hint?: string | null;
 }
 
 export interface ResultadoFactura {
