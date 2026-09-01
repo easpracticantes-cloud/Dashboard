@@ -34,7 +34,6 @@ import { IntegrationsService } from '../../../core/services/integrations.service
 import { ThemeService } from '../../../core/services/theme.service';
 import {
   SeguimientoWhatsapp,
-  SheetTable,
   SheetsDashboard,
   SheetsFilters,
   VentaSheet
@@ -62,7 +61,6 @@ const SEMAFORO_COLORS: Record<string, string> = {
   VENTA: '#1F7A4C',
   SIN_DATO: '#8A9690'
 };
-const CANAL_COLORS = ['#14261C', '#1F7A4C', '#E4A01A', '#3D9A6A', '#C25145', '#4A5560', '#5B8DEF'];
 const MONTH_LABELS = [
   { value: '01', label: 'Ene' },
   { value: '02', label: 'Feb' },
@@ -78,17 +76,7 @@ const MONTH_LABELS = [
   { value: '12', label: 'Dic' }
 ];
 
-type Section =
-  | 'resumen'
-  | 'seguimientos'
-  | 'ventas'
-  | 'b2b'
-  | 'paises'
-  | 'piezas'
-  | 'estadisticas'
-  | 'despliegue'
-  | 'plan'
-  | 'hojas';
+type Section = 'resumen' | 'seguimientos' | 'ventas';
 
 @Component({
   selector: 'eas-dashboard-sheets',
@@ -124,9 +112,6 @@ export class DashboardSheetsComponent implements AfterViewInit {
   readonly data = signal<SheetsDashboard | null>(null);
   readonly filters = signal<SheetsFilters>(emptyFilters());
   readonly activeSection = signal<Section>('resumen');
-  readonly selectedRawSheet = signal('');
-  readonly nextRefreshAt = signal<number>(Date.now() + REFRESH_MS);
-  readonly nowTick = signal(Date.now());
 
   readonly editingSeguimiento = signal<SeguimientoWhatsapp | null>(null);
   readonly editingVenta = signal<VentaSheet | null>(null);
@@ -156,39 +141,25 @@ export class DashboardSheetsComponent implements AfterViewInit {
   readonly displayedColumns = [
     'acciones',
     'fecha',
-    'hojaOrigen',
     'cliente',
     'celular',
     'canal',
-    'tipo',
     'semaforo',
     'solicitud',
-    'respuesta',
-    'cotizado',
-    'encuesta',
     'asignado',
-    'priorizar',
-    'pendiente',
-    'disc',
-    'objecion',
-    'fechaServicio',
     'proximoSeguimiento',
     'notas'
   ];
   readonly ventasColumns = [
     'acciones',
     'fechaCot',
-    'tipoCliente',
     'nombre',
     'celular',
     'servicio',
     'venta',
-    'codigo',
     'fechaServicio',
     'realizado',
-    'envioReserva',
-    'pagoAutobits',
-    'soporteDrive'
+    'pagoAutobits'
   ];
 
   readonly filteredRows = computed(() =>
@@ -200,17 +171,16 @@ export class DashboardSheetsComponent implements AfterViewInit {
   readonly kpiCards = computed<KpiItem[]>(() => {
     const k = this.liveKpis();
     return [
-      { id: 'contactos', label: 'Total Contactos', value: k.totalContactos, icon: 'groups', accent: 'forest' },
-      { id: 'ventas', label: 'Total Ventas', value: k.totalVentas, icon: 'payments', accent: 'leaf' },
+      { id: 'contactos', label: 'Contactos', value: k.totalContactos, icon: 'groups', accent: 'forest' },
+      { id: 'ventas', label: 'Ventas', value: k.totalVentas, icon: 'payments', accent: 'leaf' },
       {
         id: 'conversion',
-        label: 'Tasa Conversión',
+        label: 'Conversión',
         value: k.tasaConversion,
         suffix: '%',
         icon: 'trending_up',
         accent: 'amber'
       },
-      { id: 'encuestas', label: 'Total Encuestas', value: k.totalConEncuesta, icon: 'rate_review', accent: 'mint' },
       {
         id: 'tibio',
         label: 'Tibio + Caliente',
@@ -227,16 +197,9 @@ export class DashboardSheetsComponent implements AfterViewInit {
   readonly canalOptions = computed(() =>
     uniqueSorted((this.data()?.seguimientoWhatsapp ?? []).map((r) => r.canal || 'SIN_DATO'))
   );
-  readonly hojaOptions = computed(() =>
-    uniqueSorted((this.data()?.seguimientoWhatsapp ?? []).map((r) => r.hojaOrigen || ''))
-  );
 
   readonly porSemaforo = computed(() => aggregateBy(this.filteredRows(), (r) => r.semaforo || 'SIN_DATO'));
-  readonly porCanal = computed(() => aggregateBy(this.filteredRows(), (r) => r.canal || 'SIN_DATO'));
   readonly evolucion = computed(() => buildEvolucion(this.filteredRows()));
-  readonly porMes = computed(() =>
-    this.evolucion().map((p) => ({ label: p.mes, value: p.seguimientos }))
-  );
 
   readonly pieSeries = computed<ApexNonAxisChartSeries>(() => this.porSemaforo().map((x) => x.value));
   readonly pieLabels = computed(() => this.porSemaforo().map((x) => x.label));
@@ -244,24 +207,6 @@ export class DashboardSheetsComponent implements AfterViewInit {
     this.porSemaforo().map((x) => SEMAFORO_COLORS[x.label] ?? '#8A9690')
   );
   readonly hasPie = computed(() => this.pieSeries().some((v) => Number(v) > 0));
-
-  readonly barCanalSeries = computed<ApexAxisChartSeries>(() => [
-    { name: 'Contactos', data: this.porCanal().map((x) => x.value) }
-  ]);
-  readonly barCanalXaxis = computed<ApexXAxis>(() => ({
-    categories: this.porCanal().map((x) => x.label),
-    labels: { style: { colors: this.chartLabelColor(), fontFamily: FONT, fontSize: '11px' } }
-  }));
-  readonly hasBarCanal = computed(() => this.porCanal().some((x) => x.value > 0));
-
-  readonly barMesSeries = computed<ApexAxisChartSeries>(() => [
-    { name: 'Seguimientos', data: this.porMes().map((x) => x.value) }
-  ]);
-  readonly barMesXaxis = computed<ApexXAxis>(() => ({
-    categories: this.porMes().map((x) => x.label),
-    labels: { style: { colors: this.chartLabelColor(), fontFamily: FONT, fontSize: '11px' } }
-  }));
-  readonly hasBarMes = computed(() => this.porMes().some((x) => x.value > 0));
 
   readonly lineSeries = computed<ApexAxisChartSeries>(() => [
     { name: 'Seguimientos', data: this.evolucion().map((x) => x.seguimientos) },
@@ -273,23 +218,16 @@ export class DashboardSheetsComponent implements AfterViewInit {
   }));
   readonly hasLine = computed(() => this.evolucion().length > 0);
 
-  readonly pieChart: ApexChart = { type: 'donut', height: 300, fontFamily: FONT, toolbar: { show: false } };
+  readonly pieChart: ApexChart = { type: 'donut', height: 280, fontFamily: FONT, toolbar: { show: false } };
   readonly piePlot: ApexPlotOptions = {
     pie: { donut: { size: '68%', labels: { show: true, total: { show: true, label: 'Total', fontFamily: FONT } } } }
   };
   readonly pieLegend: ApexLegend = { position: 'bottom', fontFamily: FONT };
   readonly pieTooltip = computed<ApexTooltip>(() => ({ theme: this.theme.isDark() ? 'dark' : 'light' }));
 
-  readonly barChart: ApexChart = { type: 'bar', height: 300, fontFamily: FONT, toolbar: { show: false } };
-  readonly barDataLabels: ApexDataLabels = { enabled: false };
-  readonly barPlot: ApexPlotOptions = { bar: { borderRadius: 8, columnWidth: '48%', distributed: true } };
-  readonly barLegend: ApexLegend = { show: false };
-  readonly barColors = CANAL_COLORS;
-  readonly barTooltip = computed<ApexTooltip>(() => ({ theme: this.theme.isDark() ? 'dark' : 'light' }));
-
   readonly lineChart: ApexChart = {
     type: 'line',
-    height: 300,
+    height: 280,
     fontFamily: FONT,
     toolbar: { show: false },
     zoom: { enabled: false }
@@ -300,57 +238,7 @@ export class DashboardSheetsComponent implements AfterViewInit {
   readonly lineLegend: ApexLegend = { position: 'top', fontFamily: FONT };
   readonly lineTooltip = computed<ApexTooltip>(() => ({ theme: this.theme.isDark() ? 'dark' : 'light' }));
 
-  readonly toques = computed(() => this.data()?.toques ?? []);
-  readonly b2bAgencias = computed(() => this.data()?.b2bAgencias ?? []);
-  readonly b2bTabla = computed(() => this.data()?.b2bTabla ?? null);
-  readonly piezas = computed(() => this.data()?.piezasPub ?? []);
   readonly ventas = computed(() => this.data()?.ventas ?? []);
-  readonly estadisticas = computed(() => this.data()?.estadisticas ?? null);
-  readonly despliegue = computed(() => this.data()?.despliegueSemanal ?? null);
-  readonly planComercial = computed(() => this.data()?.planComercial ?? null);
-  readonly cobertura = computed(() =>
-    (this.data()?.hojas ?? []).map((h) => ({
-      nombre: h.nombre,
-      rowCount: h.rowCount,
-      estado: h.estado
-    }))
-  );
-  readonly paises = computed(() => this.data()?.paisesDetalle?.length
-    ? this.data()!.paisesDetalle!
-    : (this.data()?.resumenPaises ?? []).map((p) => ({ pais: p.label, codigo: '', cantidad: p.value }))
-  );
-  readonly maxPais = computed(() => Math.max(1, ...this.paises().map((p) => p.cantidad)));
-  readonly hojas = computed(() => this.data()?.hojas ?? []);
-  readonly rawSheets = computed(() => this.data()?.rawSheets ?? []);
-  readonly activeRaw = computed(() => {
-    const list = this.rawSheets();
-    const name = this.selectedRawSheet();
-    return list.find((s) => s.nombre === name) ?? list[0] ?? null;
-  });
-  readonly activeRawRows = computed(() => this.activeRaw()?.fullData ?? []);
-  readonly countdownLabel = computed(() => {
-    const ms = Math.max(0, this.nextRefreshAt() - this.nowTick());
-    const m = Math.floor(ms / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  });
-
-  readonly paisBarSeries = computed<ApexAxisChartSeries>(() => [
-    { name: 'Contactos', data: this.paises().slice(0, 12).map((p) => p.cantidad) }
-  ]);
-  readonly paisBarXaxis = computed<ApexXAxis>(() => ({
-    categories: this.paises().slice(0, 12).map((p) => p.pais),
-    labels: { style: { colors: this.chartLabelColor(), fontFamily: FONT, fontSize: '11px' } }
-  }));
-  readonly paisBarChart: ApexChart = {
-    type: 'bar',
-    height: 360,
-    fontFamily: FONT,
-    toolbar: { show: false }
-  };
-  readonly paisBarPlot: ApexPlotOptions = {
-    bar: { horizontal: true, borderRadius: 6, barHeight: '70%' }
-  };
 
   constructor() {
     this.table.sortingDataAccessor = (item, column) => {
@@ -366,7 +254,6 @@ export class DashboardSheetsComponent implements AfterViewInit {
       this.ventasTable.data = this.ventas();
     });
 
-    // Instant paint desde sessionStorage (stale-while-revalidate)
     const cached = this.dashboardService.peekCachedSummary();
     if (cached?.success) {
       this.data.set(cached);
@@ -374,10 +261,6 @@ export class DashboardSheetsComponent implements AfterViewInit {
     }
 
     this.loadProgressive(false);
-
-    interval(1000)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.nowTick.set(Date.now()));
 
     interval(REFRESH_MS)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -390,14 +273,9 @@ export class DashboardSheetsComponent implements AfterViewInit {
 
   setSection(section: Section): void {
     this.activeSection.set(section);
-    if (section === 'seguimientos' || section === 'ventas' || section === 'b2b' || section === 'piezas') {
+    if (section === 'seguimientos' || section === 'ventas') {
       this.ensureFullPayload();
       queueMicrotask(() => this.bindTableControls());
-    }
-    if (section === 'hojas') {
-      this.dashboardService.getSheets(false, true).subscribe((payload) => {
-        if (payload) this.data.set(payload);
-      });
     }
   }
 
@@ -421,7 +299,33 @@ export class DashboardSheetsComponent implements AfterViewInit {
     this.editError.set(null);
     this.editSuccess.set(null);
     this.editingSeguimiento.set(row);
-    this.editDraft.set({ ...row });
+    this.editDraft.set({
+      fecha: row.fecha ?? '',
+      tipo: row.tipo ?? '',
+      canal: row.canal ?? '',
+      cliente: row.cliente ?? '',
+      celular: row.celular ?? '',
+      solicitud: row.solicitud ?? '',
+      respuesta: row.respuesta ?? '',
+      semaforo: row.semaforo ?? '',
+      cotizado: !!row.cotizado,
+      notas: row.notas ?? '',
+      fechaServicio: row.fechaServicio ?? '',
+      encuesta: !!row.encuesta,
+      asignado: row.asignado ?? '',
+      proximoSeguimiento: row.proximoSeguimiento ?? '',
+      hojaOrigen: row.hojaOrigen ?? '',
+      disc: row.disc ?? '',
+      priorizar: row.priorizar ?? '',
+      pendiente: row.pendiente ?? '',
+      objecion: row.objecion ?? '',
+      excelente: row.excelente ?? '',
+      buena: row.buena ?? '',
+      regular: row.regular ?? '',
+      registrado: row.registrado ?? '',
+      fechaCotizado: row.fechaCotizado ?? '',
+      monto: row.monto ?? ''
+    });
   }
 
   openVentaEditor(row: VentaSheet): void {
@@ -429,7 +333,21 @@ export class DashboardSheetsComponent implements AfterViewInit {
     this.editError.set(null);
     this.editSuccess.set(null);
     this.editingVenta.set(row);
-    this.editDraft.set({ ...row });
+    this.editDraft.set({
+      fechaCot: row.fechaCot ?? '',
+      tipoCliente: row.tipoCliente ?? '',
+      nombre: row.nombre ?? '',
+      celular: row.celular ?? '',
+      servicio: row.servicio ?? '',
+      venta: row.venta ?? '',
+      codigo: row.codigo ?? '',
+      fechaServicio: row.fechaServicio ?? '',
+      realizado: row.realizado ?? '',
+      envioReserva: row.envioReserva ?? '',
+      pagoAutobits: row.pagoAutobits ?? '',
+      soporteDrive: row.soporteDrive ?? '',
+      hojaOrigen: row.hojaOrigen ?? 'VENTAS'
+    });
   }
 
   closeEditor(): void {
@@ -451,58 +369,76 @@ export class DashboardSheetsComponent implements AfterViewInit {
     this.savingEdit.set(true);
     const draft = this.editDraft();
 
-    if (this.editingSeguimiento()) {
-      this.integrations.updateSeguimiento(draft).subscribe({
-        next: (res) => {
-          this.savingEdit.set(false);
-          this.applySeguimientoLocal(draft as unknown as SeguimientoWhatsapp);
-          this.editSuccess.set(res.message || 'Guardado en Google Sheets');
-          setTimeout(() => this.closeEditor(), 700);
-        },
-        error: (err) => {
-          this.savingEdit.set(false);
-          this.editError.set(err?.message || 'No se pudo guardar en Google Sheets');
-        }
-      });
+    const originalSeg = this.editingSeguimiento();
+    if (originalSeg) {
+      this.integrations
+        .updateSeguimiento({
+          ...draft,
+          hojaOrigen: originalSeg.hojaOrigen,
+          matchCelular: originalSeg.celular,
+          matchFecha: originalSeg.fecha,
+          matchCliente: originalSeg.cliente
+        })
+        .subscribe({
+          next: (res) => {
+            this.savingEdit.set(false);
+            this.applySeguimientoLocal(draft as unknown as SeguimientoWhatsapp, originalSeg);
+            this.editSuccess.set(res.message || 'Guardado en Google Sheets');
+            setTimeout(() => this.closeEditor(), 700);
+          },
+          error: (err) => {
+            this.savingEdit.set(false);
+            this.editError.set(err?.message || 'No se pudo guardar en Google Sheets');
+          }
+        });
       return;
     }
 
-    if (this.editingVenta()) {
-      this.integrations.updateVenta(draft).subscribe({
-        next: (res) => {
-          this.savingEdit.set(false);
-          this.applyVentaLocal(draft as unknown as VentaSheet);
-          this.editSuccess.set(res.message || 'Venta guardada en Google Sheets');
-          setTimeout(() => this.closeEditor(), 700);
-        },
-        error: (err) => {
-          this.savingEdit.set(false);
-          this.editError.set(err?.message || 'No se pudo guardar la venta en Google Sheets');
-        }
-      });
+    const originalVenta = this.editingVenta();
+    if (originalVenta) {
+      this.integrations
+        .updateVenta({
+          ...draft,
+          hojaOrigen: originalVenta.hojaOrigen || 'VENTAS',
+          matchCelular: originalVenta.celular,
+          matchFecha: originalVenta.fechaCot,
+          matchNombre: originalVenta.nombre
+        })
+        .subscribe({
+          next: (res) => {
+            this.savingEdit.set(false);
+            this.applyVentaLocal(draft as unknown as VentaSheet, originalVenta);
+            this.editSuccess.set(res.message || 'Venta guardada en Google Sheets');
+            setTimeout(() => this.closeEditor(), 700);
+          },
+          error: (err) => {
+            this.savingEdit.set(false);
+            this.editError.set(err?.message || 'No se pudo guardar la venta en Google Sheets');
+          }
+        });
     }
   }
 
-  private applySeguimientoLocal(updated: SeguimientoWhatsapp): void {
+  private applySeguimientoLocal(updated: SeguimientoWhatsapp, original: SeguimientoWhatsapp): void {
     const current = this.data();
     if (!current?.seguimientoWhatsapp) return;
     const list = current.seguimientoWhatsapp.map((r) => {
-      const sameCel = (r.celular || '') === (updated.celular || '');
-      const sameFecha = (r.fecha || '').slice(0, 10) === (updated.fecha || '').slice(0, 10);
-      const sameHoja = (r.hojaOrigen || '') === (updated.hojaOrigen || '');
-      return sameCel && sameFecha && sameHoja ? { ...r, ...updated } : r;
+      const sameCel = (r.celular || '') === (original.celular || '');
+      const sameFecha = (r.fecha || '').slice(0, 10) === (original.fecha || '').slice(0, 10);
+      const sameHoja = (r.hojaOrigen || '') === (original.hojaOrigen || '');
+      return sameCel && sameFecha && sameHoja ? { ...r, ...updated, hojaOrigen: original.hojaOrigen } : r;
     });
     this.data.set({ ...current, seguimientoWhatsapp: list });
     this.dashboardService.invalidateCache();
   }
 
-  private applyVentaLocal(updated: VentaSheet): void {
+  private applyVentaLocal(updated: VentaSheet, original: VentaSheet): void {
     const current = this.data();
     if (!current?.ventas) return;
     const list = current.ventas.map((r) => {
-      const sameCel = (r.celular || '') === (updated.celular || '');
-      const sameFecha = (r.fechaCot || '').slice(0, 10) === (updated.fechaCot || '').slice(0, 10);
-      return sameCel && sameFecha ? { ...r, ...updated } : r;
+      const sameCel = (r.celular || '') === (original.celular || '');
+      const sameFecha = (r.fechaCot || '').slice(0, 10) === (original.fechaCot || '').slice(0, 10);
+      return sameCel && sameFecha ? { ...r, ...updated, hojaOrigen: original.hojaOrigen } : r;
     });
     this.data.set({ ...current, ventas: list });
     this.dashboardService.invalidateCache();
@@ -512,21 +448,60 @@ export class DashboardSheetsComponent implements AfterViewInit {
     this.loadProgressive(true);
   }
 
-  selectRawSheet(nombre: string): void {
-    this.selectedRawSheet.set(nombre);
-  }
-
   exportSeguimientos(format: 'csv' | 'xls'): void {
     const headers = [
-      'Fecha', 'Hoja', 'Cliente', 'Celular', 'Canal', 'Tipo', 'Semáforo', 'Solicitud',
-      'Respuesta', 'Cotizado', 'Encuesta', 'Asignado', 'Priorizar', 'Pendiente', 'Disc',
-      'Objeción', 'Notas', 'Fecha servicio', 'Próximo seguimiento', 'Excelente', 'Buena', 'Regular', 'Registrado'
+      'Fecha',
+      'Hoja',
+      'Cliente',
+      'Celular',
+      'Canal',
+      'Tipo',
+      'Semáforo',
+      'Solicitud',
+      'Respuesta',
+      'Cotizado',
+      'Encuesta',
+      'Asignado',
+      'Priorizar',
+      'Pendiente',
+      'Disc',
+      'Objeción',
+      'Notas',
+      'Fecha servicio',
+      'Próximo seguimiento',
+      'Excelente',
+      'Buena',
+      'Regular',
+      'Registrado',
+      'Fecha cotizado',
+      'Monto'
     ];
     const rows = this.filteredRows().map((r) => [
-      r.fecha, r.hojaOrigen ?? '', r.cliente, r.celular, r.canal, r.tipo, r.semaforo,
-      r.solicitud, r.respuesta, r.cotizado ? 'SI' : 'NO', r.encuesta ? 'SI' : 'NO',
-      r.asignado, r.priorizar ?? '', r.pendiente ?? '', r.disc ?? '', r.objecion ?? '',
-      r.notas, r.fechaServicio, r.proximoSeguimiento, r.excelente ?? '', r.buena ?? '', r.regular ?? '', r.registrado ?? ''
+      r.fecha,
+      r.hojaOrigen ?? '',
+      r.cliente,
+      r.celular,
+      r.canal,
+      r.tipo,
+      r.semaforo,
+      r.solicitud,
+      r.respuesta,
+      r.cotizado ? 'SI' : 'NO',
+      r.encuesta ? 'SI' : 'NO',
+      r.asignado,
+      r.priorizar ?? '',
+      r.pendiente ?? '',
+      r.disc ?? '',
+      r.objecion ?? '',
+      r.notas,
+      r.fechaServicio,
+      r.proximoSeguimiento,
+      r.excelente ?? '',
+      r.buena ?? '',
+      r.regular ?? '',
+      r.registrado ?? '',
+      r.fechaCotizado ?? '',
+      r.monto ?? ''
     ]);
     if (format === 'csv') downloadCsv('seguimientos-sheets', headers, rows);
     else downloadExcelCompatible('seguimientos-sheets', headers, rows);
@@ -534,70 +509,41 @@ export class DashboardSheetsComponent implements AfterViewInit {
 
   exportVentas(format: 'csv' | 'xls'): void {
     const headers = [
-      'Fecha cot', 'Tipo', 'Nombre', 'Celular', 'Servicio', 'Venta', 'Código',
-      'Fecha servicio', 'Realizado', 'Envío reserva', 'Pago', 'Soporte'
+      'Fecha cot',
+      'Tipo',
+      'Nombre',
+      'Celular',
+      'Servicio',
+      'Venta',
+      'Código',
+      'Fecha servicio',
+      'Realizado',
+      'Envío reserva',
+      'Pago',
+      'Soporte'
     ];
     const rows = this.ventas().map((v) => [
-      v.fechaCot, v.tipoCliente, v.nombre, v.celular, v.servicio, v.venta, v.codigo,
-      v.fechaServicio, v.realizado, v.envioReserva, v.pagoAutobits, v.soporteDrive
+      v.fechaCot,
+      v.tipoCliente,
+      v.nombre,
+      v.celular,
+      v.servicio,
+      v.venta,
+      v.codigo,
+      v.fechaServicio,
+      v.realizado,
+      v.envioReserva,
+      v.pagoAutobits,
+      v.soporteDrive
     ]);
     if (format === 'csv') downloadCsv('ventas-sheets', headers, rows);
     else downloadExcelCompatible('ventas-sheets', headers, rows);
-  }
-
-  exportSheetTable(table: SheetTable | null | undefined, filename: string, format: 'csv' | 'xls'): void {
-    if (!table?.headers?.length) return;
-    if (format === 'csv') downloadCsv(filename, table.headers, table.rows);
-    else downloadExcelCompatible(filename, table.headers, table.rows);
-  }
-
-  exportPaises(format: 'csv' | 'xls'): void {
-    const headers = ['País', 'Código', 'Cantidad'];
-    const rows = this.paises().map((p) => [p.pais, p.codigo, p.cantidad]);
-    if (format === 'csv') downloadCsv('paises-sheets', headers, rows);
-    else downloadExcelCompatible('paises-sheets', headers, rows);
-  }
-
-  exportB2b(format: 'csv' | 'xls'): void {
-    const headers = [
-      'Agencia', 'Estado', 'Contacto', 'Teléfono', 'Correo', 'Notas',
-      'Cotizaciones', 'Reservas', 'Tipología', 'Ticket', 'Margen'
-    ];
-    const fromB2b = this.b2bAgencias().map((a) => [
-      a.agencia, a.estado, a.contacto, a.telefono, a.correo, a.notas,
-      a.cotizacionesAnual ?? '', a.reservasAnual ?? '', a.tipologiaRentable ?? '',
-      a.ticketPromedio ?? '', a.margenNeto ?? ''
-    ]);
-    const fromToques = this.toques().map((t) => [t.agencia, t.medio, t.asesor, t.telefono, t.correo, '', '', '', '', '', '']);
-    const rows = fromB2b.length ? fromB2b : fromToques;
-    if (format === 'csv') downloadCsv('b2b-sheets', headers, rows);
-    else downloadExcelCompatible('b2b-sheets', headers, rows);
-  }
-
-  exportRaw(format: 'csv' | 'xls'): void {
-    const sheet = this.activeRaw();
-    if (!sheet) return;
-    const matrix = sheet.fullData ?? [];
-    if (!matrix.length) return;
-    const headers = (matrix[0] ?? []).map((c, i) => String(c ?? '').trim() || `Col ${i + 1}`);
-    const rows = matrix.slice(1).map((row) => headers.map((_, i) => String(row?.[i] ?? '')));
-    const name = `hoja-${sheet.nombre}`.replace(/[^\w\-]+/g, '_');
-    if (format === 'csv') downloadCsv(name, headers, rows);
-    else downloadExcelCompatible(name, headers, rows);
   }
 
   private chartLabelColor(): string {
     return this.theme.isDark() ? '#9eb0a6' : '#66707a';
   }
 
-  private load(forceRefresh: boolean, fromAuto = false): void {
-    this.loadProgressive(forceRefresh || fromAuto);
-  }
-
-  /**
-   * 1) Summary (KPIs/gráficas) → pinta en &lt;1s
-   * 2) Full en background para tablas
-   */
   private loadProgressive(force: boolean): void {
     if (!this.data() && !force) {
       this.loading.set(true);
@@ -612,30 +558,19 @@ export class DashboardSheetsComponent implements AfterViewInit {
       next: (payload) => {
         this.loading.set(false);
         this.refreshing.set(false);
-        this.nextRefreshAt.set(Date.now() + REFRESH_MS);
         if (!payload) {
           if (!this.data()) {
             this.error.set('No se pudo obtener el dashboard.');
           }
           return;
         }
-        // Si ya hay full en memoria, solo refrescar agregados/meta/kpis
         const current = this.data();
         if (current?.seguimientoWhatsapp?.length) {
           this.data.set({
             ...current,
             ...payload,
             seguimientoWhatsapp: current.seguimientoWhatsapp,
-            ventas: current.ventas,
-            toques: current.toques,
-            piezasPub: current.piezasPub,
-            b2bAgencias: current.b2bAgencias,
-            b2bTabla: current.b2bTabla,
-            estadisticas: current.estadisticas,
-            despliegueSemanal: current.despliegueSemanal,
-            planComercial: current.planComercial,
-            paisesDetalle: current.paisesDetalle,
-            rawSheets: current.rawSheets
+            ventas: current.ventas
           });
         } else {
           this.data.set(payload);
@@ -643,7 +578,6 @@ export class DashboardSheetsComponent implements AfterViewInit {
         if (!payload.success) {
           this.error.set(payload.message || 'Dashboard aún sincronizando.');
         }
-        // Hidratar tablas cuando el navegador esté idle (no pelear con first paint)
         const hydrate = () => this.ensureFullPayload();
         if (typeof requestIdleCallback !== 'undefined') {
           requestIdleCallback(() => hydrate(), { timeout: 2000 });
@@ -670,9 +604,6 @@ export class DashboardSheetsComponent implements AfterViewInit {
       next: (full) => {
         if (!full) return;
         this.data.set(full);
-        if (!this.selectedRawSheet() && full.rawSheets?.length) {
-          this.selectedRawSheet.set(full.rawSheets[0].nombre);
-        }
       }
     });
   }

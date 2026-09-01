@@ -196,29 +196,33 @@ function findMatchingRow_(values, headerIdx, headers, match) {
 
 function findColumn_(headers, key) {
   var target = normalizeHeader_(key);
-  for (var i = 0; i < headers.length; i++) {
-    var h = headers[i];
-    if (!h) continue;
-    if (h === target || h.indexOf(target) >= 0 || target.indexOf(h) >= 0) {
-      return i;
-    }
+  var i;
+  for (i = 0; i < headers.length; i++) {
+    if (headers[i] === target) return i;
   }
-  // aliases
+  for (i = 0; i < headers.length; i++) {
+    var h = headers[i];
+    if (h && h.indexOf(target) >= 0) return i;
+  }
   var aliases = {
     'CELULAR': ['TELEFONO', 'WHATSAPP', 'PHONE'],
     'CLIENTE': ['NOMBRE', 'NAME'],
     'SEMAFORO': ['STATUS', 'ESTADO'],
     'NOTAS': ['NOTA', 'OBSERVACIONES', 'COMENTARIOS'],
-    'PROXIMO SEGUIMIENTO': ['PROXIMO', 'PROX SEGUIMIENTO', 'SEGUIMIENTO'],
+    'PROXIMO SEGUIMIENTO': ['PROXIMO', 'PROX SEGUIMIENTO'],
     'FECHA SERVICIO': ['FECHASERVICIO'],
+    'FECHA COTIZADO': ['FECHA COTIZACION', 'FECHA DE COTIZACION'],
+    'OBJECION': ['OBJECCION'],
+    'REGISTRADO': ['REGISTRADA'],
     'COTIZADO': ['COTIZACION']
   };
   var list = aliases[target] || [];
   for (var a = 0; a < list.length; a++) {
     for (var j = 0; j < headers.length; j++) {
-      if (headers[j] === list[a] || (headers[j] && headers[j].indexOf(list[a]) >= 0)) {
-        return j;
-      }
+      if (headers[j] === list[a]) return j;
+    }
+    for (var k = 0; k < headers.length; k++) {
+      if (headers[k] && headers[k].indexOf(list[a]) >= 0) return k;
     }
   }
   return -1;

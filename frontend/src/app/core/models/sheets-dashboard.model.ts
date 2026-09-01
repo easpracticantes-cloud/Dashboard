@@ -41,6 +41,8 @@ export interface SeguimientoWhatsapp {
   buena?: string;
   regular?: string;
   registrado?: string;
+  fechaCotizado?: string;
+  monto?: number | string;
 }
 
 export interface VentaSheet {

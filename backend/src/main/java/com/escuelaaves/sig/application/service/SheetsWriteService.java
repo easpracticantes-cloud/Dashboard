@@ -58,8 +58,11 @@ public class SheetsWriteService {
         if (blank(sheetName)) {
             throw new BadRequestException("hojaOrigen es obligatorio");
         }
-        String celular = str(body.get("celular"));
-        String fecha = str(body.get("fecha"));
+        String celular = firstNonBlank(str(body.get("matchCelular")), str(body.get("celular")));
+        String fecha = firstNonBlank(str(body.get("matchFecha")), str(body.get("fecha")));
+        String clienteMatch = body.containsKey("matchCliente")
+                ? str(body.get("matchCliente"))
+                : str(body.get("cliente"));
         if (blank(celular) && blank(fecha)) {
             throw new BadRequestException("celular o fecha son obligatorios para localizar la fila");
         }
@@ -67,36 +70,42 @@ public class SheetsWriteService {
         Map<String, String> match = new LinkedHashMap<>();
         if (!blank(celular)) match.put("celular", celular);
         if (!blank(fecha)) match.put("fecha", fecha.length() >= 10 ? fecha.substring(0, 10) : fecha);
-        if (!blank(str(body.get("cliente")))) match.put("cliente", str(body.get("cliente")));
+        if (!blank(clienteMatch)) match.put("cliente", clienteMatch);
 
         Map<String, Object> fields = new LinkedHashMap<>();
-        putIfPresent(fields, "CLIENTE", body.get("cliente"));
-        putIfPresent(fields, "CELULAR", body.get("celular"));
-        putIfPresent(fields, "CANAL", body.get("canal"));
-        putIfPresent(fields, "TIPO", body.get("tipo"));
-        putIfPresent(fields, "SEMAFORO", body.get("semaforo"));
-        putIfPresent(fields, "SOLICITUD", body.get("solicitud"));
-        putIfPresent(fields, "RESPUESTA", body.get("respuesta"));
-        putIfPresent(fields, "NOTAS", body.get("notas"));
-        putIfPresent(fields, "ASIGNADO", body.get("asignado"));
-        putIfPresent(fields, "PROXIMO SEGUIMIENTO", body.get("proximoSeguimiento"));
-        putIfPresent(fields, "FECHA SERVICIO", body.get("fechaServicio"));
-        putIfPresent(fields, "DISC", body.get("disc"));
-        putIfPresent(fields, "PRIORIZAR", body.get("priorizar"));
-        putIfPresent(fields, "PENDIENTE", body.get("pendiente"));
-        putIfPresent(fields, "OBJECION", body.get("objecion"));
+        putIfKey(fields, "FECHA", body, "fecha");
+        putIfKey(fields, "CLIENTE", body, "cliente");
+        putIfKey(fields, "CELULAR", body, "celular");
+        putIfKey(fields, "CANAL", body, "canal");
+        putIfKey(fields, "TIPO", body, "tipo");
+        putIfKey(fields, "SEMAFORO", body, "semaforo");
+        putIfKey(fields, "SOLICITUD", body, "solicitud");
+        putIfKey(fields, "RESPUESTA", body, "respuesta");
+        putIfKey(fields, "NOTAS", body, "notas");
+        putIfKey(fields, "ASIGNADO", body, "asignado");
+        putIfKey(fields, "PROXIMO SEGUIMIENTO", body, "proximoSeguimiento");
+        putIfKey(fields, "FECHA SERVICIO", body, "fechaServicio");
+        putIfKey(fields, "DISC", body, "disc");
+        putIfKey(fields, "PRIORIZAR", body, "priorizar");
+        putIfKey(fields, "PENDIENTE", body, "pendiente");
+        putIfKey(fields, "OBJECION", body, "objecion");
+        putIfKey(fields, "EXCELENTE", body, "excelente");
+        putIfKey(fields, "BUENA", body, "buena");
+        putIfKey(fields, "REGULAR", body, "regular");
+        putIfKey(fields, "REGISTRADO", body, "registrado");
+        putIfKey(fields, "FECHA COTIZADO", body, "fechaCotizado");
         if (body.containsKey("cotizado")) {
             fields.put("COTIZADO", boolLabel(body.get("cotizado")));
         }
         if (body.containsKey("encuesta")) {
             fields.put("ENCUESTA", boolLabel(body.get("encuesta")));
         }
-        if (body.containsKey("monto") && body.get("monto") != null) {
-            fields.put("MONTO", body.get("monto"));
+        if (body.containsKey("monto")) {
+            fields.put("MONTO", body.get("monto") == null ? "" : body.get("monto"));
         }
 
         SheetRowWriteResultDto result = write(new SheetRowWriteRequest("updaterow", sheetName, match, fields));
-        patchSeguimientoCache(body);
+        patchSeguimientoCache(body, celular, fecha);
         return result;
     }
 
@@ -105,42 +114,45 @@ public class SheetsWriteService {
         if (blank(sheetName)) {
             sheetName = "VENTAS";
         }
-        String celular = str(body.get("celular"));
-        String fecha = str(body.get("fechaCot"));
-        if (blank(celular) && blank(fecha) && blank(str(body.get("nombre")))) {
+        String celular = firstNonBlank(str(body.get("matchCelular")), str(body.get("celular")));
+        String fecha = firstNonBlank(str(body.get("matchFecha")), str(body.get("fechaCot")));
+        String nombreMatch = body.containsKey("matchNombre")
+                ? str(body.get("matchNombre"))
+                : str(body.get("nombre"));
+        if (blank(celular) && blank(fecha) && blank(nombreMatch)) {
             throw new BadRequestException("celular, fechaCot o nombre requeridos");
         }
 
         Map<String, String> match = new LinkedHashMap<>();
         if (!blank(celular)) match.put("celular", celular);
         if (!blank(fecha)) match.put("fecha", fecha.length() >= 10 ? fecha.substring(0, 10) : fecha);
-        if (!blank(str(body.get("nombre")))) match.put("cliente", str(body.get("nombre")));
+        if (!blank(nombreMatch)) match.put("cliente", nombreMatch);
 
         Map<String, Object> fields = new LinkedHashMap<>();
-        putIfPresent(fields, "NOMBRE", body.get("nombre"));
-        putIfPresent(fields, "CELULAR", body.get("celular"));
-        putIfPresent(fields, "TIPO CLIENTE", body.get("tipoCliente"));
-        putIfPresent(fields, "SERVICIO", body.get("servicio"));
-        putIfPresent(fields, "VENTA", body.get("venta"));
-        putIfPresent(fields, "CODIGO", body.get("codigo"));
-        putIfPresent(fields, "FECHA SERVICIO", body.get("fechaServicio"));
-        putIfPresent(fields, "REALIZADO", body.get("realizado"));
-        putIfPresent(fields, "ENVIO RESERVA", body.get("envioReserva"));
-        putIfPresent(fields, "PAGO AUTOBITS", body.get("pagoAutobits"));
-        putIfPresent(fields, "SOPORTE DRIVE", body.get("soporteDrive"));
-        putIfPresent(fields, "FECHA COT", body.get("fechaCot"));
+        putIfKey(fields, "NOMBRE", body, "nombre");
+        putIfKey(fields, "CELULAR", body, "celular");
+        putIfKey(fields, "TIPO CLIENTE", body, "tipoCliente");
+        putIfKey(fields, "SERVICIO", body, "servicio");
+        putIfKey(fields, "VENTA", body, "venta");
+        putIfKey(fields, "CODIGO", body, "codigo");
+        putIfKey(fields, "FECHA SERVICIO", body, "fechaServicio");
+        putIfKey(fields, "REALIZADO", body, "realizado");
+        putIfKey(fields, "ENVIO RESERVA", body, "envioReserva");
+        putIfKey(fields, "PAGO AUTOBITS", body, "pagoAutobits");
+        putIfKey(fields, "SOPORTE DRIVE", body, "soporteDrive");
+        putIfKey(fields, "FECHA COT", body, "fechaCot");
 
         SheetRowWriteResultDto result = write(new SheetRowWriteRequest("updaterow", sheetName, match, fields));
-        patchVentaCache(body);
+        patchVentaCache(body, celular, fecha);
         return result;
     }
 
-    private void patchSeguimientoCache(Map<String, Object> body) {
+    private void patchSeguimientoCache(Map<String, Object> body, String matchCelular, String matchFecha) {
         try {
             sheetsSyncService.patchSeguimientoRow(
                     str(body.get("hojaOrigen")),
-                    str(body.get("celular")),
-                    str(body.get("fecha")),
+                    matchCelular,
+                    matchFecha,
                     body
             );
         } catch (Exception ex) {
@@ -148,12 +160,12 @@ public class SheetsWriteService {
         }
     }
 
-    private void patchVentaCache(Map<String, Object> body) {
+    private void patchVentaCache(Map<String, Object> body, String matchCelular, String matchFecha) {
         try {
             sheetsSyncService.patchVentaRow(
                     str(body.get("hojaOrigen")),
-                    str(body.get("celular")),
-                    str(body.get("fechaCot")),
+                    matchCelular,
+                    matchFecha,
                     body
             );
         } catch (Exception ex) {
@@ -161,11 +173,32 @@ public class SheetsWriteService {
         }
     }
 
-    private static void putIfPresent(Map<String, Object> fields, String key, Object value) {
-        if (value == null) return;
-        String s = String.valueOf(value).trim();
-        if (s.isEmpty() || "null".equalsIgnoreCase(s)) return;
-        fields.put(key, value instanceof Boolean ? boolLabel(value) : value);
+    private static void putIfKey(Map<String, Object> fields, String sheetKey, Map<String, Object> body, String jsonKey) {
+        if (body == null || !body.containsKey(jsonKey)) {
+            return;
+        }
+        putField(fields, sheetKey, body.get(jsonKey));
+    }
+
+    private static void putField(Map<String, Object> fields, String key, Object value) {
+        if (value == null) {
+            fields.put(key, "");
+            return;
+        }
+        if (value instanceof Boolean) {
+            fields.put(key, boolLabel(value));
+            return;
+        }
+        String s = String.valueOf(value);
+        if ("null".equalsIgnoreCase(s.trim())) {
+            fields.put(key, "");
+            return;
+        }
+        fields.put(key, value);
+    }
+
+    private static String firstNonBlank(String a, String b) {
+        return blank(a) ? b : a;
     }
 
     private static String boolLabel(Object value) {
