@@ -37,7 +37,11 @@ export interface DocumentDetail {
   moneda?: string;
   concepto?: string;
   metodo_ocr?: string;
-  confidence: { global?: number; fields: Record<string, number> };
+  confidence: {
+    global?: number;
+    fields: Record<string, number>;
+    fields_detail?: Record<string, { valor?: unknown; confianza?: number; fuente?: string }>;
+  };
   requiere_revision: boolean;
   observaciones?: string;
   extracted: Record<string, unknown>;
@@ -92,10 +96,12 @@ export class DocumentsApiService {
     return this.http.post<UploadResponse>(`${this.base}/upload`, form);
   }
 
-  process(id: number, solicitud: string): Observable<{ ok: boolean; error?: string }> {
+  process(id: number, solicitud?: string): Observable<{ ok: boolean; error?: string; estado?: string }> {
     const form = new FormData();
-    form.append('solicitud', solicitud);
-    return this.http.post<{ ok: boolean; error?: string }>(
+    if (solicitud) {
+      form.append('solicitud', solicitud);
+    }
+    return this.http.post<{ ok: boolean; error?: string; estado?: string }>(
       `${this.base}/${id}/process`,
       form
     );

@@ -1,6 +1,6 @@
 """Routers API — dominio documentos (Fase 2)."""
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -16,6 +16,9 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 class ConfidenceFields(BaseModel):
     global_score: float | None = Field(None, alias="global")
     fields: dict[str, float] = {}
+    fields_detail: dict[str, dict] = {}
+
+    model_config = {"populate_by_name": True}
 
 
 class DocumentSummary(BaseModel):
@@ -134,8 +137,7 @@ async def upload_document(
         if not errores:
             result = processor.process_by_id(
                 doc.id,
-                "Extrae numero de factura, proveedor, NIT, fecha de emision, "
-                "subtotal, impuesto, total, moneda, compra y reserva.",
+                None,
             )
             if not result.get("ok"):
                 process_error = result.get("error") or "Procesamiento incompleto"
@@ -205,13 +207,18 @@ def delete_document(document_id: int, db: Session = Depends(get_db)):
 @router.post("/{document_id}/process", response_model=ProcessResponse)
 def process_document(
     document_id: int,
-    solicitud: str = Form(
-        "Extrae numero de factura, proveedor, fecha de emision, subtotal, impuesto, total y moneda."
-    ),
+    background_tasks: BackgroundTasks,
+    solicitud: str | None = Form(None),
+    async_mode: bool = Form(False),
     db: Session = Depends(get_db),
 ):
-    """Procesa un documento ya subido con OCR + IA."""
+    """Procesa un documento ya subido con OCR + extracción estructurada de factura.
+
+    async_mode=true (o PROCESS_ASYNC_DEFAULT) encola el trabajo y responde estado=PROCESANDO.
+    """
     from pathlib import Path
+
+    from config.settings import get_settings
 
     service = DocumentService(db)
     doc = service.get_document(document_id)
@@ -227,11 +234,26 @@ def process_document(
     if errores:
         raise HTTPException(status_code=503, detail=" ".join(errores))
 
+    settings = get_settings()
+    use_async = async_mode or bool(settings.process_async_default)
+    if use_async:
+        def _run() -> None:
+            processor.process_by_id(document_id, solicitud)
+
+        background_tasks.add_task(_run)
+        return ProcessResponse(
+            ok=True,
+            document_id=document_id,
+            estado="PROCESANDO",
+            error=None,
+        )
+
     result = processor.process_by_id(document_id, solicitud)
+    estado = result.get("estado") or ("EXTRAIDO" if result.get("ok") else "ERROR")
     return ProcessResponse(
         ok=result.get("ok", False),
         document_id=document_id,
-        estado="EXTRAIDO" if result.get("ok") else "ERROR",
+        estado=estado,
         error=result.get("error") or None,
     )
 

@@ -47,7 +47,7 @@ public class GeminiActionPlanInterpreter implements ActionPlanInterpreter {
         String user = "Instrucción:\n" + instruction
                 + "\n\nContexto JSON (puede estar vacío):\n"
                 + (contextJson == null || contextJson.isBlank() ? "{}" : contextJson);
-        String raw = aiProviderFactory.getActiveProvider().chat(system, user);
+        String raw = aiProviderFactory.getActiveProvider().chat(system, user, "action_plan");
         try {
             JsonNode root = objectMapper.readTree(extractJson(raw));
             String rationale = root.path("rationale").asText("");

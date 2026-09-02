@@ -73,7 +73,7 @@ public abstract class DisabledAiProviderStub implements GenerativeAiPort {
 
     private BadRequestException disabled() {
         return new BadRequestException(
-                "Proveedor IA '" + providerId() + "' no está habilitado. Configure app.ai.provider=gemini y GEMINI_API_KEY."
+                "Proveedor IA '" + providerId() + "' no está habilitado. Use APP_AI_PROVIDER=gemini|anthropic y la API key correspondiente."
         );
     }
 }

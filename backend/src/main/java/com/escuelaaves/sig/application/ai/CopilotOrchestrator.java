@@ -7,6 +7,7 @@ import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
 import com.escuelaaves.sig.domain.ai.port.out.AiObservabilityPort;
 import com.escuelaaves.sig.domain.ai.port.out.ConversationMemoryPort;
 import com.escuelaaves.sig.domain.ai.port.out.RecommendationPort;
+import com.escuelaaves.sig.infrastructure.ai.support.PromptAssembly;
 import com.escuelaaves.sig.shared.exception.BadRequestException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,7 +18,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Ave — chat abierto conversacional.
@@ -70,6 +70,8 @@ public class CopilotOrchestrator {
     private final CatalogQuoteService catalogQuoteService;
     private final RecommendationPort recommendationPort;
     private final CommercialCatalogService commercialCatalog;
+    private final ContextRetriever contextRetriever;
+    private final SessionSlotStore sessionSlotStore;
     private final ConversationMemoryPort memoryPort;
     private final AiObservabilityPort observabilityPort;
     private final ObjectMapper objectMapper;
@@ -129,17 +131,25 @@ public class CopilotOrchestrator {
         String provider = aiProviderFactory.activeType().id();
         GenerativeAiPort ai = aiProviderFactory.getActiveProvider();
 
-        String catalog = commercialCatalog.buildPromptIndex(90);
-        String snippets = commercialCatalog.retrieveSnippets(message, 6).stream()
-                .collect(Collectors.joining("\n"));
+        var slots = sessionSlotStore.getOrCreate(sessionId);
+        slots.merge(HeuristicQuoteInterpreter.interpret(message));
+
+        // Missing-data gate: sin LLM si pide cotización y faltan slots críticos
+        if (CLEAR_QUOTE.matcher(message).find() && !slots.hasCriticalQuoteSlots()) {
+            String ask = slots.missingCriticalPrompt().orElse("¿Qué tour y para cuántas personas?");
+            return new CopilotResponse(sessionId, ask, "ANSWER", List.of("missing-slots"), provider, true);
+        }
+
+        String context = contextRetriever.buildCompactContext(message, slots, 6, 3);
         String history = softHistory(sessionId);
 
-        String system = SYSTEM + catalog
-                + (snippets.isBlank() ? "" : "\n\nFragmentos más cercanos al mensaje:\n" + snippets);
+        String system = SYSTEM + context
+                + "\nSlots actuales: " + slots.toPromptJson();
 
         String raw = ai.chat(
                 system,
-                "Historial:\n" + history + "\n\nUsuario ahora:\n" + message
+                PromptAssembly.fenceUntrusted("Historial+usuario:", "Historial:\n" + history + "\n\nUsuario ahora:\n" + message),
+                CLEAR_QUOTE.matcher(message).find() && message.length() > 400 ? "complex_chat" : "chat"
         );
 
         // Si Gemini devolvió JSON de herramienta

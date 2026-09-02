@@ -8,7 +8,7 @@ from pathlib import Path
 from config.settings import PROYECTO_RAIZ, get_settings
 from domain.enums import DocumentOrigin, DocumentStatus, ProcessingMode
 from domain.rules.rule_engine import RuleEngine
-from domain.services.confidence_scorer import score_invoice_extraction
+from domain.services.confidence_scorer import confidence_to_dict, score_invoice_extraction
 from domain.services.duplicate_detector import DuplicateDetector
 from exportador import guardar_texto
 from infrastructure.ai.ai_factory import (
@@ -185,7 +185,8 @@ class DocumentProcessingService:
 
             extracted = dict(ai_result.data)
             conf = score_invoice_extraction(extracted, max(len(ocr_result.text.strip()), 1))
-            extracted["_confidence"] = {"global": conf.global_score, "fields": conf.fields}
+            extracted["_confidence"] = confidence_to_dict(conf)
+            extracted["_metodo_ocr"] = resultado["metodo_ocr"]
 
             doc_repo.update_extraction(
                 document,
@@ -231,6 +232,179 @@ class DocumentProcessingService:
         finally:
             db.close()
 
+    def _finalize_structured_extraction(
+        self,
+        *,
+        db,
+        doc_repo: DocumentRepository,
+        job_repo: ProcessingJobRepository,
+        audit: AuditRepository,
+        document,
+        job,
+        ai_data: dict,
+        ocr_text: str,
+        metodo_ocr: str,
+    ) -> dict:
+        """Aplica reglas + confidence + duplicados sobre extracción JSON de factura."""
+        extracted = dict(ai_data)
+        extracted["_metodo_ocr"] = metodo_ocr
+        rule = self.rules.evaluate_invoice(extracted)
+        conf = score_invoice_extraction(extracted, len((ocr_text or "").strip()))
+        extracted["_confidence"] = confidence_to_dict(conf)
+
+        estado_doc = self.rules.map_estado_documento(rule)
+        if rule.estado == "procesado" and not conf.requiere_revision:
+            estado_doc = DocumentStatus.PROCESADO
+        elif conf.requiere_revision or rule.requiere_revision:
+            estado_doc = DocumentStatus.REQUIERE_REVISION
+
+        doc_repo.update_extraction(
+            document,
+            extracted=extracted,
+            ocr_text=ocr_text,
+            metodo_ocr=metodo_ocr,
+            estado=estado_doc,
+            requiere_revision=rule.requiere_revision or conf.requiere_revision,
+            observaciones="; ".join(rule.observaciones) if rule.observaciones else None,
+            confidence_global=conf.global_score,
+        )
+
+        dup_detector = DuplicateDetector(db)
+        nit = extracted.get("nit_o_identificacion")
+        if isinstance(extracted.get("proveedor"), dict):
+            nit = extracted["proveedor"].get("nit") or nit
+        meta_dup = dup_detector.check_metadata(
+            nit,
+            document.numero_documento,
+            document.total,
+            exclude_id=document.id,
+            fecha_emision=document.fecha_emision,
+        )
+        if meta_dup.is_duplicate:
+            document.estado = DocumentStatus.DUPLICADO
+            document.observaciones = meta_dup.reason
+            document.requiere_revision = True
+            estado_doc = DocumentStatus.DUPLICADO
+
+        if rule.requiere_revision or rule.estado == "revisar" or conf.requiere_revision:
+            job_repo.mark_requires_review(job)
+        else:
+            job_repo.mark_completed(job)
+
+        audit.log("STRUCTURED_PROCESADO", "Document", str(document.id), valor_nuevo=estado_doc)
+        db.commit()
+
+        return {
+            "ok": True,
+            "estado": estado_doc,
+            "document_id": document.id,
+            "datos": extracted,
+            "metodo_ocr": metodo_ocr,
+            "confidence_global": conf.global_score,
+            "respuesta_ia": json.dumps(
+                {k: v for k, v in ai_data.items() if not str(k).startswith("_")},
+                ensure_ascii=False,
+                indent=2,
+            ),
+            "error": "",
+        }
+
+    def process_structured_by_id(self, document_id: int) -> dict:
+        """Path de producto: OCR + extract_invoice JSON + reglas (no texto libre)."""
+        init_db()
+        db = SessionLocal()
+        try:
+            doc_repo = DocumentRepository(db)
+            job_repo = ProcessingJobRepository(db)
+            audit = AuditRepository(db)
+
+            document = doc_repo.get_by_id(document_id)
+            if not document or not document.storage_path:
+                return {"ok": False, "error": "Documento no encontrado", "document_id": document_id}
+            path = Path(document.storage_path)
+            if not path.exists():
+                return {"ok": False, "error": "Archivo no encontrado", "document_id": document_id}
+
+            document.estado = DocumentStatus.PROCESANDO
+            job = job_repo.create(document.id, ProcessingMode.INVOICE_BATCH)
+            job_repo.mark_processing(job)
+            db.commit()
+
+            self._ensure_output_dirs()
+            stem = path.stem
+            ruta_pre = self.carpeta_preprocesadas / f"{stem}.png"
+            if not self.ocr.preprocess(path, ruta_pre):
+                ruta_pre = None
+
+            ocr_result = self.ocr.extract_with_fallback(
+                path,
+                ruta_pre if ruta_pre and ruta_pre.exists() else None,
+            )
+            guardar_texto(self.carpeta_textos / f"{stem}.txt", ocr_result.text)
+
+            ai_result = None
+            metodo = ocr_result.method
+            if len(ocr_result.text.strip()) < settings.min_caracteres_ocr:
+                vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
+                use_vision = (
+                    bool(getattr(settings, "gemini_vision_on_weak_ocr", True))
+                    and callable(vision_fn)
+                    and resolve_ai_provider_name() == "gemini"
+                )
+                if not use_vision:
+                    error = (
+                        f"OCR debil ({len(ocr_result.text.strip())} caracteres). "
+                        "Sube una imagen mas nitida o configura Gemini vision."
+                    )
+                    document.estado = DocumentStatus.REQUIERE_REVISION
+                    job_repo.mark_requires_review(job)
+                    audit.log("OCR_DEBIL", "Document", str(document.id), valor_nuevo=error)
+                    db.commit()
+                    return {"ok": False, "error": error, "document_id": document.id, "estado": DocumentStatus.REQUIERE_REVISION}
+
+                logger.info("OCR debil — extract_invoice vision sobre doc #%s", document.id)
+                ai_result = vision_fn(path)
+                metodo = "GEMINI_VISION"
+                if not ai_result.ok:
+                    error = f"Vision Gemini fallo: {ai_result.error}"
+                    document.estado = DocumentStatus.REQUIERE_REVISION
+                    job_repo.mark_requires_review(job)
+                    audit.log("OCR_VISION_FAIL", "Document", str(document.id), valor_nuevo=error)
+                    db.commit()
+                    return {"ok": False, "error": error, "document_id": document.id, "estado": DocumentStatus.REQUIERE_REVISION}
+            else:
+                ai_result = self.ai.extract_invoice(ocr_result.text)
+
+            if not ai_result.ok:
+                document.estado = DocumentStatus.ERROR
+                job_repo.mark_failed(job, ai_result.error)
+                audit.log("IA_ERROR", "Document", str(document.id), valor_nuevo=ai_result.error)
+                db.commit()
+                return {
+                    "ok": False,
+                    "error": ai_result.error or "No se pudo extraer la factura",
+                    "document_id": document.id,
+                    "estado": DocumentStatus.ERROR,
+                }
+
+            return self._finalize_structured_extraction(
+                db=db,
+                doc_repo=doc_repo,
+                job_repo=job_repo,
+                audit=audit,
+                document=document,
+                job=job,
+                ai_data=ai_result.data,
+                ocr_text=ocr_result.text,
+                metodo_ocr=metodo,
+            )
+        except Exception as error:
+            db.rollback()
+            logger.exception("Error en process_structured_by_id")
+            return {"ok": False, "error": str(error), "document_id": document_id}
+        finally:
+            db.close()
+
     def process_invoice_batch(self, ruta_imagen: Path) -> dict:
         """Procesamiento batch estilo main.py con persistencia."""
         ruta_imagen = Path(ruta_imagen)
@@ -270,6 +444,7 @@ class DocumentProcessingService:
                 ocr_result.text,
             )
 
+            ai_result = None
             if len(ocr_result.text.strip()) < settings.min_caracteres_ocr:
                 vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
                 use_vision = (
@@ -281,7 +456,6 @@ class DocumentProcessingService:
                     logger.info("Batch OCR debil — Gemini vision sobre %s", ruta_imagen.name)
                     ai_result = vision_fn(ruta_imagen)
                     if ai_result.ok:
-                        # Reusar flujo de éxito batch más abajo
                         ocr_result = type(ocr_result)(
                             text=ocr_result.text or "(vision)",
                             method="GEMINI_VISION",
@@ -302,63 +476,23 @@ class DocumentProcessingService:
 
             if ocr_result.method != "GEMINI_VISION":
                 ai_result = self.ai.extract_invoice(ocr_result.text)
-            if not ai_result.ok:
+            if not ai_result or not ai_result.ok:
                 document.estado = DocumentStatus.ERROR
-                job_repo.mark_failed(job, ai_result.error)
+                job_repo.mark_failed(job, ai_result.error if ai_result else "sin resultado IA")
                 db.commit()
                 return {"ok": False, "estado": "revisar", "document_id": document.id}
 
-            rule = self.rules.evaluate_invoice(ai_result.data)
-            conf = score_invoice_extraction(ai_result.data, len(ocr_result.text.strip()))
-            extracted = dict(ai_result.data)
-            extracted["_confidence"] = {"global": conf.global_score, "fields": conf.fields}
-            estado_doc = self.rules.map_estado_documento(rule)
-            if rule.estado == "procesado" and not conf.requiere_revision:
-                estado_doc = DocumentStatus.PROCESADO
-            elif conf.requiere_revision:
-                estado_doc = DocumentStatus.REQUIERE_REVISION
-
-            doc_repo.update_extraction(
-                document,
-                extracted=extracted,
+            return self._finalize_structured_extraction(
+                db=db,
+                doc_repo=doc_repo,
+                job_repo=job_repo,
+                audit=audit,
+                document=document,
+                job=job,
+                ai_data=ai_result.data,
                 ocr_text=ocr_result.text,
                 metodo_ocr=ocr_result.method,
-                estado=estado_doc,
-                requiere_revision=rule.requiere_revision or conf.requiere_revision,
-                observaciones="; ".join(rule.observaciones) if rule.observaciones else None,
-                confidence_global=conf.global_score,
             )
-
-            dup_detector = DuplicateDetector(db)
-            nit = extracted.get("nit_o_identificacion")
-            if isinstance(extracted.get("proveedor"), dict):
-                nit = extracted["proveedor"].get("nit") or nit
-            meta_dup = dup_detector.check_metadata(
-                nit,
-                document.numero_documento,
-                document.total,
-                exclude_id=document.id,
-            )
-            if meta_dup.is_duplicate:
-                document.estado = DocumentStatus.DUPLICADO
-                document.observaciones = meta_dup.reason
-                document.requiere_revision = True
-
-            if rule.requiere_revision or rule.estado == "revisar":
-                job_repo.mark_requires_review(job)
-            else:
-                job_repo.mark_completed(job)
-
-            audit.log("BATCH_PROCESADO", "Document", str(document.id), valor_nuevo=estado_doc)
-            db.commit()
-
-            return {
-                "ok": rule.passed,
-                "estado": rule.estado,
-                "document_id": document.id,
-                "datos": ai_result.data,
-                "metodo_ocr": ocr_result.method,
-            }
 
         except Exception as error:
             db.rollback()
@@ -386,7 +520,8 @@ class DocumentProcessingService:
             rule = self.rules.evaluate_invoice(datos)
             conf = score_invoice_extraction(datos, len(ocr_text.strip()))
             enriched = dict(datos)
-            enriched["_confidence"] = {"global": conf.global_score, "fields": conf.fields}
+            enriched["_confidence"] = confidence_to_dict(conf)
+            enriched["_metodo_ocr"] = metodo_ocr
             estado_doc = DocumentStatus.PROCESADO if estado == "procesado" and not conf.requiere_revision else DocumentStatus.REQUIERE_REVISION
             doc_repo.update_extraction(
                 document,
@@ -408,24 +543,12 @@ class DocumentProcessingService:
         finally:
             db.close()
 
-
-    def process_by_id(self, document_id: int, solicitud_usuario: str) -> dict:
-        """Procesa un documento ya registrado en BD."""
-        init_db()
-        db = SessionLocal()
-        try:
-            doc_repo = DocumentRepository(db)
-            document = doc_repo.get_by_id(document_id)
-            if not document or not document.storage_path:
-                return {"ok": False, "error": "Documento no encontrado", "document_id": document_id}
-            path = Path(document.storage_path)
-            if not path.exists():
-                return {"ok": False, "error": "Archivo no encontrado", "document_id": document_id}
-        finally:
-            db.close()
-
-        result = self.process_interactive(path, solicitud_usuario, existing_document_id=document_id)
-        return result
+    def process_by_id(self, document_id: int, solicitud_usuario: str | None = None) -> dict:
+        """Procesa un documento ya registrado — siempre extracción estructurada de factura."""
+        # solicitud_usuario se conserva por compatibilidad de firma; el path de producto
+        # ya no usa extract_custom (texto libre).
+        _ = solicitud_usuario
+        return self.process_structured_by_id(document_id)
 
 
 _service: DocumentProcessingService | None = None

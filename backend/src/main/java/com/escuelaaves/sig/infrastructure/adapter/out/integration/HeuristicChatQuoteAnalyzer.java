@@ -1,11 +1,13 @@
 package com.escuelaaves.sig.infrastructure.adapter.out.integration;
 
+import com.escuelaaves.sig.application.ai.CatalogQuoteService;
 import com.escuelaaves.sig.domain.model.ChatQuoteContext;
 import com.escuelaaves.sig.domain.model.IntegrationStatus;
 import com.escuelaaves.sig.domain.model.QuoteAnalysis;
 import com.escuelaaves.sig.domain.port.out.integration.ChatQuoteAnalyzerPort;
 import com.escuelaaves.sig.domain.port.out.integration.ClaudeAiPort;
-import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slfj.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,34 +16,20 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Analiza el texto del chat (WhatsApp proyectado desde Google Sheets) y arma una
- * cotizacion tentativa: experiencia, numero de personas, fecha y monto estimado.
- *
- * Funciona de inmediato con reglas locales. Cuando Claude AI este CONNECTED,
- * usa la sugerencia del LLM para enriquecer el titulo/descripcion.
+ * Analiza el chat CRM y cotiza con el mismo catálogo {@code ai/catalogo/} que Ave/Consola.
+ * Ya no usa precios hardcodeados: el PricingEngine (CatalogQuoteService) es la fuente de verdad.
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class HeuristicChatQuoteAnalyzer implements ChatQuoteAnalyzerPort {
 
     private static final String CURRENCY = "COP";
-
-    /** Palabras clave -> nombre de experiencia + precio base por persona (COP). */
-    private static final List<Experience> EXPERIENCES = List.of(
-            new Experience("Avistamiento de aves", 95000,
-                    "avistamiento", "aves", "ave", "pajar", "pájar", "bird", "ornitolog"),
-            new Experience("Cabalgata ecológica", 85000, "cabalg", "caballo"),
-            new Experience("Tour del café", 65000, "café", "cafe", "finca", "barism", "cafetal"),
-            new Experience("Valle de Cócora", 70000, "cocora", "cócora", "palma", "wax palm"),
-            new Experience("Caminata ecológica", 60000, "caminata", "sender", "trekking", "trekk", "ecolog"),
-            new Experience("Camping en Salento", 55000, "camping", "acampar", "carpa"),
-            new Experience("Programa educativo escolar", 50000,
-                    "colegio", "escolar", "estudiantes", "curso", "taller", "educativ", "excursión", "excursion")
-    );
 
     private static final Pattern PARTY_SIZE = Pattern.compile(
             "(\\d{1,3})\\s*(personas|persona|pax|adultos|adulto|cupos|cupo|ni[nñ]os|ni[nñ]o|gente|integrantes|estudiantes|visitantes|turistas)",
@@ -62,13 +50,10 @@ public class HeuristicChatQuoteAnalyzer implements ChatQuoteAnalyzerPort {
     };
 
     private final ClaudeAiPort claudeAiPort;
+    private final CatalogQuoteService catalogQuoteService;
 
     @Value("${app.ai.quote.base-price-per-person:75000}")
     private long basePricePerPerson;
-
-    public HeuristicChatQuoteAnalyzer(ClaudeAiPort claudeAiPort) {
-        this.claudeAiPort = claudeAiPort;
-    }
 
     @Override
     public QuoteAnalysis analyze(ChatQuoteContext context) {
@@ -90,84 +75,140 @@ public class HeuristicChatQuoteAnalyzer implements ChatQuoteAnalyzerPort {
         String haystack = (clientText + "\n" + allText).toLowerCase(Locale.ROOT);
 
         List<String> highlights = new ArrayList<>();
-        int confidence = 15;
-
-        Experience experience = detectExperience(haystack);
-        boolean experienceMatched = experience != null;
-        if (experienceMatched) {
-            confidence += 30;
-            highlights.add("Experiencia detectada: " + experience.name());
-        } else {
-            experience = new Experience("Experiencia Escuela Aves Salento", basePricePerPerson);
-        }
+        int confidence = 20;
 
         int partySize = detectPartySize(haystack);
         if (partySize > 0) {
-            confidence += 25;
+            confidence += 20;
             highlights.add("Personas: " + partySize);
         } else {
-            partySize = 1;
+            partySize = 2;
+            highlights.add("Personas no claras — se asume 2 (catálogo)");
         }
 
         LocalDate serviceDate = detectDate(allText);
         if (serviceDate != null) {
-            confidence += 15;
+            confidence += 10;
             highlights.add("Fecha tentativa: " + serviceDate);
         }
 
-        BigDecimal detectedMoney = detectMoney(allText);
-        long pricePerPerson = experienceMatched ? experience.pricePerPerson() : basePricePerPerson;
+        String natural = buildNaturalQuery(partySize, clientText, allText);
+        Optional<CatalogQuoteService.QuoteResult> priced = catalogQuoteService.tryQuote(natural);
+
+        String experienceName;
         BigDecimal amount;
-        if (detectedMoney.signum() > 0) {
-            amount = detectedMoney;
-            confidence += 15;
-            highlights.add("Monto mencionado en el chat");
+        String analyzer;
+        String description;
+
+        if (priced.isPresent()) {
+            CatalogQuoteService.QuoteResult q = priced.get();
+            experienceName = q.name();
+            amount = q.total();
+            analyzer = "CATALOGO";
+            confidence = Math.min(confidence + 45, 95);
+            if (q.reviewFlag()) {
+                confidence = Math.min(confidence, 80);
+                highlights.add("Tarifa marcada para revisión comercial");
+            }
+            highlights.add("Precio desde ai/catalogo/: " + q.code());
+            highlights.add("Unitario: " + q.unitPrice() + " × " + q.people());
+            partySize = q.people();
+            description = buildCatalogDescription(context.clientName(), q, serviceDate, clientText);
         } else {
-            amount = BigDecimal.valueOf(pricePerPerson).multiply(BigDecimal.valueOf(partySize));
-            highlights.add("Monto estimado: " + partySize + " x $" + String.format(Locale.US, "%,d", pricePerPerson));
+            experienceName = "Experiencia Escuela Aves Salento";
+            amount = BigDecimal.valueOf(basePricePerPerson).multiply(BigDecimal.valueOf(partySize));
+            analyzer = "HEURISTICA_SIN_CATALOGO";
+            confidence = Math.min(confidence, 40);
+            highlights.add("Sin match en ai/catalogo/ — monto base provisional (requiere revisión)");
+            description = buildFallbackDescription(context.clientName(), experienceName, partySize, serviceDate, clientText);
         }
 
-        confidence = Math.min(confidence, 95);
-
-        String title = experience.name()
-                + (partySize > 1 ? " · " + partySize + " personas" : "");
-        String description = buildDescription(context.clientName(), experience, partySize, serviceDate, clientText);
-        String analyzer = "HEURISTICA";
+        BigDecimal detectedMoney = detectMoney(allText);
+        if (detectedMoney.signum() > 0) {
+            highlights.add("Monto mencionado en chat: " + detectedMoney + " COP (informativo; no reemplaza catálogo)");
+            confidence = Math.min(confidence + 5, 95);
+        }
 
         // Enriquecimiento opcional con Claude cuando este disponible.
         if (claudeAiPort.status() == IntegrationStatus.CONNECTED) {
             try {
-                String prompt = buildClaudePrompt(context, experience, partySize, serviceDate, amount);
+                String prompt = buildClaudePrompt(context, experienceName, partySize, serviceDate, amount);
                 String suggestion = claudeAiPort.generateSuggestion(prompt);
                 if (suggestion != null && !suggestion.isBlank()
                         && !suggestion.toLowerCase(Locale.ROOT).contains("no disponible")) {
                     description = suggestion.trim();
-                    analyzer = "CLAUDE_AI";
-                    confidence = Math.min(confidence + 5, 99);
-                    highlights.add("Descripción generada por Claude AI");
+                    analyzer = analyzer + "+CLAUDE";
+                    confidence = Math.min(confidence + 3, 99);
+                    highlights.add("Descripción enriquecida por Claude AI");
                 }
             } catch (Exception ex) {
                 log.warn("No se pudo enriquecer la cotización con Claude AI: {}", ex.getMessage());
             }
         }
 
+        String title = experienceName + (partySize > 1 ? " · " + partySize + " personas" : "");
         LocalDate validUntil = LocalDate.now().plusDays(15);
 
         return new QuoteAnalysis(
-                experience.name(), title, description, partySize,
+                experienceName, title, description, partySize,
                 amount, CURRENCY, serviceDate, validUntil,
                 confidence, analyzer, highlights);
     }
 
-    private Experience detectExperience(String haystack) {
-        for (Experience exp : EXPERIENCES) {
-            for (String keyword : exp.keywords()) {
-                if (haystack.contains(keyword)) {
-                    return exp;
-                }
-            }
+    private static String buildNaturalQuery(int partySize, String clientText, String allText) {
+        String base = (clientText != null && !clientText.isBlank()) ? clientText : allText;
+        return partySize + " personas. " + (base != null ? base.trim() : "");
+    }
+
+    private String buildCatalogDescription(String clientName, CatalogQuoteService.QuoteResult q,
+                                           LocalDate serviceDate, String clientText) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Cotización generada desde el catálogo comercial (ai/catalogo/)");
+        if (clientName != null && !clientName.isBlank()) {
+            sb.append(" para ").append(clientName.trim());
         }
-        return null;
+        sb.append(".\n\n");
+        sb.append("• Servicio: ").append(q.name()).append(" (").append(q.code()).append(")\n");
+        if (q.modality() != null) {
+            sb.append("• Modalidad: ").append(q.modality()).append('\n');
+        }
+        sb.append("• Personas: ").append(q.people()).append('\n');
+        sb.append("• Precio/persona: ").append(q.unitPrice()).append(" ").append(q.currency()).append('\n');
+        sb.append("• Total: ").append(q.total()).append(" ").append(q.currency()).append('\n');
+        if (serviceDate != null) {
+            sb.append("• Fecha tentativa: ").append(serviceDate).append('\n');
+        }
+        if (q.includes() != null && !q.includes().isBlank()) {
+            sb.append("\nIncluye: ").append(q.includes()).append('\n');
+        }
+        if (q.excludes() != null && !q.excludes().isBlank()) {
+            sb.append("No incluye: ").append(q.excludes()).append('\n');
+        }
+        String resumen = summarizeClient(clientText);
+        if (!resumen.isBlank()) {
+            sb.append("\nSolicitud del cliente:\n\"").append(resumen).append("\"");
+        }
+        return sb.toString();
+    }
+
+    private String buildFallbackDescription(String clientName, String experienceName, int partySize,
+                                            LocalDate serviceDate, String clientText) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Borrador provisional: no se encontró tarifa en ai/catalogo/.\n");
+        sb.append("Revisa y cotiza manualmente o reformula la solicitud.\n\n");
+        sb.append("• Título tentativo: ").append(experienceName).append('\n');
+        sb.append("• Personas: ").append(partySize).append('\n');
+        if (serviceDate != null) {
+            sb.append("• Fecha tentativa: ").append(serviceDate).append('\n');
+        }
+        if (clientName != null && !clientName.isBlank()) {
+            sb.append("• Cliente: ").append(clientName.trim()).append('\n');
+        }
+        String resumen = summarizeClient(clientText);
+        if (!resumen.isBlank()) {
+            sb.append("\nSolicitud:\n\"").append(resumen).append("\"");
+        }
+        return sb.toString();
     }
 
     private int detectPartySize(String haystack) {
@@ -251,26 +292,6 @@ public class HeuristicChatQuoteAnalyzer implements ChatQuoteAnalyzerPort {
         }
     }
 
-    private String buildDescription(String clientName, Experience experience, int partySize,
-                                    LocalDate serviceDate, String clientText) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Cotización generada por el asistente de IA a partir del chat de WhatsApp");
-        if (clientName != null && !clientName.isBlank()) {
-            sb.append(" con ").append(clientName.trim());
-        }
-        sb.append(".\n\n");
-        sb.append("• Experiencia: ").append(experience.name()).append('\n');
-        sb.append("• Personas: ").append(partySize).append('\n');
-        if (serviceDate != null) {
-            sb.append("• Fecha tentativa: ").append(serviceDate).append('\n');
-        }
-        String resumen = summarizeClient(clientText);
-        if (!resumen.isBlank()) {
-            sb.append("\nSolicitud del cliente:\n\"").append(resumen).append("\"");
-        }
-        return sb.toString();
-    }
-
     private String summarizeClient(String clientText) {
         if (clientText == null || clientText.isBlank()) {
             return "";
@@ -279,17 +300,17 @@ public class HeuristicChatQuoteAnalyzer implements ChatQuoteAnalyzerPort {
         return cleaned.length() > 400 ? cleaned.substring(0, 397) + "..." : cleaned;
     }
 
-    private String buildClaudePrompt(ChatQuoteContext context, Experience experience,
+    private String buildClaudePrompt(ChatQuoteContext context, String experienceName,
                                      int partySize, LocalDate serviceDate, BigDecimal amount) {
         StringBuilder sb = new StringBuilder();
         sb.append("Eres asesor comercial de Escuela Aves Salento. Redacta una descripción breve y ")
                 .append("profesional para una cotización basada en este chat de WhatsApp.\n");
-        sb.append("Experiencia sugerida: ").append(experience.name()).append('\n');
+        sb.append("Experiencia sugerida: ").append(experienceName).append('\n');
         sb.append("Personas: ").append(partySize).append('\n');
         if (serviceDate != null) {
             sb.append("Fecha: ").append(serviceDate).append('\n');
         }
-        sb.append("Monto estimado: ").append(amount).append(" COP\n\nChat:\n");
+        sb.append("Monto (catálogo): ").append(amount).append(" COP\n\nChat:\n");
         for (ChatQuoteContext.ChatTurn turn : context.turns()) {
             sb.append(turn.fromClient() ? "Cliente: " : "Asesor: ").append(turn.text()).append('\n');
         }
@@ -333,8 +354,5 @@ public class HeuristicChatQuoteAnalyzer implements ChatQuoteAnalyzerPort {
         } catch (Exception ex) {
             return null;
         }
-    }
-
-    private record Experience(String name, long pricePerPerson, String... keywords) {
     }
 }

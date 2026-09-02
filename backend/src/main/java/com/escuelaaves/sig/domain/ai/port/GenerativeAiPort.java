@@ -38,6 +38,14 @@ public interface GenerativeAiPort extends
 
     String summarizeConversation(String conversationText);
 
+    /**
+     * Chat con operación etiquetada para routing de modelo (Haiku vs Sonnet).
+     * Default: delega a {@link #chat(String, String)}.
+     */
+    default String chat(String systemPrompt, String userMessage, String operation) {
+        return chat(systemPrompt, userMessage);
+    }
+
     default String detectIntent(String text) {
         return classifyConversation(text).intent();
     }

@@ -67,7 +67,8 @@ app:
     connect-timeout-seconds: ${CONTABLE_CONNECT_TIMEOUT_SECONDS:20}
     read-timeout-seconds: ${CONTABLE_READ_TIMEOUT_SECONDS:120}
   ai:
-    provider: ${APP_AI_PROVIDER:gemini}
+    # gemini | anthropic | claude | openai | deepseek
+    provider: ${APP_AI_PROVIDER:${AI_PROVIDER:gemini}}
     quote:
       base-price-per-person: ${AI_QUOTE_BASE_PRICE:75000}
       min-confidence: ${AI_QUOTE_MIN_CONFIDENCE:25}
@@ -79,6 +80,20 @@ app:
       fallback-models: ${GEMINI_FALLBACK_MODELS:gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-latest,gemini-flash-latest}
       connect-timeout-seconds: ${GEMINI_CONNECT_TIMEOUT_SECONDS:15}
       read-timeout-seconds: ${GEMINI_READ_TIMEOUT_SECONDS:90}
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      model-fast: ${AI_MODEL_FAST:claude-haiku-4-5-20251001}
+      model-reasoning: ${AI_MODEL_REASONING:claude-sonnet-4-5-20250929}
+      base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+      api-version: ${ANTHROPIC_API_VERSION:2023-06-01}
+      max-tokens: ${ANTHROPIC_MAX_TOKENS:4096}
+      max-retries: ${ANTHROPIC_MAX_RETRIES:2}
+      connect-timeout-seconds: ${ANTHROPIC_CONNECT_TIMEOUT_SECONDS:15}
+      read-timeout-seconds: ${ANTHROPIC_READ_TIMEOUT_SECONDS:90}
+      price-fast-input-per-mtok: ${AI_PRICE_HAIKU_INPUT:1.0}
+      price-fast-output-per-mtok: ${AI_PRICE_HAIKU_OUTPUT:5.0}
+      price-reasoning-input-per-mtok: ${AI_PRICE_SONNET_INPUT:3.0}
+      price-reasoning-output-per-mtok: ${AI_PRICE_SONNET_OUTPUT:15.0}
 
 management:
   endpoints:

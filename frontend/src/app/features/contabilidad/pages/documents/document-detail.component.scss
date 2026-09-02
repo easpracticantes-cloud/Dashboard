@@ -228,3 +228,17 @@
     min-height: 320px;
   }
 }
+
+.conf-src {
+  color: var(--muted);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.prompt-sheet .hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+  line-height: 1.45;
+}

@@ -28,7 +28,13 @@ public class DefaultAiProviderFactory implements AiProviderFactory {
             providers.put(type, port);
         }
         this.activeType = AiProviderType.from(provider);
-        log.info("[AI] Proveedor activo={} disponibles={}", activeType.id(), providers.keySet());
+        log.info("[AI] Proveedor activo={} (config={}) disponibles={}",
+                activeType.id(), provider, providers.keySet());
+        GenerativeAiPort active = providers.get(activeType);
+        if (active != null && active.status() == com.escuelaaves.sig.domain.model.IntegrationStatus.DISABLED) {
+            log.warn("[AI] Proveedor activo '{}' está DISABLED (falta API key). Las llamadas fallarán hasta configurarlo.",
+                    activeType.id());
+        }
     }
 
     @Override

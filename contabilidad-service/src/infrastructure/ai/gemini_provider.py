@@ -5,62 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from infrastructure.ai.gemini_client import GeminiClient, GeminiClientError
+from infrastructure.ai.invoice_schema import INVOICE_VISION_PROMPT, build_invoice_text_prompt
 from infrastructure.ai.ollama_provider import AIExtractionResult
-
-
-INVOICE_JSON_PROMPT = """
-Extrae datos de una factura a partir del siguiente texto OCR.
-
-Responde SOLO con JSON valido. No agregues explicaciones.
-No inventes datos. Si un campo no aparece claramente, usa null.
-Si hay ambiguedad, requiere_revision debe ser true.
-Si el documento no parece factura, requiere_revision debe ser true.
-El total debe ser numerico si se puede identificar.
-Si faltan campos importantes, agregalos en campos_faltantes.
-
-Usa exactamente esta estructura:
-{{
-  "tipo_documento": "factura",
-  "numero_factura": null,
-  "proveedor": null,
-  "nit_o_identificacion": null,
-  "fecha_emision": null,
-  "subtotal": null,
-  "impuesto": null,
-  "total": null,
-  "moneda": null,
-  "concepto_general": null,
-  "campos_faltantes": [],
-  "requiere_revision": false,
-  "observaciones": null
-}}
-
-Texto OCR:
-{ocr_text}
-"""
-
-INVOICE_VISION_PROMPT = """
-Eres un asistente contable. Analiza la IMAGEN de este documento (factura/recibo).
-
-Responde SOLO con JSON valido. No inventes datos. Si un campo no se ve claro, usa null.
-
-Usa exactamente esta estructura:
-{
-  "tipo_documento": "factura",
-  "numero_factura": null,
-  "proveedor": null,
-  "nit_o_identificacion": null,
-  "fecha_emision": null,
-  "subtotal": null,
-  "impuesto": null,
-  "total": null,
-  "moneda": null,
-  "concepto_general": null,
-  "campos_faltantes": [],
-  "requiere_revision": false,
-  "observaciones": null
-}
-"""
 
 
 class GeminiAIProvider:
@@ -75,7 +21,7 @@ class GeminiAIProvider:
 
     def extract_invoice(self, ocr_text: str) -> AIExtractionResult:
         try:
-            datos = self.client.generate_json(INVOICE_JSON_PROMPT.format(ocr_text=ocr_text))
+            datos = self.client.generate_json(build_invoice_text_prompt(ocr_text))
             if not datos:
                 return AIExtractionResult(ok=False, data={}, error="No se obtuvo JSON desde Gemini")
             return AIExtractionResult(ok=True, data=datos)

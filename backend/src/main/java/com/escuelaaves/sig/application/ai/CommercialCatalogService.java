@@ -256,9 +256,11 @@ public class CommercialCatalogService {
             return List.of();
         }
         String needle = normalize(query);
-        List<String> hits = new ArrayList<>();
+        record Hit(int score, String line) {}
+        List<Hit> ranked = new ArrayList<>();
         for (CatalogProduct p : products) {
-            if (score(p, needle) <= 0) {
+            int s = score(p, needle);
+            if (s <= 0) {
                 continue;
             }
             StringBuilder line = new StringBuilder();
@@ -279,7 +281,12 @@ public class CommercialCatalogService {
             if (p.reviewFlag()) {
                 line.append(" [REVISAR]");
             }
-            hits.add(line.toString());
+            ranked.add(new Hit(s, line.toString()));
+        }
+        ranked.sort(Comparator.comparingInt(Hit::score).reversed());
+        List<String> hits = new ArrayList<>();
+        for (Hit h : ranked) {
+            hits.add(h.line());
             if (hits.size() >= limit) {
                 return hits;
             }

@@ -1,18 +1,34 @@
 package com.escuelaaves.sig.infrastructure.adapter.out.integration;
 
+import com.escuelaaves.sig.domain.ai.model.AiProviderType;
+import com.escuelaaves.sig.domain.ai.port.AiProviderFactory;
+import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
 import com.escuelaaves.sig.domain.model.IntegrationCode;
 import com.escuelaaves.sig.domain.model.IntegrationStatus;
 import com.escuelaaves.sig.domain.port.out.integration.ClaudeAiPort;
+import com.escuelaaves.sig.infrastructure.ai.config.AnthropicProperties;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 /**
- * Adaptador stub para las funciones de IA (sugerencias de reabastecimiento,
- * pronosticos basicos y deteccion de anomalias delegadas a un LLM).
+ * Estado de integración Claude AI (panel Integraciones).
+ * Delega sugerencias al AnthropicAdapter cuando hay API key.
  */
 @Slf4j
 @Component
 public class ClaudeAiStubAdapter implements ClaudeAiPort {
+
+    private final AnthropicProperties anthropicProperties;
+    private final AiProviderFactory aiProviderFactory;
+
+    public ClaudeAiStubAdapter(
+            AnthropicProperties anthropicProperties,
+            @Lazy AiProviderFactory aiProviderFactory
+    ) {
+        this.anthropicProperties = anthropicProperties;
+        this.aiProviderFactory = aiProviderFactory;
+    }
 
     @Override
     public IntegrationCode code() {
@@ -21,12 +37,24 @@ public class ClaudeAiStubAdapter implements ClaudeAiPort {
 
     @Override
     public IntegrationStatus status() {
-        return IntegrationStatus.DISABLED;
+        return anthropicProperties.hasApiKey() ? IntegrationStatus.READY : IntegrationStatus.DISABLED;
     }
 
     @Override
     public String generateSuggestion(String prompt) {
-        log.info("[ClaudeAI-STUB] Sugerencia simulada para prompt de {} caracteres", prompt != null ? prompt.length() : 0);
-        return "Sugerencia no disponible: integracion con Claude AI pendiente de configuracion.";
+        if (!anthropicProperties.hasApiKey()) {
+            log.info("[ClaudeAI] Sin ANTHROPIC_API_KEY — sugerencia no disponible");
+            return "Sugerencia no disponible: define ANTHROPIC_API_KEY para habilitar Claude.";
+        }
+        try {
+            GenerativeAiPort claude = aiProviderFactory.getProvider(AiProviderType.CLAUDE);
+            return claude.chat(
+                    "Eres el asistente de Escuela Aves Salento. Responde en español, breve y accionable.",
+                    prompt != null ? prompt : ""
+            );
+        } catch (Exception ex) {
+            log.warn("[ClaudeAI] Falló generateSuggestion: {}", ex.getMessage());
+            return "No se pudo generar sugerencia: " + ex.getMessage();
+        }
     }
 }

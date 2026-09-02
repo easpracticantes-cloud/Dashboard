@@ -73,8 +73,13 @@ export interface UsageLog {
   operation: string;
   provider: string;
   endpoint: string;
+  model?: string;
+  modelTier?: string;
   latencyMs: number;
   estimatedTokens: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  estimatedCostUsd?: number;
   success: boolean;
   createdAt: string;
 }

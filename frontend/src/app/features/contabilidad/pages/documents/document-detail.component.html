@@ -118,7 +118,9 @@
               </div>
               @for (item of confidenceEntries(); track item[0]) {
                 <div class="conf-row">
-                  <span>{{ item[0] }}</span>
+                  <span>{{ item[0] }}@if (fieldSource(item[0])) {
+                    <small class="conf-src"> · {{ fieldSource(item[0]) }}</small>
+                  }</span>
                   <div class="conf-track">
                     <div
                       class="conf-fill"
@@ -139,8 +141,11 @@
         </div>
 
         <div class="sheet sheet-pad prompt-sheet">
-          <span class="label-caps">Instrucción de extracción</span>
-          <textarea class="textarea" rows="3" [(ngModel)]="solicitud"></textarea>
+          <span class="label-caps">Reproceso</span>
+          <p class="hint">
+            Vuelve a correr OCR + extracción estructurada (JSON de factura). El sistema no inventa montos:
+            aplica reglas y marca revisión si faltan campos o la matemática no cuadra.
+          </p>
         </div>
 
         @if (doc.extracted && (doc.extracted | json) !== '{}') {

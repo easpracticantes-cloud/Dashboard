@@ -172,7 +172,17 @@
       <div class="ai-table-wrap">
         <table class="ai-table">
           <thead>
-            <tr><th>Cuándo</th><th>Operación</th><th>Proveedor</th><th>ms</th><th>Tokens</th><th>OK</th></tr>
+            <tr>
+              <th>Cuándo</th>
+              <th>Operación</th>
+              <th>Proveedor</th>
+              <th>Modelo</th>
+              <th>Tier</th>
+              <th>ms</th>
+              <th>In/Out</th>
+              <th>USD≈</th>
+              <th>OK</th>
+            </tr>
           </thead>
           <tbody>
             @for (u of usage(); track u.id) {
@@ -180,8 +190,11 @@
                 <td>{{ u.createdAt | date: 'short' }}</td>
                 <td>{{ u.operation }}</td>
                 <td>{{ u.provider }}</td>
+                <td>{{ u.model || '—' }}</td>
+                <td>{{ u.modelTier || '—' }}</td>
                 <td>{{ u.latencyMs }}</td>
-                <td>{{ u.estimatedTokens }}</td>
+                <td>{{ u.inputTokens ?? '—' }}/{{ u.outputTokens ?? u.estimatedTokens }}</td>
+                <td>{{ u.estimatedCostUsd != null ? (u.estimatedCostUsd | number: '1.4-6') : '—' }}</td>
                 <td>{{ u.success ? 'Sí' : 'No' }}</td>
               </tr>
             }

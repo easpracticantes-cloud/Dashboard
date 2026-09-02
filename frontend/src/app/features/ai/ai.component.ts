@@ -1,4 +1,4 @@
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -19,7 +19,7 @@ type AiTab = 'quote' | 'rules' | 'checklist' | 'providers' | 'whatsapp' | 'insig
 @Component({
   selector: 'eas-ai',
   standalone: true,
-  imports: [FormsModule, MatIconModule, PageHeaderComponent, CurrencyPipe, DatePipe],
+  imports: [FormsModule, MatIconModule, PageHeaderComponent, CurrencyPipe, DatePipe, DecimalPipe],
   templateUrl: './ai.component.html',
   styleUrl: './ai.component.scss'
 })

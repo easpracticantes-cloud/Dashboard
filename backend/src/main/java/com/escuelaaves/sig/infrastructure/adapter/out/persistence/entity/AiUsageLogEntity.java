@@ -3,6 +3,7 @@ package com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
@@ -38,6 +39,18 @@ public class AiUsageLogEntity {
 
     @Column(name = "estimated_tokens")
     private Integer estimatedTokens;
+
+    @Column(name = "input_tokens")
+    private Integer inputTokens;
+
+    @Column(name = "output_tokens")
+    private Integer outputTokens;
+
+    @Column(name = "estimated_cost_usd", precision = 12, scale = 8)
+    private BigDecimal estimatedCostUsd;
+
+    @Column(name = "model_tier", length = 20)
+    private String modelTier;
 
     @Column(nullable = false)
     @Builder.Default

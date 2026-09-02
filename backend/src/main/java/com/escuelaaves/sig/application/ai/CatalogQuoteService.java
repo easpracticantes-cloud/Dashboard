@@ -16,16 +16,21 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Cotización 100% desde archivos {@code ai/catalogo/}. Sin transacciones ni tablas.
+ * A7: cache en memoria de tarifas calculadas (TTL corto).
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CatalogQuoteService {
 
+    private static final long CACHE_TTL_MS = 5 * 60_000L;
+
     private final CommercialCatalogService catalog;
+    private final ConcurrentHashMap<String, CachedQuote> tariffCache = new ConcurrentHashMap<>();
 
     public QuoteResult quote(String naturalMessage) {
         if (naturalMessage == null || naturalMessage.isBlank()) {
@@ -50,6 +55,13 @@ public class CatalogQuoteService {
             modality = "COMPARTIDO";
         } else if (notes.contains("privado") || tourHint.toLowerCase(Locale.ROOT).contains("privado")) {
             modality = "PRIVADO";
+        }
+
+        String cacheKey = (tourHint + "|" + people + "|" + (modality != null ? modality : "")).toUpperCase(Locale.ROOT);
+        CachedQuote cached = tariffCache.get(cacheKey);
+        if (cached != null && !cached.expired()) {
+            log.debug("[CatalogQuote] cache hit key={}", cacheKey);
+            return cached.result().withInterpretationMeta(interpretation);
         }
 
         CatalogProduct product = catalog.findBestMatch(tourHint, modality)
@@ -87,7 +99,7 @@ public class CatalogQuoteService {
         markdown.append("\n_Abre el panel de revisión para editar y descargar PDF._");
 
         log.info("[CatalogQuote] code={} people={} unit={} total={}", product.code(), people, unit, total);
-        return new QuoteResult(
+        QuoteResult result = new QuoteResult(
                 product.code(),
                 product.name(),
                 product.modality(),
@@ -104,6 +116,8 @@ public class CatalogQuoteService {
                 interpretation.rawNotes(),
                 scale
         );
+        tariffCache.put(cacheKey, new CachedQuote(result, System.currentTimeMillis() + CACHE_TTL_MS));
+        return result;
     }
 
     public Optional<QuoteResult> tryQuote(String naturalMessage) {
@@ -158,5 +172,24 @@ public class CatalogQuoteService {
             String notes,
             Map<String, BigDecimal> priceScaleByPax
     ) {
+        QuoteResult withInterpretationMeta(QuoteInterpretation interpretation) {
+            if (interpretation == null) {
+                return this;
+            }
+            return new QuoteResult(
+                    code, name, modality, people, unitPrice, total, currency, markdown, reviewFlag,
+                    interpretation.date() != null ? interpretation.date() : date,
+                    interpretation.pickup() != null ? interpretation.pickup() : pickup,
+                    includes, excludes,
+                    interpretation.rawNotes() != null ? interpretation.rawNotes() : notes,
+                    priceScaleByPax
+            );
+        }
+    }
+
+    private record CachedQuote(QuoteResult result, long expiresAtMs) {
+        boolean expired() {
+            return System.currentTimeMillis() > expiresAtMs;
+        }
     }
 }

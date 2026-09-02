@@ -12,6 +12,7 @@ import com.escuelaaves.sig.domain.ai.model.QuoteInterpretation;
 import com.escuelaaves.sig.domain.ai.model.ReservationExtraction;
 import com.escuelaaves.sig.domain.ai.model.SentimentAnalysis;
 import com.escuelaaves.sig.domain.ai.model.TourPrice;
+import com.escuelaaves.sig.domain.ai.port.AiProviderFactory;
 import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
 import com.escuelaaves.sig.domain.ai.port.TourPricingPort;
 import com.escuelaaves.sig.shared.exception.BadRequestException;
@@ -27,7 +28,7 @@ import java.util.List;
 /**
  * Servicio de aplicacion del modulo de IA (capa legacy reutilizable).
  * Preferir {@link IntelligenceService} como fachada HTTP.
- * Orquesta GenerativeAiPort y TourPricingPort (PostgreSQL).
+ * Orquesta GenerativeAiPort (vía factory) y TourPricingPort (PostgreSQL).
  */
 @Slf4j
 @Service
@@ -39,13 +40,18 @@ public class AIService {
             Responde en espanol, claro y profesional. No inventes precios.
             """;
 
-    private final GenerativeAiPort generativeAiPort;
+    private final AiProviderFactory aiProviderFactory;
     private final TourPricingPort tourPricingPort;
+
+    private GenerativeAiPort ai() {
+        return aiProviderFactory.getActiveProvider();
+    }
 
     public ChatResponse chat(ChatRequest request) {
         String system = (request.systemPrompt() == null || request.systemPrompt().isBlank())
                 ? DEFAULT_SYSTEM
                 : request.systemPrompt();
+        GenerativeAiPort generativeAiPort = ai();
         String reply = generativeAiPort.chat(system, request.message());
         return new ChatResponse(reply, generativeAiPort.providerId(), true, "OK");
     }
@@ -88,39 +94,39 @@ public class AIService {
 
     public QuoteInterpretation interpretQuote(String message) {
         log.info("[AI] interpretQuote chars={}", message != null ? message.length() : 0);
-        return generativeAiPort.interpretQuote(message);
+        return ai().interpretQuote(message);
     }
 
     public String summarizeConversation(String conversationText) {
-        return generativeAiPort.summarizeConversation(conversationText);
+        return ai().summarizeConversation(conversationText);
     }
 
     public ConversationClassification classifyConversation(String conversationText) {
-        return generativeAiPort.classifyConversation(conversationText);
+        return ai().classifyConversation(conversationText);
     }
 
     public String generateEmail(String context) {
-        return generativeAiPort.generateEmail(context);
+        return ai().generateEmail(context);
     }
 
     public NaturalLanguageQuotation generateQuotation(PricedQuotation priced) {
-        return generativeAiPort.generateQuotationNarrative(priced);
+        return ai().generateQuotationNarrative(priced);
     }
 
     public ReservationExtraction extractReservationInformation(String message) {
-        return generativeAiPort.extractReservationInformation(message);
+        return ai().extractReservationInformation(message);
     }
 
     public LanguageDetection detectLanguage(String text) {
-        return generativeAiPort.detectLanguage(text);
+        return ai().detectLanguage(text);
     }
 
     public SentimentAnalysis analyzeSentiment(String text) {
-        return generativeAiPort.analyzeSentiment(text);
+        return ai().analyzeSentiment(text);
     }
 
     public String suggestReply(String conversationText) {
-        return generativeAiPort.suggestReply(conversationText);
+        return ai().suggestReply(conversationText);
     }
 
     /**

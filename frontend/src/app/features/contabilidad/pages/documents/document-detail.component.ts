@@ -29,8 +29,6 @@ export class DocumentDetailComponent implements OnInit {
   cargando = true;
   error = '';
   procesando = false;
-  solicitud =
-    'Extrae numero de factura, proveedor, fecha de emision, subtotal, impuesto, total y moneda.';
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -54,7 +52,8 @@ export class DocumentDetailComponent implements OnInit {
   procesar(): void {
     if (!this.doc) return;
     this.procesando = true;
-    this.api.process(this.doc.id, this.solicitud).subscribe({
+    this.error = '';
+    this.api.process(this.doc.id).subscribe({
       next: (res) => {
         this.procesando = false;
         if (!res.ok) {
@@ -63,9 +62,9 @@ export class DocumentDetailComponent implements OnInit {
         }
         this.api.get(this.doc!.id).subscribe((d) => (this.doc = d));
       },
-      error: () => {
+      error: (err) => {
         this.procesando = false;
-        this.error = 'No se pudo procesar el documento.';
+        this.error = err?.error?.detail || err?.message || 'No se pudo procesar el documento.';
       },
     });
   }
@@ -73,6 +72,10 @@ export class DocumentDetailComponent implements OnInit {
   confidenceEntries(): [string, number][] {
     if (!this.doc?.confidence?.fields) return [];
     return Object.entries(this.doc.confidence.fields);
+  }
+
+  fieldSource(key: string): string {
+    return this.doc?.confidence?.fields_detail?.[key]?.fuente || '';
   }
 
   estadoClass(estado: string): string {

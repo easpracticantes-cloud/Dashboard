@@ -166,16 +166,17 @@ class DocumentService:
 
     def parse_confidence(self, doc: DocumentModel) -> dict:
         if not doc.extracted_json:
-            return {"global": doc.confidence_global, "fields": {}}
+            return {"global": doc.confidence_global, "fields": {}, "fields_detail": {}}
         try:
             data = json.loads(doc.extracted_json)
             conf = data.get("_confidence", {})
             return {
                 "global": doc.confidence_global or conf.get("global"),
                 "fields": conf.get("fields", {}),
+                "fields_detail": conf.get("fields_detail", {}),
             }
         except json.JSONDecodeError:
-            return {"global": doc.confidence_global, "fields": {}}
+            return {"global": doc.confidence_global, "fields": {}, "fields_detail": {}}
 
     def to_detail_dict(self, doc: DocumentModel) -> dict:
         extracted = {}

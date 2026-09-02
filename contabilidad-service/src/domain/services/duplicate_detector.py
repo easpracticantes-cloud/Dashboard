@@ -5,6 +5,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from domain.matching.normalize import normalize_nit
 from infrastructure.persistence.models import DocumentModel
 from infrastructure.persistence.repositories import DocumentRepository, file_hash
 
@@ -44,8 +45,9 @@ class DuplicateDetector:
         numero: str | None,
         total: float | None,
         exclude_id: int | None = None,
+        fecha_emision: str | None = None,
     ) -> DuplicateCheckResult:
-        """Detecta posible duplicado por NIT + numero + total."""
+        """Detecta posible duplicado por NIT + numero + total (+ fecha opcional)."""
         if not numero:
             return DuplicateCheckResult(is_duplicate=False)
 
@@ -55,16 +57,48 @@ class DuplicateDetector:
         if exclude_id:
             q = q.filter(DocumentModel.id != exclude_id)
 
+        want_nit = normalize_nit(nit) if nit else ""
+        want_fecha = (fecha_emision or "").strip()[:10]
+
         for doc in q.all():
-            if total is not None and doc.total is not None:
-                if abs(doc.total - total) < 0.01:
-                    return DuplicateCheckResult(
-                        is_duplicate=True,
-                        reason=f"Posible duplicado: mismo numero y total (doc #{doc.id})",
-                        existing_document_id=doc.id,
-                        match_type="METADATA",
-                    )
-            elif doc.numero_documento == numero:
+            doc_nit = ""
+            if doc.provider and doc.provider.nit:
+                doc_nit = normalize_nit(doc.provider.nit)
+
+            if want_nit and doc_nit and want_nit != doc_nit:
+                continue
+
+            same_total = (
+                total is not None
+                and doc.total is not None
+                and abs(doc.total - total) < 0.01
+            )
+            same_fecha = False
+            if want_fecha and doc.fecha_emision:
+                same_fecha = doc.fecha_emision.strip()[:10] == want_fecha
+
+            if want_nit and doc_nit and want_nit == doc_nit and same_total:
+                return DuplicateCheckResult(
+                    is_duplicate=True,
+                    reason=f"Posible duplicado: mismo NIT, numero y total (doc #{doc.id})",
+                    existing_document_id=doc.id,
+                    match_type="METADATA",
+                )
+            if want_nit and doc_nit and want_nit == doc_nit and same_fecha:
+                return DuplicateCheckResult(
+                    is_duplicate=True,
+                    reason=f"Posible duplicado: mismo NIT, numero y fecha (doc #{doc.id})",
+                    existing_document_id=doc.id,
+                    match_type="METADATA",
+                )
+            if not want_nit and same_total:
+                return DuplicateCheckResult(
+                    is_duplicate=True,
+                    reason=f"Posible duplicado: mismo numero y total (doc #{doc.id})",
+                    existing_document_id=doc.id,
+                    match_type="METADATA",
+                )
+            if not want_nit and not same_total and doc.numero_documento == numero:
                 return DuplicateCheckResult(
                     is_duplicate=True,
                     reason=f"Posible duplicado: mismo numero de documento (doc #{doc.id})",

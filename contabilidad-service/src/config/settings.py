@@ -52,6 +52,47 @@ class Settings(BaseSettings):
     # Si OCR < umbral, Gemini visión analiza la imagen (evita "0 caracteres")
     gemini_vision_on_weak_ocr: bool = True
 
+    # Anthropic Claude (A4)
+    anthropic_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("ANTHROPIC_API_KEY", "anthropic_api_key"),
+    )
+    anthropic_base_url: str = Field(
+        default="https://api.anthropic.com",
+        validation_alias=AliasChoices("ANTHROPIC_BASE_URL", "anthropic_base_url"),
+    )
+    anthropic_api_version: str = "2023-06-01"
+    anthropic_max_tokens: int = Field(
+        default=4096,
+        validation_alias=AliasChoices("ANTHROPIC_MAX_TOKENS", "AI_MAX_TOKENS"),
+    )
+    anthropic_timeout: int = Field(
+        default=90,
+        validation_alias=AliasChoices("ANTHROPIC_TIMEOUT", "AI_TIMEOUT"),
+    )
+    anthropic_max_retries: int = Field(
+        default=2,
+        validation_alias=AliasChoices("ANTHROPIC_MAX_RETRIES", "AI_MAX_RETRIES"),
+    )
+    ai_model_fast: str = Field(
+        default="claude-haiku-4-5-20251001",
+        validation_alias=AliasChoices("AI_MODEL_FAST", "ai_model_fast"),
+    )
+    ai_model_reasoning: str = Field(
+        default="claude-sonnet-4-5-20250929",
+        validation_alias=AliasChoices("AI_MODEL_REASONING", "ai_model_reasoning"),
+    )
+    ai_price_haiku_input: float = Field(default=1.0, validation_alias=AliasChoices("AI_PRICE_HAIKU_INPUT"))
+    ai_price_haiku_output: float = Field(default=5.0, validation_alias=AliasChoices("AI_PRICE_HAIKU_OUTPUT"))
+    ai_price_sonnet_input: float = Field(default=3.0, validation_alias=AliasChoices("AI_PRICE_SONNET_INPUT"))
+    ai_price_sonnet_output: float = Field(default=15.0, validation_alias=AliasChoices("AI_PRICE_SONNET_OUTPUT"))
+
+    # A7: procesamiento en background (FastAPI BackgroundTasks) cuando el router lo solicite
+    process_async_default: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("PROCESS_ASYNC_DEFAULT", "AI_PROCESS_ASYNC"),
+    )
+
     tesseract_lang: str = "spa+eng"
     tesseract_cmd: str | None = None
     storage_provider: str = "local"

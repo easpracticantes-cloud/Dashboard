@@ -208,16 +208,21 @@ public class IntelligenceService implements AIUseCase {
     }
 
     private Map<String, Object> toUsageMap(AiUsageLogEntity e) {
-        return Map.of(
-                "id", e.getId() != null ? e.getId() : 0,
-                "operation", e.getOperation() != null ? e.getOperation() : "",
-                "provider", e.getProvider() != null ? e.getProvider() : "",
-                "endpoint", e.getEndpoint() != null ? e.getEndpoint() : "",
-                "latencyMs", e.getLatencyMs() != null ? e.getLatencyMs() : 0,
-                "estimatedTokens", e.getEstimatedTokens() != null ? e.getEstimatedTokens() : 0,
-                "success", e.isSuccess(),
-                "createdAt", e.getCreatedAt() != null ? e.getCreatedAt().toString() : ""
-        );
+        java.util.HashMap<String, Object> map = new java.util.HashMap<>();
+        map.put("id", e.getId() != null ? e.getId() : 0);
+        map.put("operation", e.getOperation() != null ? e.getOperation() : "");
+        map.put("provider", e.getProvider() != null ? e.getProvider() : "");
+        map.put("endpoint", e.getEndpoint() != null ? e.getEndpoint() : "");
+        map.put("model", e.getModel() != null ? e.getModel() : "");
+        map.put("modelTier", e.getModelTier() != null ? e.getModelTier() : "");
+        map.put("latencyMs", e.getLatencyMs() != null ? e.getLatencyMs() : 0);
+        map.put("estimatedTokens", e.getEstimatedTokens() != null ? e.getEstimatedTokens() : 0);
+        map.put("inputTokens", e.getInputTokens() != null ? e.getInputTokens() : 0);
+        map.put("outputTokens", e.getOutputTokens() != null ? e.getOutputTokens() : 0);
+        map.put("estimatedCostUsd", e.getEstimatedCostUsd() != null ? e.getEstimatedCostUsd() : 0);
+        map.put("success", e.isSuccess());
+        map.put("createdAt", e.getCreatedAt() != null ? e.getCreatedAt().toString() : "");
+        return map;
     }
 
     private <T> T observe(String operation, String endpoint, Supplier<T> action) {
