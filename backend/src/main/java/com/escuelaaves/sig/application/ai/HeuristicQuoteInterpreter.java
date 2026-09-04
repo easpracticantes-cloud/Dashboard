@@ -7,7 +7,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Interpreta cotizaciones en español con reglas locales (sin llamar a Gemini).
+ * Interpreta cotizaciones en español con reglas locales (sin LLM).
+ * No inventa tour ni personas: si no hay señal clara, deja null
+ * (el PricingEngine / CatalogQuoteService aplican defaults solo al cotizar).
  */
 public final class HeuristicQuoteInterpreter {
 
@@ -23,34 +25,7 @@ public final class HeuristicQuoteInterpreter {
         String text = message != null ? message : "";
         String norm = normalize(text);
 
-        String tour = "ACAIME";
-        if (norm.contains("rafting")) {
-            tour = "RAFTING_EN_EL_EJE_CAFETERO";
-        } else if (norm.contains("cabalgata")) {
-            tour = "CABALGATA_ECOLOGICA";
-        } else if (norm.contains("canopy")) {
-            tour = "CANOPY_EXTREMO_EN_EL_QUINDIO";
-        } else if (norm.contains("parapente")) {
-            tour = "PARAPENTE";
-        } else if (norm.contains("paramotor")) {
-            tour = "PARAMOTOR";
-        } else if (norm.contains("globo")) {
-            tour = "GLOBO_AEROSTATICO";
-        } else if (norm.contains("santuario") || norm.contains("palma de cera")) {
-            tour = "SANTUARIO_DE_LA_PALMA_DE_CERA";
-        } else if (norm.contains("bicirriel")) {
-            tour = "BICIRRIEL_EN_EL_QUINDIO";
-        } else if (norm.contains("filandia")) {
-            tour = "FILANDIA";
-        } else if (norm.contains("termales") || norm.contains("termal")) {
-            tour = "TERMALES";
-        } else if (norm.contains("cafe") || norm.contains("café") || norm.contains("cafeter")) {
-            tour = "CAFE";
-        } else if (norm.contains("cocora") || norm.contains("cócora")) {
-            tour = "COCORA";
-        } else if (norm.contains("acaime")) {
-            tour = "ACAIME";
-        }
+        String tour = detectTour(norm);
 
         Integer people = null;
         Matcher m = PEOPLE.matcher(text);
@@ -58,25 +33,29 @@ public final class HeuristicQuoteInterpreter {
             String g1 = m.group(1);
             String g2 = m.group(2);
             people = Integer.parseInt(g1 != null ? g1 : g2);
-        }
-        if (people == null || people < 1) {
-            people = 2;
+            if (people < 1) {
+                people = null;
+            }
         }
 
-        boolean transport = containsAny(norm,
+        Boolean transport = null;
+        boolean hasTransport = containsAny(norm,
                 "transporte", "jeep", "recogida", "pickup", "traslado", "con transport");
         boolean noTransport = containsAny(norm, "sin transporte", "no transporte", "sin jeep");
         if (noTransport) {
             transport = false;
-        } else if (!transport && people > 4) {
+        } else if (hasTransport) {
             transport = true;
         }
 
-        boolean restaurant = containsAny(norm,
+        Boolean restaurant = null;
+        boolean hasRestaurant = containsAny(norm,
                 "almuerzo", "comida", "restaurante", "lunch", "con rest");
         boolean noRestaurant = containsAny(norm, "sin almuerzo", "sin comida", "sin restaurante");
         if (noRestaurant) {
             restaurant = false;
+        } else if (hasRestaurant) {
+            restaurant = true;
         }
 
         String modalityNote = containsAny(norm, "compartido", "civitatis", "grupo")
@@ -94,7 +73,7 @@ public final class HeuristicQuoteInterpreter {
             pickup = "Calarcá";
         }
 
-        String notes = "interpretación local (sin Gemini)";
+        String notes = "interpretación local";
         if (modalityNote != null) {
             notes = notes + " | " + modalityNote;
         }
@@ -108,6 +87,49 @@ public final class HeuristicQuoteInterpreter {
                 restaurant,
                 notes
         );
+    }
+
+    private static String detectTour(String norm) {
+        if (norm.contains("rafting")) {
+            return "RAFTING_EN_EL_EJE_CAFETERO";
+        }
+        if (norm.contains("cabalgata")) {
+            return "CABALGATA_ECOLOGICA";
+        }
+        if (norm.contains("canopy")) {
+            return "CANOPY_EXTREMO_EN_EL_QUINDIO";
+        }
+        if (norm.contains("parapente")) {
+            return "PARAPENTE";
+        }
+        if (norm.contains("paramotor")) {
+            return "PARAMOTOR";
+        }
+        if (norm.contains("globo")) {
+            return "GLOBO_AEROSTATICO";
+        }
+        if (norm.contains("santuario") || norm.contains("palma de cera")) {
+            return "SANTUARIO_DE_LA_PALMA_DE_CERA";
+        }
+        if (norm.contains("bicirriel")) {
+            return "BICIRRIEL_EN_EL_QUINDIO";
+        }
+        if (norm.contains("filandia")) {
+            return "FILANDIA";
+        }
+        if (norm.contains("termales") || norm.contains("termal")) {
+            return "TERMALES";
+        }
+        if (norm.contains("cafe") || norm.contains("café") || norm.contains("cafeter")) {
+            return "CAFE";
+        }
+        if (norm.contains("cocora") || norm.contains("cócora")) {
+            return "COCORA";
+        }
+        if (norm.contains("acaime")) {
+            return "ACAIME";
+        }
+        return null;
     }
 
     private static boolean containsAny(String haystack, String... needles) {

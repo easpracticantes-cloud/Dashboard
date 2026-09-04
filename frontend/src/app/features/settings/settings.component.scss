@@ -48,7 +48,7 @@
 .settings-nav__item.is-active mat-icon {
   opacity: 1;
   color: var(--eas-leaf);
-  transform: scale(1.05);
+  transform: none;
 }
 
 .settings-nav__item.is-active,

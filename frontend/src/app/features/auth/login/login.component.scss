@@ -60,7 +60,7 @@
   z-index: 0;
   background: url('/assets/brand/login-cocora-sunset.jpg') center / cover no-repeat;
   transform: scale(1.04);
-  animation: login-kenburns 42s ease-in-out infinite alternate;
+  animation: none;
 }
 
 .login-hero__veil {
@@ -96,7 +96,7 @@
   top: -10%;
   right: -8%;
   background: radial-gradient(circle, rgba(228, 160, 26, 0.42), transparent 68%);
-  animation: login-glow-pulse 12s ease-in-out infinite alternate;
+  animation: none;
 }
 
 .login-hero__glow--leaf {
@@ -105,7 +105,7 @@
   bottom: 12%;
   left: -10%;
   background: radial-gradient(circle, rgba(61, 154, 106, 0.25), transparent 70%);
-  animation: login-glow-pulse 16s ease-in-out infinite alternate-reverse;
+  animation: none;
 }
 
 @keyframes login-kenburns {
@@ -247,7 +247,7 @@
   border-radius: 50%;
   pointer-events: none;
   filter: blur(2px);
-  animation: login-orb-drift 20s ease-in-out infinite alternate;
+  animation: none;
 }
 
 .login-main__orb--a {
@@ -532,10 +532,8 @@
 
 .login-submit:hover:not(:disabled) {
   background: linear-gradient(180deg, #214a36 0%, #1a3d2c 100%);
-  box-shadow:
-    0 14px 28px rgba(20, 38, 28, 0.3),
-    0 0 0 3px rgba(228, 160, 26, 0.2);
-  transform: translateY(-1px);
+  box-shadow: none;
+  transform: none;
 }
 
 .login-submit:disabled {
@@ -590,8 +588,8 @@
 .login-google-btn:hover:not(:disabled) {
   background: #f8faf9;
   border-color: rgba(20, 38, 28, 0.24);
-  box-shadow: 0 6px 16px rgba(20, 38, 28, 0.07);
-  transform: translateY(-1px);
+  box-shadow: none;
+  transform: none;
 }
 
 .login-google-btn:disabled {

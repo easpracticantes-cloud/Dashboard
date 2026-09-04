@@ -73,11 +73,11 @@ class RemediationService:
         descripcion: str,
         proveedor: str | None = None,
         valor_involucrado: float | None = None,
-        responsable: str | None = "ANDREA",
+        responsable: str | None = None,
         fecha_limite: str | None = None,
         observaciones: str | None = None,
         crossing_id: int | None = None,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
     ) -> dict:
         doc = self.doc_repo.get_by_id(document_id)
         if not doc:
@@ -93,7 +93,7 @@ class RemediationService:
             tipo_problema=tipo_problema,
             descripcion=descripcion,
             valor_involucrado=valor_involucrado,
-            responsable=responsable,
+            responsable=(responsable or "").strip() or usuario,
             fecha_limite=fecha_limite,
             observaciones=observaciones,
         )
@@ -115,7 +115,7 @@ class RemediationService:
         responsable: str | None = None,
         fecha_limite: str | None = None,
         observaciones: str | None = None,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
     ) -> dict:
         remediation = self.repo.get_by_id(remediation_id)
         if not remediation:
@@ -145,7 +145,7 @@ class RemediationService:
         estado: str,
         *,
         observaciones: str | None = None,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
     ) -> dict:
         if estado not in RemediationStatus:
             raise RemediationServiceError(f"Estado inválido: {estado}", "INVALID_STATUS")
@@ -172,7 +172,7 @@ class RemediationService:
         self.db.refresh(remediation)
         return self.to_dict(remediation)
 
-    def delete_remediation(self, remediation_id: int, usuario: str = "ANDREA") -> bool:
+    def delete_remediation(self, remediation_id: int, usuario: str = "SISTEMA") -> bool:
         remediation = self.repo.get_by_id(remediation_id)
         if not remediation:
             return False

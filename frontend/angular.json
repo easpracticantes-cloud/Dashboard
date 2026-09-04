@@ -36,16 +36,10 @@
               "@angular/material/prebuilt-themes/azure-blue.css",
               "src/styles.scss",
               "src/styles/dark-mode.css",
-              "src/styles/visual-polish.css",
-              "src/styles/visual-polish-v2.css",
-              "src/styles/visual-polish-v3.css",
               "src/styles/sig-ui-real.css",
-              "src/styles/soft-motion.css",
               "src/styles/theme-transitions.css",
-              "src/styles/visual-polish-v6-noticeable.css",
-              "src/styles/visual-polish-v7-BOLD.css",
-              "src/styles/visual-polish-v8-fluid.css",
-              "src/styles/contabilidad-sig.css"
+              "src/styles/contabilidad-sig.css",
+              "src/styles/no-motion.css"
             ],
             "stylePreprocessorOptions": {
               "includePaths": [

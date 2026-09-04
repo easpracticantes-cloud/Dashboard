@@ -28,7 +28,7 @@
 }
 
 .cd__back:hover {
-  transform: translateX(-2px);
+  transform: none;
   background: var(--eas-mist);
 }
 
@@ -54,7 +54,7 @@
 
 .cd__ai-btn:hover {
   background: var(--eas-tint-leaf-strong);
-  box-shadow: var(--eas-shadow-sm);
+  box-shadow: none;
 }
 
 .cd__ai-banner {
@@ -313,5 +313,5 @@
 }
 
 .cd__chips button:hover {
-  transform: translateY(-1px);
+  transform: none;
 }

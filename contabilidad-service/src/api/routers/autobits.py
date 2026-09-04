@@ -2,11 +2,12 @@
 
 import json
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from api.deps import resolve_usuario
 from application.services.autobits_service import AutobitsService, AutobitsServiceError
 from infrastructure.persistence.database import get_db
 
@@ -68,9 +69,11 @@ def list_fields(db: Session = Depends(get_db)):
 
 @router.post("/upload", response_model=ImportResponse)
 async def upload_and_import(
+    request: Request,
     archivo: UploadFile = File(...),
-    imported_by: str = Form("ANDREA"),
+    imported_by: str | None = Form(None),
     auto_cruzar: bool = Form(True),
+    force: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     """Importa Excel: Ollama analiza la estructura y deduce campos automáticamente."""
@@ -80,11 +83,15 @@ async def upload_and_import(
         result = service.import_file_direct(
             content,
             archivo.filename or "autobits.xlsx",
-            imported_by=imported_by,
+            imported_by=resolve_usuario(request, imported_by),
             auto_cruzar=auto_cruzar,
+            force=force,
         )
     except AutobitsServiceError as exc:
-        raise HTTPException(status_code=400, detail=exc.message) from exc
+        raise HTTPException(
+            status_code=getattr(exc, "status_code", 400) or 400,
+            detail=exc.message,
+        ) from exc
     return ImportResponse(**result)
 
 
@@ -105,11 +112,12 @@ async def preview_import(
 
 @router.post("/import", response_model=ImportResponse)
 def confirm_import(
+    request: Request,
     preview_id: str = Form(...),
     mapping_json: str = Form(...),
     period_start: str | None = Form(None),
     period_end: str | None = Form(None),
-    imported_by: str = Form("ANDREA"),
+    imported_by: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     """Legacy: confirma importación con mapeo manual."""
@@ -125,7 +133,7 @@ def confirm_import(
             mapping,
             period_start=period_start or None,
             period_end=period_end or None,
-            imported_by=imported_by,
+            imported_by=resolve_usuario(request, imported_by),
         )
     except AutobitsServiceError as exc:
         status = 404 if exc.code == "PREVIEW_NOT_FOUND" else 400
@@ -187,14 +195,37 @@ def get_record(record_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/batches/{batch_id}/mark-ready", response_model=MarkReadyResponse)
-def mark_batch_ready(batch_id: int, db: Session = Depends(get_db)):
+def mark_batch_ready(request: Request, batch_id: int, db: Session = Depends(get_db)):
     """Marca registros del lote como listos para actualizar Autobits manualmente."""
     service = AutobitsService(db)
     try:
-        result = service.mark_batch_ready_for_update(batch_id)
+        result = service.mark_batch_ready_for_update(batch_id, resolve_usuario(request))
     except AutobitsServiceError as exc:
         raise HTTPException(status_code=404, detail=exc.message) from exc
     return MarkReadyResponse(**result)
+
+
+@router.delete("/excels")
+def purge_excels(
+    request: Request,
+    confirm: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Limpia Excels Autobits/Cruce ya subidos y datos derivados (no borra facturas)."""
+    from application.services.excel_purge_service import ExcelPurgeService
+
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Pase confirm=true para limpiar todos los Excels Autobits/Cruce.",
+        )
+    try:
+        return ExcelPurgeService(db).purge_all(
+            usuario=resolve_usuario(request),
+            confirm=True,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/batches/{batch_id}/export")

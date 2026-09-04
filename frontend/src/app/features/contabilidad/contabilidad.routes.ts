@@ -37,6 +37,11 @@ export const CONTABILIDAD_ROUTES: Routes = [
           import('./pages/crossings/crossings.component').then((m) => m.CrossingsComponent)
       },
       {
+        path: 'pendientes',
+        loadComponent: () =>
+          import('./pages/pending/pending.component').then((m) => m.PendingComponent)
+      },
+      {
         path: 'subsanaciones',
         loadComponent: () =>
           import('./pages/remediations/remediations.component').then((m) => m.RemediationsComponent)
@@ -50,6 +55,11 @@ export const CONTABILIDAD_ROUTES: Routes = [
         path: 'paquetes',
         loadComponent: () =>
           import('./pages/packages/packages.component').then((m) => m.PackagesComponent)
+      },
+      {
+        path: 'cola',
+        loadComponent: () =>
+          import('./pages/cola/cola.component').then((m) => m.ColaComponent)
       }
     ]
   }

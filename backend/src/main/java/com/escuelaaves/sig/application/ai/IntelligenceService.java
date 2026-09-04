@@ -48,10 +48,7 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class IntelligenceService implements AIUseCase {
 
-    private static final String DEFAULT_SYSTEM = """
-            Eres el asistente comercial de Escuela Aves Salento (SIG).
-            Responde en español, claro y profesional. No inventes precios.
-            """;
+    private static final String DEFAULT_SYSTEM = AveSystemPrompt.SYSTEM;
 
     private final AiProviderFactory aiProviderFactory;
     private final QuotationOrchestrator quotationOrchestrator;
@@ -198,6 +195,14 @@ public class IntelligenceService implements AIUseCase {
 
     public CopilotResponse copilot(CopilotRequest request) {
         return copilotOrchestrator.chat(request);
+    }
+
+    public void copilotStream(
+            CopilotRequest request,
+            java.util.function.Consumer<String> onDelta,
+            java.util.function.Consumer<CopilotResponse> onDone
+    ) {
+        copilotOrchestrator.chatStreaming(request, onDelta, onDone);
     }
 
     @Transactional(readOnly = true)

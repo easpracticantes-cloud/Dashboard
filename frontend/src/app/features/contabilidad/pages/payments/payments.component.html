@@ -1,18 +1,17 @@
 <div class="pagos cosmos-page">
-  <header class="page-hero sheet">
-    <div class="hero-glow" aria-hidden="true"></div>
+  <header class="page-hero">
     <div class="hero-row">
       <div>
         <span class="label-caps">Ejecución manual · Bancolombia</span>
-        <h1 class="page-title">Pagos</h1>
+        <h1 class="page-title">Pagos AP</h1>
         <p class="page-lead">
-          Apruebe, marque como pagado y adjunte el comprobante contramarcado de cada proveedor.
+          Apruebe, confirme transferencia bancaria y adjunte el comprobante. Solo «Marcar pagado» confirma el pago.
         </p>
       </div>
       <div class="hero-actions">
-        <button type="button" class="btn btn-primary" (click)="exportarPendientes()">
+        <button type="button" class="btn btn-primary" (click)="exportarPendientes()" [disabled]="exportando">
           <mat-icon>download</mat-icon>
-          Reporte de pagos
+          {{ exportando ? 'Descargando…' : 'Reporte de pagos' }}
         </button>
         <a routerLink="/app/contabilidad/cruce" class="btn btn-secondary">
           <mat-icon>compare_arrows</mat-icon>
@@ -23,17 +22,17 @@
   </header>
 
   @if (pagos.length) {
-    <div class="pay-stats">
+    <div class="ap-kpi-grid">
       @for (s of resumen; track s.label) {
-        <div class="pay-stat" [class]="s.cls">
-          <span class="pay-num">{{ s.val }}</span>
-          <span class="pay-lbl">{{ s.label }}</span>
-        </div>
+        <article class="ap-kpi sheet" [class]="s.cls">
+          <span class="kpi-val">{{ s.val }}</span>
+          <span class="kpi-lbl">{{ s.label }}</span>
+        </article>
       }
-      <div class="pay-stat total">
-        <span class="pay-num">{{ totalValor | number:'1.0-0' }}</span>
-        <span class="pay-lbl">Valor total (COP)</span>
-      </div>
+      <article class="ap-kpi sheet money accent">
+        <span class="kpi-val">{{ formatCop(totalValor) }}</span>
+        <span class="kpi-lbl">Valor total (sin anulados)</span>
+      </article>
     </div>
   }
 
@@ -47,7 +46,7 @@
     />
     <select class="select" [(ngModel)]="filtroEstado" (change)="cargar()">
       @for (e of estados; track e) {
-        <option [value]="e">{{ e || 'Todos los estados' }}</option>
+        <option [value]="e">{{ e ? labelEstado(e, 'payment') : 'Todos los estados' }}</option>
       }
     </select>
     <button type="button" class="btn btn-secondary" (click)="cargar()">Filtrar</button>
@@ -123,9 +122,12 @@
                   <span class="mono">{{ p.numero_documento || '—' }}</span>
                 }
               </td>
-              <td class="num">{{ p.valor != null ? (p.valor | number:'1.0-0') : '—' }}</td>
+              <td class="num">{{ formatCop(p.valor) }}</td>
               <td>
-                <span class="status" [class]="estadoClass(p.estado)">{{ p.estado }}</span>
+                <span class="estado-chip" [class]="toneEstado(p.estado)">
+                  <mat-icon>{{ iconEstado(p.estado) }}</mat-icon>
+                  {{ labelEstado(p.estado, 'payment') }}
+                </span>
               </td>
               <td>
                 @if (p.has_receipt) {
@@ -140,18 +142,39 @@
                   </span>
                 }
               </td>
-              <td class="actions">
-                @if (p.estado === 'PENDIENTE_APROBACION') {
-                  <button type="button" class="btn btn-primary btn-sm" (click)="aprobar(p)">
+              <td class="actions row-actions">
+                @if (puedeAprobar(p)) {
+                  <button
+                    type="button"
+                    class="btn btn-success btn-sm"
+                    (click)="aprobar(p)"
+                    [disabled]="accionEnCurso === p.id"
+                  >
                     Aprobar
                   </button>
                 }
-                @if (p.estado === 'PENDIENTE_PAGO') {
-                  <button type="button" class="btn btn-primary btn-sm" (click)="marcarPagado(p)">
+                @if (puedeMarcarPagado(p)) {
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    (click)="marcarPagado(p)"
+                    [disabled]="accionEnCurso === p.id"
+                  >
                     Marcar pagado
                   </button>
                 }
-                @if (p.estado === 'PAGADO' || p.estado === 'COMPROBANTE_PENDIENTE' || p.estado === 'PENDIENTE_PAGO') {
+                @if (puedeCompletar(p)) {
+                  <button
+                    type="button"
+                    class="btn btn-success btn-sm"
+                    (click)="completar(p)"
+                    [disabled]="accionEnCurso === p.id"
+                    title="Cerrar pago con comprobante"
+                  >
+                    Completar
+                  </button>
+                }
+                @if (puedeSubirComprobante(p)) {
                   <label class="btn btn-secondary btn-sm upload-receipt">
                     <mat-icon>attach_file</mat-icon>
                     Comprobante
@@ -159,9 +182,31 @@
                       type="file"
                       accept=".jpg,.jpeg,.png,.pdf"
                       (change)="onReceiptSelected(p, $event)"
-                      [disabled]="subiendo"
+                      [disabled]="subiendo || accionEnCurso === p.id"
                     />
                   </label>
+                }
+                @if (puedeAjustar(p)) {
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    (click)="ajustarValor(p)"
+                    [disabled]="accionEnCurso === p.id"
+                    title="Corregir valor con motivo y auditoría"
+                  >
+                    Ajustar
+                  </button>
+                }
+                @if (puedeAnular(p)) {
+                  <button
+                    type="button"
+                    class="btn btn-danger btn-sm"
+                    (click)="anular(p)"
+                    [disabled]="accionEnCurso === p.id"
+                    title="Anular pago (no elimina el registro)"
+                  >
+                    Anular
+                  </button>
                 }
               </td>
             </tr>

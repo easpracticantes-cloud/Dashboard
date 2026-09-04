@@ -1,40 +1,42 @@
 <div class="cruce cosmos-module cosmos-page">
-  <header class="cruce-hero">
-    <div class="cruce-hero-text">
-      <span class="label-caps">Cruce de cuentas</span>
-      <h1 class="page-title">Reporte de pagos</h1>
-      <p class="page-lead">
-        Suba el Excel de Autobits y luego adjunte su CRUCE DE CUENTAS: el sistema compara ambos
-        y le dice qué falta por llenar (factura/CDC, fecha de pago, filas sin digitar).
-      </p>
-    </div>
-    <div class="cruce-actions">
-      <button
-        type="button"
-        class="btn btn-primary"
-        (click)="sincronizarDesdeUltimoExcel()"
-        [disabled]="ejecutando"
-      >
-        @if (ejecutando) {
-          <mat-spinner diameter="16"></mat-spinner>
-        } @else {
-          <mat-icon>sync</mat-icon>
-        }
-        Sincronizar Excel
-      </button>
-      <button
-        type="button"
-        class="btn btn-secondary"
-        (click)="generarPagos()"
-        [disabled]="ejecutando || !context?.counts?.['APROBADO']"
-      >
-        <mat-icon>payments</mat-icon>
-        Generar pagos
-      </button>
-      <a routerLink="/app/contabilidad/autobits" class="btn btn-ghost">
-        <mat-icon>upload_file</mat-icon>
-        Subir Autobits
-      </a>
+  <header class="page-hero">
+    <div class="hero-row">
+      <div>
+        <span class="label-caps">Cruce de cuentas</span>
+        <h1 class="page-title">Reporte de pagos</h1>
+        <p class="page-lead">
+          Suba el Excel de Autobits y luego adjunte su CRUCE DE CUENTAS: el sistema compara ambos
+          y le dice qué falta por llenar (factura/CDC, fecha de pago, filas sin digitar).
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="sincronizarDesdeUltimoExcel()"
+          [disabled]="ejecutando"
+        >
+          @if (ejecutando) {
+            <mat-spinner diameter="16"></mat-spinner>
+          } @else {
+            <mat-icon>sync</mat-icon>
+          }
+          Sincronizar Excel
+        </button>
+        <button
+          type="button"
+          class="btn btn-success"
+          (click)="generarPagos()"
+          [disabled]="ejecutando || !context?.counts?.['APROBADO']"
+        >
+          <mat-icon>payments</mat-icon>
+          Generar pagos
+        </button>
+        <a routerLink="/app/contabilidad/autobits" class="btn btn-ghost">
+          <mat-icon>upload_file</mat-icon>
+          Subir Autobits
+        </a>
+      </div>
     </div>
   </header>
 
@@ -146,9 +148,10 @@
       <section class="pendientes-panel">
         <header class="pendientes-head">
           <div>
-            <h2 class="section-head">Qué falta por llenar</h2>
+            <h2 class="section-head">Qué falta por diligenciar</h2>
             <p class="pendientes-lead">
-              Comparación entre Autobits y su Excel de cruce de cuentas.
+              Comparación de su Excel de cruce contra Autobits.
+              Priorice las filas «Falta en cruce» para agregarlas a su hoja.
             </p>
           </div>
           <div class="pendientes-actions">
@@ -173,6 +176,7 @@
               type="button"
               class="tipo-chip sheet"
               [class.activo]="tipoPendienteActivo === t.tipo"
+              [class.urgente]="t.tipo === 'FALTA_EN_CRUCE'"
               (click)="filtrarPendiente(t.tipo)"
             >
               <mat-icon>{{ t.icono }}</mat-icon>
@@ -183,12 +187,18 @@
         </div>
 
         @for (grupo of pendientesVisibles; track grupo.tipo) {
-          <div class="pendiente-grupo sheet">
+          <div class="pendiente-grupo sheet" [class.urgente]="grupo.tipo === 'FALTA_EN_CRUCE'">
             <h3>
               <mat-icon>{{ grupo.icono }}</mat-icon>
               {{ grupo.etiqueta }}
               <span class="grupo-count">{{ grupo.items.length }}</span>
             </h3>
+            @if (grupo.tipo === 'FALTA_EN_CRUCE') {
+              <p class="grupo-hint">
+                Estas filas están en Autobits y no aparecen en su Excel. Agréguelas con compra, reserva,
+                valor, FACTURA/CDC y FECHA DE PAGO.
+              </p>
+            }
             <table class="data-table compact">
               <thead>
                 <tr>
@@ -203,18 +213,24 @@
               <tbody>
                 @for (p of grupo.items; track $index) {
                   <tr>
-                    <td>{{ p.proveedor || '—' }}</td>
+                    <td class="strong">{{ p.proveedor || '—' }}</td>
                     <td class="mono">{{ p.numero_compra || '—' }}</td>
                     <td class="mono">{{ p.numero_reserva || '—' }}</td>
                     <td class="num">
-                      {{ p.valor != null ? (p.valor | number:'1.0-0') : '—' }}
+                      {{ p.valor != null ? formatCop(p.valor) : '—' }}
                     </td>
                     <td class="detalle">{{ p.detalle }}</td>
-                    <td>
-                      @if (p.crossing_id) {
-                        <button type="button" class="btn btn-secondary btn-sm" (click)="empezarEdicionPorId(p.crossing_id)">
+                    <td class="actions row-actions">
+                      @if (puedeCompletarPendiente(grupo.tipo, p.crossing_id)) {
+                        <button
+                          type="button"
+                          class="btn btn-primary btn-sm"
+                          (click)="empezarEdicionPorId(p.crossing_id!)"
+                        >
                           Completar
                         </button>
+                      } @else {
+                        <span class="accion-hint">{{ accionPendienteLabel(grupo.tipo) }}</span>
                       }
                     </td>
                   </tr>
@@ -316,7 +332,7 @@
                   <td class="mono">{{ c.numero_reserva || '—' }}</td>
                   <td class="num">
                     @if (c.valor_autobits != null) {
-                      {{ c.valor_autobits | number: '1.0-0' }}
+                      {{ formatCop(c.valor_autobits) }}
                     } @else {
                       —
                     }
@@ -347,6 +363,26 @@
                       <button type="button" class="btn btn-secondary btn-sm" (click)="empezarEdicion(c)">
                         Editar
                       </button>
+                      @if (puedeAprobar(c)) {
+                        <button
+                          type="button"
+                          class="btn btn-success btn-sm"
+                          [disabled]="ejecutando"
+                          (click)="aprobarCruce(c)"
+                        >
+                          Aprobar
+                        </button>
+                      }
+                      @if (puedeRechazar(c)) {
+                        <button
+                          type="button"
+                          class="btn btn-danger btn-sm"
+                          [disabled]="ejecutando"
+                          (click)="rechazarCruce(c)"
+                        >
+                          Rechazar
+                        </button>
+                      }
                     }
                   </td>
                 </tr>

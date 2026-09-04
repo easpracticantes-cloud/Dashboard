@@ -10,8 +10,10 @@ from domain.matching.normalize import (
     names_similar,
     normalize_id,
     normalize_nit,
+    value_difference,
     values_close,
 )
+from domain.utils.money import money_to_float
 from infrastructure.persistence.models import AutobitsRecordModel, DocumentModel
 
 
@@ -144,8 +146,7 @@ class MatchingEngine:
             score += 15
             reasons.append("valor")
         elif ctx.valor and record.valor:
-            diff_pct = abs(ctx.valor - record.valor) / max(abs(ctx.valor), abs(record.valor), 1.0) * 100
-            if diff_pct <= 5:
+            if values_close(ctx.valor, record.valor, tolerance_pct=5.0):
                 score += 8
                 reasons.append("valor_cercano")
 
@@ -157,17 +158,15 @@ class MatchingEngine:
             score = 100.0
 
         match_type = self.classify(score, reasons)
-        diferencia = None
-        if ctx.valor is not None and record.valor is not None:
-            diferencia = round(ctx.valor - record.valor, 2)
+        diferencia = money_to_float(value_difference(ctx.valor, record.valor))
 
         return MatchCandidate(
             autobits_record_id=record.id,
             score=round(score, 1),
             match_type=match_type,
             reasons=reasons,
-            valor_documento=ctx.valor,
-            valor_autobits=record.valor,
+            valor_documento=money_to_float(ctx.valor),
+            valor_autobits=money_to_float(record.valor),
             diferencia=diferencia,
             numero_compra=record.numero_compra,
             numero_reserva=record.numero_reserva,

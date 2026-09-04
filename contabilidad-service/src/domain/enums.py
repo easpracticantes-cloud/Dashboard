@@ -39,6 +39,7 @@ class DocumentStatus(StrEnum):
     REQUIERE_REVISION = "REQUIERE_REVISION"
     SUBSANACION = "SUBSANACION"
     DUPLICADO = "DUPLICADO"
+    ANULADO = "ANULADO"
     PROCESADO = "PROCESADO"  # compatibilidad POC batch
 
 
@@ -79,7 +80,7 @@ class CrossingStatus(StrEnum):
     EN_REVISION = "EN_REVISION"
     APROBADO = "APROBADO"  # Ya tiene factura/CDC (texto)
     SUBSANACION = "SUBSANACION"
-    PAGADO = "PAGADO"  # Tiene fecha de pago
+    PAGADO = "PAGADO"  # Confirmación bancaria vía PaymentService.mark_paid (no fecha/obs Excel)
     ARCHIVADO = "ARCHIVADO"  # Fuera del Excel vigente (semana anterior)
 
 
@@ -104,9 +105,30 @@ class PaymentStatus(StrEnum):
     PENDIENTE_APROBACION = "PENDIENTE_APROBACION"
     APROBADO = "APROBADO"
     PENDIENTE_PAGO = "PENDIENTE_PAGO"
-    PAGADO = "PAGADO"
+    PAGADO = "PAGADO"  # confirmado en banco por Andrea
     COMPROBANTE_PENDIENTE = "COMPROBANTE_PENDIENTE"
     COMPLETADO = "COMPLETADO"
+    ANULADO = "ANULADO"
+
+
+# Pagos generados que aún no tienen confirmación bancaria.
+PAGOS_SIN_CONFIRMACION_BANCARIA = {
+    PaymentStatus.PENDIENTE_APROBACION,
+    PaymentStatus.APROBADO,
+    PaymentStatus.PENDIENTE_PAGO,
+}
+
+
+class AdjustmentAction(StrEnum):
+    """Correcciones contables: nunca se borra, se registra el ajuste."""
+
+    ANULACION = "ANULACION"
+    AJUSTE = "AJUSTE"
+
+
+class PeriodClosureStatus(StrEnum):
+    OPEN = "OPEN"
+    CLOSED = "CLOSED"
 
 
 class StorageFolderType(StrEnum):

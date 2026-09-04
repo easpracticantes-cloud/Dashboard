@@ -240,8 +240,16 @@
   }
 
   &.activo {
-    border-color: rgba(232, 200, 138, 0.4);
-    box-shadow: var(--glow-gold);
+    border-color: color-mix(in srgb, #1f7a4c 40%, transparent);
+    box-shadow: none;
+  }
+
+  &.urgente {
+    border-color: color-mix(in srgb, #c0392b 35%, transparent);
+  }
+
+  &.urgente .tipo-num {
+    color: #c0392b;
   }
 }
 
@@ -283,6 +291,25 @@
       color: var(--gold-dim);
     }
   }
+
+  &.urgente {
+    border-color: color-mix(in srgb, #c0392b 30%, transparent);
+  }
+}
+
+.grupo-hint {
+  margin: 0;
+  padding: 0.65rem 1.15rem;
+  font-size: 0.8rem;
+  color: var(--eas-muted, #666);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, #c0392b 6%, transparent);
+}
+
+.accion-hint {
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--eas-muted, #666);
 }
 
 .grupo-count {

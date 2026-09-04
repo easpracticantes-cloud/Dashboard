@@ -13,7 +13,7 @@ eas-dashboard, eas-dashboard-sheets, eas-quotes, eas-conversations-list, eas-cli
 .sheets-table-wrap::-webkit-scrollbar, .crm-table__scroll::-webkit-scrollbar { height: 8px; width: 8px; }
 .sheets-table-wrap::-webkit-scrollbar-thumb, .crm-table__scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--eas-leaf) 40%, transparent); border-radius: 999px; }
 .kpi, .sheet-card, .eas-card, .crm-toolbar { transition: transform var(--eas-v5-fast) var(--eas-v5-ease), box-shadow var(--eas-v5-med) var(--eas-v5-ease); }
-.kpi:hover, .sheet-card:hover { transform: translateY(-2px); }
+.kpi:hover, .sheet-card:hover { transform: none; }
 html[data-theme="dark"] .sheets-table-wrap::-webkit-scrollbar-thumb, html[data-theme="dark"] .crm-table__scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, #5ec993 45%, transparent); }
 .tb__theme { transition: background-color var(--eas-v5-med) var(--eas-v5-ease), border-color var(--eas-v5-med) var(--eas-v5-ease), color var(--eas-v5-med) var(--eas-v5-ease); }
 .semaforo, .pill, .eas-chip { transition: transform var(--eas-v5-fast) var(--eas-v5-ease); }

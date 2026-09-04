@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ContabilidadUserContext } from './contabilidad-user-context';
 
 export interface RemediationSummary {
   id: number;
@@ -29,8 +30,8 @@ export interface RemediationCatalog {
 @Injectable({ providedIn: 'root' })
 export class RemediationsApiService {
   private readonly base = '/contabilidad/remediations';
-
-  constructor(private readonly http: HttpClient) {}
+  private readonly http = inject(HttpClient);
+  private readonly userCtx = inject(ContabilidadUserContext);
 
   catalog(): Observable<RemediationCatalog> {
     return this.http.get<RemediationCatalog>(`${this.base}/catalog`);
@@ -67,11 +68,13 @@ export class RemediationsApiService {
     fecha_limite?: string;
     observaciones?: string;
   }): Observable<RemediationSummary> {
-    return this.http.post<RemediationSummary>(`${this.base}`, {
-      usuario: 'ANDREA',
-      responsable: 'ANDREA',
-      ...body,
-    });
+    return this.http.post<RemediationSummary>(
+      this.base,
+      this.userCtx.withUsuario({
+        ...body,
+        responsable: body.responsable ?? this.userCtx.username(),
+      })
+    );
   }
 
   update(
@@ -86,10 +89,10 @@ export class RemediationsApiService {
       observaciones: string;
     }>
   ): Observable<RemediationSummary> {
-    return this.http.patch<RemediationSummary>(`${this.base}/${id}`, {
-      usuario: 'ANDREA',
-      ...body,
-    });
+    return this.http.patch<RemediationSummary>(
+      `${this.base}/${id}`,
+      this.userCtx.withUsuario({ ...body })
+    );
   }
 
   updateEstado(
@@ -97,11 +100,10 @@ export class RemediationsApiService {
     estado: string,
     observaciones?: string
   ): Observable<RemediationSummary> {
-    return this.http.patch<RemediationSummary>(`${this.base}/${id}/estado`, {
-      estado,
-      observaciones,
-      usuario: 'ANDREA',
-    });
+    return this.http.patch<RemediationSummary>(
+      `${this.base}/${id}/estado`,
+      this.userCtx.withUsuario({ estado, observaciones })
+    );
   }
 
   delete(id: number): Observable<{ ok: boolean }> {

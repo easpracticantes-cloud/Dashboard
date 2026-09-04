@@ -11,12 +11,13 @@ public enum AiProviderType {
 
     public static AiProviderType from(String raw) {
         if (raw == null || raw.isBlank()) {
-            return GEMINI;
+            return CLAUDE;
         }
         return switch (raw.trim().toLowerCase()) {
             case "openai" -> OPENAI;
             case "claude", "anthropic" -> CLAUDE;
             case "deepseek" -> DEEPSEEK;
+            case "gemini", "google" -> GEMINI;
             default -> GEMINI;
         };
     }

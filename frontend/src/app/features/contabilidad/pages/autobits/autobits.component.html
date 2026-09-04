@@ -1,23 +1,66 @@
 <div class="autobits cosmos-page">
-  <header class="page-hero sheet">
-    <div class="hero-glow" aria-hidden="true"></div>
+  <header class="page-hero">
     <div class="hero-row">
       <div>
-        <span class="label-caps">Reporte semanal</span>
+        <span class="label-caps">Reporte semanal · Origen AP</span>
         <h1 class="page-title">Autobits</h1>
         <p class="page-lead">
           Adjunte el Excel de la semana (sábado a viernes). La IA detecta proveedor, NIT,
           orden de compra, reserva, valores y observaciones.
         </p>
       </div>
-      @if (batches.length) {
-        <a routerLink="/app/contabilidad/cruce" class="btn btn-secondary">
-          <mat-icon>compare_arrows</mat-icon>
-          Ir al cruce
-        </a>
-      }
+      <div class="hero-actions">
+        <button type="button" class="btn btn-secondary" (click)="cargar()" [disabled]="cargando || procesando">
+          <mat-icon>refresh</mat-icon>
+          Actualizar
+        </button>
+        @if (batches.length) {
+          <button
+            type="button"
+            class="btn btn-secondary"
+            (click)="limpiarExcels()"
+            [disabled]="cargando || procesando || limpiando"
+          >
+            <mat-icon>delete_sweep</mat-icon>
+            Limpiar Excels
+          </button>
+          <a routerLink="/app/contabilidad/cruce" class="btn btn-primary">
+            <mat-icon>compare_arrows</mat-icon>
+            Ir al cruce
+          </a>
+        }
+      </div>
     </div>
   </header>
+
+  @if (!cargando && batches.length) {
+    <section class="ap-kpi-grid">
+      <article class="ap-kpi sheet ok">
+        <div class="kpi-icon"><mat-icon>task_alt</mat-icon></div>
+        <span class="kpi-val">{{ kpiImportadas }}</span>
+        <span class="kpi-lbl">Filas procesadas</span>
+        <span class="kpi-sub">Importadas en lotes cargados</span>
+      </article>
+      <article class="ap-kpi sheet warn">
+        <div class="kpi-icon"><mat-icon>schedule</mat-icon></div>
+        <span class="kpi-val">{{ kpiPendientes }}</span>
+        <span class="kpi-lbl">Pendientes / omitidas</span>
+        <span class="kpi-sub">Filas saltadas + listos por marcar</span>
+      </article>
+      <article class="ap-kpi sheet" [class]="kpiErrores > 0 ? 'bad' : 'ok'">
+        <div class="kpi-icon"><mat-icon>error_outline</mat-icon></div>
+        <span class="kpi-val">{{ kpiErrores }}</span>
+        <span class="kpi-lbl">Con error</span>
+        <span class="kpi-sub">Reportados en los lotes</span>
+      </article>
+      <article class="ap-kpi sheet">
+        <div class="kpi-icon"><mat-icon>folder_open</mat-icon></div>
+        <span class="kpi-val">{{ batches.length }}</span>
+        <span class="kpi-lbl">Excel importados</span>
+        <span class="kpi-sub">{{ totalRecords }} fila(s) visibles</span>
+      </article>
+    </section>
+  }
 
   <label class="sheet upload-hero" [class.busy]="procesando">
     <div class="upload-icon">
@@ -43,52 +86,66 @@
   </label>
 
   @if (mensajeOk) {
-    <div class="alert alert-success">{{ mensajeOk }}</div>
+    <div class="alert alert-success">
+      <mat-icon>check_circle</mat-icon>
+      <div>{{ mensajeOk }}</div>
+    </div>
   }
   @if (error) {
-    <div class="alert alert-error">{{ error }}</div>
+    <div class="alert error">
+      <mat-icon>error</mat-icon>
+      <div>
+        <strong>Error</strong>
+        <p>{{ error }}</p>
+      </div>
+    </div>
   }
 
   @if (ultimoResultado) {
     <section class="sheet sheet-pad import-result">
       <h2 class="section-head">Última importación</h2>
-
-      <div class="result-stats">
-        <div class="rstat ok">
-          <span class="rstat-num">{{ ultimoResultado.imported_rows }}</span>
-          <span class="rstat-lbl">Importadas</span>
-        </div>
-        <div class="rstat">
-          <span class="rstat-num">{{ ultimoResultado.skipped_duplicates }}</span>
-          <span class="rstat-lbl">Actualizadas</span>
-        </div>
-        <div class="rstat">
-          <span class="rstat-num">{{ ultimoResultado.skipped_empty }}</span>
-          <span class="rstat-lbl">Vacías</span>
-        </div>
-        <div class="rstat gold">
-          <span class="rstat-num">{{ ultimoResultado.crossing?.created || 0 }}</span>
-          <span class="rstat-lbl">Cruces nuevos</span>
-        </div>
+      <div class="ap-kpi-grid">
+        <article class="ap-kpi sheet ok">
+          <span class="kpi-val">{{ ultimoResultado.imported_rows }}</span>
+          <span class="kpi-lbl">Importadas</span>
+        </article>
+        <article class="ap-kpi sheet">
+          <span class="kpi-val">{{ ultimoResultado.skipped_duplicates }}</span>
+          <span class="kpi-lbl">Actualizadas</span>
+        </article>
+        <article class="ap-kpi sheet warn">
+          <span class="kpi-val">{{ ultimoResultado.skipped_empty }}</span>
+          <span class="kpi-lbl">Vacías</span>
+        </article>
+        <article class="ap-kpi sheet ok">
+          <span class="kpi-val">{{ ultimoResultado.crossing?.created || 0 }}</span>
+          <span class="kpi-lbl">Cruces nuevos</span>
+        </article>
       </div>
 
-      <div class="result-meta">
+      <div class="hero-actions" style="margin-top: 0.85rem">
         @if (ultimoResultado.batch.period_start) {
-          <span class="meta-chip">
+          <span class="estado-chip info">
             <mat-icon>date_range</mat-icon>
             {{ ultimoResultado.batch.period_start }} → {{ ultimoResultado.batch.period_end }}
           </span>
         }
         @if (ultimoResultado.analysis_mode) {
-          <span class="meta-chip">
+          <span class="estado-chip muted">
             <mat-icon>psychology</mat-icon>
             {{ ultimoResultado.analysis_mode === 'ia' ? 'IA (Ollama)' : 'Análisis heurístico' }}
+          </span>
+        }
+        @if (ultimoResultado.parse_errors.length) {
+          <span class="estado-chip warn">
+            <mat-icon>warning</mat-icon>
+            {{ ultimoResultado.parse_errors.length }} advertencia(s)
           </span>
         }
       </div>
 
       @if (detectedMappingEntries().length) {
-        <div class="mapping">
+        <div class="mapping" style="margin-top: 1rem">
           <span class="label-caps">Columnas detectadas</span>
           <div class="map-chips">
             @for (entry of detectedMappingEntries(); track entry[0]) {
@@ -102,11 +159,11 @@
       }
 
       @if (ultimoResultado.crossing?.error) {
-        <p class="result-warn">{{ ultimoResultado.crossing?.error }}</p>
+        <div class="alert error" style="margin-top: 0.85rem">{{ ultimoResultado.crossing?.error }}</div>
       }
 
       @if (ultimoResultado.parse_errors.length) {
-        <details class="warn-block">
+        <details class="warn-block" style="margin-top: 0.85rem">
           <summary>{{ ultimoResultado.parse_errors.length }} advertencia(s) de lectura</summary>
           <ul>
             @for (err of ultimoResultado.parse_errors; track err) {
@@ -116,124 +173,144 @@
         </details>
       }
 
-      <a routerLink="/app/contabilidad/cruce" class="btn btn-primary">
-        <mat-icon>arrow_forward</mat-icon>
-        Revisar el cruce
-      </a>
+      <div class="hero-actions" style="margin-top: 1rem">
+        <a routerLink="/app/contabilidad/cruce" class="btn btn-primary">
+          <mat-icon>arrow_forward</mat-icon>
+          Revisar el cruce
+        </a>
+      </div>
     </section>
   }
 
   @if (cargando) {
-    <div class="loading">
-      <mat-spinner diameter="32"></mat-spinner>
-      <span>Cargando importaciones…</span>
+    <div class="ap-skeleton-wrap">
+      <div class="ap-kpi-grid">
+        <div class="skel"></div>
+        <div class="skel"></div>
+        <div class="skel"></div>
+        <div class="skel"></div>
+      </div>
+      <div class="skel tall"></div>
+    </div>
+  } @else if (!batches.length) {
+    <div class="sheet empty-state">
+      <div class="empty-icon"><mat-icon>upload_file</mat-icon></div>
+      <h2>Sin importaciones</h2>
+      <p>Adjunte arriba el Excel de Autobits para iniciar la semana contable.</p>
     </div>
   } @else {
-    @if (!batches.length) {
-      <div class="sheet empty-state">
-        <div class="empty-icon"><mat-icon>upload_file</mat-icon></div>
-        <h2>Sin importaciones</h2>
-        <p>Adjunte arriba el Excel de Autobits para iniciar la semana contable.</p>
-      </div>
-    } @else {
-      <section class="batches">
-        <h2 class="section-head">Excel importados</h2>
-        <div class="batch-grid">
-          @for (batch of batches; track batch.id; let first = $first) {
-            <article class="sheet batch-card" [class.current]="first">
+    <section class="sheet sheet-pad">
+      <h2 class="section-head">Excel importados</h2>
+      <div class="batch-grid">
+        @for (batch of batches; track batch.id; let first = $first) {
+          <article class="sheet batch-card" [class.current]="first">
+            <div class="batch-top">
+              <mat-icon>description</mat-icon>
+              <strong class="batch-name" [title]="batch.filename">{{ batch.filename }}</strong>
               @if (first) {
-                <span class="batch-flag">Vigente</span>
+                <span class="estado-chip ok">Vigente</span>
               }
-              <div class="batch-top">
-                <mat-icon>description</mat-icon>
-                <strong class="batch-name" [title]="batch.filename">{{ batch.filename }}</strong>
-              </div>
-              <div class="batch-period">
-                @if (batch.period_start || batch.period_end) {
-                  {{ batch.period_start || '?' }} → {{ batch.period_end || '?' }}
-                } @else {
-                  Sin período detectado
-                }
-              </div>
-              <div class="batch-nums">
-                <span><strong>{{ batch.imported_rows }}</strong> filas</span>
-                <span>{{ batch.imported_at | date:'dd/MM/yy HH:mm' }}</span>
-              </div>
-              <div class="batch-actions">
-                <button type="button" class="btn btn-secondary btn-sm" (click)="verLote(batch.id)">
-                  Ver filas
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="marcarListo(batch.id)">
-                  Marcar listo
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="exportarLote(batch.id)">
-                  CSV
-                </button>
-              </div>
-            </article>
-          }
-        </div>
-      </section>
-
-      <section class="records">
-        <div class="records-head">
-          <h2 class="section-head">Filas del Excel ({{ totalRecords }})</h2>
-          <div class="records-filters">
-            <input
-              class="input"
-              type="search"
-              placeholder="Buscar proveedor, NIT, compra…"
-              [(ngModel)]="filtroBusqueda"
-              (keyup.enter)="cargarRegistros()"
-            />
-            <button type="button" class="btn btn-secondary" (click)="cargarRegistros()">Buscar</button>
-            @if (filtroBatchId) {
-              <button type="button" class="btn btn-ghost" (click)="quitarFiltroLote()">
-                Ver todos
+              <span class="estado-chip" [class]="toneEstado(batch.status)">
+                {{ labelEstado(batch.status) }}
+              </span>
+            </div>
+            <div class="batch-period muted">
+              @if (batch.period_start || batch.period_end) {
+                {{ batch.period_start || '?' }} → {{ batch.period_end || '?' }}
+              } @else {
+                Sin período detectado
+              }
+            </div>
+            <div class="batch-nums">
+              <span><strong>{{ batch.imported_rows }}</strong> filas</span>
+              @if (batch.error_count) {
+                <span class="estado-chip warn">{{ batch.error_count }} error(es)</span>
+              }
+              <span class="muted">{{ formatFechaContable(batch.imported_at) }}</span>
+            </div>
+            <div class="actions row-actions">
+              <button type="button" class="btn btn-secondary btn-sm" (click)="verLote(batch.id)">
+                <mat-icon>visibility</mat-icon>
+                Ver filas
               </button>
-            }
-          </div>
-        </div>
-
-        @if (!records.length) {
-          <div class="sheet empty-state">
-            <div class="empty-icon"><mat-icon>search_off</mat-icon></div>
-            <h2>Sin resultados</h2>
-            <p>Ajuste la búsqueda o quite el filtro de lote.</p>
-          </div>
-        } @else {
-          <div class="sheet table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Proveedor</th>
-                  <th>NIT</th>
-                  <th>Compra</th>
-                  <th>Reserva</th>
-                  <th>Valor</th>
-                  <th>Fecha</th>
-                  <th>Observaciones</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (row of records; track row.id) {
-                  <tr>
-                    <td class="strong">{{ row.proveedor || '—' }}</td>
-                    <td class="mono">{{ row.nit || '—' }}</td>
-                    <td class="mono">{{ row.numero_compra || '—' }}</td>
-                    <td class="mono">{{ row.numero_reserva || '—' }}</td>
-                    <td class="num">{{ row.valor != null ? (row.valor | number:'1.0-0') : '—' }}</td>
-                    <td class="date">{{ row.fecha || '—' }}</td>
-                    <td class="obs" [title]="row.observaciones || ''">{{ row.observaciones || '—' }}</td>
-                    <td><span class="status muted">{{ row.estado }}</span></td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
+              <button type="button" class="btn btn-success btn-sm" (click)="marcarListo(batch.id)">
+                Marcar listo
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="exportarLote(batch.id)">
+                CSV
+              </button>
+            </div>
+          </article>
         }
-      </section>
-    }
+      </div>
+    </section>
+
+    <section class="records">
+      <div class="filters-bar sheet">
+        <h2 class="section-head" style="margin: 0; flex: 1 1 180px">
+          Filas del Excel ({{ totalRecords }})
+        </h2>
+        <input
+          class="input search"
+          type="search"
+          placeholder="Buscar proveedor, NIT, compra…"
+          [(ngModel)]="filtroBusqueda"
+          (keyup.enter)="cargarRegistros()"
+        />
+        <button type="button" class="btn btn-secondary" (click)="cargarRegistros()">
+          <mat-icon>search</mat-icon>
+          Buscar
+        </button>
+        @if (filtroBatchId) {
+          <button type="button" class="btn btn-ghost" (click)="quitarFiltroLote()">
+            Ver todos
+          </button>
+        }
+      </div>
+
+      @if (!records.length) {
+        <div class="sheet empty-state">
+          <div class="empty-icon"><mat-icon>search_off</mat-icon></div>
+          <h2>Sin resultados</h2>
+          <p>Ajuste la búsqueda o quite el filtro de lote. No es un error del sistema.</p>
+        </div>
+      } @else {
+        <div class="sheet table-wrap sticky-head">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Proveedor</th>
+                <th>NIT</th>
+                <th>Compra</th>
+                <th>Reserva</th>
+                <th>Valor</th>
+                <th>Fecha</th>
+                <th>Observaciones</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of records; track row.id) {
+                <tr>
+                  <td class="strong">{{ row.proveedor || '—' }}</td>
+                  <td class="mono">{{ row.nit || '—' }}</td>
+                  <td class="mono">{{ row.numero_compra || '—' }}</td>
+                  <td class="mono">{{ row.numero_reserva || '—' }}</td>
+                  <td class="num">{{ formatCop(row.valor) }}</td>
+                  <td class="date">{{ row.fecha || '—' }}</td>
+                  <td class="obs" [title]="row.observaciones || ''">{{ row.observaciones || '—' }}</td>
+                  <td>
+                    <span class="estado-chip" [class]="toneEstado(row.estado)">
+                      <mat-icon>{{ iconEstado(row.estado) }}</mat-icon>
+                      {{ labelEstado(row.estado) }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
   }
 </div>

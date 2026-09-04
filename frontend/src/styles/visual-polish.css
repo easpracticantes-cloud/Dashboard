@@ -50,7 +50,7 @@ html[data-theme='dark'] body {
 }
 
 .eas-card:hover {
-  transform: translateY(-2px);
+  transform: none;
   box-shadow: var(--eas-shadow-md);
   border-color: rgba(31, 122, 76, 0.16);
 }
@@ -110,7 +110,7 @@ html[data-theme='dark'] .eas-card::after {
 
 .eas-btn-primary:hover:not(:disabled),
 .eas-btn-accent:hover:not(:disabled) {
-  transform: translateY(-1px);
+  transform: none;
   box-shadow: 0 12px 24px rgba(20, 38, 28, 0.22);
 }
 
@@ -118,7 +118,7 @@ html[data-theme='dark'] .eas-card::after {
 .eas-btn-ghost:hover:not(:disabled),
 .eas-btn-action:hover,
 .eas-btn-icon:hover {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .eas-btn-action {
@@ -145,7 +145,7 @@ html[data-theme='dark'] .eas-card::after {
 }
 
 .eas-chip:hover {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .eas-chip.is-active {
@@ -233,10 +233,10 @@ eas-empty-state .grid.h-16 {
 @keyframes eas-float {
   0%,
   100% {
-    transform: translateY(0);
+    transform: none;
   }
   50% {
-    transform: translateY(-6px);
+    transform: none;
   }
 }
 
@@ -256,22 +256,22 @@ eas-empty-state .grid.h-16 {
 @keyframes eas-rise-in {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.985);
+    transform: none;
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
   }
 }
 
 @keyframes eas-fade-scale {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: none;
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 

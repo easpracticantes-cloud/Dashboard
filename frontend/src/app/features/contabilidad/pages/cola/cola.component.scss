@@ -1,0 +1,14 @@
+.alerts-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.queue-section {
+  margin-top: 0.25rem;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}

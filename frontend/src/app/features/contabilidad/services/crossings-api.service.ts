@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ContabilidadUserContext } from './contabilidad-user-context';
 
 export interface CrossingSummary {
   id: number;
@@ -66,8 +67,8 @@ export interface SeedResult {
 @Injectable({ providedIn: 'root' })
 export class CrossingsApiService {
   private readonly base = '/contabilidad/crossings';
-
-  constructor(private readonly http: HttpClient) {}
+  private readonly http = inject(HttpClient);
+  private readonly userCtx = inject(ContabilidadUserContext);
 
   getContext(batchId?: number): Observable<CrossingContext> {
     const q = batchId ? `?batch_id=${batchId}` : '';
@@ -98,17 +99,19 @@ export class CrossingsApiService {
   }
 
   seedFromAutobits(batchId?: number, useLatest = true): Observable<SeedResult> {
-    return this.http.post<SeedResult>(`${this.base}/seed-from-autobits`, {
-      usuario: 'ANDREA',
-      batch_id: batchId ?? null,
-      use_latest: useLatest,
-    });
+    return this.http.post<SeedResult>(
+      `${this.base}/seed-from-autobits`,
+      this.userCtx.withUsuario({
+        batch_id: batchId ?? null,
+        use_latest: useLatest,
+      })
+    );
   }
 
   createPaymentsFromBatch(batchId?: number): Observable<{ created: number; skipped: number; errors: string[] }> {
     return this.http.post<{ created: number; skipped: number; errors: string[] }>(
       `${this.base}/payments-from-batch`,
-      { usuario: 'ANDREA', batch_id: batchId ?? null }
+      this.userCtx.withUsuario({ batch_id: batchId ?? null })
     );
   }
 
@@ -116,28 +119,30 @@ export class CrossingsApiService {
     id: number,
     data: { factura_cdc?: string; fecha_pago?: string; observaciones?: string }
   ): Observable<CrossingSummary> {
-    return this.http.patch<CrossingSummary>(`${this.base}/${id}/complete`, {
-      usuario: 'ANDREA',
-      ...data,
-    });
+    return this.http.patch<CrossingSummary>(
+      `${this.base}/${id}/complete`,
+      this.userCtx.withUsuario({ ...data })
+    );
   }
 
   approve(id: number): Observable<CrossingSummary> {
-    return this.http.post<CrossingSummary>(`${this.base}/${id}/approve`, {
-      usuario: 'ANDREA',
-    });
+    return this.http.post<CrossingSummary>(
+      `${this.base}/${id}/approve`,
+      this.userCtx.withUsuario({})
+    );
   }
 
   approveAllRevision(): Observable<{ approved: number }> {
-    return this.http.post<{ approved: number }>(`${this.base}/approve-all-revision`, {
-      usuario: 'ANDREA',
-    });
+    return this.http.post<{ approved: number }>(
+      `${this.base}/approve-all-revision`,
+      this.userCtx.withUsuario({})
+    );
   }
 
   reject(id: number, motivo: string): Observable<CrossingSummary> {
-    return this.http.post<CrossingSummary>(`${this.base}/${id}/reject`, {
-      motivo,
-      usuario: 'ANDREA',
-    });
+    return this.http.post<CrossingSummary>(
+      `${this.base}/${id}/reject`,
+      this.userCtx.withUsuario({ motivo })
+    );
   }
 }

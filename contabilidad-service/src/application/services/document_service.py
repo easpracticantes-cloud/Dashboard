@@ -9,6 +9,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from application.services.period_service import PeriodService
 from config.settings import PROYECTO_RAIZ, get_settings
 from domain.enums import DocumentOrigin, DocumentStatus
 from domain.services.duplicate_detector import DuplicateCheckResult, DuplicateDetector
@@ -39,6 +40,7 @@ class DocumentService:
         self.repo = DocumentRepository(db)
         self.audit = AuditRepository(db)
         self.duplicates = DuplicateDetector(db)
+        self.periods = PeriodService(db)
 
     def list_documents(
         self,
@@ -148,10 +150,13 @@ class DocumentService:
         self.db.refresh(doc)
         return doc
 
-    def delete_document(self, doc_id: int) -> bool:
+    def delete_document(self, doc_id: int, usuario: str = "SISTEMA") -> bool:
         doc = self.repo.get_by_id(doc_id)
         if not doc:
             return False
+
+        self.periods.ensure_period_open(doc.received_at, accion="eliminar documentos")
+
         if doc.storage_path:
             p = Path(doc.storage_path)
             if p.exists() and p.is_file():
@@ -159,7 +164,13 @@ class DocumentService:
                     p.unlink()
                 except OSError:
                     pass
-        self.audit.log("ELIMINADO", "Document", str(doc.id))
+        self.audit.log(
+            "ELIMINADO",
+            "Document",
+            str(doc.id),
+            valor_anterior=doc.estado,
+            usuario=usuario,
+        )
         self.db.delete(doc)
         self.db.commit()
         return True

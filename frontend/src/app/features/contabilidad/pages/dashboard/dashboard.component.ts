@@ -1,14 +1,21 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import {
   DashboardApiService,
   DashboardKpis,
   WeekOption,
 } from '../../services/dashboard-api.service';
+import { OpsAlert, OpsApiService, OpsQueueGroup, alertDetail, alertSeverity, alertTitle, extractAlerts } from '../../services/ops-api.service';
+import { PeriodsApiService } from '../../services/periods-api.service';
+import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
+import { formatCop } from '../../utils/contabilidad-labels';
+import { AuthService } from '../../../../core/services/auth.service';
 
 @Component({
   selector: 'eas-contabilidad-dashboard',
@@ -18,10 +25,21 @@ import {
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit {
+  private readonly api = inject(DashboardApiService);
+  private readonly opsApi = inject(OpsApiService);
+  private readonly periodsApi = inject(PeriodsApiService);
+  private readonly download = inject(ContabilidadDownloadService);
+  private readonly auth = inject(AuthService);
+
   kpis: DashboardKpis | null = null;
+  alerts: OpsAlert[] = [];
+  queueGroups: OpsQueueGroup[] = [];
+  periodStatus: Record<string, unknown> | null = null;
   weeks: WeekOption[] = [];
   cargando = true;
   error = '';
+  exportando = false;
+  cerrandoPeriodo = false;
 
   filtroModo: 'semana' | 'mes' | 'anio' = 'semana';
   weekRef = '';
@@ -30,8 +48,19 @@ export class DashboardComponent implements OnInit {
   filtroProveedor = '';
   filtroEstado = '';
 
+  readonly formatCop = formatCop;
+  readonly alertSeverity = alertSeverity;
+  readonly alertTitle = alertTitle;
+  readonly alertDetail = alertDetail;
+
+  /** Backend solo permite ADMIN/GERENCIA; la UI no debe ofrecer el botón a otros. */
+  get puedeReabrirPeriodo(): boolean {
+    return this.auth.hasAnyRole(['ADMINISTRADOR', 'GERENCIA']);
+  }
+
   quickLinks = [
     { path: '/app/contabilidad/documentos', label: 'Documentos' },
+    { path: '/app/contabilidad/cola', label: 'Cola operativa' },
     { path: '/app/contabilidad/cruce', label: 'Cruce' },
     { path: '/app/contabilidad/pagos', label: 'Pagos pendientes' },
     { path: '/app/contabilidad/subsanaciones', label: 'Subsanaciones' },
@@ -76,8 +105,6 @@ export class DashboardComponent implements OnInit {
     },
   ];
 
-  constructor(private readonly api: DashboardApiService) {}
-
   get sinDatos(): boolean {
     const c = this.kpis?.conteos;
     if (!c) return false;
@@ -89,6 +116,11 @@ export class DashboardComponent implements OnInit {
       c.subsanaciones_pendientes === 0 &&
       c.paquetes_pendientes === 0
     );
+  }
+
+  get periodoCerrado(): boolean {
+    const s = this.periodStatus?.['estado'] ?? this.periodStatus?.['status'];
+    return String(s).toUpperCase() === 'CERRADO';
   }
 
   ngOnInit(): void {
@@ -103,32 +135,7 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  cargar(): void {
-    this.cargando = true;
-    this.error = '';
-    const params: Record<string, unknown> = {};
-    if (this.filtroModo === 'semana' && this.weekRef) params['week_ref'] = this.weekRef;
-    if (this.filtroModo === 'mes') {
-      params['mes'] = this.mes;
-      params['anio'] = this.anio;
-    }
-    if (this.filtroModo === 'anio') params['anio'] = this.anio;
-    if (this.filtroProveedor) params['proveedor'] = this.filtroProveedor;
-    if (this.filtroEstado) params['estado'] = this.filtroEstado;
-
-    this.api.getKpis(params as Parameters<DashboardApiService['getKpis']>[0]).subscribe({
-      next: (data) => {
-        this.kpis = data;
-        this.cargando = false;
-      },
-      error: () => {
-        this.error = 'No se pudieron cargar los KPIs.';
-        this.cargando = false;
-      },
-    });
-  }
-
-  exportReport(kind: 'documents' | 'payments' | 'crossings' | 'remediations' | 'semanal'): void {
+  periodParams(): { week_ref?: string; mes?: number; anio?: number } {
     const params: { week_ref?: string; mes?: number; anio?: number } = {};
     if (this.filtroModo === 'semana' && this.weekRef) params.week_ref = this.weekRef;
     if (this.filtroModo === 'mes') {
@@ -136,6 +143,134 @@ export class DashboardComponent implements OnInit {
       params.anio = this.anio;
     }
     if (this.filtroModo === 'anio') params.anio = this.anio;
-    window.open(this.api.reportUrl(kind, params), '_blank');
+    return params;
+  }
+
+  cargar(): void {
+    this.cargando = true;
+    this.error = '';
+    const period = this.periodParams();
+    const kpiParams: Record<string, unknown> = { ...period };
+    if (this.filtroProveedor) kpiParams['proveedor'] = this.filtroProveedor;
+    if (this.filtroEstado) kpiParams['estado'] = this.filtroEstado;
+
+    const weekForStatus = this.filtroModo === 'semana' ? this.weekRef : undefined;
+
+    forkJoin({
+      kpis: this.api.getKpis(kpiParams as Parameters<DashboardApiService['getKpis']>[0]).pipe(
+        catchError(() => of(null))
+      ),
+      alerts: this.opsApi.getAlerts(period).pipe(
+        catchError(() => of({ alerts: [] as OpsAlert[] }))
+      ),
+      queue: this.opsApi.getQueue(period).pipe(
+        catchError(() => of({ groups: [] as OpsQueueGroup[] }))
+      ),
+      periodStatus: this.periodsApi.status(weekForStatus).pipe(
+        catchError(() => of(null))
+      ),
+    }).subscribe({
+      next: (res) => {
+        if (!res.kpis) {
+          this.error = 'No se pudieron cargar los KPIs.';
+        } else {
+          this.kpis = res.kpis;
+        }
+        this.alerts = extractAlerts(res.alerts);
+        this.queueGroups = res.queue.groups ?? [];
+        this.periodStatus = res.periodStatus;
+        this.cargando = false;
+      },
+      error: () => {
+        this.error = 'No se pudieron cargar los indicadores.';
+        this.cargando = false;
+      },
+    });
+  }
+
+  async exportReport(kind: 'documents' | 'payments' | 'crossings' | 'remediations' | 'semanal' | 'ops-queue'): Promise<void> {
+    this.exportando = true;
+    this.error = '';
+    try {
+      await this.download.download(this.api.reportUrl(kind, this.periodParams()));
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'No se pudo exportar el reporte.';
+    } finally {
+      this.exportando = false;
+    }
+  }
+
+  cerrarPeriodo(): void {
+    if (
+      !confirm(
+        '¿Cerrar el periodo contable seleccionado? No podrá registrar movimientos hasta reabrirlo.'
+      )
+    ) {
+      return;
+    }
+    const resumen = prompt('Resumen opcional del cierre:') || undefined;
+    this.cerrandoPeriodo = true;
+    this.error = '';
+    const weekRef = this.filtroModo === 'semana' ? this.weekRef : undefined;
+    this.periodsApi.close(weekRef, resumen).subscribe({
+      next: () => {
+        this.cerrandoPeriodo = false;
+        this.cargar();
+      },
+      error: (err) => {
+        this.cerrandoPeriodo = false;
+        this.error = err?.error?.detail || 'No se pudo cerrar el periodo.';
+      },
+    });
+  }
+
+  reabrirPeriodo(): void {
+    if (this.filtroModo !== 'semana' || !this.weekRef) {
+      this.error = 'Seleccione una semana para reabrir el periodo.';
+      return;
+    }
+    const motivo = prompt('Motivo de reapertura (obligatorio):');
+    if (!motivo?.trim()) {
+      return;
+    }
+    this.cerrandoPeriodo = true;
+    this.error = '';
+    this.periodsApi.reopen(this.weekRef, motivo.trim()).subscribe({
+      next: () => {
+        this.cerrandoPeriodo = false;
+        this.cargar();
+      },
+      error: (err) => {
+        this.cerrandoPeriodo = false;
+        this.error = err?.error?.detail || 'No se pudo reabrir el periodo.';
+      },
+    });
+  }
+
+  queueLink(key: string): string | null {
+    const k = key.toLowerCase();
+    if (k.includes('pago') || k.includes('payment')) return '/app/contabilidad/pagos';
+    if (k.includes('cruce') || k.includes('cross')) return '/app/contabilidad/cruce';
+    if (k.includes('document') || k.includes('factura')) return '/app/contabilidad/documentos';
+    if (k.includes('paquete') || k.includes('package')) return '/app/contabilidad/paquetes';
+    if (k.includes('subsan') || k.includes('remediation')) return '/app/contabilidad/subsanaciones';
+    if (k.includes('autobits')) return '/app/contabilidad/autobits';
+    return null;
+  }
+
+  alertSeverityClass(severity: string): string {
+    const s = (severity || '').toLowerCase();
+    if (['critical', 'critica', 'crítica', 'error', 'high', 'alta'].includes(s)) return 'bad';
+    if (['warning', 'warn', 'medium', 'media', 'media'].includes(s)) return 'warn';
+    if (['info', 'low', 'baja', 'informativa'].includes(s)) return 'info';
+    return 'muted';
+  }
+
+  alertIcon(severity: string): string {
+    const s = (severity || '').toLowerCase();
+    if (['critical', 'critica', 'crítica', 'error', 'high', 'alta'].includes(s)) return 'error';
+    if (['warning', 'warn', 'medium', 'media'].includes(s)) return 'warning';
+    if (['info', 'low', 'baja', 'informativa'].includes(s)) return 'info';
+    return 'notifications';
   }
 }

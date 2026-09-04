@@ -21,7 +21,7 @@ ENV PYTHONUNBUFFERED=1
 ENV DATABASE_URL=sqlite:////app/data/contable.db
 ENV STORAGE_ROOT=/app/storage
 
-# Render asigna $PORT; run_web.py lo respeta
+# Render asignaba $PORT; en Oracle Compose usamos APP_PORT/8787
 EXPOSE 8787
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \

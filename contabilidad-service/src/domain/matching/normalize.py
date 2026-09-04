@@ -2,6 +2,10 @@
 
 import re
 import unicodedata
+from decimal import Decimal
+
+from domain.utils.money import to_money
+from domain.utils.money import values_close as money_values_close
 
 
 def normalize_text(value: str | None) -> str:
@@ -42,9 +46,17 @@ def names_similar(a: str | None, b: str | None) -> bool:
 
 
 def values_close(a: float | None, b: float | None, tolerance_pct: float = 1.0) -> bool:
+    """Compara importes con tolerancia porcentual, en Decimal (sin ruido binario)."""
+    return money_values_close(
+        a,
+        b,
+        rel=Decimal(str(tolerance_pct)) / Decimal("100"),
+        abs_tol=Decimal("0"),
+    )
+
+
+def value_difference(a: float | None, b: float | None) -> Decimal | None:
+    """Diferencia contable exacta entre dos importes."""
     if a is None or b is None:
-        return False
-    if a == b:
-        return True
-    base = max(abs(a), abs(b), 1.0)
-    return abs(a - b) / base * 100 <= tolerance_pct
+        return None
+    return to_money(a) - to_money(b)

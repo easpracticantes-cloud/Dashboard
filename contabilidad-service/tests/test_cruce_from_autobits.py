@@ -95,6 +95,8 @@ def test_seed_and_complete_cruce_from_autobits(client):
         json={"factura_cdc": "FV POS 12345", "fecha_pago": "2026-08-25"},
     )
     assert done.status_code == 200
-    assert done.json()["estado"] == "PAGADO"
+    # D) complete conserva fecha_pago pero no confirma PAGADO.
+    assert done.json()["estado"] == "APROBADO"
+    assert done.json()["estado"] != "PAGADO"
     assert done.json()["factura_cdc"] == "FV POS 12345"
     assert done.json()["fecha_pago"] == "2026-08-25"

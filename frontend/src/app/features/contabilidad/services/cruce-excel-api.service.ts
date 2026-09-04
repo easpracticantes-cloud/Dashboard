@@ -34,6 +34,11 @@ export interface PendientesData {
   por_tipo: Record<string, PendienteItem[]>;
   resumen: PendientesResumen[];
   valor_pendiente: number;
+  ultimo_cruce?: {
+    archivo?: string;
+    aplicado?: boolean;
+    timestamp?: string;
+  };
 }
 
 export interface PendientesResponse {

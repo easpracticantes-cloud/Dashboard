@@ -1,10 +1,20 @@
 """Routers API — dominio documentos (Fase 2)."""
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from api.deps import resolve_usuario
 from application.services.document_processing_service import get_document_processing_service
 from application.services.document_service import DocumentService, DocumentUploadError
 from domain.enums import DocumentOrigin
@@ -75,7 +85,7 @@ class UploadResponse(BaseModel):
 
 class EstadoUpdate(BaseModel):
     estado: str
-    usuario: str = "SISTEMA"
+    usuario: str | None = None
 
 
 class ProcessResponse(BaseModel):
@@ -154,6 +164,218 @@ async def upload_document(
     )
 
 
+class BatchUploadItem(BaseModel):
+    filename: str
+    document: DocumentSummary | None = None
+    ok: bool = True
+    duplicate_warning: str | None = None
+    duplicate_document_id: int | None = None
+    error: str | None = None
+
+
+class BatchUploadResponse(BaseModel):
+    total_recibidos: int
+    total_errores: int
+    total_duplicados: int
+    pack_size: int
+    packs: int
+    queued_ids: list[int]
+    items: list[BatchUploadItem]
+    mensaje: str
+
+
+class ProcessBatchRequest(BaseModel):
+    document_ids: list[int]
+    pack_size: int = 25
+
+
+class ProcessBatchResponse(BaseModel):
+    ok: bool
+    queued: int
+    pack_size: int
+    packs: int
+    document_ids: list[int]
+    mensaje: str
+
+
+BATCH_PACK_SIZE = 25
+
+
+def _process_document_ids_in_packs(document_ids: list[int], pack_size: int = BATCH_PACK_SIZE) -> None:
+    """Procesa IDs en paquetes; dentro del paquete hasta 3 en paralelo."""
+    import logging
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    from domain.enums import DocumentStatus
+    from infrastructure.persistence.database import SessionLocal
+    from infrastructure.persistence.repositories import DocumentRepository
+
+    logger = logging.getLogger(__name__)
+    processor = get_document_processing_service()
+    size = max(1, min(int(pack_size or BATCH_PACK_SIZE), 50))
+    ids = [int(i) for i in document_ids if i]
+
+    for offset in range(0, len(ids), size):
+        pack = ids[offset : offset + size]
+        db = SessionLocal()
+        try:
+            repo = DocumentRepository(db)
+            for doc_id in pack:
+                doc = repo.get_by_id(doc_id)
+                if doc and doc.estado in {
+                    DocumentStatus.RECIBIDO,
+                    DocumentStatus.ERROR,
+                    DocumentStatus.REQUIERE_REVISION,
+                }:
+                    doc.estado = DocumentStatus.PROCESANDO
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("No se pudo marcar pack como PROCESANDO")
+        finally:
+            db.close()
+
+        with ThreadPoolExecutor(max_workers=min(3, len(pack))) as pool:
+            futures = {pool.submit(processor.process_by_id, doc_id, None): doc_id for doc_id in pack}
+            for fut in as_completed(futures):
+                doc_id = futures[fut]
+                try:
+                    fut.result()
+                except Exception:
+                    logger.exception("Fallo procesando documento #%s en lote", doc_id)
+
+
+@router.post("/upload-batch", response_model=BatchUploadResponse)
+async def upload_documents_batch(
+    background_tasks: BackgroundTasks,
+    archivos: list[UploadFile] = File(...),
+    origen: str = Form(DocumentOrigin.CARGA_MANUAL),
+    tipo: str = Form("FACTURA"),
+    auto_procesar: bool = Form(True),
+    pack_size: int = Form(BATCH_PACK_SIZE),
+    db: Session = Depends(get_db),
+):
+    """Sube muchas facturas y procesa en paquetes de `pack_size` (default 25)."""
+    if not archivos:
+        raise HTTPException(status_code=400, detail="No se recibieron archivos.")
+
+    service = DocumentService(db)
+    items: list[BatchUploadItem] = []
+    queued_ids: list[int] = []
+    dup_count = 0
+    err_count = 0
+
+    for archivo in archivos:
+        filename = archivo.filename or "documento.jpg"
+        try:
+            content = await archivo.read()
+            doc, dup = service.save_upload(
+                content,
+                filename,
+                origen=origen,
+                tipo=tipo,
+            )
+            warning = dup.reason if dup else None
+            dup_id = dup.existing_document_id if dup else None
+            if dup and dup.is_duplicate:
+                dup_count += 1
+            else:
+                queued_ids.append(doc.id)
+            items.append(
+                BatchUploadItem(
+                    filename=filename,
+                    document=_to_summary(doc),
+                    ok=True,
+                    duplicate_warning=warning,
+                    duplicate_document_id=dup_id,
+                )
+            )
+        except DocumentUploadError as e:
+            err_count += 1
+            items.append(BatchUploadItem(filename=filename, ok=False, error=e.message))
+        except Exception as e:
+            err_count += 1
+            items.append(BatchUploadItem(filename=filename, ok=False, error=str(e)))
+
+    size = max(1, min(int(pack_size or BATCH_PACK_SIZE), 50))
+    packs = (len(queued_ids) + size - 1) // size if queued_ids else 0
+
+    if auto_procesar and queued_ids:
+        processor = get_document_processing_service()
+        errores = processor.verify_dependencies()
+        if errores:
+            return BatchUploadResponse(
+                total_recibidos=len(items) - err_count,
+                total_errores=err_count,
+                total_duplicados=dup_count,
+                pack_size=size,
+                packs=packs,
+                queued_ids=queued_ids,
+                items=items,
+                mensaje=(
+                    f"{len(queued_ids)} archivo(s) guardados. "
+                    "OCR/IA no disponible aún: " + " ".join(errores)
+                ),
+            )
+        background_tasks.add_task(_process_document_ids_in_packs, list(queued_ids), size)
+        mensaje = (
+            f"{len(queued_ids)} factura(s) en cola · {packs} paquete(s) de hasta {size}. "
+            "El análisis corre en segundo plano; refresque la lista para ver resultados."
+        )
+    else:
+        mensaje = f"{len(queued_ids)} archivo(s) guardados sin procesar automáticamente."
+
+    return BatchUploadResponse(
+        total_recibidos=len(items) - err_count,
+        total_errores=err_count,
+        total_duplicados=dup_count,
+        pack_size=size,
+        packs=packs,
+        queued_ids=queued_ids,
+        items=items,
+        mensaje=mensaje,
+    )
+
+
+@router.post("/process-batch", response_model=ProcessBatchResponse)
+def process_documents_batch(
+    body: ProcessBatchRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Encola el reprocesamiento de varios documentos en paquetes."""
+    ids = [int(i) for i in (body.document_ids or []) if i]
+    if not ids:
+        raise HTTPException(status_code=400, detail="document_ids vacío.")
+
+    service = DocumentService(db)
+    valid: list[int] = []
+    for doc_id in ids:
+        doc = service.get_document(doc_id)
+        if doc and doc.storage_path:
+            valid.append(doc_id)
+
+    if not valid:
+        raise HTTPException(status_code=404, detail="Ningún documento válido para procesar.")
+
+    processor = get_document_processing_service()
+    errores = processor.verify_dependencies()
+    if errores:
+        raise HTTPException(status_code=503, detail=" ".join(errores))
+
+    size = max(1, min(int(body.pack_size or BATCH_PACK_SIZE), 50))
+    packs = (len(valid) + size - 1) // size
+    background_tasks.add_task(_process_document_ids_in_packs, list(valid), size)
+    return ProcessBatchResponse(
+        ok=True,
+        queued=len(valid),
+        pack_size=size,
+        packs=packs,
+        document_ids=valid,
+        mensaje=f"{len(valid)} documento(s) en {packs} paquete(s) de hasta {size}.",
+    )
+
+
 @router.get("/{document_id}", response_model=DocumentDetail)
 def get_document(document_id: int, db: Session = Depends(get_db)):
     """Detalle completo de un documento."""
@@ -182,6 +404,7 @@ def preview_document(document_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/{document_id}/estado", response_model=DocumentSummary)
 def update_estado(
+    request: Request,
     document_id: int,
     body: EstadoUpdate,
     db: Session = Depends(get_db),
@@ -189,17 +412,21 @@ def update_estado(
     """Actualiza el estado de un documento."""
     service = DocumentService(db)
     try:
-        doc = service.update_estado(document_id, body.estado, body.usuario)
+        doc = service.update_estado(
+            document_id,
+            body.estado,
+            resolve_usuario(request, body.usuario),
+        )
     except DocumentUploadError as e:
         raise HTTPException(status_code=404, detail=e.message) from e
     return _to_summary(doc)
 
 
 @router.delete("/{document_id}")
-def delete_document(document_id: int, db: Session = Depends(get_db)):
+def delete_document(request: Request, document_id: int, db: Session = Depends(get_db)):
     """Elimina un documento y su archivo."""
     service = DocumentService(db)
-    if not service.delete_document(document_id):
+    if not service.delete_document(document_id, resolve_usuario(request)):
         raise HTTPException(status_code=404, detail="Documento no encontrado")
     return {"ok": True, "deleted_id": document_id}
 

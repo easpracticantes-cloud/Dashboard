@@ -135,4 +135,11 @@ export class AutobitsApiService {
   exportBatchUrl(batchId: number): string {
     return `${this.base}/batches/${batchId}/export`;
   }
+
+  /** Limpia Excels Autobits/Cruce y datos derivados (no borra facturas). */
+  purgeExcels(confirm = true): Observable<{ ok: boolean; deleted: Record<string, number> }> {
+    return this.http.delete<{ ok: boolean; deleted: Record<string, number> }>(
+      `${this.base}/excels?confirm=${confirm ? 'true' : 'false'}`
+    );
+  }
 }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -10,6 +10,14 @@ import {
   AutobitsRecord,
   ImportResult,
 } from '../../services/autobits-api.service';
+import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
+import {
+  formatCop,
+  formatFechaContable,
+  iconEstado,
+  labelEstado,
+  toneEstado,
+} from '../../utils/contabilidad-labels';
 
 @Component({
   selector: 'eas-contabilidad-autobits',
@@ -25,8 +33,12 @@ import {
   styleUrl: './autobits.component.scss',
 })
 export class AutobitsComponent implements OnInit {
+  private readonly api = inject(AutobitsApiService);
+  private readonly download = inject(ContabilidadDownloadService);
+
   cargando = true;
   procesando = false;
+  limpiando = false;
   error = '';
   mensajeOk = '';
 
@@ -38,7 +50,28 @@ export class AutobitsComponent implements OnInit {
   filtroBusqueda = '';
   filtroBatchId = '';
 
-  constructor(private readonly api: AutobitsApiService) {}
+  readonly formatCop = formatCop;
+  readonly formatFechaContable = formatFechaContable;
+  readonly labelEstado = labelEstado;
+  readonly toneEstado = toneEstado;
+  readonly iconEstado = iconEstado;
+
+  /** KPIs derivados solo de lotes/registros ya cargados. */
+  get kpiImportadas(): number {
+    return this.batches.reduce((acc, b) => acc + (Number(b.imported_rows) || 0), 0);
+  }
+
+  get kpiPendientes(): number {
+    const skipped = this.batches.reduce((acc, b) => acc + (Number(b.skipped_rows) || 0), 0);
+    const listos = this.records.filter((r) =>
+      (r.estado || '').toUpperCase().includes('LISTO')
+    ).length;
+    return skipped + listos;
+  }
+
+  get kpiErrores(): number {
+    return this.batches.reduce((acc, b) => acc + (Number(b.error_count) || 0), 0);
+  }
 
   ngOnInit(): void {
     this.cargar();
@@ -111,6 +144,32 @@ export class AutobitsComponent implements OnInit {
     });
   }
 
+  limpiarExcels(): void {
+    const ok = window.confirm(
+      '¿Limpiar todos los Excels de Autobits y Cruce ya subidos?\n\n' +
+        'Se borrarán lotes, cruces y pagos derivados. Las facturas subidas se conservan.'
+    );
+    if (!ok) return;
+    this.limpiando = true;
+    this.error = '';
+    this.mensajeOk = '';
+    this.api.purgeExcels(true).subscribe({
+      next: (res) => {
+        const d = res.deleted || {};
+        this.mensajeOk =
+          `Excels limpiados: ${d['batches'] ?? 0} lote(s), ` +
+          `${d['records'] ?? 0} fila(s), ${d['crossings'] ?? 0} cruce(s).`;
+        this.limpiando = false;
+        this.ultimoResultado = null;
+        this.cargar();
+      },
+      error: (err) => {
+        this.error = err?.error?.detail || 'No se pudieron limpiar los Excels.';
+        this.limpiando = false;
+      },
+    });
+  }
+
   verLote(batchId: number): void {
     this.filtroBatchId = String(batchId);
     this.cargarRegistros();
@@ -133,8 +192,13 @@ export class AutobitsComponent implements OnInit {
     });
   }
 
-  exportarLote(batchId: number): void {
-    window.open(this.api.exportBatchUrl(batchId), '_blank');
+  async exportarLote(batchId: number): Promise<void> {
+    this.error = '';
+    try {
+      await this.download.download(this.api.exportBatchUrl(batchId), `autobits-lote-${batchId}.xlsx`);
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'No se pudo exportar el lote.';
+    }
   }
 
   detectedMappingEntries(): [string, string][] {

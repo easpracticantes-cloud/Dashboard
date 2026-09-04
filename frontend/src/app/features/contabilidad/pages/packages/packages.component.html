@@ -1,37 +1,51 @@
 <div class="page cosmos-module cosmos-page">
-  <header class="page-hero sheet">
-    <div class="hero-glow" aria-hidden="true"></div>
-    <span class="label-caps">Entrega a Katherine</span>
-    <h1 class="page-title">Paquetes digitales</h1>
-    <p class="page-lead">
-      {{ total }} paquete(s) — se entregan para digitalizar en Word Office.
-      @if (storageInfo) {
-        Almacenamiento: {{ storageInfo.active_provider }}.
-      }
-    </p>
+  <header class="page-hero">
+    <div class="hero-row">
+      <div>
+        <span class="label-caps">Entrega a Katherine</span>
+        <h1 class="page-title">Paquetes digitales</h1>
+        <p class="page-lead">
+          {{ total }} paquete(s) — se entregan para digitalizar en Word Office.
+          @if (storageInfo) {
+            Almacenamiento: {{ storageInfo.active_provider }}.
+          }
+        </p>
+      </div>
+    </div>
   </header>
 
-  <section class="card card-pad">
-    <h3>Crear paquete</h3>
-    <div class="create-row">
+  <section class="sheet sheet-pad">
+    <h2 class="section-head">Crear paquete</h2>
+    <div class="filters-bar" style="padding: 0; border: 0; box-shadow: none; background: transparent">
       <input class="input" type="number" placeholder="ID documento" [(ngModel)]="documentIdNuevo" />
-      <button type="button" class="btn btn-primary" (click)="crearPaquete()">Crear paquete</button>
+      <button type="button" class="btn btn-primary" (click)="crearPaquete()">
+        <mat-icon>inventory_2</mat-icon>
+        Crear paquete
+      </button>
     </div>
   </section>
 
-  <div class="filters">
-    <select [(ngModel)]="filtroEstado" (change)="cargar()">
+  <div class="filters-bar sheet">
+    <select class="select" [(ngModel)]="filtroEstado" (change)="cargar()">
       @for (e of estados; track e) {
-        <option [value]="e">{{ e || 'Todos los estados' }}</option>
+        <option [value]="e">{{ e ? labelEstado(e, 'package') : 'Todos los estados' }}</option>
       }
     </select>
     <button type="button" class="btn btn-secondary" (click)="cargar()">Filtrar</button>
   </div>
 
   @if (cargando) {
-    <div class="loading"><div class="spinner"></div><p>Cargando…</p></div>
+    <div class="ap-skeleton-wrap">
+      <div class="skel tall"></div>
+    </div>
   } @else if (error) {
-    <div class="alert alert-error">{{ error }}</div>
+    <div class="alert error">
+      <mat-icon>error</mat-icon>
+      <div>
+        <strong>Error</strong>
+        <p>{{ error }}</p>
+      </div>
+    </div>
   } @else if (!paquetes.length) {
     <div class="sheet empty-state">
       <div class="empty-icon"><mat-icon>inventory_2</mat-icon></div>
@@ -39,8 +53,8 @@
       <p>Cree un paquete cuando el documento tenga pago y comprobante listos.</p>
     </div>
   } @else {
-    <div class="table-wrap">
-      <table class="table">
+    <div class="sheet table-wrap sticky-head">
+      <table class="data-table">
         <thead>
           <tr>
             <th>Documento</th>
@@ -49,36 +63,45 @@
             <th>Estado</th>
             <th>ZIP</th>
             <th>Fecha</th>
-            <th></th>
+            <th class="col-actions">Acciones</th>
           </tr>
         </thead>
         <tbody>
           @for (p of paquetes; track p.id) {
             <tr>
               <td>
-                <a [routerLink]="['/app/contabilidad/documentos', p.document_id]" class="link">
+                <a [routerLink]="['/app/contabilidad/documentos', p.document_id]">
                   {{ p.document_filename || 'Doc ' + p.document_id }}
                 </a>
               </td>
               <td>{{ p.proveedor || '—' }}</td>
               <td>{{ p.responsable }}</td>
               <td>
-                <span class="badge" [class]="estadoClass(p.estado)">{{ p.estado }}</span>
+                <span class="estado-chip" [class]="toneEstado(p.estado)">
+                  <mat-icon>{{ iconEstado(p.estado) }}</mat-icon>
+                  {{ labelEstado(p.estado, 'package') }}
+                </span>
               </td>
-              <td>{{ p.has_zip ? '✓' : '—' }}</td>
-              <td class="date">{{ p.created_at | date:'short' }}</td>
-              <td class="actions">
+              <td>
+                @if (p.has_zip) {
+                  <span class="estado-chip ok">Listo</span>
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+              <td class="date">{{ formatFechaContable(p.created_at) }}</td>
+              <td class="actions row-actions">
                 @if (p.estado === 'PENDIENTE') {
-                  <button type="button" class="btn-link" (click)="generar(p)">Generar ZIP</button>
+                  <button type="button" class="btn btn-primary btn-sm" (click)="generar(p)">Generar ZIP</button>
                 }
                 @if (p.has_zip) {
-                  <button type="button" class="btn-link" (click)="descargar(p)">Descargar</button>
+                  <button type="button" class="btn btn-secondary btn-sm" (click)="descargar(p)">Descargar</button>
                 }
                 @if (p.estado === 'GENERADO') {
-                  <button type="button" class="btn-link" (click)="entregar(p)">Entregar</button>
+                  <button type="button" class="btn btn-success btn-sm" (click)="entregar(p)">Entregar</button>
                 }
                 @if (p.estado === 'ENTREGADO' || p.estado === 'DIGITALIZADO') {
-                  <button type="button" class="btn-link" (click)="cerrar(p)">Cerrar</button>
+                  <button type="button" class="btn btn-secondary btn-sm" (click)="cerrar(p)">Cerrar</button>
                 }
               </td>
             </tr>

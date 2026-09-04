@@ -1,0 +1,21 @@
+# Opcional: desarrollo / depuración local.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Expone puertos internos. NO usar en Oracle de producción.
+
+services:
+  db:
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+
+  backend:
+    ports:
+      - "${BACKEND_PORT:-8081}:8080"
+
+  contabilidad:
+    ports:
+      - "${CONTABILIDAD_PORT:-8787}:8787"
+
+  frontend:
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"

@@ -12,33 +12,79 @@
           </div>
           <div>
             <strong>Ave</strong>
-            <span>Chat abierto · revisión + PDF</span>
+            <span>Asistente · pregunta lo que necesites</span>
           </div>
         </div>
-        <button type="button" class="ave-icon-btn" (click)="toggle()" aria-label="Cerrar chat">
-          <mat-icon>close</mat-icon>
-        </button>
+        <div class="ave-panel__actions">
+          <button
+            type="button"
+            class="ave-icon-btn"
+            (click)="newConversation()"
+            aria-label="Nueva conversación"
+            title="Nueva conversación"
+          >
+            <mat-icon>add_comment</mat-icon>
+          </button>
+          <button type="button" class="ave-icon-btn" (click)="toggle()" aria-label="Cerrar chat">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
       </header>
 
-      <div class="ave-panel__body" #scroller>
-        @for (m of messages(); track $index) {
+      <div class="ave-panel__body" #scroller (scroll)="onScroll()">
+        @for (m of messages(); track m.id) {
           <div
             class="ave-msg"
             [class.ave-msg--user]="m.role === 'user'"
             [class.ave-msg--system]="m.role === 'system'"
             [class.ave-msg--quote]="m.mode === 'QUOTE'"
+            [class.ave-msg--error]="m.error"
           >
-            <div class="ave-msg__bubble" [innerHTML]="formatHtml(m.text)"></div>
-            @if (m.hasQuote) {
-              <button type="button" class="ave-msg__review" (click)="openQuoteReview()">
-                <mat-icon>open_in_new</mat-icon>
-                Revisar / editar / PDF
-              </button>
+            @if (m.role === 'assistant') {
+              <div class="ave-msg__meta">
+                <div class="ave-avatar ave-avatar--xs">
+                  <img src="assets/brand/mark-bird.svg" alt="" width="18" height="18" />
+                </div>
+                <span>Ave</span>
+              </div>
             }
+            <div
+              class="ave-msg__bubble"
+              [class.ave-msg__bubble--streaming]="m.streaming && !m.text"
+              [innerHTML]="formatHtml(m.text || (m.streaming ? '…' : ''))"
+            ></div>
+            @if (m.streaming && m.text) {
+              <span class="ave-cursor" aria-hidden="true"></span>
+            }
+            <div class="ave-msg__toolbar">
+              @if (m.role === 'assistant' && m.text && !m.streaming) {
+                <button type="button" class="ave-mini" (click)="copyMessage(m.text)" title="Copiar">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              }
+              @if (m.error && m.retryOf) {
+                <button type="button" class="ave-mini" (click)="retry(m.retryOf)" title="Reintentar">
+                  <mat-icon>refresh</mat-icon>
+                  Reintentar
+                </button>
+              }
+              @if (m.hasQuote) {
+                <button type="button" class="ave-msg__review" (click)="openQuoteReview()">
+                  <mat-icon>open_in_new</mat-icon>
+                  Revisar / editar / PDF
+                </button>
+              }
+            </div>
           </div>
         }
-        @if (sending()) {
+        @if (sending() && messages().every((x) => !x.streaming)) {
           <div class="ave-msg">
+            <div class="ave-msg__meta">
+              <div class="ave-avatar ave-avatar--xs">
+                <img src="assets/brand/mark-bird.svg" alt="" width="18" height="18" />
+              </div>
+              <span>Ave está escribiendo…</span>
+            </div>
             <div class="ave-msg__bubble ave-msg__bubble--typing">
               <span></span><span></span><span></span>
             </div>
@@ -46,11 +92,14 @@
         }
       </div>
 
-      <div class="ave-panel__hints">
-        @for (s of suggestions; track s) {
-          <button type="button" class="ave-chip" (click)="useSuggestion(s)">{{ s }}</button>
-        }
-      </div>
+      @if (showSuggestions()) {
+        <div class="ave-panel__hints">
+          <p class="ave-panel__hints-label">Ideas para empezar (opcionales)</p>
+          @for (s of suggestions; track s) {
+            <button type="button" class="ave-chip" (click)="useSuggestion(s)">{{ s }}</button>
+          }
+        </div>
+      }
 
       <footer class="ave-panel__foot">
         <textarea
@@ -59,7 +108,7 @@
           rows="2"
           [(ngModel)]="draft"
           (keydown)="onKeydown($event)"
-          placeholder="Escríbele como en un chat… (Enter envía)"
+          placeholder="Escribe lo que quieras… Enter envía · Shift+Enter nueva línea"
           [disabled]="sending()"
         ></textarea>
         <button

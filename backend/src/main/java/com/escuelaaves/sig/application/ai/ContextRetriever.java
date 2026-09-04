@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.stream.Collectors;
 
 /**
  * Recuperación top-K de contexto comercial (anti-dump de catálogo completo).
@@ -22,15 +21,40 @@ public class ContextRetriever {
     private final CommercialCatalogService catalog;
 
     public String buildCompactContext(String query, SessionSlotState slots, int productLimit, int providerLimit) {
+        return buildCompactContext(query, slots, productLimit, providerLimit, false);
+    }
+
+    /**
+     * @param indexIfNoHit si true (p. ej. interpretQuote), adjunta un índice corto cuando no hay match.
+     *                     En chat general debe ser false para no sesgar a Claude hacia tours.
+     */
+    public String buildCompactContext(
+            String query,
+            SessionSlotState slots,
+            int productLimit,
+            int providerLimit,
+            boolean indexIfNoHit
+    ) {
+        List<ScoredProduct> scored = scoreProducts(query, slots);
+        boolean hasTourSlot = slots != null && slots.tourCode() != null && !slots.tourCode().isBlank();
+        boolean catalogHit = !scored.isEmpty();
+
+        if (!hasTourSlot && !catalogHit) {
+            if (indexIfNoHit) {
+                return catalog.buildPromptIndex(Math.min(8, productLimit));
+            }
+            return "";
+        }
+
         StringBuilder sb = new StringBuilder();
-        sb.append("Contexto recuperado (top-K; no inventes precios fuera de aquí):\n");
+        sb.append("Contexto de catálogo (solo para esta consulta de negocio; no restringe otros temas):\n");
         if (slots != null && !slots.toMap().isEmpty()) {
             sb.append("Slots sesión: ").append(slots.toPromptJson()).append('\n');
         }
 
-        List<ScoredProduct> scored = scoreProducts(query, slots);
         int limit = Math.max(1, productLimit);
-        for (int i = 0; i < Math.min(limit, scored.size()); i++) {
+        int n = Math.min(limit, scored.size());
+        for (int i = 0; i < n; i++) {
             CatalogProduct p = scored.get(i).product();
             sb.append("- ").append(p.code()).append(" | ").append(p.name())
                     .append(" | ").append(p.modality()).append(" | escala=");
@@ -55,8 +79,7 @@ public class ContextRetriever {
                     .append(" tour=").append(pr.tourCode()).append('\n');
         }
 
-        if (scored.isEmpty()) {
-            // Fallback mínimo: índice corto sin dump de 90 tours
+        if (scored.isEmpty() && hasTourSlot) {
             sb.append(catalog.buildPromptIndex(Math.min(8, productLimit)));
         }
         return sb.toString();
@@ -92,7 +115,7 @@ public class ContextRetriever {
             if (modality != null && modality.equalsIgnoreCase(p.modality())) {
                 s += 15;
             }
-            if (s > 0) {
+            if (s >= 20) {
                 list.add(new ScoredProduct(p, s));
             }
         }
@@ -102,7 +125,7 @@ public class ContextRetriever {
 
     private static int score(CatalogProduct p, String needle) {
         if (needle == null || needle.isBlank()) {
-            return 1; // allow mild fallback ranking
+            return 0;
         }
         int s = 0;
         String code = normalize(p.code());
@@ -111,7 +134,7 @@ public class ContextRetriever {
         if (code.contains(needle) || needle.contains(code)) s += 40;
         if (name.contains(needle) || needle.contains(name)) s += 30;
         for (String token : needle.split("\\s+")) {
-            if (token.length() < 3) continue;
+            if (token.length() < 4) continue;
             if (code.contains(token) || name.contains(token)) s += 10;
             for (String kw : p.keywords()) {
                 String k = normalize(kw);

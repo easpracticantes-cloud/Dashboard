@@ -19,6 +19,20 @@ PALABRAS_CLAVE_FACTURA = [
     "SUMMARY",
     "Total",
     "Gross worth",
+    # Español / DIAN / cuentas de cobro físicas
+    "Factura",
+    "NIT",
+    "IVA",
+    "CUFE",
+    "Razón social",
+    "Razon social",
+    "Fecha",
+    "Subtotal",
+    "Total a pagar",
+    "Cuenta de cobro",
+    "Proveedor",
+    "Resolución",
+    "Resolucion",
 ]
 
 
@@ -64,31 +78,56 @@ def verificar_tesseract():
 
 
 def extraer_texto_imagen(ruta_imagen):
-    """Extrae texto de una imagen usando pytesseract."""
+    """Extrae texto de una imagen usando pytesseract (multi-PSM)."""
     try:
         import pytesseract
         from PIL import Image
 
         from config.settings import get_settings
+        from infrastructure.ocr.pdf_rasterize import ensure_raster_image, is_pdf
 
         configurar_tesseract()
 
-        imagen = Image.open(ruta_imagen)
+        ruta = Path(ruta_imagen)
+        if is_pdf(ruta):
+            raster = ensure_raster_image(ruta)
+            ruta = raster
+
+        imagen = Image.open(ruta)
         if imagen.mode not in ("RGB", "L"):
             imagen = imagen.convert("RGB")
 
-        lang = (get_settings().tesseract_lang or "spa").strip() or "spa"
-        # En Docker suele haber solo spa; spa+eng falla si falta eng.
-        try:
-            texto = pytesseract.image_to_string(
-                imagen, lang=lang, timeout=max(TIMEOUT_OCR, 30)
-            )
-        except Exception:
-            texto = pytesseract.image_to_string(
-                imagen, lang="spa", timeout=max(TIMEOUT_OCR, 30)
-            )
+        # Upscale textos muy pequeños (fotos de celular)
+        w, h = imagen.size
+        if max(w, h) < 1200:
+            scale = 1200 / max(w, h)
+            imagen = imagen.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
-        return texto
+        lang = (get_settings().tesseract_lang or "spa").strip() or "spa"
+        configs = [
+            "--oem 3 --psm 6",
+            "--oem 3 --psm 4",
+            "--oem 3 --psm 3",
+            "--oem 3 --psm 11",
+        ]
+        mejores = []
+        for cfg in configs:
+            try:
+                texto = pytesseract.image_to_string(
+                    imagen, lang=lang, config=cfg, timeout=max(TIMEOUT_OCR, 45)
+                )
+            except Exception:
+                try:
+                    texto = pytesseract.image_to_string(
+                        imagen, lang="spa", config=cfg, timeout=max(TIMEOUT_OCR, 45)
+                    )
+                except Exception:
+                    texto = ""
+            if texto:
+                mejores.append(texto)
+        if not mejores:
+            return ""
+        return max(mejores, key=lambda t: calcular_puntaje_ocr(t)["puntaje"])
     except Exception as error:
         print(f"ERROR en OCR: {error}")
         return ""

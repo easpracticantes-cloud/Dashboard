@@ -1,5 +1,6 @@
 package com.escuelaaves.sig.infrastructure.adapter.out.integration;
 
+import com.escuelaaves.sig.application.ai.AveSystemPrompt;
 import com.escuelaaves.sig.domain.ai.model.AiProviderType;
 import com.escuelaaves.sig.domain.ai.port.AiProviderFactory;
 import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
@@ -49,7 +50,7 @@ public class ClaudeAiStubAdapter implements ClaudeAiPort {
         try {
             GenerativeAiPort claude = aiProviderFactory.getProvider(AiProviderType.CLAUDE);
             return claude.chat(
-                    "Eres el asistente de Escuela Aves Salento. Responde en español, breve y accionable.",
+                    AveSystemPrompt.SYSTEM,
                     prompt != null ? prompt : ""
             );
         } catch (Exception ex) {

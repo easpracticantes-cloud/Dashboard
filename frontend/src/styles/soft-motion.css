@@ -1,10 +1,10 @@
 /**
- * Soft motion — feedback quieto, sin saltos al pasar el cursor.
+ * Soft motion — solo color/borde. Sin desplazamientos.
  */
 
 :root {
-  --eas-ease-soft: cubic-bezier(0.33, 1, 0.32, 1);
-  --eas-dur-soft: 220ms;
+  --eas-ease-soft: ease;
+  --eas-dur-soft: 120ms;
 }
 
 .eas-card,
@@ -33,11 +33,9 @@
   transition:
     background-color var(--eas-dur-soft) var(--eas-ease-soft),
     border-color var(--eas-dur-soft) var(--eas-ease-soft),
-    box-shadow var(--eas-dur-soft) var(--eas-ease-soft),
     color var(--eas-dur-soft) var(--eas-ease-soft) !important;
 }
 
-/* Sin desplazamientos ni escalas en hover (evita distraer) */
 .eas-card:hover,
 .eas-panel:hover,
 .kpi:hover,
@@ -69,22 +67,10 @@ eas-avatar:hover {
 .kpi:hover,
 .sheet-card:hover {
   border-color: color-mix(in srgb, var(--eas-leaf) 20%, var(--eas-line)) !important;
-  box-shadow:
-    0 1px 0 color-mix(in srgb, #fff 35%, transparent) inset,
-    0 6px 16px color-mix(in srgb, var(--eas-forest) 6%, transparent) !important;
+  box-shadow: none !important;
 }
 
 .crm-row:hover,
 .mat-mdc-row:hover .mat-mdc-cell {
   background: color-mix(in srgb, var(--eas-leaf) 4.5%, transparent) !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
 }

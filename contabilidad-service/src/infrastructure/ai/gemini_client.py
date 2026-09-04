@@ -131,7 +131,7 @@ class GeminiClient:
         if not self.configured():
             raise GeminiClientError(
                 "GEMINI_API_KEY no configurada en Contabilidad. "
-                "Copia la misma key del backend SIG (dashboard-7spt)."
+                "Copia la misma key del backend SIG (.env / Oracle)."
             )
 
         last_error = ""

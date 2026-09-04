@@ -6,9 +6,9 @@ import sys
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -17,9 +17,12 @@ from api.routers.crossings import router as crossings_router
 from api.routers.cruce_excel import router as cruce_excel_router
 from api.routers.documents import router as documents_router
 from api.routers.dashboard import router as dashboard_router
+from api.routers.ops import router as ops_router
 from api.routers.packages import router as packages_router
 from api.routers.payments import router as payments_router
+from api.routers.periods import router as periods_router
 from api.routers.remediations import router as remediations_router
+from application.services.period_service import PeriodClosedError
 from infrastructure.persistence.database import init_db
 
 # Permite importar los modulos de src/
@@ -51,6 +54,17 @@ app.include_router(cruce_excel_router)
 app.include_router(remediations_router)
 app.include_router(payments_router)
 app.include_router(packages_router)
+app.include_router(periods_router)
+app.include_router(ops_router)
+
+
+@app.exception_handler(PeriodClosedError)
+def _period_closed_handler(request: Request, exc: PeriodClosedError):
+    """Semana cerrada: 409 con el mensaje contable, no un 500."""
+    return JSONResponse(
+        status_code=409,
+        content={"detail": exc.message, "code": exc.code},
+    )
 
 
 @app.on_event("startup")

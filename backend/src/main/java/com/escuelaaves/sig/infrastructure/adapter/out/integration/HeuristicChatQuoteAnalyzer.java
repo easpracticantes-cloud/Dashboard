@@ -7,7 +7,7 @@ import com.escuelaaves.sig.domain.model.QuoteAnalysis;
 import com.escuelaaves.sig.domain.port.out.integration.ChatQuoteAnalyzerPort;
 import com.escuelaaves.sig.domain.port.out.integration.ClaudeAiPort;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slfj.Slf4j;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 

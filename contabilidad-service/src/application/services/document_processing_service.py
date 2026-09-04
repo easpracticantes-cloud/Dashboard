@@ -10,13 +10,15 @@ from domain.enums import DocumentOrigin, DocumentStatus, ProcessingMode
 from domain.rules.rule_engine import RuleEngine
 from domain.services.confidence_scorer import confidence_to_dict, score_invoice_extraction
 from domain.services.duplicate_detector import DuplicateDetector
+from domain.services.invoice_heuristics import extract_invoice_hints, merge_hints_into_extraction
 from exportador import guardar_texto
 from infrastructure.ai.ai_factory import (
     ai_unavailable_message,
     create_ai_provider,
     resolve_ai_provider_name,
 )
-from infrastructure.ai.ollama_provider import AIProvider
+from infrastructure.ai.ollama_provider import AIExtractionResult, AIProvider
+from infrastructure.ocr.pdf_rasterize import ensure_raster_image, is_pdf
 from infrastructure.ocr.tesseract_provider import TesseractOCRProvider
 from infrastructure.persistence.database import SessionLocal, init_db
 from infrastructure.persistence.repositories import (
@@ -232,6 +234,26 @@ class DocumentProcessingService:
         finally:
             db.close()
 
+    def _vision_enabled(self) -> bool:
+        vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
+        return bool(getattr(settings, "gemini_vision_on_weak_ocr", True)) and callable(vision_fn)
+
+    def _ocr_parece_basura(self, text: str) -> bool:
+        """OCR con muchos caracteres pero sin señales de factura → forzar visión."""
+        from ocr import calcular_puntaje_ocr
+
+        t = (text or "").strip()
+        if len(t) < settings.min_caracteres_ocr:
+            return True
+        score = calcular_puntaje_ocr(t)
+        return score["palabras_clave"] < 2 and score["caracteres"] < 400
+
+    def _prepare_image_for_ocr(self, path: Path) -> Path:
+        """PDF → PNG; imágenes se dejan igual."""
+        work = self.carpeta_preprocesadas
+        work.mkdir(parents=True, exist_ok=True)
+        return ensure_raster_image(path, work)
+
     def _finalize_structured_extraction(
         self,
         *,
@@ -246,10 +268,15 @@ class DocumentProcessingService:
         metodo_ocr: str,
     ) -> dict:
         """Aplica reglas + confidence + duplicados sobre extracción JSON de factura."""
-        extracted = dict(ai_data)
+        hints = extract_invoice_hints(ocr_text)
+        extracted = merge_hints_into_extraction(dict(ai_data), hints)
         extracted["_metodo_ocr"] = metodo_ocr
         rule = self.rules.evaluate_invoice(extracted)
-        conf = score_invoice_extraction(extracted, len((ocr_text or "").strip()))
+        # Vision: no penalizar por OCR corto
+        ocr_chars = len((ocr_text or "").strip())
+        if str(metodo_ocr).upper().endswith("VISION") or "VISION" in str(metodo_ocr).upper():
+            ocr_chars = max(ocr_chars, 800)
+        conf = score_invoice_extraction(extracted, ocr_chars)
         extracted["_confidence"] = confidence_to_dict(conf)
 
         estado_doc = self.rules.map_estado_documento(rule)
@@ -302,7 +329,7 @@ class DocumentProcessingService:
             "metodo_ocr": metodo_ocr,
             "confidence_global": conf.global_score,
             "respuesta_ia": json.dumps(
-                {k: v for k, v in ai_data.items() if not str(k).startswith("_")},
+                {k: v for k, v in extracted.items() if not str(k).startswith("_")},
                 ensure_ascii=False,
                 indent=2,
             ),
@@ -332,48 +359,93 @@ class DocumentProcessingService:
 
             self._ensure_output_dirs()
             stem = path.stem
+            image_path = self._prepare_image_for_ocr(path)
             ruta_pre = self.carpeta_preprocesadas / f"{stem}.png"
-            if not self.ocr.preprocess(path, ruta_pre):
+            if not self.ocr.preprocess(image_path, ruta_pre):
                 ruta_pre = None
 
             ocr_result = self.ocr.extract_with_fallback(
-                path,
+                image_path,
                 ruta_pre if ruta_pre and ruta_pre.exists() else None,
             )
             guardar_texto(self.carpeta_textos / f"{stem}.txt", ocr_result.text)
 
             ai_result = None
             metodo = ocr_result.method
-            if len(ocr_result.text.strip()) < settings.min_caracteres_ocr:
-                vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
-                use_vision = (
-                    bool(getattr(settings, "gemini_vision_on_weak_ocr", True))
-                    and callable(vision_fn)
-                    and resolve_ai_provider_name() == "gemini"
-                )
-                if not use_vision:
-                    error = (
-                        f"OCR debil ({len(ocr_result.text.strip())} caracteres). "
-                        "Sube una imagen mas nitida o configura Gemini vision."
-                    )
-                    document.estado = DocumentStatus.REQUIERE_REVISION
-                    job_repo.mark_requires_review(job)
-                    audit.log("OCR_DEBIL", "Document", str(document.id), valor_nuevo=error)
-                    db.commit()
-                    return {"ok": False, "error": error, "document_id": document.id, "estado": DocumentStatus.REQUIERE_REVISION}
+            ocr_debil = self._ocr_parece_basura(ocr_result.text)
+            vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
 
-                logger.info("OCR debil — extract_invoice vision sobre doc #%s", document.id)
-                ai_result = vision_fn(path)
-                metodo = "GEMINI_VISION"
+            if ocr_debil and self._vision_enabled():
+                vision_target = image_path if image_path.exists() else path
+                provider = resolve_ai_provider_name()
+                logger.info(
+                    "OCR debil/basura — vision (%s) sobre doc #%s (%s)",
+                    provider,
+                    document.id,
+                    vision_target.name,
+                )
+                ai_result = vision_fn(vision_target)
+                metodo = f"{provider.upper()}_VISION"
+                if not ai_result.ok and is_pdf(path) and vision_target != path:
+                    # reintento sobre PNG si el path original falló
+                    ai_result = vision_fn(image_path)
                 if not ai_result.ok:
-                    error = f"Vision Gemini fallo: {ai_result.error}"
+                    error = f"Vision IA fallo: {ai_result.error}"
                     document.estado = DocumentStatus.REQUIERE_REVISION
                     job_repo.mark_requires_review(job)
                     audit.log("OCR_VISION_FAIL", "Document", str(document.id), valor_nuevo=error)
                     db.commit()
-                    return {"ok": False, "error": error, "document_id": document.id, "estado": DocumentStatus.REQUIERE_REVISION}
+                    return {
+                        "ok": False,
+                        "error": error,
+                        "document_id": document.id,
+                        "estado": DocumentStatus.REQUIERE_REVISION,
+                    }
+            elif ocr_debil:
+                error = (
+                    f"OCR debil ({len(ocr_result.text.strip())} caracteres) y "
+                    "no hay proveedor de vision disponible. "
+                    "Sube JPG/PNG nitido o configura Gemini/Anthropic."
+                )
+                document.estado = DocumentStatus.REQUIERE_REVISION
+                job_repo.mark_requires_review(job)
+                audit.log("OCR_DEBIL", "Document", str(document.id), valor_nuevo=error)
+                db.commit()
+                return {
+                    "ok": False,
+                    "error": error,
+                    "document_id": document.id,
+                    "estado": DocumentStatus.REQUIERE_REVISION,
+                }
             else:
+                # Texto OCR + visión de refuerzo si faltan campos clave tras OCR largo
                 ai_result = self.ai.extract_invoice(ocr_result.text)
+                if ai_result.ok and self._vision_enabled():
+                    datos = ai_result.data or {}
+                    faltan = not datos.get("total") or not (
+                        datos.get("nit_o_identificacion")
+                        or (isinstance(datos.get("proveedor"), dict) and datos["proveedor"].get("nit"))
+                        or datos.get("numero_factura")
+                    )
+                    if faltan:
+                        logger.info("Extracción incompleta — refuerzo vision doc #%s", document.id)
+                        vision_result = vision_fn(image_path if image_path.exists() else path)
+                        if vision_result.ok:
+                            merged = merge_hints_into_extraction(
+                                dict(vision_result.data or {}),
+                                extract_invoice_hints(ocr_result.text),
+                            )
+                            # Completar huecos con lo que sí sacó el OCR+texto
+                            merged = merge_hints_into_extraction(
+                                merged,
+                                {k: v for k, v in datos.items() if v not in (None, "", [], {})},
+                            )
+                            ai_result = AIExtractionResult(
+                                ok=True,
+                                data=merged,
+                                raw_text=vision_result.raw_text,
+                            )
+                            metodo = f"{resolve_ai_provider_name().upper()}_VISION+OCR"
 
             if not ai_result.ok:
                 document.estado = DocumentStatus.ERROR

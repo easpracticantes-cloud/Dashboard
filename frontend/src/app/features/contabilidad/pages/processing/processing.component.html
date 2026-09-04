@@ -1,41 +1,99 @@
 <div class="proc cosmos-page">
-  <header class="page-hero sheet">
-    <div class="hero-glow" aria-hidden="true"></div>
-    <div class="proc-head-inner">
+  <header class="page-hero">
+    <div class="hero-row">
       <div>
-        <span class="label-caps">Análisis rápido</span>
+        <span class="label-caps">Carga masiva · OCR + IA persistente</span>
         <h1 class="page-title">Procesamiento</h1>
-        <p class="page-lead">Extracción inmediata sin guardar en el sistema — ideal para pruebas.</p>
+        <p class="page-lead">
+          Suba facturas (JPG, PNG, PDF). Se guardan y analizan en paquetes de {{ packSize }}
+          (máx. 3 workers por paquete). Los errores no detienen el resto del lote.
+        </p>
       </div>
-      @if (health) {
-        <div class="health-chips">
-          <span class="status" [class.ok]="health.tesseract" [class.bad]="!health.tesseract">
+      <div class="hero-actions">
+        <a routerLink="/app/contabilidad/documentos" class="btn btn-secondary">
+          <mat-icon>description</mat-icon>
+          Ver documentos
+        </a>
+        @if (health) {
+          <span class="estado-chip" [class]="health.tesseract ? 'ok' : 'bad'">
             <mat-icon>document_scanner</mat-icon>
-            OCR
+            OCR {{ health.tesseract ? 'OK' : 'fallo' }}
           </span>
-          <span class="status" [class.ok]="health.ai ?? health.ollama" [class.bad]="!(health.ai ?? health.ollama)">
+          <span class="estado-chip" [class]="(health.ai ?? health.ollama) ? 'ok' : 'bad'">
             <mat-icon>psychology</mat-icon>
             {{ health.ai_provider === 'gemini' ? 'Gemini' : 'Motor IA' }}
-            @if (health.ai_model) {
-              <small class="model-tag">{{ health.ai_model }}</small>
-            }
+            {{ (health.ai ?? health.ollama) ? 'OK' : 'fallo' }}
           </span>
-          @if (health.vision_fallback) {
-            <span class="status ok">
-              <mat-icon>visibility</mat-icon>
-              Visión
-            </span>
+        }
+      </div>
+    </div>
+    @if (health?.errores?.length || health?.hint) {
+      <article class="ap-alert bad" style="margin-top: 1rem">
+        <div class="ap-alert-icon"><mat-icon>priority_high</mat-icon></div>
+        <div>
+          <strong>Requiere atención del entorno</strong>
+          @if (health?.errores?.length) {
+            <p>{{ health!.errores.join(' ') }}</p>
+          }
+          @if (health?.hint) {
+            <p>{{ health!.hint }}</p>
           }
         </div>
-        @if (health.errores?.length) {
-          <p class="health-warn">{{ health.errores.join(' ') }}</p>
-        }
-        @if (health.hint) {
-          <p class="health-warn">{{ health.hint }}</p>
-        }
-      }
-    </div>
+      </article>
+    }
   </header>
+
+  <section class="ap-kpi-grid">
+    <article class="ap-kpi sheet">
+      <div class="kpi-icon"><mat-icon>queue</mat-icon></div>
+      <span class="kpi-val">{{ archivos.length }}</span>
+      <span class="kpi-lbl">En cola local</span>
+      <span class="kpi-sub">Archivos seleccionados</span>
+    </article>
+    <article class="ap-kpi sheet ok">
+      <div class="kpi-icon"><mat-icon>task_alt</mat-icon></div>
+      <span class="kpi-val">{{ kpiOk }}</span>
+      <span class="kpi-lbl">Correctos</span>
+      <span class="kpi-sub">Extraídos / listos</span>
+    </article>
+    <article class="ap-kpi sheet" [class]="kpiPendientes ? 'warn' : ''">
+      <div class="kpi-icon"><mat-icon>hourglass_empty</mat-icon></div>
+      <span class="kpi-val">{{ kpiPendientes }}</span>
+      <span class="kpi-lbl">Pendientes</span>
+      <span class="kpi-sub">OCR/IA en curso</span>
+    </article>
+    <article class="ap-kpi sheet" [class]="kpiErrores ? 'bad' : 'ok'">
+      <div class="kpi-icon"><mat-icon>error_outline</mat-icon></div>
+      <span class="kpi-val">{{ kpiErrores }}</span>
+      <span class="kpi-lbl">Errores</span>
+      <span class="kpi-sub">Reprocesables</span>
+    </article>
+    <article class="ap-kpi sheet" [class]="procesando ? 'warn' : (progreso === 100 ? 'ok' : '')">
+      <div class="kpi-icon"><mat-icon>inventory_2</mat-icon></div>
+      <span class="kpi-val">{{ packActual }}/{{ packTotal || '—' }}</span>
+      <span class="kpi-lbl">Paquete</span>
+      <span class="kpi-sub">{{ progreso }}% · {{ estado }}</span>
+    </article>
+  </section>
+
+  @if (procesando || progreso > 0) {
+    <section class="sheet sheet-pad progress-panel">
+      <div class="section-head-row">
+        <h2 class="section-head">Progreso del lote</h2>
+        <span class="estado-chip" [class]="procesando ? 'warn' : (kpiErrores ? 'bad' : 'final')">
+          {{ procesando ? 'En curso' : (progreso === 100 ? 'Finalizado' : 'En espera') }}
+        </span>
+      </div>
+      <mat-progress-bar mode="determinate" [value]="progreso"></mat-progress-bar>
+      <p class="muted" style="margin: 0.65rem 0 0">{{ estado }}</p>
+      @if (loteResumen) {
+        <p class="muted">
+          Recibidos {{ loteResumen.total_recibidos }} · errores subida {{ loteResumen.total_errores }}
+          · duplicados {{ loteResumen.total_duplicados }} · en cola OCR {{ queuedIds.length }}
+        </p>
+      }
+    </section>
+  }
 
   <div class="proc-grid">
     <div class="sheet composer" [class.drag]="arrastrando">
@@ -47,10 +105,15 @@
       >
         <div class="drop-icon"><mat-icon>upload_file</mat-icon></div>
         <p class="drop-title">Suelta las facturas aquí</p>
-        <p class="drop-hint">JPG o PNG · varios archivos a la vez</p>
+        <p class="drop-hint">JPG, PNG o PDF · varios a la vez · paquetes de {{ packSize }}</p>
         <label class="btn btn-primary btn-lg">
           Seleccionar archivos
-          <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple (change)="onFileInput($event)" />
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
+            multiple
+            (change)="onFileInput($event)"
+          />
         </label>
       </div>
 
@@ -61,37 +124,60 @@
               type="button"
               class="file-tag"
               [class.active]="i === seleccionIndex"
+              [class.needs-attention]="resultadoDe(item.file.name)?.ok === false"
               (click)="seleccionar(i)"
             >
-              <mat-icon>description</mat-icon>
+              <mat-icon>{{ iconoArchivo(item.file.name) }}</mat-icon>
               {{ item.file.name }}
+              @if (resultadoDe(item.file.name); as r) {
+                <span class="estado-chip" [class]="r.ok ? 'ok' : 'bad'">
+                  {{ r.duplicate ? 'Dup' : r.ok ? 'OK' : 'Error' }}
+                </span>
+              }
               <span class="remove" (click)="quitar(i, $event)">×</span>
             </button>
           }
           <button type="button" class="btn btn-ghost" (click)="limpiar()">Limpiar todo</button>
         </div>
+      } @else {
+        <div class="empty-state compact">
+          <div class="empty-icon"><mat-icon>folder_open</mat-icon></div>
+          <p>No hay archivos en cola. Agregue facturas para comenzar.</p>
+        </div>
       }
 
       <div class="prompt">
-        <label class="label-caps">Instrucción personalizada</label>
-        <textarea class="textarea" [(ngModel)]="solicitud" rows="4" placeholder="Opcional: indica qué campos extraer…"></textarea>
         <div class="prompt-actions">
           <button type="button" class="btn btn-primary btn-lg" [disabled]="procesando" (click)="procesar()">
             @if (procesando) {
               <mat-spinner diameter="18"></mat-spinner>
               Procesando…
             } @else {
-              <mat-icon>auto_fix_high</mat-icon>
-              Analizar
+              <mat-icon>cloud_upload</mat-icon>
+              Subir y procesar
             }
           </button>
+          @if (documentosLote.length) {
+            <button
+              type="button"
+              class="btn btn-secondary"
+              [disabled]="procesando"
+              (click)="reprocesarPendientes()"
+            >
+              <mat-icon>replay</mat-icon>
+              Reprocesar pendientes
+            </button>
+          }
           <span class="status-text">{{ estado }}</span>
         </div>
-        @if (procesando || progreso === 100) {
-          <mat-progress-bar mode="determinate" [value]="progreso"></mat-progress-bar>
-        }
         @if (errorGlobal) {
-          <div class="alert error">{{ errorGlobal }}</div>
+          <div class="alert error" style="margin-top: 0.75rem">
+            <mat-icon>error</mat-icon>
+            <div>
+              <strong>Atención</strong>
+              <p>{{ errorGlobal }}</p>
+            </div>
+          </div>
         }
       </div>
     </div>
@@ -102,7 +188,14 @@
         @if (archivoActivo) {
           <p class="file-name">{{ archivoActivo.file.name }}</p>
           <div class="preview">
-            <img [src]="archivoActivo.previewUrl" [alt]="archivoActivo.file.name" />
+            @if (archivoActivo.previewUrl) {
+              <img [src]="archivoActivo.previewUrl" [alt]="archivoActivo.file.name" />
+            } @else {
+              <div class="empty-state compact">
+                <div class="empty-icon"><mat-icon>picture_as_pdf</mat-icon></div>
+                <p>PDF — sin vista previa local</p>
+              </div>
+            }
           </div>
         } @else {
           <div class="empty-state compact">
@@ -113,28 +206,100 @@
       </div>
 
       <div class="sheet sheet-pad result-panel">
-        <div class="result-head">
-          <h2 class="section-head">Respuesta</h2>
+        <div class="section-head-row">
+          <h2 class="section-head">Estado</h2>
           @if (resultadoActivo) {
-            <span class="status" [class.ok]="resultadoActivo.ok" [class.bad]="!resultadoActivo.ok">
-              {{ resultadoActivo.ok ? 'Completado' : 'Error' }}
+            <span class="estado-chip" [class]="resultadoActivo.ok ? 'final' : 'bad'">
+              <mat-icon>{{ resultadoActivo.ok ? 'verified' : 'error' }}</mat-icon>
+              {{ resultadoActivo.estado || (resultadoActivo.ok ? 'OK' : 'Error') }}
             </span>
           }
         </div>
         @if (resultadoActivo) {
-          @if (resultadoActivo.ok) {
-            <p class="meta">{{ resultadoActivo.metodo_ocr }} · {{ resultadoActivo.caracteres_ocr }} caracteres</p>
-            <pre class="result">{{ resultadoActivo.respuesta_ia }}</pre>
-          } @else {
-            <div class="alert error">{{ resultadoActivo.error }}</div>
+          @if (resultadoActivo.documentId) {
+            <p class="meta muted">Documento #{{ resultadoActivo.documentId }}</p>
+            <a
+              class="btn btn-secondary btn-sm"
+              [routerLink]="['/app/contabilidad/documentos', resultadoActivo.documentId]"
+            >
+              Abrir ficha
+            </a>
+          }
+          @if (resultadoActivo.error) {
+            <div class="alert error" style="margin-top: 0.75rem">
+              <mat-icon>error</mat-icon>
+              <div>{{ resultadoActivo.error }}</div>
+            </div>
           }
         } @else {
           <div class="empty-state compact">
             <div class="empty-icon"><mat-icon>text_snippet</mat-icon></div>
-            <p>El resultado aparecerá aquí</p>
+            <p>El estado del archivo aparecerá tras subir el lote</p>
           </div>
         }
       </div>
     </aside>
   </div>
+
+  @if (resultados.length || documentosLote.length) {
+    <section class="sheet sheet-pad">
+      <div class="section-head-row">
+        <h2 class="section-head">Resultados del lote</h2>
+        <span class="estado-chip" [class]="kpiErrores ? 'warn' : 'ok'">
+          {{ kpiOk }} OK · {{ kpiPendientes }} pend. · {{ kpiErrores }} error(es)
+        </span>
+      </div>
+      <div class="table-wrap sticky-head">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Archivo</th>
+              <th>Documento</th>
+              <th>Estado</th>
+              <th>Detalle</th>
+              <th class="col-actions">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of resultados; track r.archivo) {
+              <tr [class.row-attention]="!r.ok">
+                <td class="strong">{{ r.archivo }}</td>
+                <td class="mono">{{ r.documentId || '—' }}</td>
+                <td>
+                  <span
+                    class="estado-chip"
+                    [class]="r.estado ? toneEstado(r.estado) : r.ok ? 'ok' : 'bad'"
+                  >
+                    <mat-icon>{{ r.estado ? iconEstado(r.estado) : r.ok ? 'verified' : 'error' }}</mat-icon>
+                    {{ r.estado ? labelEstado(r.estado, 'document') : r.ok ? 'OK' : 'Error' }}
+                  </span>
+                </td>
+                <td class="detalle">
+                  {{
+                    r.duplicate
+                      ? 'Duplicado detectado'
+                      : r.error
+                        ? r.error
+                        : r.ok
+                          ? 'En pipeline OCR/IA'
+                          : 'Fallo al registrar'
+                  }}
+                </td>
+                <td class="actions row-actions">
+                  <button type="button" class="btn btn-secondary btn-sm" (click)="seleccionarPorNombre(r.archivo)">
+                    Ver
+                  </button>
+                  @if (r.documentId) {
+                    <a class="btn btn-ghost btn-sm" [routerLink]="['/app/contabilidad/documentos', r.documentId]">
+                      Ficha
+                    </a>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
 </div>

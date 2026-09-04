@@ -3,11 +3,16 @@ package com.escuelaaves.sig.infrastructure.ai.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Propiedades Anthropic (Claude). Keys solo vía entorno / application.yml.
+ * Propiedades Anthropic (Claude). Secrets solo vía entorno / application.yml.
  */
 @ConfigurationProperties(prefix = "app.ai.anthropic")
 public record AnthropicProperties(
         String apiKey,
+        /**
+         * Requerido por Anthropic cuando la API key está ligada a una identidad
+         * (header HTTP {@code anthropic-workspace-id}). Nunca hardcodear.
+         */
+        String workspaceId,
         String modelFast,
         String modelReasoning,
         String baseUrl,
@@ -59,10 +64,20 @@ public record AnthropicProperties(
         if (priceReasoningOutputPerMtok <= 0) {
             priceReasoningOutputPerMtok = 15.0;
         }
+        if (workspaceId != null) {
+            workspaceId = workspaceId.trim();
+            if (workspaceId.isEmpty()) {
+                workspaceId = null;
+            }
+        }
     }
 
     public boolean hasApiKey() {
         return apiKey != null && !apiKey.isBlank();
+    }
+
+    public boolean hasWorkspaceId() {
+        return workspaceId != null && !workspaceId.isBlank();
     }
 
     public String modelFor(com.escuelaaves.sig.domain.ai.model.AiModelTier tier) {

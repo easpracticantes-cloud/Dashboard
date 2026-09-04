@@ -10,6 +10,7 @@ import com.escuelaaves.sig.domain.model.IntegrationStatus;
 import com.escuelaaves.sig.infrastructure.ai.adapters.PromptingGenerativeAiAdapter;
 import com.escuelaaves.sig.infrastructure.ai.config.AnthropicProperties;
 import com.escuelaaves.sig.infrastructure.ai.config.AnthropicRestClientConfig;
+import com.escuelaaves.sig.infrastructure.ai.support.AiPromptTrace;
 import com.escuelaaves.sig.infrastructure.ai.support.AiStructuredJson;
 import com.escuelaaves.sig.shared.exception.BadRequestException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -93,6 +94,8 @@ public class AnthropicAdapter extends PromptingGenerativeAiAdapter {
         )));
         body.put("temperature", jsonMode ? 0.1 : 0.3);
 
+        AiPromptTrace.logAnthropicWire(operation, jsonMode, system, userMessage);
+
         int maxAttempts = Math.max(1, properties.maxRetries());
         RestClientException lastNetwork = null;
         String lastHttpDetail = null;
@@ -100,13 +103,25 @@ public class AnthropicAdapter extends PromptingGenerativeAiAdapter {
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             try {
-                log.info("[Anthropic] POST /v1/messages model={} tier={} op={} jsonMode={} chars={} attempt={}/{}",
-                        model, tier, operation, jsonMode, userMessage.length(), attempt, maxAttempts);
+                log.info("[Anthropic] POST /v1/messages model={} tier={} op={} jsonMode={} chars={} workspaceHeader={} attempt={}/{}",
+                        model, tier, operation, jsonMode, userMessage.length(),
+                        properties.hasWorkspaceId(), attempt, maxAttempts);
 
-                String raw = anthropicRestClient.post()
+                RestClient.RequestBodySpec request = anthropicRestClient.post()
                         .uri("/v1/messages")
                         .header("x-api-key", properties.apiKey())
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .contentType(MediaType.APPLICATION_JSON);
+
+                // Defensa: si el RestClient se construyó sin workspace pero ahora hay id en props
+                // (p. ej. tests), asegurar el header en la request.
+                if (properties.hasWorkspaceId()) {
+                    request = request.header(
+                            AnthropicRestClientConfig.WORKSPACE_HEADER,
+                            properties.workspaceId()
+                    );
+                }
+
+                String raw = request
                         .body(body)
                         .retrieve()
                         .body(String.class);
@@ -143,7 +158,7 @@ public class AnthropicAdapter extends PromptingGenerativeAiAdapter {
             } catch (RestClientResponseException ex) {
                 int status = ex.getStatusCode().value();
                 lastHttpDetail = "HTTP " + status + " model=" + model + ": "
-                        + AiStructuredJson.truncate(ex.getResponseBodyAsString(), 300);
+                        + scrubSecrets(AiStructuredJson.truncate(ex.getResponseBodyAsString(), 300));
                 log.error("[Anthropic] {}", lastHttpDetail);
                 if (attempt < maxAttempts && (status == 429 || status >= 500)) {
                     sleepBackoff(attempt);
@@ -153,6 +168,13 @@ public class AnthropicAdapter extends PromptingGenerativeAiAdapter {
                         operation, "/anthropic/v1/messages", "claude", model, tier,
                         System.currentTimeMillis() - start, null, null, false, lastHttpDetail
                 );
+                if (status == 400 && lastHttpDetail.toLowerCase().contains("workspace")) {
+                    throw new BadRequestException(
+                            "Error Anthropic: falta ANTHROPIC_WORKSPACE_ID. "
+                                    + "Con API keys ligadas a identidad debes definir el workspace "
+                                    + "(header anthropic-workspace-id) y reiniciar el backend."
+                    );
+                }
                 throw new BadRequestException("Error Anthropic " + lastHttpDetail);
             } catch (BadRequestException ex) {
                 usageService.recordLlmCall(
@@ -204,6 +226,16 @@ public class AnthropicAdapter extends PromptingGenerativeAiAdapter {
             }
         }
         return sb.toString().trim();
+    }
+
+    private static String scrubSecrets(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        // Nunca filtrar hacia logs valores de API key / workspace id si el body los repitiera
+        return raw
+                .replaceAll("(?i)sk-ant-[A-Za-z0-9_\\-]+", "[omitido]")
+                .replaceAll("(?i)(\"workspace[_-]id\"\\s*:\\s*\")[^\"]+\"", "$1[omitido]\"");
     }
 
     private static void sleepBackoff(int attempt) {

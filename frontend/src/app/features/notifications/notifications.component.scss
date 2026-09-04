@@ -25,7 +25,7 @@
 
 .notif-item:hover {
   background: color-mix(in srgb, var(--eas-mist) 75%, transparent);
-  padding-left: 1.35rem;
+  
 }
 
 .notif-item.is-unread {
@@ -81,7 +81,7 @@
   background: var(--eas-leaf);
   flex: none;
   box-shadow: 0 0 0 3px rgba(31, 122, 76, 0.18);
-  animation: eas-pulse-dot 1.8s ease-in-out infinite;
+  animation: none;
 }
 
 .notif-item__action {

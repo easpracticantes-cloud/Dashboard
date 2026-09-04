@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -8,6 +8,13 @@ import {
   PackagesApiService,
   StorageStatus,
 } from '../../services/packages-api.service';
+import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
+import {
+  formatFechaContable,
+  iconEstado,
+  labelEstado,
+  toneEstado,
+} from '../../utils/contabilidad-labels';
 
 @Component({
   selector: 'eas-contabilidad-packages',
@@ -17,6 +24,9 @@ import {
   styleUrl: './packages.component.scss',
 })
 export class PackagesComponent implements OnInit {
+  private readonly api = inject(PackagesApiService);
+  private readonly download = inject(ContabilidadDownloadService);
+
   paquetes: DigitalPackage[] = [];
   total = 0;
   cargando = true;
@@ -26,9 +36,12 @@ export class PackagesComponent implements OnInit {
   filtroEstado = '';
   documentIdNuevo = '';
 
-  estados = ['', 'PENDIENTE', 'GENERADO', 'ENTREGADO', 'DIGITALIZADO', 'CERRADO'];
+  readonly formatFechaContable = formatFechaContable;
+  readonly labelEstado = labelEstado;
+  readonly toneEstado = toneEstado;
+  readonly iconEstado = iconEstado;
 
-  constructor(private readonly api: PackagesApiService) {}
+  estados = ['', 'PENDIENTE', 'GENERADO', 'ENTREGADO', 'DIGITALIZADO', 'CERRADO'];
 
   ngOnInit(): void {
     this.api.storageStatus().subscribe({
@@ -102,18 +115,12 @@ export class PackagesComponent implements OnInit {
     });
   }
 
-  descargar(p: DigitalPackage): void {
-    window.open(this.api.downloadUrl(p.id), '_blank');
-  }
-
-  estadoClass(estado: string): string {
-    const map: Record<string, string> = {
-      PENDIENTE: 'warn',
-      GENERADO: 'muted',
-      ENTREGADO: 'ok',
-      DIGITALIZADO: 'ok',
-      CERRADO: 'ok',
-    };
-    return map[estado] || 'muted';
+  async descargar(p: DigitalPackage): Promise<void> {
+    this.error = '';
+    try {
+      await this.download.download(this.api.downloadUrl(p.id), `paquete-${p.id}.zip`);
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'No se pudo descargar el paquete.';
+    }
   }
 }

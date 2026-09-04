@@ -7,7 +7,7 @@ import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
 import com.escuelaaves.sig.domain.ai.port.out.AiObservabilityPort;
 import com.escuelaaves.sig.domain.ai.port.out.ConversationMemoryPort;
 import com.escuelaaves.sig.domain.ai.port.out.RecommendationPort;
-import com.escuelaaves.sig.infrastructure.ai.support.PromptAssembly;
+import com.escuelaaves.sig.infrastructure.ai.support.AiPromptTrace;
 import com.escuelaaves.sig.shared.exception.BadRequestException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,45 +17,18 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
- * Ave — chat abierto conversacional.
- * Gemini responde en lenguaje natural; si pide cotización, se calcula desde ai/catalogo/.
+ * Ave — asistente de propósito general.
+ * Flujo: mensaje → Claude siempre. El SIG (catálogo/tools) se adjunta solo si el turno es de negocio.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CopilotOrchestrator {
-
-    private static final String SYSTEM = """
-            Eres Ave, asistente conversacional de Escuela Aves Salento (SIG).
-            Eres cercana, clara y profesional (español colombiano). No suenas a robot ni a menú de opciones.
-
-            Personalidad:
-            - Hablas como una compañera del equipo comercial/operaciones.
-            - Interpretas la intención aunque escriban mal, incompleto o informal.
-            - Si falta un dato importante, preguntas UNA sola cosa concreta.
-            - Puedes conversar de cualquier tema del negocio: tours, precios, jeep, clientes, WhatsApp,
-              reservas, procesos del SIG, proveedores, tips comerciales, dudas del día a día.
-            - No inventes precios. Si hablas de tarifas, usa SOLO el catálogo adjunto (escala por pax).
-            - Si no está en el catálogo, dilo con honestidad y ofrece anotar la tarifa faltante.
-
-            Reglas operativas útiles (si aplican):
-            - Jeep: >4 personas suele privado; ≤4 público.
-            - Guías no pagan entrada; sí pagan almuerzo cuando hay restaurante.
-            - Modalidades PRIVADO y COMPARTIDO.
-
-            Cómo responder:
-            - Por defecto: texto natural (markdown ligero). NO uses listas de “elige 1/2/3” salvo que el usuario lo pida.
-            - Si el usuario quiere un precio/cotización y ya tienes tour + personas (o puedes inferirlos),
-              responde SOLO con este JSON (sin fences):
-              {"mode":"QUOTE","message":"<frase completa con tour y personas>"}
-            - Si quiere proveedores: {"mode":"PROVIDERS","tourCode":"CODIGO","category":null}
-            - En cualquier otro caso responde texto libre, sin JSON.
-
-            Catálogo (referencia; no inventes montos fuera de aquí):
-            """;
 
     private static final Pattern CLEAR_QUOTE = Pattern.compile(
             "(cotiz|precio|cu[aá]nto|tarifa|presupuesto|vale (para|por)|cu[aá]nto (cuesta|sale|vale))",
@@ -64,6 +37,9 @@ public class CopilotOrchestrator {
     private static final Pattern HAS_PEOPLE = Pattern.compile(
             "(\\d{1,3})\\s*(personas?|pax|gente)|para\\s+(\\d{1,3})",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+    );
+    private static final Pattern SECRET_LEAK = Pattern.compile(
+            "(?i)(sk-ant-|AIza|Bearer\\s+[A-Za-z0-9_\\-.]{20,}|api[_-]?key\\s*[:=]\\s*\\S+)"
     );
 
     private final AiProviderFactory aiProviderFactory;
@@ -93,17 +69,26 @@ public class CopilotOrchestrator {
             }
             final String sid = softSession(request.sessionId());
             sessionId = sid;
-            String userMsg = request.message().trim();
-            softAppend(sid, "user", userMsg);
+            String userMsg = sanitizeUserInput(request.message().trim());
 
+            // Historial ANTES de persistir este turno: el mensaje actual no debe
+            // ir en history y de nuevo en "Usuario ahora" (ni marcar historyPresent
+            // en conversaciones nuevas).
             CopilotResponse response;
             try {
                 response = converse(sid, userMsg);
             } catch (Exception ex) {
-                log.warn("[Ave] Gemini falló, fallback local: {}", ex.getMessage());
-                response = localFallback(sid, userMsg);
+                String failedProvider = resolveFailedProviderLabel(ex);
+                log.warn("[Ave] {} falló: {}", failedProvider, scrubLogMessage(ex.getMessage()));
+                response = recoverFromLlmFailure(sid, userMsg, ex);
             }
+            response = sanitizeResponse(response);
             usedProvider = response.provider() != null ? response.provider() : usedProvider;
+            if (!response.success()) {
+                success = false;
+                error = response.reply();
+            }
+            softAppend(sid, "user", userMsg);
             softAppend(sid, "assistant", response.reply());
             return response;
         } catch (BadRequestException ex) {
@@ -114,7 +99,7 @@ public class CopilotOrchestrator {
             success = false;
             error = ex.getMessage();
             log.error("[Ave] error: {}", ex.getMessage());
-            return localFallback(sessionId, request != null ? request.message() : "");
+            return providerFailureReply(sessionId, ex);
         } finally {
             try {
                 observabilityPort.record(new AiObservabilityPort.AiUsageEvent(
@@ -127,71 +112,149 @@ public class CopilotOrchestrator {
         }
     }
 
-    private CopilotResponse converse(String sessionId, String message) {
-        String provider = aiProviderFactory.activeType().id();
-        GenerativeAiPort ai = aiProviderFactory.getActiveProvider();
-
-        var slots = sessionSlotStore.getOrCreate(sessionId);
-        slots.merge(HeuristicQuoteInterpreter.interpret(message));
-
-        // Missing-data gate: sin LLM si pide cotización y faltan slots críticos
-        if (CLEAR_QUOTE.matcher(message).find() && !slots.hasCriticalQuoteSlots()) {
-            String ask = slots.missingCriticalPrompt().orElse("¿Qué tour y para cuántas personas?");
-            return new CopilotResponse(sessionId, ask, "ANSWER", List.of("missing-slots"), provider, true);
-        }
-
-        String context = contextRetriever.buildCompactContext(message, slots, 6, 3);
-        String history = softHistory(sessionId);
-
-        String system = SYSTEM + context
-                + "\nSlots actuales: " + slots.toPromptJson();
-
-        String raw = ai.chat(
-                system,
-                PromptAssembly.fenceUntrusted("Historial+usuario:", "Historial:\n" + history + "\n\nUsuario ahora:\n" + message),
-                CLEAR_QUOTE.matcher(message).find() && message.length() > 400 ? "complex_chat" : "chat"
-        );
-
-        // Si Gemini devolvió JSON de herramienta
-        JsonNode plan = tryParseTool(raw);
-        if (plan != null) {
-            String mode = plan.path("mode").asText("ANSWER").toUpperCase(Locale.ROOT);
-            return switch (mode) {
-                case "QUOTE" -> doQuote(sessionId, plan.path("message").asText(message), provider);
-                case "PROVIDERS" -> doProviders(
-                        sessionId,
-                        blankToNull(plan.path("tourCode").asText(null)),
-                        blankToNull(plan.path("category").asText(null)),
-                        provider
-                );
-                default -> {
-                    String reply = plan.path("reply").asText("");
-                    if (reply.isBlank()) {
-                        reply = stripJsonFences(raw);
-                    }
-                    yield new CopilotResponse(sessionId, reply, "ANSWER", List.of(), provider, true);
-                }
-            };
-        }
-
-        // Texto libre conversacional
-        String text = stripJsonFences(raw);
-        if (text.isBlank()) {
-            return localFallback(sessionId, message);
-        }
-
-        // Si el usuario pidió precio de forma clara y Gemini no cotizó, cotizamos nosotros
-        if (CLEAR_QUOTE.matcher(message).find() && HAS_PEOPLE.matcher(message).find()) {
-            var maybe = catalogQuoteService.tryQuote(message);
-            if (maybe.isPresent()) {
-                CatalogQuoteService.QuoteResult q = maybe.get();
-                String blended = text + "\n\n---\n\n" + q.markdown();
-                return quoteResponse(sessionId, blended, List.of("catalog-quote"), provider, q);
+    /**
+     * Ejecuta el chat y emite deltas de texto (revelado progresivo) + evento final.
+     */
+    public void chatStreaming(CopilotRequest request, Consumer<String> onDelta, Consumer<CopilotResponse> onDone) {
+        CopilotResponse full = chat(request);
+        String reply = full.reply() != null ? full.reply() : "";
+        int step = Math.max(8, reply.length() / 40);
+        for (int i = 0; i < reply.length(); i += step) {
+            int end = Math.min(reply.length(), i + step);
+            onDelta.accept(reply.substring(i, end));
+            try {
+                Thread.sleep(12);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
             }
         }
-
-        return new CopilotResponse(sessionId, text, "ANSWER", List.of(), provider, true);
+        onDone.accept(full);
     }
+
+    private CopilotResponse converse(String sessionId, String message) {
+        String requestId = AiPromptTrace.newRequestId();
+        AiPromptTrace.begin(requestId);
+        try {
+            var slots = sessionSlotStore.getOrCreate(sessionId);
+            boolean businessTurn = SigTopicDetector.needsBusinessContext(message);
+
+            String catalog = "";
+            String slotsJson = "";
+            if (businessTurn) {
+                slots.merge(HeuristicQuoteInterpreter.interpret(message));
+                catalog = contextRetriever.buildCompactContext(message, slots, 6, 3);
+                slotsJson = slots.toPromptJson();
+            }
+
+            String history = softHistory(sessionId);
+            AvePromptAssembler.Assembled assembled = AvePromptAssembler.assemble(
+                    message, history, businessTurn, catalog, slotsJson
+            );
+
+            AiPromptTrace.logRoot(requestId, sessionId, "pending", assembled, false);
+
+            // Guardrail: identidad comercial en SYSTEM en turno general = bug de ensamblado
+            if (!businessTurn && assembled.commercialIdentityInSystem()) {
+                log.error("[AI-ROOT-TRACE] BUG commercial identity in general SYSTEM sources={} → force clean",
+                        assembled.systemSources());
+                assembled = AvePromptAssembler.assemble(message, "(sin historial previo)", false, null, null);
+                AiPromptTrace.logRoot(requestId + "-clean", sessionId, "pending", assembled, false);
+            }
+
+            String operation = businessTurn && CLEAR_QUOTE.matcher(message).find() && message.length() > 400
+                    ? "complex_chat" : "chat";
+
+            ChatAttempt attempt = chatWithProviderFailover(assembled.system(), assembled.user(), operation);
+            String provider = attempt.providerId();
+            String raw = attempt.text();
+
+            JsonNode plan = tryParseTool(raw);
+            if (plan != null) {
+                String mode = plan.path("mode").asText("ANSWER").toUpperCase(Locale.ROOT);
+                return switch (mode) {
+                    case "QUOTE" -> doQuote(sessionId, plan.path("message").asText(message), provider);
+                    case "PROVIDERS" -> doProviders(
+                            sessionId,
+                            blankToNull(plan.path("tourCode").asText(null)),
+                            blankToNull(plan.path("category").asText(null)),
+                            provider
+                    );
+                    default -> {
+                        String reply = plan.path("reply").asText("");
+                        if (reply.isBlank()) {
+                            reply = stripJsonFences(raw);
+                        }
+                        yield new CopilotResponse(sessionId, reply, "ANSWER", List.of(), provider, true);
+                    }
+                };
+            }
+
+            String text = stripJsonFences(raw);
+            if (text.isBlank()) {
+                throw new BadRequestException("El modelo de IA devolvió una respuesta vacía");
+            }
+
+            // Si el modelo vuelve a la persona comercial en turno general: un reintento limpio sin historial
+            if (!businessTurn && AvePromptAssembler.looksLikeCommercialRefusal(text)) {
+                log.warn("[AI-ROOT-TRACE] requestId={} commercialRefusalInReply → retry without history", requestId);
+                AvePromptAssembler.Assembled retry = AvePromptAssembler.assemble(
+                        message, "(sin historial previo)", false, null, null
+                );
+                AiPromptTrace.logRoot(requestId + "-retry", sessionId, provider, retry, false);
+                ChatAttempt second = chatWithProviderFailover(retry.system(), retry.user(), "chat");
+                String retryText = stripJsonFences(second.text());
+                if (!retryText.isBlank() && !AvePromptAssembler.looksLikeCommercialRefusal(retryText)) {
+                    return new CopilotResponse(sessionId, retryText, "ANSWER",
+                            List.of("general-retry"), second.providerId(), true);
+                }
+            }
+
+            if (CLEAR_QUOTE.matcher(message).find() && HAS_PEOPLE.matcher(message).find()) {
+                var maybe = catalogQuoteService.tryQuote(message);
+                if (maybe.isPresent()) {
+                    CatalogQuoteService.QuoteResult q = maybe.get();
+                    String blended = text + "\n\n---\n\n" + q.markdown();
+                    return quoteResponse(sessionId, blended, List.of("catalog-quote"), provider, q);
+                }
+            }
+
+            return new CopilotResponse(sessionId, text, "ANSWER", List.of(), provider, true);
+        } finally {
+            AiPromptTrace.end();
+        }
+    }
+
+    /**
+     * Llama al proveedor activo; si falla por error de API/red, reintenta con otro READY.
+     */
+    private ChatAttempt chatWithProviderFailover(String system, String userPayload, String operation) {
+        GenerativeAiPort primary = aiProviderFactory.getActiveProvider();
+        try {
+            String text = primary.chat(system, userPayload, operation);
+            return new ChatAttempt(primary.providerId(), text);
+        } catch (Exception primaryEx) {
+            var alt = aiProviderFactory.findAlternateReady(primary);
+            if (alt.isEmpty()) {
+                throw primaryEx instanceof RuntimeException re ? re
+                        : new BadRequestException(primaryEx.getMessage());
+            }
+            GenerativeAiPort secondary = alt.get();
+            log.warn("[Ave] Failover runtime {} → {} por: {}",
+                    primary.providerId(), secondary.providerId(), scrubLogMessage(primaryEx.getMessage()));
+            try {
+                String text = secondary.chat(system, userPayload, operation);
+                return new ChatAttempt(secondary.providerId(), text);
+            } catch (Exception secondaryEx) {
+                log.error("[Ave] También falló proveedor '{}': {}",
+                        secondary.providerId(), scrubLogMessage(secondaryEx.getMessage()));
+                throw secondaryEx instanceof RuntimeException re ? re
+                        : new BadRequestException(secondaryEx.getMessage());
+            }
+        }
+    }
+
+    private record ChatAttempt(String providerId, String text) {}
 
     private CopilotResponse doQuote(String sessionId, String message, String provider) {
         try {
@@ -200,9 +263,9 @@ public class CopilotOrchestrator {
         } catch (Exception ex) {
             log.warn("[Ave] cotización: {}", ex.getMessage());
             String soft = """
-                    No encontré esa tarifa exacta en el catálogo de archivos.
+                    No encontré esa tarifa exacta en el catálogo.
                     Dime el nombre del tour (ej. Acaime, Rafting, Parapente) y cuántas personas.
-                    Si el tour falta en `ai/catalogo/productos.json`, lo agregamos después.
+                    Si el tour falta en el catálogo, lo podemos agregar después — no inventaré un precio.
                     """;
             return new CopilotResponse(sessionId, soft.trim(), "ANSWER", List.of("quote-miss"), provider, true);
         }
@@ -232,20 +295,63 @@ public class CopilotOrchestrator {
         }
     }
 
-    private CopilotResponse localFallback(String sessionId, String message) {
+    /**
+     * Si el LLM falló y el mensaje era una cotización clara, intenta catálogo determinístico.
+     * En cualquier otro caso: error técnico honesto (nunca fingir menú tour/jeep/proveedores).
+     */
+    private CopilotResponse recoverFromLlmFailure(String sessionId, String message, Exception ex) {
         if (message != null && CLEAR_QUOTE.matcher(message).find()) {
-            return catalogQuoteService.tryQuote(message)
-                    .map(q -> quoteResponse(sessionId, q.markdown(),
-                            List.of("catalog-quote-local"), "local", q))
-                    .orElseGet(() -> new CopilotResponse(sessionId,
-                            "Puedo cotizarte si me dices el tour y el número de personas. "
-                                    + "Ejemplo: “Acaime para 4 personas, privado”.",
-                            "ANSWER", List.of("fallback"), "local", true));
+            var quoted = catalogQuoteService.tryQuote(message);
+            if (quoted.isPresent()) {
+                return quoteResponse(sessionId, quoted.get().markdown(),
+                        List.of("catalog-quote-local"), "local", quoted.get());
+            }
         }
-        return new CopilotResponse(sessionId,
-                "Estoy un poco lenta con el modelo ahora. Cuéntame de nuevo qué necesitas "
-                        + "(cotización, duda de un tour, jeep, proveedores…) y te ayudo.",
-                "ANSWER", List.of("fallback"), "local", true);
+        return providerFailureReply(sessionId, ex);
+    }
+
+    private CopilotResponse providerFailureReply(String sessionId, Exception ex) {
+        return new CopilotResponse(
+                sessionId,
+                friendlyProviderError(ex),
+                "ANSWER",
+                List.of("provider-error"),
+                "local",
+                false
+        );
+    }
+
+    private static String friendlyProviderError(Exception ex) {
+        String msg = ex != null && ex.getMessage() != null ? ex.getMessage() : "";
+        msg = SECRET_LEAK.matcher(msg).replaceAll("[omitido]");
+        String lower = msg.toLowerCase(Locale.ROOT);
+        if (lower.contains("workspace") || lower.contains("anthropic-workspace-id")
+                || lower.contains("anthropic_workspace_id")) {
+            return "Claude/Anthropic rechazó la petición: falta configurar ANTHROPIC_WORKSPACE_ID "
+                    + "(necesario con API keys ligadas a identidad). Un administrador debe definirlo "
+                    + "en el entorno del backend y reiniciar el servicio.";
+        }
+        if (lower.contains("no está configurado")
+                || lower.contains("no hay proveedor")
+                || lower.contains("api key")
+                || lower.contains("define la variable")) {
+            return "No puedo responder ahora: el proveedor de IA no está configurado. "
+                    + "Un administrador debe definir ANTHROPIC_API_KEY (recomendado, APP_AI_PROVIDER=anthropic) "
+                    + "y, si aplica, ANTHROPIC_WORKSPACE_ID; o GEMINI_API_KEY, y reiniciar el backend.";
+        }
+        if (lower.contains("timeout") || lower.contains("timed out") || lower.contains("i/o error")) {
+            return "Hubo un problema temporal de conexión con el modelo de IA (tiempo de espera). "
+                    + "Inténtalo de nuevo en unos segundos.";
+        }
+        if (lower.contains("429") || lower.contains("rate") || lower.contains("resource_exhausted")) {
+            return "El proveedor de IA está saturado en este momento. Espera un momento e inténtalo otra vez.";
+        }
+        if (lower.contains("404") || lower.contains("not found") || lower.contains("ningún modelo")) {
+            return "Hubo un problema con el modelo de IA configurado (modelo no disponible). "
+                    + "Revisa GEMINI_MODEL / modelos Anthropic y las claves API, luego reintenta.";
+        }
+        return "Hubo un problema temporal al contactar el modelo de IA. Inténtalo nuevamente en un momento. "
+                + "Si continúa, revisa APP_AI_PROVIDER y las claves API en el entorno del servidor.";
     }
 
     private CopilotResponse quoteResponse(
@@ -264,6 +370,32 @@ public class CopilotOrchestrator {
                 true,
                 catalogQuoteService.toDraft(q)
         );
+    }
+
+    private CopilotResponse sanitizeResponse(CopilotResponse response) {
+        if (response == null || response.reply() == null) {
+            return response;
+        }
+        String cleaned = SECRET_LEAK.matcher(response.reply()).replaceAll("[omitido]");
+        if (cleaned.equals(response.reply())) {
+            return response;
+        }
+        return new CopilotResponse(
+                response.sessionId(),
+                cleaned,
+                response.mode(),
+                response.toolsUsed(),
+                response.provider(),
+                response.success(),
+                response.quoteDraft()
+        );
+    }
+
+    private static String sanitizeUserInput(String message) {
+        if (message.length() > 8000) {
+            return message.substring(0, 8000) + "…";
+        }
+        return message;
     }
 
     private JsonNode tryParseTool(String raw) {
@@ -331,8 +463,15 @@ public class CopilotOrchestrator {
             return "(sin historial previo)";
         }
         try {
-            return memoryPort.recentMessages(sessionId, 16).stream()
-                    .map(m -> m.role() + ": " + m.content())
+            // Últimos 12 turnos; truncar contenido largo para controlar tokens
+            return memoryPort.recentMessages(sessionId, 12).stream()
+                    .map(m -> {
+                        String c = AveHistorySanitizer.sanitizeTurn(m.role(), m.content());
+                        if (c.length() > 600) {
+                            c = c.substring(0, 500) + "…";
+                        }
+                        return m.role() + ": " + c;
+                    })
                     .collect(Collectors.joining("\n"));
         } catch (Exception ex) {
             return "(sin historial previo)";
@@ -351,5 +490,27 @@ public class CopilotOrchestrator {
             return null;
         }
         return s;
+    }
+
+    private String resolveFailedProviderLabel(Exception ex) {
+        String msg = ex != null && ex.getMessage() != null ? ex.getMessage().toLowerCase(Locale.ROOT) : "";
+        if (msg.contains("anthropic") || msg.contains("claude") || msg.contains("workspace")) {
+            return "Claude/Anthropic";
+        }
+        if (msg.contains("gemini")) {
+            return "Gemini";
+        }
+        try {
+            return "Proveedor IA (" + aiProviderFactory.activeType().id() + ")";
+        } catch (Exception ignored) {
+            return "Proveedor IA";
+        }
+    }
+
+    private static String scrubLogMessage(String message) {
+        if (message == null) {
+            return "";
+        }
+        return SECRET_LEAK.matcher(message).replaceAll("[omitido]");
     }
 }

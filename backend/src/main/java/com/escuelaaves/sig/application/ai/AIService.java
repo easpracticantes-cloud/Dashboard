@@ -35,10 +35,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AIService {
 
-    private static final String DEFAULT_SYSTEM = """
-            Eres el asistente comercial de Escuela Aves Salento (SIG).
-            Responde en espanol, claro y profesional. No inventes precios.
-            """;
+    private static final String DEFAULT_SYSTEM = AveSystemPrompt.SYSTEM;
 
     private final AiProviderFactory aiProviderFactory;
     private final TourPricingPort tourPricingPort;

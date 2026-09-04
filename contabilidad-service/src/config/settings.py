@@ -57,6 +57,10 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("ANTHROPIC_API_KEY", "anthropic_api_key"),
     )
+    anthropic_workspace_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("ANTHROPIC_WORKSPACE_ID", "anthropic_workspace_id"),
+    )
     anthropic_base_url: str = Field(
         default="https://api.anthropic.com",
         validation_alias=AliasChoices("ANTHROPIC_BASE_URL", "anthropic_base_url"),

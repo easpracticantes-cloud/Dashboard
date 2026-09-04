@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -15,6 +15,8 @@ import {
   PendienteItem,
   PendientesData,
 } from '../../services/cruce-excel-api.service';
+import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
+import { formatCop } from '../../utils/contabilidad-labels';
 
 const ICONOS_PENDIENTE: Record<string, string> = {
   SIN_FACTURA: 'receipt_long',
@@ -33,6 +35,10 @@ const ICONOS_PENDIENTE: Record<string, string> = {
   styleUrl: './crossings.component.scss',
 })
 export class CrossingsComponent implements OnInit {
+  private readonly api = inject(CrossingsApiService);
+  private readonly cruceExcel = inject(CruceExcelApiService);
+  private readonly download = inject(ContabilidadDownloadService);
+
   cruces: CrossingSummary[] = [];
   total = 0;
   context: CrossingContext | null = null;
@@ -58,10 +64,7 @@ export class CrossingsComponent implements OnInit {
   editFactura = '';
   editFechaPago = '';
 
-  constructor(
-    private readonly api: CrossingsApiService,
-    private readonly cruceExcel: CruceExcelApiService,
-  ) {}
+  readonly formatCop = formatCop;
 
   ngOnInit(): void {
     this.cargarContexto();
@@ -201,10 +204,19 @@ export class CrossingsComponent implements OnInit {
         this.pendientes = res.pendientes;
         this.tipoPendienteActivo = '';
         const c = res.conciliacion;
-        this.mensajeOk = res.aplicado
-          ? `Cruce de cuentas aplicado: ${c.emparejadas} fila(s) coinciden con Autobits, ` +
-            `${c.actualizadas} actualizada(s). Pendientes: ${res.pendientes.total}.`
-          : `Revisión sin cambios: ${c.emparejadas} coinciden · ${res.pendientes.total} pendiente(s).`;
+        const faltan = res.pendientes?.por_tipo?.['FALTA_EN_CRUCE']?.length || 0;
+        const base = res.aplicado
+          ? `Cruce aplicado: ${c.emparejadas} coinciden con Autobits · ${c.actualizadas} actualizada(s)`
+          : `Revisión: ${c.emparejadas} coinciden con Autobits (sin modificar)`;
+        this.mensajeOk =
+          faltan > 0
+            ? `${base}. ${faltan} fila(s) de Autobits faltan en su Excel — diligéncielas abajo.`
+            : `${base}. Pendientes por campos: ${res.pendientes.total}.`;
+        if (faltan > 0) {
+          this.tipoPendienteActivo = 'FALTA_EN_CRUCE';
+          this.verSoloPendientes = true;
+        }
+        // Recarga contexto/filas; GET /pendientes ya trae FALTA_EN_CRUCE del snapshot.
         this.cargarContexto();
       },
       error: (err) => {
@@ -217,12 +229,28 @@ export class CrossingsComponent implements OnInit {
     });
   }
 
+  accionPendienteLabel(tipo: string): string {
+    if (tipo === 'FALTA_EN_CRUCE') return 'Agregar al Excel de cruce';
+    if (tipo === 'SOBRA_EN_CRUCE') return 'Revisar en Autobits';
+    if (tipo === 'SIN_FACTURA' || tipo === 'SIN_FECHA_PAGO') return 'Completar';
+    return 'Ver';
+  }
+
+  puedeCompletarPendiente(tipo: string, crossingId?: number | null): boolean {
+    return !!crossingId && (tipo === 'SIN_FACTURA' || tipo === 'SIN_FECHA_PAGO' || tipo === 'DIFERENCIA_VALOR');
+  }
+
   filtrarPendiente(tipo: string): void {
     this.tipoPendienteActivo = this.tipoPendienteActivo === tipo ? '' : tipo;
   }
 
-  exportarPendientes(): void {
-    window.open(this.cruceExcel.exportUrl(this.batchId), '_blank');
+  async exportarPendientes(): Promise<void> {
+    this.error = '';
+    try {
+      await this.download.download(this.cruceExcel.exportUrl(this.batchId), 'cruce-pendientes.csv');
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'No se pudo exportar pendientes.';
+    }
   }
 
   toggleSoloPendientes(): void {
@@ -310,6 +338,54 @@ export class CrossingsComponent implements OnInit {
           this.error = 'No se pudo guardar el cruce.';
         },
       });
+  }
+
+  puedeAprobar(c: CrossingSummary): boolean {
+    return c.estado === 'PENDIENTE' || c.estado === 'EN_REVISION';
+  }
+
+  puedeRechazar(c: CrossingSummary): boolean {
+    return c.estado !== 'PAGADO' && c.estado !== 'ARCHIVADO' && c.estado !== 'SUBSANACION';
+  }
+
+  aprobarCruce(c: CrossingSummary): void {
+    if (!this.puedeAprobar(c)) return;
+    if (!confirm(`¿Aprobar el cruce #${c.id} de ${c.proveedor || 'proveedor'}?`)) return;
+    this.error = '';
+    this.ejecutando = true;
+    this.api.approve(c.id).subscribe({
+      next: () => {
+        this.ejecutando = false;
+        this.mensajeOk = `Cruce #${c.id} aprobado.`;
+        this.cargarContexto();
+      },
+      error: (err) => {
+        this.ejecutando = false;
+        this.error = err?.error?.detail || 'No se pudo aprobar el cruce.';
+      },
+    });
+  }
+
+  rechazarCruce(c: CrossingSummary): void {
+    if (!this.puedeRechazar(c)) return;
+    const motivo = (prompt('Motivo del rechazo / envío a subsanación:') || '').trim();
+    if (!motivo) {
+      this.error = 'Debe indicar el motivo del rechazo.';
+      return;
+    }
+    this.error = '';
+    this.ejecutando = true;
+    this.api.reject(c.id, motivo).subscribe({
+      next: () => {
+        this.ejecutando = false;
+        this.mensajeOk = `Cruce #${c.id} enviado a subsanación.`;
+        this.cargarContexto();
+      },
+      error: (err) => {
+        this.ejecutando = false;
+        this.error = err?.error?.detail || 'No se pudo rechazar el cruce.';
+      },
+    });
   }
 
   estadoClass(estado: string): string {

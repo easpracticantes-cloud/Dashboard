@@ -1,6 +1,8 @@
-# Despliegue Contabilidad en Render
+# Despliegue Contabilidad — histórico Render
 
-Para que **Contabilidad** funcione en la página pública (no solo local):
+> **Obsoleto para producción.** Usar Oracle: [`docs/ORACLE_DEPLOYMENT.md`](../docs/ORACLE_DEPLOYMENT.md).
+
+Para que **Contabilidad** funcionara en la página pública en Render:
 
 ## Checklist rápido
 

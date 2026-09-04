@@ -1,4 +1,9 @@
-"""Interpreta OBSERVACIONES (y señales) del Excel Autobits para el cruce."""
+"""Interpreta OBSERVACIONES (y señales) del Excel Autobits para el cruce.
+
+Importante: ninguna señal aquí confirma pago bancario. ``CrossingStatus.PAGADO``
+solo lo escribe ``PaymentService.mark_paid``. ``fecha_pago`` y notas de pago
+son metadatos / señales operativas (como máximo ``APROBADO``).
+"""
 
 from __future__ import annotations
 
@@ -22,8 +27,9 @@ _EMPTY = {"", "-", "--", "n/a", "na", "ninguna", "ninguno", "sin observaciones",
 # Cabeceras que a veces quedan como valor por Excel mal leído
 _HEADER_LEAKS = {"observaciones", "observacion", "si", "no", "total", "moneda"}
 
-# Pagado / liquidado en caja o banco
-_PAGADO = (
+# Notas de caja/banco en Autobits: metadato operativo, NUNCA confirmación bancaria.
+# Como máximo informan APROBADO (junto con CDC/factura enviada).
+_SENAL_PAGO_OPERATIVA = (
     "efectivo",
     "en fisico",
     "pago en efectivo",
@@ -151,6 +157,10 @@ def infer_crossing_status(
     """
     Deriva estado de cruce desde notas Autobits.
 
+    Nunca devuelve ``CrossingStatus.PAGADO``: las notas de pago son señales
+    operativas (como máximo ``APROBADO``). La confirmación bancaria solo ocurre
+    vía ``PaymentService.mark_paid``.
+
     Returns:
         (CrossingStatus, texto_observaciones a guardar)
     """
@@ -160,16 +170,15 @@ def infer_crossing_status(
     if not text:
         return CrossingStatus.PENDIENTE, obs
 
-    has_pagado = any(k in text for k in _PAGADO)
+    has_senal_pago = any(k in text for k in _SENAL_PAGO_OPERATIVA)
     has_aprobado = any(k in text for k in _APROBADO)
     has_pendiente = any(k in text for k in _PENDIENTE)
     has_subs = any(k in text for k in _SUBSANACION)
 
-    if has_subs and not has_pagado:
+    if has_subs and not has_senal_pago:
         return CrossingStatus.SUBSANACION, obs
-    if has_pagado:
-        return CrossingStatus.PAGADO, obs
-    if has_aprobado and not has_pendiente:
+    # Señales de pago o de soporte documental: metadato, no confirmación bancaria.
+    if (has_senal_pago or has_aprobado) and not has_pendiente:
         return CrossingStatus.APROBADO, obs
     if has_pendiente:
         return CrossingStatus.PENDIENTE, obs
@@ -189,10 +198,17 @@ def resolve_crossing_estado(
     observaciones: str | None,
     estado_compra: str | None = None,
 ) -> str:
-    """Prioridad: fecha de pago → factura/CDC → inferencia Autobits."""
-    if (fecha_pago or "").strip():
-        return CrossingStatus.PAGADO
+    """Resuelve estado operativo del cruce (nunca ``PAGADO``).
+
+    - ``factura_cdc`` → ``APROBADO``
+    - ``fecha_pago`` se ignora para el estado (solo metadato)
+    - observaciones → inferencia (máximo ``APROBADO``)
+
+    ``CrossingStatus.PAGADO`` solo lo escribe ``PaymentService.mark_paid``.
+    """
+    # fecha_pago es metadato; no confirma pago bancario.
+    _ = fecha_pago
     if (factura_cdc or "").strip():
         return CrossingStatus.APROBADO
-    estado, _ = infer_crossing_status(observaciones, estado_compra=estado_compra)
+    estado, _obs = infer_crossing_status(observaciones, estado_compra=estado_compra)
     return estado

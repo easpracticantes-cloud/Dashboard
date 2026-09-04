@@ -8,6 +8,7 @@ frontend/.angular/
 *.tmp
 Thumbs.db
 desktop.ini
+backups/
 
 # Build artifacts and local patching workdirs
 BOOT-INF/

@@ -51,8 +51,8 @@
 .history-item:hover {
   background: var(--eas-mist);
   border-color: var(--eas-line-soft);
-  transform: translateX(3px);
-  box-shadow: var(--eas-shadow-sm);
+  transform: none;
+  box-shadow: none;
 }
 
 .history-item:hover::before {
@@ -110,7 +110,7 @@
 
 .history-item:hover > mat-icon {
   color: var(--eas-leaf);
-  transform: translateX(3px);
+  transform: none;
 }
 
 @media (max-width: 640px) {

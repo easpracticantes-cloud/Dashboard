@@ -22,12 +22,12 @@ body { text-rendering: optimizeLegibility; }
 .sheets-tabs button {
   transition: transform var(--eas-motion-fast) var(--eas-ease-soft), box-shadow var(--eas-motion) ease;
 }
-.sheets-tabs button:hover { transform: translateY(-1px); }
-.sheets-tabs button.is-active { box-shadow: 0 8px 18px rgba(31,122,76,0.16); }
-.sheets-chip { transition: transform var(--eas-motion-fast) ease, box-shadow var(--eas-motion) ease; }
-.sheets-chip:hover { transform: translateY(-1px); box-shadow: var(--eas-shadow-sm); }
-.sheet-card { transition: transform var(--eas-motion) var(--eas-ease-out), box-shadow var(--eas-motion) ease; }
-.sheet-card:hover { transform: translateY(-3px); box-shadow: var(--eas-shadow-md); border-color: color-mix(in srgb, var(--eas-leaf) 30%, var(--eas-line-soft)); }
+.sheets-tabs button:hover { transform: none; }
+.sheets-tabs button.is-active { box-shadow: none; }
+.sheets-chip { transition: border-color var(--eas-motion-fast) ease, background var(--eas-motion) ease; }
+.sheets-chip:hover { transform: none; box-shadow: none; }
+.sheet-card { transition: border-color var(--eas-motion) var(--eas-ease-out), box-shadow var(--eas-motion) ease; }
+.sheet-card:hover { transform: none; box-shadow: var(--eas-shadow-sm); border-color: color-mix(in srgb, var(--eas-leaf) 30%, var(--eas-line-soft)); }
 .sheets-table-wrap { scroll-behavior: smooth; }
 .sheets-table .mat-mdc-row:hover { background: color-mix(in srgb, var(--eas-mist) 70%, transparent); }
 .semaforo { transition: transform 0.15s ease; }

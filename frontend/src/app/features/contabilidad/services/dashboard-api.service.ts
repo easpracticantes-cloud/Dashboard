@@ -62,7 +62,7 @@ export class DashboardApiService {
     return this.http.get<DashboardKpis>(`/api/dashboard/kpis${qs ? '?' + qs : ''}`);
   }
 
-  reportUrl(kind: 'documents' | 'payments' | 'crossings' | 'remediations' | 'semanal', params?: {
+  reportUrl(kind: 'documents' | 'payments' | 'crossings' | 'remediations' | 'semanal' | 'ops-queue', params?: {
     week_ref?: string;
     mes?: number;
     anio?: number;
@@ -72,8 +72,12 @@ export class DashboardApiService {
     if (params?.mes) q.set('mes', String(params.mes));
     if (params?.anio) q.set('anio', String(params.anio));
     const qs = q.toString();
-    const ext = kind === 'semanal' ? 'html' : 'csv';
-    const path = kind === 'semanal' ? '/api/reports/semanal.html' : `/api/reports/${kind}.csv`;
-    return `${path}${qs ? '?' + qs : ''}`;
+    if (kind === 'semanal') {
+      return `/api/reports/semanal.html${qs ? '?' + qs : ''}`;
+    }
+    if (kind === 'ops-queue') {
+      return `/api/reports/ops-queue.csv${qs ? '?' + qs : ''}`;
+    }
+    return `/api/reports/${kind}.csv${qs ? '?' + qs : ''}`;
   }
 }

@@ -94,7 +94,7 @@
   background: rgba(232, 200, 138, 0.1);
   border: 1px solid rgba(232, 200, 138, 0.25);
   color: var(--gold-core);
-  animation: float-up 4s ease-in-out infinite;
+  animation: none;
 
   mat-icon {
     font-size: 30px;
@@ -157,6 +157,27 @@
     background: rgba(232, 200, 138, 0.1);
     box-shadow: var(--glow-gold);
   }
+
+  &.needs-attention {
+    border-color: color-mix(in srgb, #c0392b 40%, transparent);
+    background: color-mix(in srgb, #c0392b 8%, transparent);
+  }
+
+  .estado-chip {
+    margin-left: 0.15rem;
+  }
+}
+
+.progress-panel mat-progress-bar {
+  margin-top: 0.35rem;
+}
+
+.row-attention {
+  background: color-mix(in srgb, #c0392b 5%, transparent) !important;
+}
+
+.detalle {
+  max-width: 40ch;
 }
 
 .remove {

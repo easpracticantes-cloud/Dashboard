@@ -124,6 +124,23 @@ def export_remediations_csv(
     })
 
 
+@router.get("/api/reports/ops-queue.csv")
+def export_ops_queue_csv(
+    period_start: str | None = None,
+    period_end: str | None = None,
+    week_ref: str | None = None,
+    mes: int | None = None,
+    anio: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Cadena/cola operativa incompleta del período (misma lógica que /api/ops/queue)."""
+    service = ReportService(db)
+    content = service.export_ops_queue_csv(**_period_params(period_start, period_end, week_ref, mes, anio))
+    return PlainTextResponse(content, media_type="text/csv", headers={
+        "Content-Disposition": 'attachment; filename="reporte_cola_operativa.csv"'
+    })
+
+
 @router.get("/api/reports/semanal.html")
 def export_weekly_html(
     period_start: str | None = None,

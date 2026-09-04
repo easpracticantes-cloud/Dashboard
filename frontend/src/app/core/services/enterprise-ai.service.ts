@@ -1,6 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
+import { AppConfigService } from './app-config.service';
+import { AuthService } from './auth.service';
 
 export interface QuotationResponse {
   tour: string;
@@ -94,6 +96,8 @@ export interface AnalyticsInsight {
 @Injectable({ providedIn: 'root' })
 export class EnterpriseAiService {
   private readonly api = inject(ApiService);
+  private readonly appConfig = inject(AppConfigService);
+  private readonly auth = inject(AuthService);
 
   status(): Observable<Record<string, string>> {
     return this.api.get('/ai/status');
@@ -162,6 +166,80 @@ export class EnterpriseAiService {
 
   copilot(message: string, sessionId?: string): Observable<CopilotResponse> {
     return this.api.post('/ai/copilot', { message, sessionId });
+  }
+
+  /**
+   * Streaming SSE de Ave. Usa fetch (Authorization header) porque EventSource no lo permite.
+   */
+  async copilotStream(
+    message: string,
+    sessionId: string | undefined,
+    handlers: {
+      signal?: AbortSignal;
+      onDelta: (chunk: string) => void;
+      onDone: (res: CopilotResponse) => void;
+      onError: (message: string) => void;
+    }
+  ): Promise<void> {
+    const token = this.auth.token();
+    const url = `${this.appConfig.apiBaseUrl}/ai/copilot/stream`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ message, sessionId }),
+      signal: handlers.signal
+    });
+
+    if (!res.ok || !res.body) {
+      const text = await res.text().catch(() => '');
+      throw Object.assign(new Error(text || res.statusText), { status: res.status });
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let eventName = 'message';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n');
+      buffer = parts.pop() ?? '';
+      for (const line of parts) {
+        if (line.startsWith('event:')) {
+          eventName = line.slice(6).trim();
+        } else if (line.startsWith('data:')) {
+          const data = line.slice(5).trim();
+          if (eventName === 'delta') {
+            // Spring may JSON-encode strings
+            try {
+              handlers.onDelta(JSON.parse(data));
+            } catch {
+              handlers.onDelta(data);
+            }
+          } else if (eventName === 'done') {
+            handlers.onDone(JSON.parse(data) as CopilotResponse);
+          } else if (eventName === 'error') {
+            try {
+              const obj = JSON.parse(data) as { message?: string };
+              handlers.onError(obj.message || 'Error desconocido');
+            } catch {
+              handlers.onError(data);
+            }
+          }
+          eventName = 'message';
+        } else if (line.trim() === '') {
+          eventName = 'message';
+        }
+      }
+    }
   }
 }
 

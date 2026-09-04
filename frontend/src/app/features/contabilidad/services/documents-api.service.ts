@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ContabilidadUserContext } from './contabilidad-user-context';
 
 export interface DocumentSummary {
   id: number;
@@ -58,11 +59,31 @@ export interface UploadResponse {
   process_error?: string;
 }
 
+export interface BatchUploadItem {
+  filename: string;
+  document?: DocumentSummary | null;
+  ok: boolean;
+  duplicate_warning?: string | null;
+  duplicate_document_id?: number | null;
+  error?: string | null;
+}
+
+export interface BatchUploadResponse {
+  total_recibidos: number;
+  total_errores: number;
+  total_duplicados: number;
+  pack_size: number;
+  packs: number;
+  queued_ids: number[];
+  items: BatchUploadItem[];
+  mensaje: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class DocumentsApiService {
   private readonly base = '/contabilidad/documents';
-
-  constructor(private readonly http: HttpClient) {}
+  private readonly http = inject(HttpClient);
+  private readonly userCtx = inject(ContabilidadUserContext);
 
   list(params?: {
     limit?: number;
@@ -96,6 +117,31 @@ export class DocumentsApiService {
     return this.http.post<UploadResponse>(`${this.base}/upload`, form);
   }
 
+  /** Carga masiva: guarda todos y procesa en paquetes de 25 en segundo plano. */
+  uploadBatch(files: File[], tipo = 'FACTURA', packSize = 25): Observable<BatchUploadResponse> {
+    const form = new FormData();
+    for (const file of files) {
+      form.append('archivos', file, file.name);
+    }
+    form.append('tipo', tipo);
+    form.append('origen', 'CARGA_MANUAL');
+    form.append('auto_procesar', 'true');
+    form.append('pack_size', String(packSize));
+    return this.http.post<BatchUploadResponse>(`${this.base}/upload-batch`, form);
+  }
+
+  processBatch(documentIds: number[], packSize = 25): Observable<{
+    ok: boolean;
+    queued: number;
+    packs: number;
+    mensaje: string;
+  }> {
+    return this.http.post<{ ok: boolean; queued: number; packs: number; mensaje: string }>(
+      `${this.base}/process-batch`,
+      { document_ids: documentIds, pack_size: packSize }
+    );
+  }
+
   process(id: number, solicitud?: string): Observable<{ ok: boolean; error?: string; estado?: string }> {
     const form = new FormData();
     if (solicitud) {
@@ -108,10 +154,10 @@ export class DocumentsApiService {
   }
 
   updateEstado(id: number, estado: string): Observable<DocumentSummary> {
-    return this.http.patch<DocumentSummary>(`${this.base}/${id}/estado`, {
-      estado,
-      usuario: 'ANDREA',
-    });
+    return this.http.patch<DocumentSummary>(
+      `${this.base}/${id}/estado`,
+      this.userCtx.withUsuario({ estado })
+    );
   }
 
   delete(id: number): Observable<{ ok: boolean }> {

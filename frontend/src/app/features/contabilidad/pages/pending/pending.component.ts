@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,6 +10,8 @@ import {
   PendienteItem,
   PendientesData,
 } from '../../services/cruce-excel-api.service';
+import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
+import { formatCop } from '../../utils/contabilidad-labels';
 
 const ICONOS: Record<string, string> = {
   SIN_FACTURA: 'receipt_long',
@@ -28,6 +30,9 @@ const ICONOS: Record<string, string> = {
   styleUrl: './pending.component.scss',
 })
 export class PendingComponent implements OnInit {
+  private readonly api = inject(CruceExcelApiService);
+  private readonly download = inject(ContabilidadDownloadService);
+
   cargando = true;
   subiendo = false;
   error = '';
@@ -40,7 +45,7 @@ export class PendingComponent implements OnInit {
 
   tipoActivo = '';
 
-  constructor(private readonly api: CruceExcelApiService) {}
+  readonly formatCop = formatCop;
 
   ngOnInit(): void {
     this.cargar();
@@ -119,8 +124,38 @@ export class PendingComponent implements OnInit {
     this.tipoActivo = this.tipoActivo === tipo ? '' : tipo;
   }
 
-  exportar(): void {
-    window.open(this.api.exportUrl(this.batch?.id), '_blank');
+  /** Prioridad visual únicamente (no cambia reglas de negocio). */
+  tipoTone(tipo: string): 'bad' | 'warn' | 'info' | 'muted' {
+    const t = (tipo || '').toUpperCase();
+    if (t === 'SIN_FACTURA' || t === 'DIFERENCIA_VALOR' || t === 'FALTA_EN_CRUCE') return 'bad';
+    if (t === 'SIN_FECHA_PAGO' || t === 'SIN_SOPORTE') return 'warn';
+    if (t === 'SOBRA_EN_CRUCE') return 'info';
+    return 'muted';
+  }
+
+  tipoPriorityLabel(tipo: string): string {
+    const t = (tipo || '').toUpperCase();
+    if (t === 'FALTA_EN_CRUCE') return 'Falta en Excel';
+    const tone = this.tipoTone(tipo);
+    if (tone === 'bad') return 'Urgente';
+    if (tone === 'warn') return 'Pendiente';
+    if (tone === 'info') return 'Revisar';
+    return 'Info';
+  }
+
+  accionPendienteLabel(tipo: string): string {
+    if (tipo === 'FALTA_EN_CRUCE') return 'Agregar al Excel de cruce';
+    if (tipo === 'SOBRA_EN_CRUCE') return 'Revisar en Autobits';
+    return 'Completar en cruce';
+  }
+
+  async exportar(): Promise<void> {
+    this.error = '';
+    try {
+      await this.download.download(this.api.exportUrl(this.batch?.id), 'pendientes-cruce.csv');
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'No se pudo exportar.';
+    }
   }
 
   periodoLabel(): string {

@@ -2,7 +2,8 @@
 
 /* ——— Anclas de la ola (se notan al instante) ——— */
 .eas-card:hover, .sheet-card:hover, .kpi:hover {
-  transform: translateY(-3px);
+  /* Sin elevación: evita que la tarjeta “flote” y se sobreponga al hover */
+  transform: none;
   border-color: color-mix(in srgb, var(--eas-leaf) 30%, var(--eas-line));
 }
 .crm-toolbar__filters .eas-select,
@@ -19,21 +20,15 @@
 .amount-cell strong { color: var(--eas-leaf); font-weight: 800; }
 .sb__link.is-active { letter-spacing: 0.01em; }
 .eas-chip.is-active, .sheets-tabs button.is-active {
-  box-shadow: 0 10px 22px rgba(20, 38, 28, 0.22);
+  box-shadow: none;
 }
 
 /* r1000-1 */ .sb__link { border-radius: 11px; }
-/* r1000-2 */ .sb__link:hover { border-radius: 12px !important; }
-/* r1000-3 */ html[data-theme="dark"] .sb__link { border-radius: 13px !important; }
-/* r1000-4 */ html[data-theme="dark"] .sb__link:hover { border-radius: 14px !important; }
+/* r1000-2 */ .sb__link:hover { border-radius: 11px !important; }
 /* r1000-5 */ .sb__link { padding-block: 0.55rem; }
-/* r1000-6 */ .sb__link:hover { padding-block: 0.6000000000000001rem !important; }
-/* r1000-7 */ html[data-theme="dark"] .sb__link { padding-block: 0.65rem !important; }
-/* r1000-8 */ html[data-theme="dark"] .sb__link:hover { padding-block: 0.7000000000000001rem !important; }
+/* r1000-6 */ .sb__link:hover { padding-block: 0.55rem !important; }
 /* r1000-9 */ .sb__link { padding-inline: 0.99rem; }
-/* r1000-10 */ .sb__link:hover { padding-inline: 0.75rem !important; }
-/* r1000-11 */ html[data-theme="dark"] .sb__link { padding-inline: 0.81rem !important; }
-/* r1000-12 */ html[data-theme="dark"] .sb__link:hover { padding-inline: 0.87rem !important; }
+/* r1000-10 */ .sb__link:hover { padding-inline: 0.99rem !important; }
 /* r1000-13 */ .sb__link { font-weight: 600; }
 /* r1000-14 */ .sb__link:hover { font-weight: 650 !important; }
 /* r1000-15 */ html[data-theme="dark"] .sb__link { font-weight: 700 !important; }
@@ -54,10 +49,10 @@
 /* r1000-30 */ .sb__link.is-active:hover { letter-spacing: 0.01em !important; }
 /* r1000-31 */ html[data-theme="dark"] .sb__link.is-active { letter-spacing: 0.01em !important; }
 /* r1000-32 */ html[data-theme="dark"] .sb__link.is-active:hover { letter-spacing: 0.01em !important; }
-/* r1000-33 */ .sb__link.is-active { box-shadow: 0 11px 23px color-mix(in srgb, var(--eas-forest) 17%, transparent); }
-/* r1000-34 */ .sb__link.is-active:hover { box-shadow: 0 12px 24px color-mix(in srgb, var(--eas-forest) 18%, transparent) !important; }
-/* r1000-35 */ html[data-theme="dark"] .sb__link.is-active { box-shadow: 0 13px 25px color-mix(in srgb, var(--eas-forest) 19%, transparent) !important; }
-/* r1000-36 */ html[data-theme="dark"] .sb__link.is-active:hover { box-shadow: 0 8px 26px color-mix(in srgb, var(--eas-forest) 20%, transparent) !important; }
+/* r1000-33 */ .sb__link.is-active { box-shadow: none; }
+/* r1000-34 */ .sb__link.is-active:hover { box-shadow: none !important; }
+/* r1000-35 */ html[data-theme="dark"] .sb__link.is-active { box-shadow: none !important; }
+/* r1000-36 */ html[data-theme="dark"] .sb__link.is-active:hover { box-shadow: none !important; }
 /* r1000-37 */ .sb__link.is-active { border-color: transparent; }
 /* r1000-38 */ .sb__link.is-active:hover { border-color: transparent !important; }
 /* r1000-39 */ html[data-theme="dark"] .sb__link.is-active { border-color: transparent !important; }
@@ -1026,3 +1021,60 @@
 @media (prefers-reduced-motion: reduce) {
   .eas-card:hover, .sheet-card:hover, .kpi:hover { transform: none !important; }
 }
+
+/*
+ * Anti-solapamiento: las reglas r1000-* cambiaban padding/sombra al hover
+ * y hacían que menús, cards y tabs “flotaran” encima de lo vecino.
+ * Fijamos tamaño y quitamos elevación; el hover solo puede cambiar color.
+ */
+.sb__link,
+.sb__link:hover,
+.sb__link.is-active,
+.sb__link.is-active:hover,
+html[data-theme='dark'] .sb__link,
+html[data-theme='dark'] .sb__link:hover,
+html[data-theme='dark'] .sb__link.is-active,
+html[data-theme='dark'] .sb__link.is-active:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  padding-block: 0.78rem !important;
+  padding-inline: 0.9rem !important;
+  border-radius: 12px !important;
+}
+
+.eas-card:hover,
+.sheet-card:hover,
+.kpi:hover,
+.ph:hover,
+.eas-panel:hover,
+.eas-glass:hover,
+.sheets-tabs button:hover,
+.sheets-tabs button.is-active,
+.sheets-tabs button.is-active:hover,
+.contab__nav a:hover,
+.contab__nav a.is-active,
+.contab__nav a.is-active:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Congela padding al hover (evita que el bloque crezca y tape al vecino) */
+.eas-card,
+.eas-card:hover { padding: 1.15rem 1.2rem !important; }
+.kpi,
+.kpi:hover { padding: 1.05rem 1.1rem !important; }
+.ph,
+.ph:hover { padding: 1rem 1.15rem !important; }
+.eas-panel,
+.eas-panel:hover { padding: 1rem 1.1rem !important; }
+.sb__footer,
+.sb__footer:hover { padding: 1rem 1.1rem !important; box-shadow: none !important; }
+.sb__badge,
+.sb__badge:hover { padding: 0.18rem 0.5rem !important; box-shadow: none !important; font-size: 0.62rem !important; }
+.tb__icon-btn,
+.tb__icon-btn:hover { padding: 0.55rem !important; }
+.tb__user,
+.tb__user:hover { padding: 0.45rem 0.65rem !important; }
+.tb__theme,
+.tb__theme:hover { padding: 0.45rem 0.65rem !important; }
+

@@ -31,6 +31,7 @@ def init_db() -> None:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(bind=engine)
     _apply_sqlite_migrations()
+    _apply_fase4_migrations()
 
 
 def _apply_sqlite_migrations() -> None:
@@ -52,6 +53,11 @@ def _apply_sqlite_migrations() -> None:
                 conn.execute(
                     text("ALTER TABLE autobits_records ADD COLUMN estado_compra VARCHAR(64)")
                 )
+
+        batch_cols = conn.execute(text("PRAGMA table_info(autobits_import_batches)")).fetchall()
+        batch_names = {row[1] for row in batch_cols}
+        if batch_cols and "file_hash" not in batch_names:
+            conn.execute(text("ALTER TABLE autobits_import_batches ADD COLUMN file_hash VARCHAR(64)"))
 
         xcols = conn.execute(text("PRAGMA table_info(account_crossings)")).fetchall()
         if not xcols:
@@ -202,6 +208,84 @@ def _apply_sqlite_migrations() -> None:
                 conn.execute(text("DROP TABLE payments"))
                 conn.execute(text("ALTER TABLE payments_new RENAME TO payments"))
                 conn.execute(text("PRAGMA foreign_keys=ON"))
+
+
+# Tablas nuevas de la Fase 4. Se crean con IF NOT EXISTS y las columnas se
+# agregan con ALTER TABLE: nunca se borra ni se recrea nada existente.
+_FASE4_TABLAS: dict[str, str] = {
+    "accounting_adjustments": """
+        CREATE TABLE IF NOT EXISTS accounting_adjustments (
+            id INTEGER PRIMARY KEY,
+            entity_type VARCHAR(64) NOT NULL,
+            entity_id VARCHAR(64) NOT NULL,
+            action VARCHAR(32),
+            motivo TEXT NOT NULL,
+            valor_anterior TEXT,
+            valor_nuevo TEXT,
+            related_entity_id VARCHAR(64),
+            usuario VARCHAR(128),
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """,
+    "period_closures": """
+        CREATE TABLE IF NOT EXISTS period_closures (
+            id INTEGER PRIMARY KEY,
+            period_start VARCHAR(32) NOT NULL,
+            period_end VARCHAR(32) NOT NULL,
+            status VARCHAR(16),
+            summary_json TEXT,
+            observaciones TEXT,
+            closed_by VARCHAR(128),
+            closed_at DATETIME,
+            reopened_by VARCHAR(128),
+            reopened_at DATETIME,
+            motivo_reapertura TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """,
+}
+
+_FASE4_COLUMNAS: dict[str, dict[str, str]] = {
+    "accounting_adjustments": {
+        "related_entity_id": "VARCHAR(64)",
+        "usuario": "VARCHAR(128)",
+    },
+    "period_closures": {
+        "summary_json": "TEXT",
+        "observaciones": "TEXT",
+        "reopened_by": "VARCHAR(128)",
+        "reopened_at": "DATETIME",
+        "motivo_reapertura": "TEXT",
+    },
+}
+
+_FASE4_INDICES = (
+    "CREATE INDEX IF NOT EXISTS ix_adjustments_entity "
+    "ON accounting_adjustments (entity_type, entity_id)",
+    "CREATE INDEX IF NOT EXISTS ix_period_closures_rango "
+    "ON period_closures (period_start, period_end)",
+)
+
+
+def _apply_fase4_migrations() -> None:
+    """Fase 4: ajustes contables y cierre operativo semanal (aditivo)."""
+    if not settings.database_url.startswith("sqlite"):
+        return
+    with engine.begin() as conn:
+        for ddl in _FASE4_TABLAS.values():
+            conn.execute(text(ddl))
+
+        for tabla, columnas in _FASE4_COLUMNAS.items():
+            existentes = {
+                row[1] for row in conn.execute(text(f"PRAGMA table_info({tabla})")).fetchall()
+            }
+            for columna, tipo in columnas.items():
+                if columna not in existentes:
+                    conn.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}"))
+
+        for ddl in _FASE4_INDICES:
+            conn.execute(text(ddl))
 
 
 def get_db() -> Generator[Session, None, None]:

@@ -48,8 +48,8 @@
 }
 
 .reports-stat:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--eas-shadow-sm);
+  transform: none;
+  box-shadow: none;
 }
 
 .reports-stat__label {
@@ -109,10 +109,10 @@
 }
 
 .reports-export:hover:not(:disabled) {
-  transform: translateY(-2px);
+  transform: none;
   background: var(--eas-mist);
   border-color: rgba(31, 122, 76, 0.2);
-  box-shadow: var(--eas-shadow-sm);
+  box-shadow: none;
 }
 
 .reports-export:disabled {
@@ -133,7 +133,7 @@
 }
 
 .reports-export:hover .reports-export__icon {
-  transform: scale(1.06) rotate(-3deg);
+  transform: none;
   background: rgba(228, 160, 26, 0.16);
   color: var(--eas-amber-deep);
 }

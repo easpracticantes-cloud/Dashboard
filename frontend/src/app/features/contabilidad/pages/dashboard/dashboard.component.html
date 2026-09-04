@@ -1,16 +1,65 @@
 <div class="dash cosmos-page">
-  <header class="page-hero sheet">
-    <div class="hero-glow" aria-hidden="true"></div>
-    <span class="label-caps">Panel de control</span>
-    <h1 class="page-title">Resumen</h1>
-    @if (kpis) {
-      <p class="page-lead">{{ kpis.periodo.etiqueta }} — indicadores del periodo seleccionado</p>
-    } @else {
-      <p class="page-lead">Indicadores y totales de facturación</p>
-    }
+  <header class="page-hero">
+    <div class="hero-row">
+      <div>
+        <span class="label-caps">Contabilidad AP · Panel operativo</span>
+        <h1 class="page-title">Resumen de cuentas por pagar</h1>
+        <p class="page-lead">
+          Visión del ciclo Autobits → factura → cruce → pago → comprobante → paquete
+          @if (kpis) {
+            · periodo <strong>{{ kpis.periodo.etiqueta }}</strong>
+          }
+        </p>
+      </div>
+      <div class="hero-actions">
+        <a routerLink="/app/contabilidad/cola" class="btn btn-secondary">
+          <mat-icon>pending_actions</mat-icon>
+          Abrir cola
+        </a>
+        <a routerLink="/app/contabilidad/pagos" class="btn btn-primary">
+          <mat-icon>payments</mat-icon>
+          Ir a pagos
+        </a>
+      </div>
+    </div>
   </header>
 
-  <div class="filters-bar sheet">
+  <div class="period-banner" [class.open]="!periodoCerrado" [class.closed]="periodoCerrado">
+    <span class="period-dot" aria-hidden="true"></span>
+    <div>
+      <strong>
+        @if (periodoCerrado) {
+          Periodo cerrado
+        } @else {
+          Periodo abierto
+        }
+      </strong>
+      <div class="period-hint">
+        @if (periodoCerrado) {
+          Las operaciones que avanzan el pago están bloqueadas. Anulación y ajuste siguen disponibles.
+        } @else {
+          Puede aprobar, confirmar pagos, cargar comprobantes y generar paquetes.
+        }
+      </div>
+    </div>
+    <div class="hero-actions" style="margin-left: auto">
+      @if (filtroModo === 'semana') {
+        @if (periodoCerrado) {
+          @if (puedeReabrirPeriodo) {
+            <button type="button" class="btn btn-secondary btn-sm" (click)="reabrirPeriodo()" [disabled]="cerrandoPeriodo">
+              Reabrir periodo
+            </button>
+          }
+        } @else {
+          <button type="button" class="btn btn-secondary btn-sm" (click)="cerrarPeriodo()" [disabled]="cerrandoPeriodo">
+            Cerrar periodo
+          </button>
+        }
+      }
+    </div>
+  </div>
+
+  <div class="filters-bar">
     <select class="select" [(ngModel)]="filtroModo" (change)="cargar()">
       <option value="semana">Semana</option>
       <option value="mes">Mes</option>
@@ -41,122 +90,159 @@
       [(ngModel)]="filtroProveedor"
       (keyup.enter)="cargar()"
     />
-    <button type="button" class="btn btn-primary" (click)="cargar()">Aplicar filtros</button>
+    <button type="button" class="btn btn-primary" (click)="cargar()">Aplicar</button>
   </div>
 
-  @if (cargando) {
-    <div class="loading">
-      <mat-spinner diameter="36"></mat-spinner>
-      <span>Cargando indicadores…</span>
-    </div>
-  } @else if (error) {
+  @if (error) {
     <div class="alert error">{{ error }}</div>
+  }
+
+  @if (cargando) {
+    <div class="ap-skeleton-wrap">
+      <div class="skel tall"></div>
+      <div class="ap-kpi-grid">
+        <div class="skel"></div>
+        <div class="skel"></div>
+        <div class="skel"></div>
+        <div class="skel"></div>
+        <div class="skel"></div>
+      </div>
+    </div>
   } @else if (kpis) {
     @if (sinDatos) {
-      <section class="sheet start-panel">
-        <div class="start-glow" aria-hidden="true"></div>
-        <div class="start-head">
-          <span class="label-caps">Semana en blanco</span>
-          <h2>Empiece por aquí</h2>
-          <p>No hay información cargada en {{ kpis.periodo.etiqueta }}. Siga el orden del proceso contable.</p>
+      <section class="sheet empty-state">
+        <div class="empty-icon"><mat-icon>insights</mat-icon></div>
+        <h2>Sin movimiento en este periodo</h2>
+        <p>
+          No hay documentos ni pagos cargados en {{ kpis.periodo.etiqueta }}.
+          Siga el flujo operativo para empezar.
+        </p>
+        <div class="hero-actions" style="justify-content: center">
+          <a routerLink="/app/contabilidad/autobits" class="btn btn-primary">Subir Autobits</a>
+          <a routerLink="/app/contabilidad/documentos" class="btn btn-secondary">Cargar facturas</a>
         </div>
-        <ol class="start-steps">
-          @for (paso of arranque; track paso.path) {
-            <li>
-              <a [routerLink]="paso.path">
-                <span class="step-num">{{ paso.step }}</span>
-                <span class="step-icon"><mat-icon>{{ paso.icon }}</mat-icon></span>
-                <span class="step-text">
-                  <strong>{{ paso.label }}</strong>
-                  <em>{{ paso.hint }}</em>
-                </span>
-                <mat-icon class="step-go">chevron_right</mat-icon>
-              </a>
-            </li>
-          }
-        </ol>
       </section>
     }
 
-    <div class="kpi-grid">
-      <article class="kpi-card sheet sheet-hover">
-        <div class="kpi-top">
-          <div class="kpi-icon"><mat-icon>inbox</mat-icon></div>
-        </div>
-        <span class="kpi-val">{{ kpis.conteos.documentos_recibidos }}</span>
-        <span class="kpi-lbl">Recibidos</span>
-      </article>
-      <article class="kpi-card sheet sheet-hover">
-        <div class="kpi-top">
-          <div class="kpi-icon"><mat-icon>task_alt</mat-icon></div>
-        </div>
-        <span class="kpi-val">{{ kpis.conteos.documentos_procesados }}</span>
-        <span class="kpi-lbl">Procesados</span>
-      </article>
-      <article class="kpi-card sheet sheet-hover warn">
-        <div class="kpi-top">
-          <div class="kpi-icon"><mat-icon>rate_review</mat-icon></div>
-        </div>
+    <section class="ap-kpi-grid">
+      <article class="ap-kpi sheet sheet-hover warn">
+        <div class="kpi-icon"><mat-icon>rate_review</mat-icon></div>
         <span class="kpi-val">{{ kpis.conteos.pendientes_revision }}</span>
-        <span class="kpi-lbl">En revisión</span>
+        <span class="kpi-lbl">Pendientes de revisión</span>
+        <span class="kpi-sub">Documentos / cruces por validar</span>
       </article>
-      <article class="kpi-card sheet sheet-hover ok">
-        <div class="kpi-top">
-          <div class="kpi-icon"><mat-icon>verified</mat-icon></div>
-        </div>
+      <article class="ap-kpi sheet sheet-hover ok">
+        <div class="kpi-icon"><mat-icon>verified</mat-icon></div>
         <span class="kpi-val">{{ kpis.conteos.aprobados }}</span>
         <span class="kpi-lbl">Aprobados</span>
+        <span class="kpi-sub">Listos para generar pago</span>
       </article>
-    </div>
-
-    <div class="kpi-grid secondary">
-      <article class="kpi-card sheet compact sheet-hover">
-        <div class="kpi-top"><div class="kpi-icon"><mat-icon>build</mat-icon></div></div>
-        <span class="kpi-val">{{ kpis.conteos.subsanaciones_pendientes }}</span>
-        <span class="kpi-lbl">Subsanaciones</span>
-      </article>
-      <article class="kpi-card sheet compact sheet-hover">
-        <div class="kpi-top"><div class="kpi-icon"><mat-icon>schedule</mat-icon></div></div>
+      <article class="ap-kpi sheet sheet-hover warn">
+        <div class="kpi-icon"><mat-icon>hourglass_top</mat-icon></div>
         <span class="kpi-val">{{ kpis.conteos.pagos_pendientes }}</span>
-        <span class="kpi-lbl">Pagos pend.</span>
+        <span class="kpi-lbl">Pendientes de pago</span>
+        <span class="kpi-sub">Órdenes sin confirmación bancaria</span>
       </article>
-      <article class="kpi-card sheet compact sheet-hover ok">
-        <div class="kpi-top"><div class="kpi-icon"><mat-icon>check_circle</mat-icon></div></div>
+      <article class="ap-kpi sheet sheet-hover ok">
+        <div class="kpi-icon"><mat-icon>paid</mat-icon></div>
         <span class="kpi-val">{{ kpis.conteos.pagos_realizados }}</span>
-        <span class="kpi-lbl">Pagos hechos</span>
+        <span class="kpi-lbl">Pagados</span>
+        <span class="kpi-sub">Confirmados en banco</span>
       </article>
-      <article class="kpi-card sheet compact sheet-hover">
-        <div class="kpi-top"><div class="kpi-icon"><mat-icon>inventory_2</mat-icon></div></div>
-        <span class="kpi-val">{{ kpis.conteos.paquetes_pendientes }}</span>
-        <span class="kpi-lbl">Paquetes pend.</span>
+      <article class="ap-kpi sheet sheet-hover money accent">
+        <div class="kpi-icon"><mat-icon>account_balance_wallet</mat-icon></div>
+        <span class="kpi-val">{{ formatCop(kpis.totales.valor_pendiente_pago) }}</span>
+        <span class="kpi-lbl">Valor total por pagar</span>
+        <span class="kpi-sub">
+          Pagado en periodo: {{ formatCop(kpis.totales.valor_pagado) }}
+        </span>
       </article>
-    </div>
+    </section>
 
     <section class="sheet sheet-pad money-panel">
-      <h2 class="section-head">Totales en COP</h2>
+      <h2 class="section-head">Totales COP del periodo</h2>
       <div class="money-grid">
         <div class="money-item">
           <span>Documentos</span>
-          <strong>{{ kpis.totales.valor_documentos | number:'1.0-0' }}</strong>
+          <strong>{{ formatCop(kpis.totales.valor_documentos) }}</strong>
         </div>
         <div class="money-item">
           <span>Aprobado</span>
-          <strong class="ok">{{ kpis.totales.valor_aprobado | number:'1.0-0' }}</strong>
+          <strong class="ok">{{ formatCop(kpis.totales.valor_aprobado) }}</strong>
         </div>
         <div class="money-item">
           <span>Pendiente pago</span>
-          <strong>{{ kpis.totales.valor_pendiente_pago | number:'1.0-0' }}</strong>
+          <strong>{{ formatCop(kpis.totales.valor_pendiente_pago) }}</strong>
         </div>
         <div class="money-item">
           <span>Pagado</span>
-          <strong>{{ kpis.totales.valor_pagado | number:'1.0-0' }}</strong>
+          <strong>{{ formatCop(kpis.totales.valor_pagado) }}</strong>
         </div>
         <div class="money-item">
           <span>Por subsanar</span>
-          <strong>{{ kpis.totales.valor_por_subsanar | number:'1.0-0' }}</strong>
+          <strong>{{ formatCop(kpis.totales.valor_por_subsanar) }}</strong>
         </div>
       </div>
     </section>
+
+    <div class="dash-ops">
+      <section class="sheet sheet-pad alerts-panel">
+        <div class="section-head-row">
+          <h2 class="section-head">Alertas operativas</h2>
+          <a routerLink="/app/contabilidad/cola" class="link-more">Ver cola</a>
+        </div>
+        @if (!alerts.length) {
+          <div class="empty-state" style="padding: 1.25rem !important">
+            <div class="empty-icon" style="width:48px;height:48px"><mat-icon>notifications_none</mat-icon></div>
+            <h2 style="font-size:1rem">Sin alertas</h2>
+            <p>No hay incidencias reportadas para este periodo.</p>
+          </div>
+        } @else {
+          <div class="alerts-stack">
+            @for (a of alerts; track (a.code || a.codigo || '') + (a.title || a.titulo || '')) {
+              <article class="ap-alert" [class]="alertSeverityClass(alertSeverity(a))">
+                <div class="ap-alert-icon">
+                  <mat-icon>{{ alertIcon(alertSeverity(a)) }}</mat-icon>
+                </div>
+                <div>
+                  <strong>{{ alertTitle(a) }}</strong>
+                  @if (alertDetail(a)) {
+                    <p>{{ alertDetail(a) }}</p>
+                  }
+                </div>
+                <span class="estado-chip" [class]="alertSeverityClass(alertSeverity(a))">{{ alertSeverity(a) }}</span>
+              </article>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="sheet sheet-pad queue-panel">
+        <div class="section-head-row">
+          <h2 class="section-head">Bandeja / cola</h2>
+          <a routerLink="/app/contabilidad/cola" class="link-more">Ver todo</a>
+        </div>
+        @if (!queueGroups.length) {
+          <p class="muted">No hay grupos pendientes en cola.</p>
+        } @else {
+          <div class="queue-grid">
+            @for (g of queueGroups; track g.key) {
+              @if (queueLink(g.key); as link) {
+                <a [routerLink]="link" class="queue-card">
+                  <span class="queue-count">{{ g.count }}</span>
+                  <span class="queue-label">{{ g.label || g.key }}</span>
+                </a>
+              } @else {
+                <div class="queue-card static">
+                  <span class="queue-count">{{ g.count }}</span>
+                  <span class="queue-label">{{ g.label || g.key }}</span>
+                </div>
+              }
+            }
+          </div>
+        }
+      </section>
+    </div>
 
     <div class="dash-bottom">
       <section class="sheet sheet-pad">
@@ -174,11 +260,24 @@
       <section class="sheet sheet-pad">
         <h2 class="section-head">Exportar reportes</h2>
         <div class="exports">
-          <button type="button" class="btn btn-primary" (click)="exportReport('semanal')">Reporte semanal</button>
-          <button type="button" class="btn btn-secondary" (click)="exportReport('documents')">Documentos</button>
-          <button type="button" class="btn btn-secondary" (click)="exportReport('payments')">Pagos</button>
-          <button type="button" class="btn btn-ghost" (click)="exportReport('crossings')">Cruces</button>
-          <button type="button" class="btn btn-ghost" (click)="exportReport('remediations')">Subsanaciones</button>
+          <button type="button" class="btn btn-primary" (click)="exportReport('semanal')" [disabled]="exportando">
+            Reporte semanal
+          </button>
+          <button type="button" class="btn btn-secondary" (click)="exportReport('documents')" [disabled]="exportando">
+            Documentos
+          </button>
+          <button type="button" class="btn btn-secondary" (click)="exportReport('payments')" [disabled]="exportando">
+            Pagos
+          </button>
+          <button type="button" class="btn btn-ghost" (click)="exportReport('crossings')" [disabled]="exportando">
+            Cruces
+          </button>
+          <button type="button" class="btn btn-ghost" (click)="exportReport('remediations')" [disabled]="exportando">
+            Subsanaciones
+          </button>
+          <button type="button" class="btn btn-ghost" (click)="exportReport('ops-queue')" [disabled]="exportando">
+            Cola operativa
+          </button>
         </div>
       </section>
     </div>

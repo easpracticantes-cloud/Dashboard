@@ -26,7 +26,9 @@
       <div class="viewer-meta">
         <h1 class="page-title">{{ doc.filename }}</h1>
         <div class="meta-row">
-          <span class="status" [class]="estadoClass(doc.estado)">{{ doc.estado }}</span>
+          <span class="estado-chip" [class]="toneEstado(doc.estado)">
+            {{ labelEstado(doc.estado, 'document') }}
+          </span>
           <span class="meta-chip">#{{ doc.id }}</span>
           @if (doc.confidence.global != null) {
             <span class="meta-chip gold" [class.low]="doc.confidence.global < 75">
@@ -45,6 +47,145 @@
       <div class="alert error">{{ error }}</div>
     }
 
+    @if (chain) {
+      <section class="sheet sheet-pad chain-panel">
+        <div class="pane-head">
+          <mat-icon>account_tree</mat-icon>
+          <span>Trazabilidad del ciclo AP</span>
+          @if (chain.status) {
+            <span class="estado-chip" [class]="chain.status === 'COMPLETA' ? 'final' : 'warn'">
+              {{ chain.status === 'COMPLETA' ? 'Cadena completa' : 'En progreso' }}
+            </span>
+          }
+        </div>
+        <ol class="ap-timeline">
+          @for (step of chainSteps; track step.key; let i = $index) {
+            <li
+              [class.done]="step.present && i < currentStepIndex"
+              [class.current]="i === currentStepIndex"
+              [class.missing]="!step.present"
+            >
+              <span class="tl-dot">
+                <mat-icon>{{ step.present ? 'check' : step.icon }}</mat-icon>
+              </span>
+              <span class="tl-label">{{ step.label }}</span>
+              @if (step.detail) {
+                <span class="tl-detail muted">{{ step.detail }}</span>
+              }
+            </li>
+          }
+        </ol>
+        @if (chain.missing_links?.length) {
+          <p class="chain-hint muted">
+            Pendiente:
+            {{ chain.missing_links.join(', ') }}
+          </p>
+        }
+      </section>
+
+      <div class="detail-cards">
+        <section class="sheet detail-card">
+          <div class="pane-head">
+            <mat-icon>description</mat-icon>
+            <span>Información de factura</span>
+          </div>
+          <div class="field-grid">
+            <div class="field-cell">
+              <span class="field-label">Proveedor</span>
+              <span class="field-value">{{ doc.provider?.nombre || '—' }}</span>
+            </div>
+            <div class="field-cell">
+              <span class="field-label">Número</span>
+              <span class="field-value mono">{{ doc.numero_documento || '—' }}</span>
+            </div>
+            <div class="field-cell highlight">
+              <span class="field-label">Total</span>
+              <span class="field-value total">{{ formatCop(doc.total) }}</span>
+            </div>
+            <div class="field-cell">
+              <span class="field-label">Estado</span>
+              <span class="estado-chip" [class]="toneEstado(doc.estado)">
+                {{ labelEstado(doc.estado, 'document') }}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section class="sheet detail-card">
+          <div class="pane-head">
+            <mat-icon>compare_arrows</mat-icon>
+            <span>Cruce</span>
+          </div>
+          @if (chain.crossing) {
+            <div class="field-grid">
+              <div class="field-cell">
+                <span class="field-label">Estado</span>
+                <span class="estado-chip" [class]="toneEstado(strField(chain.crossing, 'estado'))">
+                  {{ labelEstado(strField(chain.crossing, 'estado'), 'crossing') }}
+                </span>
+              </div>
+              <div class="field-cell">
+                <span class="field-label">Factura / CDC</span>
+                <span class="field-value mono">{{ strField(chain.crossing, 'numero_documento') || '—' }}</span>
+              </div>
+              <div class="field-cell">
+                <span class="field-label">Compra</span>
+                <span class="field-value mono">{{ strField(chain.crossing, 'numero_compra') || '—' }}</span>
+              </div>
+            </div>
+          } @else {
+            <div class="sheet-pad empty-mini">
+              <p class="muted">Sin cruce vinculado todavía.</p>
+            </div>
+          }
+        </section>
+
+        <section class="sheet detail-card">
+          <div class="pane-head">
+            <mat-icon>payments</mat-icon>
+            <span>Pago</span>
+          </div>
+          @if (chain.payment) {
+            <div class="field-grid">
+              <div class="field-cell">
+                <span class="field-label">Estado</span>
+                <span class="estado-chip" [class]="toneEstado(strField(chain.payment, 'estado'))">
+                  {{ labelEstado(strField(chain.payment, 'estado'), 'payment') }}
+                </span>
+              </div>
+              <div class="field-cell highlight">
+                <span class="field-label">Valor</span>
+                <span class="field-value total">{{ formatCop(numField(chain.payment, 'valor')) }}</span>
+              </div>
+            </div>
+          } @else {
+            <div class="sheet-pad empty-mini">
+              <p class="muted">Aún no hay pago generado.</p>
+            </div>
+          }
+        </section>
+
+        <section class="sheet detail-card">
+          <div class="pane-head">
+            <mat-icon>receipt_long</mat-icon>
+            <span>Comprobante</span>
+          </div>
+          <div class="sheet-pad empty-mini">
+            @if (chain.receipt) {
+              <span class="estado-chip final">
+                <mat-icon>verified</mat-icon>
+                Comprobante recibido
+              </span>
+            } @else {
+              <p class="muted">Comprobante pendiente de carga.</p>
+            }
+          </div>
+        </section>
+      </div>
+    } @else if (chainError) {
+      <div class="alert error">{{ chainError }}</div>
+    }
+
     <div class="viewer-body">
       <section class="doc-pane sheet">
         <div class="pane-head">
@@ -52,8 +193,18 @@
           <span>Documento original</span>
         </div>
         <div class="doc-canvas">
-          @if (doc.preview_url) {
-            <img [src]="doc.preview_url" [alt]="doc.filename" />
+          @if (previewObjectUrl) {
+            <img [src]="previewObjectUrl" [alt]="doc.filename" />
+          } @else if (previewError) {
+            <div class="doc-empty">
+              <mat-icon>lock</mat-icon>
+              <p>{{ previewError }}</p>
+            </div>
+          } @else if (doc.preview_url) {
+            <div class="doc-empty">
+              <mat-spinner diameter="28"></mat-spinner>
+              <p>Cargando vista previa…</p>
+            </div>
           } @else {
             <div class="doc-empty">
               <mat-icon>broken_image</mat-icon>
@@ -86,23 +237,27 @@
             </div>
             <div class="field-cell">
               <span class="field-label">Fecha emisión</span>
-              <span class="field-value">{{ doc.fecha_emision || '—' }}</span>
+              <span class="field-value">{{ formatFechaContable(doc.fecha_emision) }}</span>
             </div>
             <div class="field-cell">
               <span class="field-label">Subtotal</span>
-              <span class="field-value mono">{{ doc.subtotal ?? '—' }}</span>
+              <span class="field-value mono">{{ formatCop(doc.subtotal) }}</span>
             </div>
             <div class="field-cell">
               <span class="field-label">IVA</span>
-              <span class="field-value mono">{{ doc.iva ?? '—' }}</span>
+              <span class="field-value mono">{{ formatCop(doc.iva) }}</span>
             </div>
             <div class="field-cell highlight">
               <span class="field-label">Total</span>
-              <span class="field-value total">{{ doc.total ?? '—' }}</span>
+              <span class="field-value total">{{ formatCop(doc.total) }}</span>
             </div>
             <div class="field-cell">
               <span class="field-label">Moneda</span>
               <span class="field-value">{{ doc.moneda || '—' }}</span>
+            </div>
+            <div class="field-cell">
+              <span class="field-label">Recibido</span>
+              <span class="field-value">{{ formatFechaContable(doc.received_at) }}</span>
             </div>
             <div class="field-cell full">
               <span class="field-label">Método OCR</span>

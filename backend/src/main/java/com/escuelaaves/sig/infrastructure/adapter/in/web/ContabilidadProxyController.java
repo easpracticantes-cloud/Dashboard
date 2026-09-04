@@ -7,6 +7,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StreamUtils;
@@ -24,15 +27,21 @@ import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * BFF / proxy hacia el microservicio Contabilidad (FastAPI) en Render o local.
- * Frontend → {@code /api/v1/contabilidad/**} (JWT SIG) → {@code CONTABLE_API_BASE/api/**}.
+ * BFF / proxy hacia el microservicio Contabilidad (FastAPI) en la red Docker o local.
+ * Frontend → {@code /api/v1/contabilidad/**} (JWT SIG + roles Contabilidad)
+ * → {@code CONTABLE_API_BASE/api/**} con identidad en {@code X-SIG-Username} / {@code X-SIG-Role}.
+ * En Oracle: CONTABLE_API_BASE=http://contabilidad:8787 (no exponer FastAPI públicamente).
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/v1/contabilidad")
 public class ContabilidadProxyController {
+
+    public static final String HEADER_SIG_USERNAME = "X-SIG-Username";
+    public static final String HEADER_SIG_ROLE = "X-SIG-Role";
 
     private final RestClient.Builder restClientBuilder;
     private final String contableBase;
@@ -89,8 +98,8 @@ public class ContabilidadProxyController {
         } catch (Exception ex) {
             log.error("[ContabilidadProxy] Error llamando {}: {}", target, ex.getMessage());
             String hint = contableBase.contains("localhost")
-                    ? " En producción define CONTABLE_API_BASE=https://<servicio-contabilidad>.onrender.com en el backend."
-                    : " Si el servicio Contabilidad está en free plan, espera el cold start (~1 min) y reintenta.";
+                    ? " Arranca el servicio Contabilidad o define CONTABLE_API_BASE=http://contabilidad:8787 en Docker."
+                    : " Revisa que el contenedor contabilidad esté healthy y CONTABLE_API_BASE apunte a la red Docker.";
             String msg = "{\"message\":\"Servicio Contabilidad no disponible." + hint + "\"}";
             return ResponseEntity.status(502)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -113,12 +122,17 @@ public class ContabilidadProxyController {
                 }
             }
         });
-        for (Map.Entry<String, MultipartFile> entry : multipart.getFileMap().entrySet()) {
-            MultipartFile file = entry.getValue();
-            if (file == null || file.isEmpty()) {
+        for (Map.Entry<String, List<MultipartFile>> entry : multipart.getMultiFileMap().entrySet()) {
+            List<MultipartFile> files = entry.getValue();
+            if (files == null) {
                 continue;
             }
-            form.add(entry.getKey(), file.getResource());
+            for (MultipartFile file : files) {
+                if (file == null || file.isEmpty()) {
+                    continue;
+                }
+                form.add(entry.getKey(), file.getResource());
+            }
         }
 
         ResponseEntity<byte[]> upstream = restClientBuilder.build()
@@ -151,6 +165,28 @@ public class ContabilidadProxyController {
             }
         }
         headers.setAccept(List.of(MediaType.ALL));
+        // Identidad real del JWT (FastAPI no tiene login propio).
+        injectSigIdentity(headers);
+    }
+
+    private void injectSigIdentity(HttpHeaders headers) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getName() == null) {
+            return;
+        }
+        String username = auth.getName().trim();
+        if (username.isEmpty() || "anonymousUser".equalsIgnoreCase(username)) {
+            return;
+        }
+        headers.set(HEADER_SIG_USERNAME, username);
+        String roles = auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .filter(a -> a != null && a.startsWith("ROLE_"))
+                .map(a -> a.substring("ROLE_".length()))
+                .collect(Collectors.joining(","));
+        if (!roles.isBlank()) {
+            headers.set(HEADER_SIG_ROLE, roles);
+        }
     }
 
     private HttpHeaders filterResponseHeaders(HttpHeaders upstream) {

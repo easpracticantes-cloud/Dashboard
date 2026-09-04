@@ -2,6 +2,7 @@ requests
 pytesseract
 Pillow
 opencv-python
+PyMuPDF
 fastapi
 uvicorn[standard]
 python-multipart

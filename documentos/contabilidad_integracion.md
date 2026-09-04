@@ -1,16 +1,24 @@
-# Contabilidad IA — integración en SIG (local + Render)
+# Contabilidad IA — integración en SIG
+
+> **Producción actual: Oracle Cloud + Docker Compose.**  
+> Guía: [`docs/ORACLE_DEPLOYMENT.md`](../docs/ORACLE_DEPLOYMENT.md) · Migración: [`docs/MIGRATION_RENDER_TO_ORACLE.md`](../docs/MIGRATION_RENDER_TO_ORACLE.md)  
+> Lo siguiente conserva notas históricas de Render; `CONTABLE_API_BASE` en Oracle es `http://contabilidad:8787`.
 
 El módulo **Contabilidad** del SIG monta el Sistema Contable IA (OCR + Autobits + cruce + pagos + paquetes).
 
 ## Arquitectura
 
 ```text
-Angular SIG (/app/contabilidad)  [ya en Static Site]
+Angular SIG (/app/contabilidad)
    → JWT → Spring Boot /api/v1/contabilidad/**
-        → CONTABLE_API_BASE → FastAPI Contabilidad (Render o local)
+        → CONTABLE_API_BASE → FastAPI Contabilidad (Docker interno o local)
 ```
 
-## Producción (Render) — obligatorio
+## Producción Oracle (actual)
+
+`CONTABLE_API_BASE=http://contabilidad:8787` en Compose. No exponer el puerto 8787 a Internet.
+
+## Histórico Render (obsoleto para prod)
 
 ### 1) Desplegar el servicio Contabilidad
 

@@ -1,0 +1,156 @@
+/**
+ * Sin movimiento — solo color/fondo. Cargado al final de angular.json.
+ * Anula elevaciones, escalas, shimmer, pulse, float y skew de polish layers.
+ */
+
+*,
+*::before,
+*::after {
+  animation: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+*:hover,
+*:focus,
+*:active,
+*.is-active,
+*.is-active:hover,
+*.activo,
+*.activo:hover {
+  transform: none !important;
+  translate: none !important;
+  scale: none !important;
+}
+
+/* Transiciones: solo color / fondo / borde / opacidad — nunca transform ni tamaño */
+*,
+*::before,
+*::after {
+  transition-property: color, background-color, background, border-color, outline-color, fill, stroke, opacity, box-shadow !important;
+}
+
+a:hover,
+button:hover,
+.sb__link:hover,
+.sb__link.is-active,
+.sb__link.is-active:hover,
+.sb__footer:hover,
+.sb__badge:hover,
+.sb__logout:hover,
+.tb__icon-btn:hover,
+.tb__theme:hover,
+.tb__user:hover,
+.tb__search:hover,
+.eas-card:hover,
+.eas-panel:hover,
+.eas-glass:hover,
+.kpi:hover,
+eas-kpi-card .kpi:hover,
+.sheet-card:hover,
+.ph:hover,
+.eas-chip:hover,
+.ave-chip:hover,
+.ave-doll:hover,
+.eas-btn-primary:hover,
+.eas-btn-primary:hover:not(:disabled),
+.eas-btn-secondary:hover,
+.eas-btn-ghost:hover,
+.eas-btn-accent:hover,
+.eas-btn-action:hover,
+.dash-hero__btn:hover,
+.dash-chart:hover,
+.ai-card:hover,
+.help-card:hover,
+.fp__card:hover,
+.profile-card:hover,
+.crm-row:hover,
+.cl-row:hover,
+.crow:hover,
+.history-item:hover,
+.notification-row:hover,
+.notif-item:hover,
+.mat-mdc-row:hover,
+.commercial-table tbody tr:hover,
+.contab__nav a:hover,
+.contab__nav a.is-active,
+.sheets-tabs button:hover,
+.sheets-tabs button.is-active,
+.cd__chips button:hover,
+.cd__back:hover,
+.contab .data-table tbody tr:hover,
+.contab .sheet-hover:hover,
+.ap-kpi:hover,
+.upload-hero:hover,
+.btn:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.sb__link:hover mat-icon,
+.sb__link.is-active mat-icon,
+.ai-card:hover .ai-card__icon,
+.help-card:hover .help-card__icon,
+.eas-btn-accent:hover mat-icon,
+.history-item:hover > mat-icon,
+.ave-doll:hover,
+.ave-doll:hover img {
+  transform: none !important;
+}
+
+/* Congela padding/tamaño en hover (causa típica de solapamiento) */
+.eas-card:hover,
+.eas-panel:hover,
+.kpi:hover,
+.ph:hover,
+.sb__link:hover,
+.sb__link.is-active,
+.sb__footer:hover,
+.sb__badge:hover,
+.tb__icon-btn:hover,
+.tb__user:hover,
+.tb__theme:hover,
+.eas-chip:hover,
+.contab__nav a:hover,
+.contab__nav a.is-active,
+.ap-kpi:hover,
+.btn:hover {
+  padding-top: inherit !important;
+  padding-right: inherit !important;
+  padding-bottom: inherit !important;
+  padding-left: inherit !important;
+  margin: inherit !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: inherit !important;
+  font-size: inherit !important;
+}
+
+.sb__link:hover {
+  background: var(--eas-sidebar-hover) !important;
+  color: var(--eas-sidebar-ink) !important;
+  box-shadow: none !important;
+}
+
+.sb__link.is-active,
+.sb__link.is-active:hover {
+  background: var(--eas-sidebar-active) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.sb__active-bar {
+  box-shadow: none !important;
+}
+
+/* Quita skew / float residuales del polish */
+.eas-shine,
+.eas-shine::before,
+.eas-shine::after,
+[class*="float"],
+[class*="shimmer"],
+[class*="pulse"] {
+  animation: none !important;
+  transform: none !important;
+}

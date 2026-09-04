@@ -136,6 +136,31 @@ class ReportService:
             )
         return output.getvalue()
 
+    def export_ops_queue_csv(self, **period_kwargs) -> str:
+        """Cola operativa del período (eslabones incompletos / acciones pendientes)."""
+        from application.services.ops_service import OpsService
+
+        queue = OpsService(self.db).get_queue(**period_kwargs)
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["grupo", "etiqueta", "entity_type", "entity_id", "document_id", "detalle"])
+        groups = queue.get("groups") or queue.get("items") or []
+        for g in groups:
+            key = g.get("key") or ""
+            label = g.get("label") or key
+            for item in g.get("items") or []:
+                writer.writerow(
+                    [
+                        key,
+                        label,
+                        item.get("entity_type") or item.get("tipo") or "",
+                        item.get("entity_id") or item.get("id") or "",
+                        item.get("document_id") or "",
+                        item.get("detail") or item.get("title") or item.get("proveedor") or "",
+                    ]
+                )
+        return output.getvalue()
+
     def export_weekly_html(self, dashboard_kpis: dict) -> str:
         """Reporte semanal HTML simple."""
         p = dashboard_kpis["periodo"]

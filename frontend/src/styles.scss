@@ -301,7 +301,7 @@ button {
 }
 
 .eas-btn-primary:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: none;
 }
 
 .eas-btn-primary:disabled {
@@ -651,7 +651,7 @@ textarea.eas-input {
 .eas-skeleton {
   background: linear-gradient(90deg, var(--eas-skeleton-a) 25%, var(--eas-skeleton-b) 37%, var(--eas-skeleton-a) 63%);
   background-size: 400% 100%;
-  animation: eas-shimmer 1.35s ease infinite;
+  animation: none;
   border-radius: 8px;
 }
 

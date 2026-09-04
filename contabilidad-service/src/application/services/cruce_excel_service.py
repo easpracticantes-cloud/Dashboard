@@ -8,8 +8,11 @@ Flujo contable que resuelve:
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -37,10 +40,11 @@ _TOLERANCIA_VALOR = 1.0
 
 
 class CruceExcelServiceError(Exception):
-    def __init__(self, message: str, code: str = "CRUCE_EXCEL_ERROR"):
+    def __init__(self, message: str, code: str = "CRUCE_EXCEL_ERROR", status_code: int = 400):
         super().__init__(message)
         self.message = message
         self.code = code
+        self.status_code = status_code
 
 
 @dataclass
@@ -95,6 +99,14 @@ class CruceExcelService:
         carpeta.mkdir(parents=True, exist_ok=True)
         return carpeta
 
+    def _carpeta_compare(self) -> Path:
+        carpeta = Path(self.settings.storage_root) / "cruce" / "compare"
+        carpeta.mkdir(parents=True, exist_ok=True)
+        return carpeta
+
+    def _snapshot_path(self, batch_id: int) -> Path:
+        return self._carpeta_compare() / f"batch_{batch_id}.json"
+
     def _guardar(self, content: bytes, filename: str) -> Path:
         nombre = Path(filename or "cruce.xlsx").name
         destino = self._carpeta_imports() / f"{uuid.uuid4().hex[:12]}_{nombre}"
@@ -107,7 +119,8 @@ class CruceExcelService:
         filename: str,
         *,
         aplicar: bool = True,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
+        force: bool = False,
     ) -> dict:
         """Lee el Excel de cruce, lo compara con Autobits y opcionalmente lo aplica."""
         if not content:
@@ -120,6 +133,17 @@ class CruceExcelService:
                 "El cruce de cuentas se compara contra ese reporte.",
                 "NO_AUTOBITS",
             )
+
+        file_hash = hashlib.sha256(content).hexdigest()
+        if not force:
+            snap = self._leer_snapshot(batch.id)
+            if snap and snap.get("file_hash") == file_hash:
+                raise CruceExcelServiceError(
+                    f"Este Excel de cruce ya fue cargado ({snap.get('archivo') or filename}). "
+                    "No se permiten archivos repetidos.",
+                    "DUPLICATE_FILE",
+                    status_code=409,
+                )
 
         ruta = self._guardar(content, filename)
         try:
@@ -176,9 +200,27 @@ class CruceExcelService:
             sobrantes=sobrantes,
         )
 
+        archivo_nombre = Path(filename or "cruce.xlsx").name
+        self._guardar_snapshot(
+            batch_id=batch.id,
+            archivo=archivo_nombre,
+            aplicado=aplicar,
+            emparejados=emparejados,
+            sobrantes=sobrantes,
+            pendientes=pendientes,
+            conciliacion={
+                "emparejadas": len(emparejados),
+                "sin_correspondencia": len(sobrantes),
+                "fuera_de_periodo": fuera_de_periodo,
+                "sin_fecha": sin_fecha,
+                "actualizadas": aplicados,
+            },
+            file_hash=file_hash,
+        )
+
         return {
             "aplicado": aplicar,
-            "archivo": Path(filename or "cruce.xlsx").name,
+            "archivo": archivo_nombre,
             "batch": self._batch_dict(batch),
             "lectura": {
                 "filas_leidas": len(parsed.rows),
@@ -195,12 +237,13 @@ class CruceExcelService:
                 "conflictos": conflictos,
             },
             "pendientes": pendientes,
+            "file_hash": file_hash,
         }
 
     # -- pendientes sin archivo -------------------------------------------
 
     def pendientes(self, batch_id: int | None = None) -> dict:
-        """Qué falta por llenar según el estado actual del sistema."""
+        """Qué falta por llenar según el estado actual + último Excel de cruce."""
         batch = None
         if batch_id:
             batch = self.autobits_repo.get_batch(batch_id)
@@ -215,10 +258,12 @@ class CruceExcelService:
             }
 
         crossings = self._crossings_del_batch(batch.id)
+        pendientes = self._detectar_pendientes(crossings)
+        pendientes = self._fusionar_snapshot(batch.id, crossings, pendientes)
         return {
             "has_autobits": True,
             "batch": self._batch_dict(batch),
-            "pendientes": self._detectar_pendientes(crossings),
+            "pendientes": pendientes,
         }
 
     # -- interno -----------------------------------------------------------
@@ -354,7 +399,8 @@ class CruceExcelService:
         return actualizados, conflictos
 
     def _estado(self, crossing: AccountCrossingModel) -> str:
-        if crossing.estado == CrossingStatus.PAGADO and not (crossing.fecha_pago or "").strip():
+        # Confirmación bancaria (mark_paid): el Excel no debe degradar ni "confirmar" PAGADO.
+        if crossing.estado == CrossingStatus.PAGADO:
             return crossing.estado
 
         estado_compra = None
@@ -378,6 +424,105 @@ class CruceExcelService:
             "por_tipo": {tipo: [] for tipo in TIPOS_PENDIENTE},
             "resumen": [],
             "valor_pendiente": 0.0,
+        }
+
+    def _guardar_snapshot(
+        self,
+        *,
+        batch_id: int,
+        archivo: str,
+        aplicado: bool,
+        emparejados: dict[int, ParsedCruceRow],
+        sobrantes: list[ParsedCruceRow],
+        pendientes: dict,
+        conciliacion: dict,
+        file_hash: str | None = None,
+    ) -> None:
+        """Persiste el último Autobits↔Cruce para GET /pendientes y export CSV."""
+        falta_ids = [
+            item.get("crossing_id")
+            for item in pendientes.get("por_tipo", {}).get("FALTA_EN_CRUCE", [])
+            if item.get("crossing_id") is not None
+        ]
+        sobra_items = list(pendientes.get("por_tipo", {}).get("SOBRA_EN_CRUCE", []))
+        payload = {
+            "batch_id": batch_id,
+            "archivo": archivo,
+            "aplicado": aplicado,
+            "file_hash": file_hash,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "emparejadas_ids": sorted(emparejados.keys()),
+            "falta_crossing_ids": falta_ids,
+            "sobra_items": sobra_items,
+            "conciliacion": conciliacion,
+        }
+        path = self._snapshot_path(batch_id)
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _leer_snapshot(self, batch_id: int) -> dict | None:
+        path = self._snapshot_path(batch_id)
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    def _fusionar_snapshot(
+        self,
+        batch_id: int,
+        crossings: list[AccountCrossingModel],
+        pendientes: dict,
+    ) -> dict:
+        """Añade FALTA_EN_CRUCE / SOBRA_EN_CRUCE del último Excel de cruce."""
+        snapshot = self._leer_snapshot(batch_id)
+        if not snapshot:
+            return pendientes
+
+        por_id = {c.id: c for c in crossings}
+        falta: list[dict] = []
+        for raw_id in snapshot.get("falta_crossing_ids") or []:
+            try:
+                crossing_id = int(raw_id)
+            except (TypeError, ValueError):
+                continue
+            crossing = por_id.get(crossing_id)
+            if crossing is None or crossing.estado == CrossingStatus.PAGADO:
+                continue
+            falta.append(
+                self._pendiente(
+                    "FALTA_EN_CRUCE",
+                    "Está en Autobits pero no aparece en el Excel de cruce",
+                    crossing,
+                )
+            )
+
+        sobra = list(snapshot.get("sobra_items") or [])
+        por_tipo = dict(pendientes.get("por_tipo") or {tipo: [] for tipo in TIPOS_PENDIENTE})
+        por_tipo["FALTA_EN_CRUCE"] = falta
+        por_tipo["SOBRA_EN_CRUCE"] = sobra
+
+        total = sum(len(v) for v in por_tipo.values())
+        resumen = [
+            {
+                "tipo": tipo,
+                "etiqueta": TIPOS_PENDIENTE[tipo],
+                "cantidad": len(por_tipo[tipo]),
+            }
+            for tipo in TIPOS_PENDIENTE
+            if por_tipo[tipo]
+        ]
+        return {
+            "total": total,
+            "por_tipo": por_tipo,
+            "resumen": resumen,
+            "valor_pendiente": pendientes.get("valor_pendiente", 0.0),
+            "ultimo_cruce": {
+                "archivo": snapshot.get("archivo"),
+                "aplicado": snapshot.get("aplicado"),
+                "timestamp": snapshot.get("timestamp"),
+            },
         }
 
     def _detectar_pendientes(

@@ -1,13 +1,16 @@
-# Blueprint Render — Frontend SPA + Contabilidad API + notas de backend
+# HISTÓRICO — Blueprint Render (NO usar para desplegar)
+# Producción actual: Oracle Cloud + docker-compose.yml
+# Ver docs/ORACLE_DEPLOYMENT.md
+#
+# Original (referencia de la arquitectura previa):
 #
 # Servicios:
 #   - dashboard-frontend (Static Site Angular)
 #   - sig-contabilidad   (FastAPI Contabilidad IA)
 #
-# Backend Java existente (dashboard-7spt): en Dashboard → Environment agregar:
-#   CONTABLE_API_BASE = URL pública de sig-contabilidad (sin slash final)
-#     ej: https://sig-contabilidad.onrender.com
-#   GEMINI_API_KEY / CORS_ALLOWED_ORIGINS / etc. (ya usados)
+# Backend Java (dashboard-7spt) en Render usaba:
+#   CONTABLE_API_BASE = URL pública de sig-contabilidad
+#   GEMINI_API_KEY / CORS_ALLOWED_ORIGINS / etc.
 
 services:
   - type: web

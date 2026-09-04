@@ -27,6 +27,7 @@ class AnthropicClient:
     def __init__(self) -> None:
         s = get_settings()
         self.api_key = (s.anthropic_api_key or "").strip()
+        self.workspace_id = (getattr(s, "anthropic_workspace_id", None) or "").strip()
         self.base_url = (s.anthropic_base_url or "https://api.anthropic.com").rstrip("/")
         self.api_version = s.anthropic_api_version or "2023-06-01"
         self.model_fast = s.ai_model_fast or "claude-haiku-4-5-20251001"
@@ -142,6 +143,8 @@ class AnthropicClient:
             "anthropic-version": self.api_version,
             "content-type": "application/json",
         }
+        if self.workspace_id:
+            headers["anthropic-workspace-id"] = self.workspace_id
         url = f"{self.base_url}/v1/messages"
         last_err: Exception | None = None
         for attempt in range(1, max(1, self.max_retries) + 1):

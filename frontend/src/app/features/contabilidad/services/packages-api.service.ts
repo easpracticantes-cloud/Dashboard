@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ContabilidadUserContext } from './contabilidad-user-context';
 
 export interface DigitalPackage {
   id: number;
@@ -31,8 +32,8 @@ export interface StorageStatus {
 @Injectable({ providedIn: 'root' })
 export class PackagesApiService {
   private readonly base = '/contabilidad/packages';
-
-  constructor(private readonly http: HttpClient) {}
+  private readonly http = inject(HttpClient);
+  private readonly userCtx = inject(ContabilidadUserContext);
 
   storageStatus(): Observable<StorageStatus> {
     return this.http.get<StorageStatus>(`${this.base}/storage/status`);
@@ -58,11 +59,13 @@ export class PackagesApiService {
     observaciones?: string;
     responsable?: string;
   }): Observable<DigitalPackage> {
-    return this.http.post<DigitalPackage>(this.base, {
-      usuario: 'ANDREA',
-      responsable: 'KATHERINE',
-      ...body,
-    });
+    return this.http.post<DigitalPackage>(
+      this.base,
+      this.userCtx.withUsuario({
+        responsable: 'KATHERINE',
+        ...body,
+      })
+    );
   }
 
   generate(id: number): Observable<DigitalPackage> {
@@ -70,11 +73,10 @@ export class PackagesApiService {
   }
 
   updateEstado(id: number, estado: string, observaciones?: string): Observable<DigitalPackage> {
-    return this.http.patch<DigitalPackage>(`${this.base}/${id}/estado`, {
-      estado,
-      observaciones,
-      usuario: 'ANDREA',
-    });
+    return this.http.patch<DigitalPackage>(
+      `${this.base}/${id}/estado`,
+      this.userCtx.withUsuario({ estado, observaciones })
+    );
   }
 
   downloadUrl(id: number): string {

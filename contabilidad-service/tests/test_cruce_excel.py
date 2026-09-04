@@ -201,7 +201,9 @@ def test_cruce_llena_factura_y_fecha_de_pago(client):
 
     assert por_compra["COM001"]["factura_cdc"] == "FV POS 123"
     assert por_compra["COM001"]["fecha_pago"] == "2026-08-25"
-    assert por_compra["COM001"]["estado"] == "PAGADO"
+    # C) Excel conserva fecha_pago pero no confirma PAGADO (solo APROBADO por factura).
+    assert por_compra["COM001"]["estado"] == "APROBADO"
+    assert por_compra["COM001"]["estado"] != "PAGADO"
 
     assert por_compra["COM002"]["factura_cdc"] == "CDC 55"
     assert not por_compra["COM002"]["fecha_pago"]
@@ -343,7 +345,96 @@ def test_pendientes_endpoint_sin_archivo(client):
     data = res.json()
     assert data["has_autobits"] is True
     assert data["pendientes"]["total"] >= 2  # sin factura + sin fecha + sin soporte
+    # Sin Excel de cruce aún no hay FALTA_EN_CRUCE persistido
+    assert not data["pendientes"]["por_tipo"].get("FALTA_EN_CRUCE")
 
     csv_res = client.get("/api/cruce-excel/pendientes/export")
     assert csv_res.status_code == 200
     assert "TIPO;PENDIENTE" in csv_res.text
+
+
+def test_pendientes_persiste_falta_en_cruce_tras_upload(client):
+    """GET /pendientes debe conservar FALTA_EN_CRUCE del último Excel de cruce."""
+    assert _subir_autobits(
+        client,
+        [
+            ["900111", "Hotel Demo SAS", "COM001", "EAS001", "2026-08-20", 150000, ""],
+            ["900333", "Restaurante Demo", "COM003", "EAS003", "2026-08-22", 70000, ""],
+        ],
+    ).status_code == 200
+
+    upload = _subir_cruce(
+        client,
+        [
+            {
+                "proveedor": "Hotel Demo SAS",
+                "filas": [
+                    ["2026-08-20", "COM001", "EAS001", "Hospedaje", 150000, "FV POS 123", None],
+                ],
+            }
+        ],
+    )
+    assert upload.status_code == 200, upload.text
+    assert "COM003" in {
+        i["numero_compra"] for i in upload.json()["pendientes"]["por_tipo"]["FALTA_EN_CRUCE"]
+    }
+
+    get_res = client.get("/api/cruce-excel/pendientes")
+    assert get_res.status_code == 200
+    pendientes = get_res.json()["pendientes"]
+    faltan = {i["numero_compra"] for i in pendientes["por_tipo"]["FALTA_EN_CRUCE"]}
+    assert "COM003" in faltan
+    assert "COM001" not in faltan
+    assert pendientes.get("ultimo_cruce", {}).get("archivo")
+
+    csv_res = client.get("/api/cruce-excel/pendientes/export")
+    assert csv_res.status_code == 200
+    assert "FALTA_EN_CRUCE" in csv_res.text
+    assert "COM003" in csv_res.text
+
+
+def test_reupload_cruce_actualiza_snapshot_falta(client):
+    """Un segundo Excel de cruce reemplaza el snapshot FALTA_EN_CRUCE."""
+    assert _subir_autobits(
+        client,
+        [
+            ["900111", "Hotel Demo SAS", "COM001", "EAS001", "2026-08-20", 150000, ""],
+            ["900333", "Restaurante Demo", "COM003", "EAS003", "2026-08-22", 70000, ""],
+        ],
+    ).status_code == 200
+
+    assert _subir_cruce(
+        client,
+        [
+            {
+                "proveedor": "Hotel Demo SAS",
+                "filas": [
+                    ["2026-08-20", "COM001", "EAS001", "Hospedaje", 150000, "FV 1", None],
+                ],
+            }
+        ],
+    ).status_code == 200
+
+    # Ahora el Excel incluye ambas filas → ya no debe faltar COM003
+    assert _subir_cruce(
+        client,
+        [
+            {
+                "proveedor": "Hotel Demo SAS",
+                "filas": [
+                    ["2026-08-20", "COM001", "EAS001", "Hospedaje", 150000, "FV 1", None],
+                ],
+            },
+            {
+                "proveedor": "Restaurante Demo",
+                "filas": [
+                    ["2026-08-22", "COM003", "EAS003", "Almuerzo", 70000, "FV 2", None],
+                ],
+            },
+        ],
+    ).status_code == 200
+
+    get_res = client.get("/api/cruce-excel/pendientes")
+    assert get_res.status_code == 200
+    faltan = get_res.json()["pendientes"]["por_tipo"].get("FALTA_EN_CRUCE") or []
+    assert not {i["numero_compra"] for i in faltan}

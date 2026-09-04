@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -7,6 +7,8 @@ import {
   RemediationSummary,
   RemediationsApiService,
 } from '../../services/remediations-api.service';
+import { ContabilidadUserContext } from '../../services/contabilidad-user-context';
+import { formatCop, labelEstado } from '../../utils/contabilidad-labels';
 
 @Component({
   selector: 'eas-contabilidad-remediations',
@@ -16,6 +18,9 @@ import {
   styleUrl: './remediations.component.scss',
 })
 export class RemediationsComponent implements OnInit {
+  private readonly api = inject(RemediationsApiService);
+  private readonly userCtx = inject(ContabilidadUserContext);
+
   items: RemediationSummary[] = [];
   total = 0;
   cargando = true;
@@ -25,6 +30,9 @@ export class RemediationsComponent implements OnInit {
   filtroEstado = '';
   filtroTipo = '';
   filtroBusqueda = '';
+
+  readonly formatCop = formatCop;
+  readonly labelEstado = labelEstado;
 
   tipos: { key: string; label: string }[] = [];
   estados: string[] = [];
@@ -38,12 +46,10 @@ export class RemediationsComponent implements OnInit {
     descripcion: '',
     proveedor: '',
     valor_involucrado: '',
-    responsable: 'ANDREA',
+    responsable: '',
     fecha_limite: '',
     observaciones: '',
   };
-
-  constructor(private readonly api: RemediationsApiService) {}
 
   ngOnInit(): void {
     this.api.catalog().subscribe({
@@ -91,7 +97,7 @@ export class RemediationsComponent implements OnInit {
       descripcion: '',
       proveedor: '',
       valor_involucrado: '',
-      responsable: 'ANDREA',
+      responsable: this.userCtx.username(),
       fecha_limite: '',
       observaciones: '',
     };
@@ -106,7 +112,7 @@ export class RemediationsComponent implements OnInit {
       descripcion: item.descripcion,
       proveedor: item.proveedor || '',
       valor_involucrado: item.valor_involucrado != null ? String(item.valor_involucrado) : '',
-      responsable: item.responsable || 'ANDREA',
+      responsable: item.responsable || this.userCtx.username(),
       fecha_limite: item.fecha_limite || '',
       observaciones: item.observaciones || '',
     };

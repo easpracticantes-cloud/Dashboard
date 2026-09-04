@@ -1,0 +1,157 @@
+<div class="cola cosmos-page">
+  <header class="page-hero">
+    <div class="hero-row">
+      <div>
+        <span class="label-caps">Bandeja de trabajo AP</span>
+        <h1 class="page-title">Cola operativa</h1>
+        <p class="page-lead">
+          Priorice alertas y grupos pendientes del periodo. Es el punto de entrada diario del área contable.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button type="button" class="btn btn-primary" (click)="cargar()">
+          <mat-icon>refresh</mat-icon>
+          Actualizar
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="filters-bar">
+    <select class="select" [(ngModel)]="filtroModo" (change)="cargar()">
+      <option value="semana">Semana</option>
+      <option value="mes">Mes</option>
+      <option value="anio">Año</option>
+    </select>
+
+    @if (filtroModo === 'semana') {
+      <select class="select" [(ngModel)]="weekRef" (change)="cargar()">
+        @for (w of weeks; track w.start) {
+          <option [value]="w.start">{{ w.label }}</option>
+        }
+      </select>
+    }
+
+    @if (filtroModo === 'mes') {
+      <input class="input" type="number" min="1" max="12" [(ngModel)]="mes" (change)="cargar()" />
+      <input class="input" type="number" [(ngModel)]="anio" (change)="cargar()" />
+    }
+
+    @if (filtroModo === 'anio') {
+      <input class="input" type="number" [(ngModel)]="anio" (change)="cargar()" />
+    }
+  </div>
+
+  @if (error) {
+    <div class="alert error">{{ error }}</div>
+  }
+
+  @if (cargando) {
+    <div class="ap-skeleton-wrap">
+      <div class="ap-kpi-grid">
+        <div class="skel"></div>
+        <div class="skel"></div>
+        <div class="skel"></div>
+      </div>
+      <div class="skel tall"></div>
+    </div>
+  } @else {
+    <section class="ap-kpi-grid">
+      <article class="ap-kpi sheet warn">
+        <div class="kpi-icon"><mat-icon>priority_high</mat-icon></div>
+        <span class="kpi-val">{{ urgentes }}</span>
+        <span class="kpi-lbl">Urgentes</span>
+        <span class="kpi-sub">Alertas high / critical / error</span>
+      </article>
+      <article class="ap-kpi sheet">
+        <div class="kpi-icon"><mat-icon>inbox</mat-icon></div>
+        <span class="kpi-val">{{ totalCola }}</span>
+        <span class="kpi-lbl">Pendientes en cola</span>
+        <span class="kpi-sub">Suma de grupos operativos</span>
+      </article>
+      <article class="ap-kpi sheet ok">
+        <div class="kpi-icon"><mat-icon>notifications</mat-icon></div>
+        <span class="kpi-val">{{ alerts.length }}</span>
+        <span class="kpi-lbl">Alertas del periodo</span>
+        <span class="kpi-sub">Incluye informativas y avisos</span>
+      </article>
+    </section>
+
+    <section class="sheet sheet-pad">
+      <h2 class="section-head">Alertas</h2>
+      @if (!alerts.length) {
+        <div class="empty-state" style="padding: 1.5rem !important">
+          <div class="empty-icon"><mat-icon>task_alt</mat-icon></div>
+          <h2>Bandeja limpia</h2>
+          <p>No hay alertas para este periodo. Revise los grupos de cola si hay trabajo pendiente.</p>
+        </div>
+      } @else {
+        <div class="alerts-stack">
+            @for (a of alerts; track (a.code || a.codigo || '') + (a.title || a.titulo || '')) {
+            <article class="ap-alert" [class]="alertSeverityClass(alertSeverity(a))">
+              <div class="ap-alert-icon">
+                <mat-icon>{{ alertIcon(alertSeverity(a)) }}</mat-icon>
+              </div>
+              <div>
+                <strong>{{ alertTitle(a) }}</strong>
+                @if (alertDetail(a)) {
+                  <p>{{ alertDetail(a) }}</p>
+                }
+                <p>
+                  @if (a.document_id) {
+                    <a [routerLink]="['/app/contabilidad/documentos', a.document_id]">Documento #{{ a.document_id }}</a>
+                  } @else if (a.entity_type && a.entity_id) {
+                    {{ a.entity_type }} #{{ a.entity_id }}
+                  }
+                </p>
+              </div>
+              <span class="estado-chip" [class]="alertSeverityClass(alertSeverity(a))">{{ alertSeverity(a) }}</span>
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="sheet table-wrap">
+      <div class="sheet-pad" style="padding-bottom: 0.35rem !important">
+        <h2 class="section-head">Grupos en cola</h2>
+      </div>
+      @if (!queueGroups.length) {
+        <div class="empty-state">
+          <div class="empty-icon"><mat-icon>checklist</mat-icon></div>
+          <h2>Sin grupos pendientes</h2>
+          <p>No hay ítems agrupados en cola para el periodo seleccionado.</p>
+        </div>
+      } @else {
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Grupo</th>
+              <th>Cantidad</th>
+              <th>Prioridad</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (g of queueGroups; track g.key) {
+              <tr>
+                <td class="strong">{{ g.label || g.key }}</td>
+                <td class="num">{{ g.count }}</td>
+                <td>
+                  <span class="estado-chip" [class]="groupTone(g)">{{ groupToneLabel(g) }}</span>
+                </td>
+                <td class="actions">
+                  @if (queueLink(g.key); as link) {
+                    <a [routerLink]="link" class="btn btn-secondary btn-sm">Trabajar</a>
+                  } @else {
+                    <span class="muted">—</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+  }
+</div>

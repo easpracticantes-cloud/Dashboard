@@ -16,20 +16,21 @@
     </div>
   </header>
 
-  <div class="filters">
+  <div class="filters-bar sheet">
     <input
+      class="input search"
       type="search"
       placeholder="Buscar proveedor, descripción…"
       [(ngModel)]="filtroBusqueda"
       (keyup.enter)="cargar()"
     />
-    <select [(ngModel)]="filtroEstado" (change)="cargar()">
+    <select class="select" [(ngModel)]="filtroEstado" (change)="cargar()">
       <option value="">Todos los estados</option>
       @for (e of estados; track e) {
-        <option [value]="e">{{ e }}</option>
+        <option [value]="e">{{ labelEstado(e, 'remediation') }}</option>
       }
     </select>
-    <select [(ngModel)]="filtroTipo" (change)="cargar()">
+    <select class="select" [(ngModel)]="filtroTipo" (change)="cargar()">
       <option value="">Todos los tipos</option>
       @for (t of tipos; track t.key) {
         <option [value]="t.key">{{ t.label }}</option>
@@ -100,9 +101,17 @@
   }
 
   @if (cargando) {
-    <div class="loading"><div class="spinner"></div><p>Cargando…</p></div>
+    <div class="ap-skeleton-wrap">
+      <div class="skel tall"></div>
+    </div>
   } @else if (error) {
-    <div class="alert alert-error">{{ error }}</div>
+    <div class="alert error">
+      <mat-icon>error</mat-icon>
+      <div>
+        <strong>Error</strong>
+        <p>{{ error }}</p>
+      </div>
+    </div>
   } @else if (!items.length) {
     <div class="sheet empty-state">
       <div class="empty-icon"><mat-icon>rule</mat-icon></div>
@@ -110,8 +119,8 @@
       <p>Se crean al cruzar documentos, o puede añadir una manualmente.</p>
     </div>
   } @else {
-    <div class="table-wrap">
-      <table class="table">
+    <div class="sheet table-wrap sticky-head">
+      <table class="data-table">
         <thead>
           <tr>
             <th>ID</th>
@@ -123,38 +132,38 @@
             <th>Responsable</th>
             <th>Límite</th>
             <th>Estado</th>
-            <th></th>
+            <th class="col-actions">Acciones</th>
           </tr>
         </thead>
         <tbody>
           @for (item of items; track item.id) {
             <tr>
-              <td>#{{ item.id }}</td>
+              <td class="mono">#{{ item.id }}</td>
               <td>
-                <a [routerLink]="['/app/contabilidad/documentos', item.document_id]" class="link">
+                <a [routerLink]="['/app/contabilidad/documentos', item.document_id]">
                   {{ item.document_filename || 'Doc ' + item.document_id }}
                 </a>
               </td>
               <td>{{ item.proveedor || '—' }}</td>
               <td><span class="tipo">{{ item.tipo_problema_label }}</span></td>
               <td class="desc">{{ item.descripcion }}</td>
-              <td>{{ item.valor_involucrado != null ? (item.valor_involucrado | number:'1.0-0') : '—' }}</td>
+              <td class="num">{{ formatCop(item.valor_involucrado) }}</td>
               <td>{{ item.responsable || '—' }}</td>
               <td>{{ item.fecha_limite || '—' }}</td>
               <td>
                 <select
-                  class="estado-select"
+                  class="select estado-select"
                   [ngModel]="item.estado"
                   (ngModelChange)="cambiarEstado(item, $event)"
                 >
                   @for (e of estados; track e) {
-                    <option [value]="e">{{ e }}</option>
+                    <option [value]="e">{{ labelEstado(e, 'remediation') }}</option>
                   }
                 </select>
               </td>
-              <td class="actions">
-                <button type="button" class="btn-link" (click)="abrirEditar(item)">Editar</button>
-                <button type="button" class="btn-link btn-danger" (click)="eliminar(item)">Eliminar</button>
+              <td class="actions row-actions">
+                <button type="button" class="btn btn-secondary btn-sm" (click)="abrirEditar(item)">Editar</button>
+                <button type="button" class="btn btn-danger btn-sm" (click)="eliminar(item)">Eliminar</button>
               </td>
             </tr>
           }

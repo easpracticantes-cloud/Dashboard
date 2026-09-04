@@ -78,6 +78,13 @@ public class SecurityConfig {
                                 "/actuator/info"
                         ).permitAll()
                         .requestMatchers("/api/v1/users/**").hasAuthority("ROLE_ADMINISTRADOR")
+                        // Contabilidad AP: mismos roles que el menú Angular (no basta con estar autenticado).
+                        .requestMatchers("/api/v1/contabilidad/**").hasAnyAuthority(
+                                "ROLE_ADMINISTRADOR",
+                                "ROLE_GERENCIA",
+                                "ROLE_CONTABILIDAD",
+                                "ROLE_SUPERVISOR"
+                        )
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
@@ -117,8 +124,7 @@ public class SecurityConfig {
                 patterns.add(origin);
             }
         }
-        // Render Static Site + previews (compatible with allowCredentials)
-        patterns.add("https://*.onrender.com");
+        // Desarrollo local (Angular / Vite). Producción: solo CORS_ALLOWED_ORIGINS.
         patterns.add("http://localhost:*");
         patterns.add("http://127.0.0.1:*");
 

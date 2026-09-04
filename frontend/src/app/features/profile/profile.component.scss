@@ -16,7 +16,7 @@
   border-radius: 18px;
   background: linear-gradient(90deg, var(--eas-skeleton-a) 25%, var(--eas-skeleton-b) 37%, var(--eas-skeleton-a) 63%);
   background-size: 400% 100%;
-  animation: eas-shimmer 1.35s ease infinite;
+  animation: none;
 }
 
 .profile-skel--wide {
@@ -36,8 +36,8 @@
 }
 
 .profile-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--eas-shadow-md);
+  transform: none;
+  box-shadow: none;
 }
 
 .profile-card__avatar {
@@ -181,7 +181,7 @@
 }
 
 .avatar-presets__item:hover {
-  transform: translateY(-2px) scale(1.04);
+  transform: none;
 }
 
 .avatar-presets__item.is-active {

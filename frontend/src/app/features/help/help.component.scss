@@ -48,8 +48,8 @@
 }
 
 .help-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--eas-shadow-md);
+  transform: none;
+  box-shadow: none;
 }
 
 .help-card__icon {

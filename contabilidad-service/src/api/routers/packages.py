@@ -1,10 +1,11 @@
 """Routers API — paquetes digitales (Fase 7)."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from api.deps import resolve_usuario
 from application.services.package_service import PackageService, PackageServiceError
 from infrastructure.persistence.database import get_db
 from infrastructure.storage import storage_status
@@ -21,17 +22,17 @@ class PackageCreate(BaseModel):
     document_id: int
     payment_id: int | None = None
     crossing_id: int | None = None
-    responsable: str = "KATHERINE"
+    responsable: str | None = None
     observaciones: str | None = None
     period_start: str | None = None
     period_end: str | None = None
-    usuario: str = "ANDREA"
+    usuario: str | None = None
 
 
 class PackageEstadoUpdate(BaseModel):
     estado: str
     observaciones: str | None = None
-    usuario: str = "ANDREA"
+    usuario: str | None = None
 
 
 @router.get("/storage/status")
@@ -67,7 +68,7 @@ def get_package(package_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("")
-def create_package(body: PackageCreate, db: Session = Depends(get_db)):
+def create_package(request: Request, body: PackageCreate, db: Session = Depends(get_db)):
     """Crea paquete digital pendiente de generación."""
     service = PackageService(db)
     try:
@@ -79,7 +80,7 @@ def create_package(body: PackageCreate, db: Session = Depends(get_db)):
             observaciones=body.observaciones,
             period_start=body.period_start,
             period_end=body.period_end,
-            usuario=body.usuario,
+            usuario=resolve_usuario(request, body.usuario),
         )
     except PackageServiceError as exc:
         status = 404 if exc.code == "NOT_FOUND" else 400
@@ -87,17 +88,18 @@ def create_package(body: PackageCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/{package_id}/generate")
-def generate_package(package_id: int, db: Session = Depends(get_db)):
+def generate_package(request: Request, package_id: int, db: Session = Depends(get_db)):
     """Genera ZIP del paquete para entrega."""
     service = PackageService(db)
     try:
-        return service.generate(package_id)
+        return service.generate(package_id, resolve_usuario(request))
     except PackageServiceError as exc:
         raise HTTPException(status_code=400, detail=exc.message) from exc
 
 
 @router.patch("/{package_id}/estado")
 def update_package_estado(
+    request: Request,
     package_id: int,
     body: PackageEstadoUpdate,
     db: Session = Depends(get_db),
@@ -109,7 +111,7 @@ def update_package_estado(
             package_id,
             body.estado,
             observaciones=body.observaciones,
-            usuario=body.usuario,
+            usuario=resolve_usuario(request, body.usuario),
         )
     except PackageServiceError as exc:
         status = 404 if exc.code == "NOT_FOUND" else 400

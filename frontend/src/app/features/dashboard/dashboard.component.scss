@@ -100,7 +100,7 @@ eas-dashboard,
 }
 
 .dash-hero__btn:hover {
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.24) !important;
+  box-shadow: none;
 }
 
 .dash-hero__ghost {
@@ -139,7 +139,7 @@ eas-dashboard,
 }
 
 .dash-sync.is-live mat-icon {
-  animation: spin 1.1s linear infinite;
+  animation: none;
 }
 
 @keyframes spin {

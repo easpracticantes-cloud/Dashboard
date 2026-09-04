@@ -8,6 +8,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from domain.enums import (
+    AdjustmentAction,
     AutobitsRecordStatus,
     CrossingStatus,
     DocumentStatus,
@@ -15,11 +16,13 @@ from domain.enums import (
     MatchType,
     PackageStatus,
     PaymentStatus,
+    PeriodClosureStatus,
     ProcessingJobStatus,
     RemediationStatus,
 )
 from infrastructure.persistence.models import (
     AccountCrossingModel,
+    AccountingAdjustmentModel,
     AuditLogModel,
     AutobitsRecordModel,
     DigitalPackageModel,
@@ -27,6 +30,7 @@ from infrastructure.persistence.models import (
     ImportBatchModel,
     PaymentModel,
     PaymentReceiptModel,
+    PeriodClosureModel,
     ProcessingJobModel,
     ProviderModel,
     PurchaseModel,
@@ -254,6 +258,7 @@ class AutobitsRepository:
         total_rows: int,
         storage_path: str,
         imported_by: str = "ANDREA",
+        file_hash: str | None = None,
     ) -> ImportBatchModel:
         batch = ImportBatchModel(
             filename=filename,
@@ -262,12 +267,23 @@ class AutobitsRepository:
             column_mapping_json=column_mapping_json,
             total_rows=total_rows,
             storage_path=storage_path,
+            file_hash=file_hash,
             imported_by=imported_by,
             status=ImportBatchStatus.COMPLETED,
         )
         self.db.add(batch)
         self.db.flush()
         return batch
+
+    def find_batch_by_file_hash(self, file_hash: str) -> ImportBatchModel | None:
+        if not file_hash:
+            return None
+        return (
+            self.db.query(ImportBatchModel)
+            .filter(ImportBatchModel.file_hash == file_hash)
+            .order_by(ImportBatchModel.imported_at.desc())
+            .first()
+        )
 
     def find_duplicate_record(
         self,
@@ -780,6 +796,18 @@ class PaymentRepository:
     def get_by_crossing(self, crossing_id: int) -> PaymentModel | None:
         return self.db.query(PaymentModel).filter(PaymentModel.crossing_id == crossing_id).first()
 
+    def get_active_by_crossing(self, crossing_id: int) -> PaymentModel | None:
+        """Pago vigente del cruce; los anulados no bloquean uno nuevo."""
+        return (
+            self.db.query(PaymentModel)
+            .filter(
+                PaymentModel.crossing_id == crossing_id,
+                PaymentModel.estado != PaymentStatus.ANULADO,
+            )
+            .order_by(PaymentModel.created_at.desc())
+            .first()
+        )
+
     def create(
         self,
         *,
@@ -979,6 +1007,144 @@ class PackageRepository:
     def delete(self, package: DigitalPackageModel) -> None:
         self.db.delete(package)
         self.db.flush()
+
+
+class AdjustmentRepository:
+    """Anulaciones y ajustes contables (Fase 4.2)."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def record(
+        self,
+        *,
+        entity_type: str,
+        entity_id: str,
+        action: str = AdjustmentAction.AJUSTE,
+        motivo: str,
+        valor_anterior: str | None = None,
+        valor_nuevo: str | None = None,
+        related_entity_id: str | None = None,
+        usuario: str = "SISTEMA",
+    ) -> AccountingAdjustmentModel:
+        adjustment = AccountingAdjustmentModel(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            action=action,
+            motivo=motivo,
+            valor_anterior=valor_anterior,
+            valor_nuevo=valor_nuevo,
+            related_entity_id=str(related_entity_id) if related_entity_id else None,
+            usuario=usuario,
+        )
+        self.db.add(adjustment)
+        self.db.flush()
+        return adjustment
+
+    def list_for_entity(self, entity_type: str, entity_id: str) -> list[AccountingAdjustmentModel]:
+        return (
+            self.db.query(AccountingAdjustmentModel)
+            .filter(
+                AccountingAdjustmentModel.entity_type == entity_type,
+                AccountingAdjustmentModel.entity_id == str(entity_id),
+            )
+            .order_by(AccountingAdjustmentModel.created_at.desc())
+            .all()
+        )
+
+    def list_adjustments(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        entity_type: str | None = None,
+        action: str | None = None,
+    ) -> tuple[list[AccountingAdjustmentModel], int]:
+        q = self.db.query(AccountingAdjustmentModel).order_by(
+            AccountingAdjustmentModel.created_at.desc()
+        )
+        if entity_type:
+            q = q.filter(AccountingAdjustmentModel.entity_type == entity_type)
+        if action:
+            q = q.filter(AccountingAdjustmentModel.action == action)
+        total = q.count()
+        return q.offset(offset).limit(limit).all(), total
+
+
+class PeriodClosureRepository:
+    """Cierre operativo semanal (Fase 4.6)."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_by_range(self, period_start: str, period_end: str) -> PeriodClosureModel | None:
+        return (
+            self.db.query(PeriodClosureModel)
+            .filter(
+                PeriodClosureModel.period_start == period_start,
+                PeriodClosureModel.period_end == period_end,
+            )
+            .first()
+        )
+
+    def find_closed_containing(self, fecha_iso: str) -> PeriodClosureModel | None:
+        """Cierre CERRADO cuyo rango contiene la fecha (ISO ordena lexicográficamente)."""
+        return (
+            self.db.query(PeriodClosureModel)
+            .filter(
+                PeriodClosureModel.status == PeriodClosureStatus.CLOSED,
+                PeriodClosureModel.period_start <= fecha_iso,
+                PeriodClosureModel.period_end >= fecha_iso,
+            )
+            .first()
+        )
+
+    def upsert(
+        self,
+        *,
+        period_start: str,
+        period_end: str,
+        status: str,
+        summary_json: str | None = None,
+        observaciones: str | None = None,
+        closed_by: str | None = None,
+        reopened_by: str | None = None,
+        motivo_reapertura: str | None = None,
+    ) -> PeriodClosureModel:
+        closure = self.get_by_range(period_start, period_end)
+        if closure is None:
+            closure = PeriodClosureModel(period_start=period_start, period_end=period_end)
+            self.db.add(closure)
+
+        closure.status = status
+        if summary_json is not None:
+            closure.summary_json = summary_json
+        if observaciones is not None:
+            closure.observaciones = observaciones
+
+        if status == PeriodClosureStatus.CLOSED:
+            closure.closed_by = closed_by
+            closure.closed_at = datetime.now(timezone.utc)
+        else:
+            closure.reopened_by = reopened_by
+            closure.reopened_at = datetime.now(timezone.utc)
+            closure.motivo_reapertura = motivo_reapertura
+
+        self.db.flush()
+        return closure
+
+    def list_closures(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        status: str | None = None,
+    ) -> tuple[list[PeriodClosureModel], int]:
+        q = self.db.query(PeriodClosureModel).order_by(PeriodClosureModel.period_start.desc())
+        if status:
+            q = q.filter(PeriodClosureModel.status == status)
+        total = q.count()
+        return q.offset(offset).limit(limit).all(), total
 
 
 def _to_float(value) -> float | None:

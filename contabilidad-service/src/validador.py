@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
+from domain.utils.money import to_money
+
 TIPOS_VALIDOS = {
     "factura",
     "cuenta_de_cobro",
@@ -25,17 +29,18 @@ def es_numero(valor):
         return False
 
 
-def _to_float(valor):
+def _to_decimal(valor) -> Decimal | None:
+    """Importe en Decimal; ``None`` cuando el campo viene vacio o sin digitos."""
     if valor is None or valor == "":
         return None
-    try:
-        return float(str(valor).replace("$", "").replace(" ", "").replace(",", ""))
-    except ValueError:
-        try:
-            texto = str(valor).replace("$", "").replace(" ", "").replace(".", "").replace(",", ".")
-            return float(texto)
-        except ValueError:
-            return None
+    if isinstance(valor, bool):
+        return None
+    if not isinstance(valor, (int, float, Decimal)) and not any(
+        c.isdigit() for c in str(valor)
+    ):
+        return None
+    return to_money(valor)
+
 
 
 def validar_factura(datos):
@@ -68,15 +73,17 @@ def validar_factura(datos):
         observaciones.append("tipo_documento desconocido")
         datos["requiere_revision"] = True
 
-    # Matematica deterministica: el LLM no es autoridad del total
-    sub = _to_float(datos.get("subtotal"))
-    iva = _to_float(datos.get("impuesto") or datos.get("iva"))
-    total = _to_float(datos.get("total"))
+    # Matematica deterministica en Decimal: el LLM no es autoridad del total
+    sub = _to_decimal(datos.get("subtotal"))
+    iva = _to_decimal(datos.get("impuesto") or datos.get("iva"))
+    total = _to_decimal(datos.get("total"))
     if sub is not None and total is not None:
-        expected = sub + (iva or 0.0)
-        if abs(expected - total) > max(1.0, total * 0.02):
+        impuesto = iva or Decimal("0")
+        esperado = sub + impuesto
+        tolerancia = max(Decimal("1"), abs(total) * Decimal("0.02"))
+        if abs(esperado - total) > tolerancia:
             observaciones.append(
-                f"Inconsistencia matematica: subtotal({sub})+impuesto({iva or 0}) != total({total})"
+                f"Inconsistencia matematica: subtotal({sub})+impuesto({impuesto}) != total({total})"
             )
             datos["requiere_revision"] = True
 

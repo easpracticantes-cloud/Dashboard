@@ -1,9 +1,10 @@
 """Routers API — subsanaciones (Fase 5)."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from api.deps import resolve_usuario
 from application.services.remediation_service import RemediationService, RemediationServiceError
 from infrastructure.persistence.database import get_db
 
@@ -40,11 +41,11 @@ class RemediationCreate(BaseModel):
     descripcion: str
     proveedor: str | None = None
     valor_involucrado: float | None = None
-    responsable: str = "ANDREA"
+    responsable: str | None = None
     fecha_limite: str | None = None
     observaciones: str | None = None
     crossing_id: int | None = None
-    usuario: str = "ANDREA"
+    usuario: str | None = None
 
 
 class RemediationUpdate(BaseModel):
@@ -55,13 +56,13 @@ class RemediationUpdate(BaseModel):
     responsable: str | None = None
     fecha_limite: str | None = None
     observaciones: str | None = None
-    usuario: str = "ANDREA"
+    usuario: str | None = None
 
 
 class EstadoUpdate(BaseModel):
     estado: str
     observaciones: str | None = None
-    usuario: str = "ANDREA"
+    usuario: str | None = None
 
 
 @router.get("/catalog")
@@ -105,7 +106,7 @@ def get_remediation(remediation_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=RemediationSummary)
-def create_remediation(body: RemediationCreate, db: Session = Depends(get_db)):
+def create_remediation(request: Request, body: RemediationCreate, db: Session = Depends(get_db)):
     """Crea una subsanación manual."""
     service = RemediationService(db)
     try:
@@ -119,7 +120,7 @@ def create_remediation(body: RemediationCreate, db: Session = Depends(get_db)):
             fecha_limite=body.fecha_limite,
             observaciones=body.observaciones,
             crossing_id=body.crossing_id,
-            usuario=body.usuario,
+            usuario=resolve_usuario(request, body.usuario),
         )
     except RemediationServiceError as exc:
         status = 404 if exc.code == "NOT_FOUND" else 400
@@ -129,6 +130,7 @@ def create_remediation(body: RemediationCreate, db: Session = Depends(get_db)):
 
 @router.patch("/{remediation_id}", response_model=RemediationSummary)
 def update_remediation(
+    request: Request,
     remediation_id: int,
     body: RemediationUpdate,
     db: Session = Depends(get_db),
@@ -145,7 +147,7 @@ def update_remediation(
             responsable=body.responsable,
             fecha_limite=body.fecha_limite,
             observaciones=body.observaciones,
-            usuario=body.usuario,
+            usuario=resolve_usuario(request, body.usuario),
         )
     except RemediationServiceError as exc:
         status = 404 if exc.code == "NOT_FOUND" else 400
@@ -155,6 +157,7 @@ def update_remediation(
 
 @router.patch("/{remediation_id}/estado", response_model=RemediationSummary)
 def update_estado(
+    request: Request,
     remediation_id: int,
     body: EstadoUpdate,
     db: Session = Depends(get_db),
@@ -166,7 +169,7 @@ def update_estado(
             remediation_id,
             body.estado,
             observaciones=body.observaciones,
-            usuario=body.usuario,
+            usuario=resolve_usuario(request, body.usuario),
         )
     except RemediationServiceError as exc:
         status = 404 if exc.code == "NOT_FOUND" else 400
@@ -175,9 +178,9 @@ def update_estado(
 
 
 @router.delete("/{remediation_id}")
-def delete_remediation(remediation_id: int, db: Session = Depends(get_db)):
+def delete_remediation(request: Request, remediation_id: int, db: Session = Depends(get_db)):
     """Elimina una subsanación."""
     service = RemediationService(db)
-    if not service.delete_remediation(remediation_id):
+    if not service.delete_remediation(remediation_id, resolve_usuario(request)):
         raise HTTPException(status_code=404, detail="Subsanación no encontrada")
     return {"ok": True, "deleted_id": remediation_id}

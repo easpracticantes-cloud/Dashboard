@@ -1,44 +1,147 @@
-<div class="docs cosmos-page">
-  <header class="page-hero sheet">
-    <div class="hero-glow" aria-hidden="true"></div>
-    <div class="docs-head-inner">
+<div class="docs cosmos-page docs--batch">
+  <header class="page-hero">
+    <div class="hero-row">
       <div>
-        <span class="label-caps">Documentos</span>
-        <h1 class="page-title">Archivo</h1>
-        <p class="page-lead">{{ total }} documento{{ total === 1 ? '' : 's' }} registrado{{ total === 1 ? '' : 's' }} en el sistema</p>
+        <span class="label-caps">Archivo documental AP</span>
+        <h1 class="page-title">Documentos / facturas</h1>
+        <p class="page-lead">
+          {{ total }} documento{{ total === 1 ? '' : 's' }} · carga masiva en paquetes de
+          {{ packSize }} · OCR + IA en segundo plano
+        </p>
       </div>
-      <label class="btn btn-primary btn-lg upload-head">
-        @if (subiendo) {
-          <mat-spinner diameter="18"></mat-spinner>
-          Subiendo…
-        } @else {
-          <mat-icon>upload_file</mat-icon>
-          Subir factura
-        }
-        <input
-          type="file"
-          accept=".jpg,.jpeg,.png,.pdf"
-          (change)="onFileSelected($event)"
+      <div class="hero-actions">
+        <button
+          type="button"
+          class="btn btn-secondary"
+          (click)="reprocesarPendientes()"
           [disabled]="subiendo"
-        />
-      </label>
+        >
+          <mat-icon>replay</mat-icon>
+          Reprocesar pendientes
+        </button>
+        <label class="btn btn-primary btn-lg upload-head">
+          @if (subiendo) {
+            <mat-spinner diameter="18"></mat-spinner>
+            Subiendo lote…
+          } @else {
+            <mat-icon>upload_file</mat-icon>
+            Subir facturas
+          }
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.pdf"
+            multiple
+            (change)="onFileSelected($event)"
+            [disabled]="subiendo"
+          />
+        </label>
+      </div>
     </div>
   </header>
 
-  <label class="sheet upload-hero">
+  <label
+    class="sheet upload-hero"
+    (drop)="onDrop($event)"
+    (dragover)="onDragOver($event)"
+  >
     <div class="upload-icon">
       <mat-icon>cloud_upload</mat-icon>
     </div>
-    <h2>Arrastra tus facturas aquí</h2>
-    <p>JPG, PNG o PDF — se procesarán automáticamente</p>
+    <h2>Arrastra muchas facturas aquí</h2>
+    <p>
+      JPG, PNG o PDF · se guardan todas y se analizan en paquetes de {{ packSize }}
+      (hasta 3 en paralelo por paquete)
+    </p>
     <span class="btn btn-primary btn-lg">Seleccionar archivos</span>
     <input
       type="file"
       accept=".jpg,.jpeg,.png,.pdf"
+      multiple
       (change)="onFileSelected($event)"
       [disabled]="subiendo"
     />
   </label>
+
+  @if (subiendo || loteResumen || loteMensaje) {
+    <section class="sheet batch-panel">
+      <div class="batch-head">
+        <div>
+          <span class="label-caps">Lote de análisis</span>
+          <h2>
+            @if (subiendo) {
+              Recibiendo {{ archivosEnCola }} archivo(s)…
+            } @else {
+              {{ loteResumen?.total_recibidos || 0 }} recibidas ·
+              {{ loteResumen?.packs || packTotal }} paquete(s) × {{ packSize }}
+            }
+          </h2>
+          @if (loteMensaje) {
+            <p class="batch-msg">{{ loteMensaje }}</p>
+          }
+        </div>
+        @if (procesandoCount > 0) {
+          <div class="batch-live">
+            <mat-spinner diameter="22"></mat-spinner>
+            <span>{{ procesandoCount }} en PROCESANDO</span>
+          </div>
+        }
+      </div>
+
+      <div class="batch-kpis">
+        <article class="batch-kpi ok">
+          <strong>{{ loteOkCount }}</strong>
+          <span>En cola / OK</span>
+        </article>
+        <article class="batch-kpi warn">
+          <strong>{{ loteResumen?.total_duplicados || 0 }}</strong>
+          <span>Duplicados</span>
+        </article>
+        <article class="batch-kpi bad">
+          <strong>{{ loteResumen?.total_errores || 0 }}</strong>
+          <span>Errores de carga</span>
+        </article>
+        <article class="batch-kpi">
+          <strong>{{ procesandoCount }}</strong>
+          <span>Analizando ahora</span>
+        </article>
+      </div>
+
+      @if (loteItems.length) {
+        <div class="batch-list">
+          @for (item of loteItems; track item.filename + $index) {
+            <div
+              class="batch-row"
+              [class.ok]="item.ok && !item.error && !item.duplicate_warning"
+              [class.dup]="!!item.duplicate_warning"
+              [class.err]="!item.ok || !!item.error"
+            >
+              <mat-icon>
+                {{
+                  item.error
+                    ? 'error'
+                    : item.duplicate_warning
+                      ? 'content_copy'
+                      : 'check_circle'
+                }}
+              </mat-icon>
+              <span class="name">{{ item.filename }}</span>
+              <span class="meta">
+                @if (item.error) {
+                  {{ item.error }}
+                } @else if (item.duplicate_warning) {
+                  {{ item.duplicate_warning }}
+                } @else if (item.document) {
+                  #{{ item.document.id }} · {{ labelEstado(item.document.estado, 'document') }}
+                } @else {
+                  OK
+                }
+              </span>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  }
 
   <div class="filters-bar sheet">
     <input
@@ -50,72 +153,69 @@
     />
     <select class="select" [(ngModel)]="filtroEstado" (change)="cargar()">
       @for (e of estados; track e) {
-        <option [value]="e">{{ e || 'Todos los estados' }}</option>
+        <option [value]="e">{{ e ? labelEstado(e, 'document') : 'Todos los estados' }}</option>
       }
     </select>
     <button type="button" class="btn btn-secondary" (click)="cargar()">Filtrar</button>
   </div>
 
   @if (error) {
-    <div class="alert error">{{ error }}</div>
+    <div class="alert error">
+      <mat-icon>error</mat-icon>
+      <div>
+        <strong>Error</strong>
+        <p>{{ error }}</p>
+      </div>
+    </div>
   }
 
   @if (cargando) {
-    <div class="loading">
-      <mat-spinner diameter="36"></mat-spinner>
-      <span>Cargando documentos…</span>
+    <div class="ap-skeleton-wrap">
+      <div class="skel tall"></div>
+      <div class="skel"></div>
+      <div class="skel"></div>
     </div>
-  } @else if (!documentos.length) {
+  } @else if (!error && !documentos.length) {
     <div class="sheet empty-state">
       <div class="empty-icon"><mat-icon>folder_open</mat-icon></div>
       <h2>Sin documentos</h2>
-      <p>Sube una factura para comenzar el archivo.</p>
+      <p>Suba un lote de facturas (JPG/PNG/PDF) para iniciar el ciclo AP.</p>
     </div>
-  } @else {
-    <div class="sheet table-wrap">
-      <table class="data-table">
+  } @else if (documentos.length) {
+    <div class="sheet table-wrap sticky-head dense">
+      <table class="data-table dense-table">
         <thead>
           <tr>
-            <th>Archivo</th>
             <th>Proveedor</th>
-            <th>Número</th>
-            <th>Total</th>
-            <th>Confianza</th>
+            <th>Factura</th>
+            <th>Archivo</th>
+            <th>Valor</th>
+            <th>Fecha</th>
             <th>Estado</th>
-            <th>Recibido</th>
-            <th></th>
+            <th class="col-actions">Acciones</th>
           </tr>
         </thead>
         <tbody>
           @for (doc of documentos; track doc.id) {
-            <tr>
+            <tr [class.row-lote]="esDelLote(doc.id)">
+              <td class="strong">{{ doc.proveedor_nombre || '—' }}</td>
+              <td class="mono">{{ doc.numero_documento || '—' }}</td>
               <td class="name">
                 <a [routerLink]="['/app/contabilidad/documentos', doc.id]">{{ doc.filename }}</a>
               </td>
-              <td>{{ doc.proveedor_nombre || '—' }}</td>
-              <td class="mono">{{ doc.numero_documento || '—' }}</td>
-              <td class="num">
-                @if (doc.total != null) {
-                  {{ doc.total | number:'1.0-0' }}
-                } @else {
-                  —
-                }
-              </td>
+              <td class="num">{{ formatCop(doc.total) }}</td>
+              <td class="date">{{ formatFechaContable(doc.received_at) }}</td>
               <td>
-                @if (doc.confidence_global != null) {
-                  <span class="conf-pill" [class.low]="doc.confidence_global < 75">
-                    {{ doc.confidence_global }}%
-                  </span>
-                } @else {
-                  —
-                }
+                <span class="estado-chip" [class]="toneEstado(doc.estado)">
+                  <mat-icon>{{ iconEstado(doc.estado) }}</mat-icon>
+                  {{ labelEstado(doc.estado, 'document') }}
+                </span>
               </td>
-              <td>
-                <span class="status" [class]="estadoClass(doc.estado)">{{ doc.estado }}</span>
-              </td>
-              <td class="date">{{ doc.received_at | date:'dd/MM/yy HH:mm' }}</td>
-              <td>
-                <a class="btn btn-secondary btn-sm" [routerLink]="['/app/contabilidad/documentos', doc.id]">Abrir</a>
+              <td class="actions row-actions">
+                <a class="btn btn-secondary btn-sm" [routerLink]="['/app/contabilidad/documentos', doc.id]">
+                  <mat-icon>visibility</mat-icon>
+                  Abrir
+                </a>
               </td>
             </tr>
           }

@@ -6,6 +6,7 @@ from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from domain.enums import (
+    AdjustmentAction,
     AutobitsRecordStatus,
     CrossingStatus,
     DocumentOrigin,
@@ -17,6 +18,7 @@ from domain.enums import (
     MatchType,
     PackageStatus,
     PaymentStatus,
+    PeriodClosureStatus,
     RemediationStatus,
 )
 from infrastructure.persistence.database import Base
@@ -114,6 +116,7 @@ class ImportBatchModel(Base):
     error_count: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(32), default=ImportBatchStatus.COMPLETED, index=True)
     storage_path: Mapped[str | None] = mapped_column(String(1024))
+    file_hash: Mapped[str | None] = mapped_column(String(64), index=True)
     imported_by: Mapped[str] = mapped_column(String(128), default="ANDREA")
     imported_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -301,3 +304,45 @@ class DigitalPackageModel(Base):
     document: Mapped[DocumentModel] = relationship(back_populates="packages")
     crossing: Mapped[AccountCrossingModel | None] = relationship()
     payment: Mapped[PaymentModel | None] = relationship()
+
+
+class AccountingAdjustmentModel(Base):
+    """Anulaciones y ajustes contables — Fase 4.2.
+
+    Nada se borra: toda corrección deja rastro del valor anterior y el motivo.
+    """
+
+    __tablename__ = "accounting_adjustments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(32), default=AdjustmentAction.AJUSTE, index=True)
+    motivo: Mapped[str] = mapped_column(Text, nullable=False)
+    valor_anterior: Mapped[str | None] = mapped_column(Text)
+    valor_nuevo: Mapped[str | None] = mapped_column(Text)
+    related_entity_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    usuario: Mapped[str] = mapped_column(String(128), default="SISTEMA")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class PeriodClosureModel(Base):
+    """Cierre operativo semanal (sábado–viernes) — Fase 4.6."""
+
+    __tablename__ = "period_closures"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    period_start: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    period_end: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), default=PeriodClosureStatus.OPEN, index=True)
+    summary_json: Mapped[str | None] = mapped_column(Text)
+    observaciones: Mapped[str | None] = mapped_column(Text)
+    closed_by: Mapped[str | None] = mapped_column(String(128))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    reopened_by: Mapped[str | None] = mapped_column(String(128))
+    reopened_at: Mapped[datetime | None] = mapped_column(DateTime)
+    motivo_reapertura: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )

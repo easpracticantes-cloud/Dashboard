@@ -1,23 +1,26 @@
 <div class="pend cosmos-page">
-  <header class="page-hero sheet">
-    <div class="hero-glow" aria-hidden="true"></div>
+  <header class="page-hero">
     <div class="hero-row">
       <div>
-        <span class="label-caps">Revisión del cruce</span>
-        <h1 class="page-title">Qué falta por llenar</h1>
+        <span class="label-caps">Bandeja de trabajo · Cruce</span>
+        <h1 class="page-title">Pendientes por diligenciar</h1>
         <p class="page-lead">
-          Adjunte el Excel de CRUCE DE CUENTAS. Se compara contra el reporte de Autobits
-          de la semana y el sistema le dice exactamente qué queda pendiente.
+          Lo que Autobits tiene y su Excel de cruce aún no, más campos sin FACTURA/CDC o FECHA DE PAGO.
+          Suba el Excel de CRUCE DE CUENTAS para actualizar la comparación.
         </p>
       </div>
       <div class="hero-actions">
+        <button type="button" class="btn btn-secondary" (click)="cargar()" [disabled]="cargando || subiendo">
+          <mat-icon>refresh</mat-icon>
+          Actualizar
+        </button>
         @if (pendientes?.total) {
           <button type="button" class="btn btn-secondary" (click)="exportar()">
             <mat-icon>download</mat-icon>
             Exportar CSV
           </button>
         }
-        <a routerLink="/app/contabilidad/cruce" class="btn btn-ghost">
+        <a routerLink="/app/contabilidad/cruce" class="btn btn-primary">
           <mat-icon>compare_arrows</mat-icon>
           Ir al cruce
         </a>
@@ -26,32 +29,59 @@
   </header>
 
   @if (!hasAutobits) {
-    <section class="sheet empty-banner">
-      <mat-icon>info</mat-icon>
+    <article class="ap-alert warn">
+      <div class="ap-alert-icon"><mat-icon>info</mat-icon></div>
       <div>
         <strong>Falta el Excel de Autobits</strong>
         <p>
           El cruce de cuentas se compara contra el reporte semanal.
-          Súbalo primero en <a routerLink="/app/contabilidad/autobits">Autobits</a>.
+          Súbalo primero en Autobits para habilitar esta bandeja.
         </p>
       </div>
-    </section>
+      <a routerLink="/app/contabilidad/autobits" class="btn btn-secondary btn-sm">Ir a Autobits</a>
+    </article>
   } @else if (batch) {
-    <section class="sheet base-banner">
-      <div class="base-icon"><mat-icon>table_chart</mat-icon></div>
-      <div class="base-info">
-        <span class="label-caps">Se compara contra</span>
-        <strong>{{ batch.filename }}</strong>
-        @if (periodoLabel()) {
-          <span class="base-period">Semana {{ periodoLabel() }}</span>
-        }
-        <span class="base-meta">{{ batch.imported_rows }} filas de Autobits</span>
+    <section class="period-banner open">
+      <span class="period-dot" aria-hidden="true"></span>
+      <div>
+        <strong>Base de comparación: {{ batch.filename }}</strong>
+        <div class="period-hint">
+          @if (periodoLabel()) {
+            Semana {{ periodoLabel() }} ·
+          }
+          {{ batch.imported_rows }} filas de Autobits
+        </div>
       </div>
       @if (pendientes) {
-        <div class="base-total">
-          <span class="base-num">{{ pendientes.total }}</span>
-          <span class="base-lbl">Pendientes</span>
-        </div>
+        <span class="estado-chip" [class]="pendientes.total ? 'warn' : 'final'">
+          <mat-icon>{{ pendientes.total ? 'pending_actions' : 'verified' }}</mat-icon>
+          {{ pendientes.total }} pendiente(s)
+        </span>
+      }
+    </section>
+  }
+
+  @if (!cargando && pendientes?.total) {
+    <section class="ap-kpi-grid">
+      <article class="ap-kpi sheet warn">
+        <div class="kpi-icon"><mat-icon>inbox</mat-icon></div>
+        <span class="kpi-val">{{ pendientes!.total }}</span>
+        <span class="kpi-lbl">Total pendientes</span>
+        <span class="kpi-sub">Items que requieren atención</span>
+      </article>
+      @for (t of tipos; track t.tipo) {
+        <button
+          type="button"
+          class="ap-kpi sheet sheet-hover"
+          [class]="tipoTone(t.tipo)"
+          [class.activo]="tipoActivo === t.tipo"
+          (click)="filtrar(t.tipo)"
+        >
+          <div class="kpi-icon"><mat-icon>{{ t.icono }}</mat-icon></div>
+          <span class="kpi-val">{{ t.cantidad }}</span>
+          <span class="kpi-lbl">{{ t.etiqueta }}</span>
+          <span class="kpi-sub">{{ tipoPriorityLabel(t.tipo) }}</span>
+        </button>
       }
     </section>
   }
@@ -93,147 +123,186 @@
   </div>
 
   @if (mensajeOk) {
-    <div class="alert alert-success">{{ mensajeOk }}</div>
+    <div class="alert alert-success">
+      <mat-icon>check_circle</mat-icon>
+      <div>{{ mensajeOk }}</div>
+    </div>
   }
   @if (error) {
-    <div class="alert alert-error">{{ error }}</div>
+    <div class="alert error">
+      <mat-icon>error</mat-icon>
+      <div>
+        <strong>Error</strong>
+        <p>{{ error }}</p>
+      </div>
+    </div>
   }
 
   @if (ultimaCarga) {
     <section class="sheet sheet-pad read-result">
       <h2 class="section-head">Lectura del archivo</h2>
-      <div class="read-stats">
-        <div class="rstat">
-          <span class="rstat-num">{{ ultimaCarga.lectura.filas_leidas }}</span>
-          <span class="rstat-lbl">Filas leídas</span>
-        </div>
-        <div class="rstat ok">
-          <span class="rstat-num">{{ ultimaCarga.conciliacion.emparejadas }}</span>
-          <span class="rstat-lbl">Coinciden</span>
-        </div>
-        <div class="rstat gold">
-          <span class="rstat-num">{{ ultimaCarga.conciliacion.actualizadas }}</span>
-          <span class="rstat-lbl">Actualizadas</span>
-        </div>
-        <div class="rstat warn">
-          <span class="rstat-num">{{ ultimaCarga.conciliacion.sin_correspondencia }}</span>
-          <span class="rstat-lbl">Sin match</span>
-        </div>
+      <div class="ap-kpi-grid">
+        <article class="ap-kpi sheet">
+          <span class="kpi-val">{{ ultimaCarga.lectura.filas_leidas }}</span>
+          <span class="kpi-lbl">Filas leídas</span>
+        </article>
+        <article class="ap-kpi sheet ok">
+          <span class="kpi-val">{{ ultimaCarga.conciliacion.emparejadas }}</span>
+          <span class="kpi-lbl">Coinciden</span>
+        </article>
+        <article class="ap-kpi sheet ok">
+          <span class="kpi-val">{{ ultimaCarga.conciliacion.actualizadas }}</span>
+          <span class="kpi-lbl">Actualizadas</span>
+        </article>
+        <article class="ap-kpi sheet warn">
+          <span class="kpi-val">{{ ultimaCarga.conciliacion.sin_correspondencia }}</span>
+          <span class="kpi-lbl">Sin match</span>
+        </article>
       </div>
 
-      <p class="read-note">
+      <p class="muted" style="margin-top: 0.85rem">
         {{ ultimaCarga.conciliacion.fuera_de_periodo }} fila(s) de otras semanas y
-        {{ ultimaCarga.conciliacion.sin_fecha }} sin fecha quedaron fuera del reporte:
-        el cruce histórico no se reclama.
+        {{ ultimaCarga.conciliacion.sin_fecha }} sin fecha quedaron fuera del reporte.
       </p>
 
-      <div class="read-sheets">
+      <div class="hero-actions" style="margin-top: 0.75rem">
         @for (hoja of ultimaCarga.lectura.hojas; track hoja.nombre) {
-          <span class="sheet-chip" [class.vacia]="!hoja.filas">
-            {{ hoja.nombre }}
-            <em>{{ hoja.filas }}</em>
+          <span class="estado-chip" [class]="hoja.filas ? 'info' : 'muted'">
+            {{ hoja.nombre }} · {{ hoja.filas }}
           </span>
         }
       </div>
 
       @if (ultimaCarga.conciliacion.conflictos.length) {
-        <div class="conflictos">
-          <h3>
-            <mat-icon>warning</mat-icon>
-            {{ ultimaCarga.conciliacion.conflictos.length }} dato(s) distintos al Excel
-          </h3>
-          <p>No se sobreescribieron. Revise cuál es el correcto.</p>
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Proveedor</th>
-                <th>Compra</th>
-                <th>Campo</th>
-                <th>En el sistema</th>
-                <th>En el Excel</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (c of ultimaCarga.conciliacion.conflictos; track c.crossing_id + c.campo) {
+        <div class="conflictos" style="margin-top: 1rem">
+          <article class="ap-alert warn" style="margin-bottom: 0.75rem">
+            <div class="ap-alert-icon"><mat-icon>warning</mat-icon></div>
+            <div>
+              <strong>{{ ultimaCarga.conciliacion.conflictos.length }} dato(s) distintos al Excel</strong>
+              <p>No se sobreescribieron. Revise cuál es el correcto.</p>
+            </div>
+          </article>
+          <div class="sheet table-wrap sticky-head">
+            <table class="data-table">
+              <thead>
                 <tr>
-                  <td>{{ c.proveedor || '—' }}</td>
-                  <td class="mono">{{ c.numero_compra || '—' }}</td>
-                  <td>{{ c.campo === 'factura_cdc' ? 'FACTURA/CDC' : 'FECHA DE PAGO' }}</td>
-                  <td class="mono">{{ c.en_sistema }}</td>
-                  <td class="mono gold">{{ c.en_excel }}</td>
-                  <td><a routerLink="/app/contabilidad/cruce">Abrir cruce</a></td>
+                  <th>Proveedor</th>
+                  <th>Compra</th>
+                  <th>Campo</th>
+                  <th>En el sistema</th>
+                  <th>En el Excel</th>
+                  <th class="col-actions">Acciones</th>
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (c of ultimaCarga.conciliacion.conflictos; track c.crossing_id + c.campo) {
+                  <tr>
+                    <td class="strong">{{ c.proveedor || '—' }}</td>
+                    <td class="mono">{{ c.numero_compra || '—' }}</td>
+                    <td>
+                      <span class="estado-chip warn">
+                        {{ c.campo === 'factura_cdc' ? 'FACTURA/CDC' : 'FECHA DE PAGO' }}
+                      </span>
+                    </td>
+                    <td class="mono">{{ c.en_sistema }}</td>
+                    <td class="mono">{{ c.en_excel }}</td>
+                    <td class="actions row-actions">
+                      <a class="btn btn-secondary btn-sm" routerLink="/app/contabilidad/cruce">Abrir cruce</a>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
       }
     </section>
   }
 
   @if (cargando) {
-    <div class="loading">
-      <mat-spinner diameter="32"></mat-spinner>
-      <span>Revisando el cruce…</span>
+    <div class="ap-skeleton-wrap">
+      <div class="ap-kpi-grid">
+        <div class="skel"></div>
+        <div class="skel"></div>
+        <div class="skel"></div>
+      </div>
+      <div class="skel tall"></div>
     </div>
   } @else if (hasAutobits && pendientes && !pendientes.total) {
-    <div class="sheet empty-state ok">
+    <div class="sheet empty-state">
       <div class="empty-icon"><mat-icon>verified</mat-icon></div>
-      <h2>No falta nada</h2>
-      <p>Todas las filas de la semana tienen factura, fecha de pago y soporte.</p>
+      <h2>Bandeja limpia</h2>
+      <p>
+        No hay filas de Autobits faltantes en el cruce ni campos pendientes por diligenciar
+        @if (pendientes!.ultimo_cruce?.archivo) {
+          (último Excel: {{ pendientes!.ultimo_cruce!.archivo }}).
+        } @else {
+          .
+        }
+      </p>
       <a routerLink="/app/contabilidad/pagos" class="btn btn-primary">Ir a pagos</a>
     </div>
   } @else if (pendientes?.total) {
-    <section class="tipos">
-      @for (t of tipos; track t.tipo) {
-        <button
-          type="button"
-          class="tipo-card sheet"
-          [class.activo]="tipoActivo === t.tipo"
-          (click)="filtrar(t.tipo)"
-        >
-          <span class="tipo-icon"><mat-icon>{{ t.icono }}</mat-icon></span>
-          <span class="tipo-num">{{ t.cantidad }}</span>
-          <span class="tipo-lbl">{{ t.etiqueta }}</span>
-        </button>
-      }
-    </section>
+    @if (pendientes!.ultimo_cruce?.archivo) {
+      <div class="filters-bar sheet">
+        <span class="estado-chip info">
+          <mat-icon>fact_check</mat-icon>
+          Último cruce: {{ pendientes!.ultimo_cruce!.archivo }}
+        </span>
+      </div>
+    }
+    @if (tipoActivo) {
+      <div class="filters-bar sheet">
+        <span class="estado-chip warn">Filtro: {{ tipoActivo }}</span>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="filtrar(tipoActivo)">Quitar filtro</button>
+      </div>
+    }
 
     @for (grupo of itemsVisibles; track grupo.tipo) {
-      <section class="grupo">
-        <h2 class="section-head">
-          <mat-icon>{{ grupo.icono }}</mat-icon>
-          {{ grupo.etiqueta }}
-          <span class="grupo-count">{{ grupo.items.length }}</span>
-        </h2>
-        <div class="sheet table-wrap">
+      <section class="sheet sheet-pad grupo">
+        <div class="section-head-row">
+          <h2 class="section-head">
+            <mat-icon>{{ grupo.icono }}</mat-icon>
+            {{ grupo.etiqueta }}
+          </h2>
+          <span class="estado-chip" [class]="tipoTone(grupo.tipo)">
+            {{ tipoPriorityLabel(grupo.tipo) }} · {{ grupo.items.length }}
+          </span>
+        </div>
+        <div class="table-wrap sticky-head">
           <table class="data-table">
             <thead>
               <tr>
+                <th>Prioridad</th>
                 <th>Proveedor</th>
                 <th>Compra</th>
                 <th>Reserva</th>
                 <th>Valor</th>
                 <th>Qué pasa</th>
-                <th></th>
+                <th class="col-actions">Acciones</th>
               </tr>
             </thead>
             <tbody>
               @for (item of grupo.items; track $index) {
-                <tr>
+                <tr [class.row-attention]="tipoTone(grupo.tipo) === 'bad'">
+                  <td>
+                    <span class="estado-chip" [class]="tipoTone(grupo.tipo)">
+                      {{ tipoPriorityLabel(grupo.tipo) }}
+                    </span>
+                  </td>
                   <td class="strong">{{ item.proveedor || '—' }}</td>
                   <td class="mono">{{ item.numero_compra || '—' }}</td>
                   <td class="mono">{{ item.numero_reserva || '—' }}</td>
-                  <td class="num">
-                    {{ item.valor != null ? (item.valor | number:'1.0-0') : '—' }}
-                  </td>
+                  <td class="num">{{ formatCop(item.valor) }}</td>
                   <td class="detalle">{{ item.detalle }}</td>
-                  <td>
-                    @if (item.crossing_id) {
-                      <a routerLink="/app/contabilidad/cruce">Completar</a>
+                  <td class="actions row-actions">
+                    @if (grupo.tipo === 'FALTA_EN_CRUCE') {
+                      <span class="muted">{{ accionPendienteLabel(grupo.tipo) }}</span>
+                      <a class="btn btn-secondary btn-sm" routerLink="/app/contabilidad/cruce">Ver en cruce</a>
+                    } @else if (item.crossing_id) {
+                      <a class="btn btn-primary btn-sm" routerLink="/app/contabilidad/cruce">Completar</a>
                     } @else {
-                      <span class="muted-sm">Revisar en el Excel</span>
+                      <span class="muted">{{ accionPendienteLabel(grupo.tipo) }}</span>
                     }
                   </td>
                 </tr>
@@ -243,5 +312,11 @@
         </div>
       </section>
     }
+  } @else if (hasAutobits && !pendientes) {
+    <div class="sheet empty-state">
+      <div class="empty-icon"><mat-icon>inbox</mat-icon></div>
+      <h2>Sin pendientes cargados</h2>
+      <p>Adjunte el Excel de cruce o actualice la bandeja.</p>
+    </div>
   }
 </div>

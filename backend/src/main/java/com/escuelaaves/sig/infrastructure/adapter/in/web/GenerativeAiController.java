@@ -26,12 +26,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -190,9 +192,47 @@ public class GenerativeAiController {
     }
 
     @PostMapping("/copilot")
-    @Operation(summary = "Copiloto conversacional Ave (FAQ + cotización/checklist/tools)")
+    @Operation(summary = "Ave — asistente conversacional de texto libre (cotización vía catálogo cuando aplique)")
     public ResponseEntity<CopilotResponse> copilot(@Valid @RequestBody CopilotRequest request) {
         return ResponseEntity.ok(intelligenceService.copilot(request));
+    }
+
+    @PostMapping(value = "/copilot/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(summary = "Ave — misma lógica que /copilot con revelado progresivo (SSE)")
+    public SseEmitter copilotStream(@Valid @RequestBody CopilotRequest request) {
+        SseEmitter emitter = new SseEmitter(180_000L);
+        java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                intelligenceService.copilotStream(
+                        request,
+                        delta -> {
+                            try {
+                                emitter.send(SseEmitter.event().name("delta").data(delta));
+                            } catch (Exception ex) {
+                                throw new RuntimeException(ex);
+                            }
+                        },
+                        done -> {
+                            try {
+                                emitter.send(SseEmitter.event().name("done").data(done));
+                                emitter.complete();
+                            } catch (Exception ex) {
+                                emitter.completeWithError(ex);
+                            }
+                        }
+                );
+            } catch (Exception ex) {
+                try {
+                    emitter.send(SseEmitter.event().name("error")
+                            .data(Map.of("message",
+                                    "Hubo un problema temporal con el asistente. Inténtalo nuevamente en un momento.")));
+                } catch (Exception ignored) {
+                    // ignore
+                }
+                emitter.completeWithError(ex);
+            }
+        });
+        return emitter;
     }
 
     @PostMapping("/memory/sessions")

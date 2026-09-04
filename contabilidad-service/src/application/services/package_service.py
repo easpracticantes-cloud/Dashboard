@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 
 from sqlalchemy.orm import Session
 
+from application.services.period_service import PeriodService
 from domain.enums import DocumentStatus, PackageStatus, PaymentStatus, StorageFolderType
 from infrastructure.persistence.models import DigitalPackageModel
 from infrastructure.storage.local_storage_provider import LocalStorageProvider
@@ -32,8 +33,6 @@ class PackageServiceError(Exception):
 
 
 class PackageService:
-    DEFAULT_RESPONSABLE = "KATHERINE"
-
     def __init__(self, db: Session):
         self.db = db
         self.repo = PackageRepository(db)
@@ -42,6 +41,7 @@ class PackageService:
         self.payment_repo = PaymentRepository(db)
         self.audit = AuditRepository(db)
         self.storage = LocalStorageProvider()
+        self.periods = PeriodService(db)
 
     def list_packages(
         self,
@@ -72,11 +72,15 @@ class PackageService:
         observaciones: str | None = None,
         period_start: str | None = None,
         period_end: str | None = None,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
     ) -> dict:
         doc = self.doc_repo.get_by_id(document_id)
         if not doc:
             raise PackageServiceError("Documento no encontrado.", "NOT_FOUND")
+        self.periods.ensure_period_open(
+            doc.received_at,
+            accion="generar paquetes digitales",
+        )
 
         existing = self.repo.get_by_document(document_id)
         if existing and existing.estado not in {PackageStatus.CERRADO}:
@@ -100,11 +104,12 @@ class PackageService:
                 doc.payments[0] if doc.payments else None,
             )
 
+        # Responsable: el enviado → usuario autenticado (sin inventar KATHERINE).
         package = self.repo.create(
             document_id=document_id,
             crossing_id=crossing.id if crossing else None,
             payment_id=payment.id if payment else None,
-            responsable=responsable or self.DEFAULT_RESPONSABLE,
+            responsable=(responsable or "").strip() or usuario,
             observaciones=observaciones,
             period_start=period_start,
             period_end=period_end,
@@ -118,7 +123,7 @@ class PackageService:
         self.db.refresh(package)
         return self.to_dict(package)
 
-    def generate(self, package_id: int, usuario: str = "ANDREA") -> dict:
+    def generate(self, package_id: int, usuario: str = "SISTEMA") -> dict:
         """Genera ZIP con documento, resumen y comprobantes."""
         package = self.repo.get_by_id(package_id)
         if not package:
@@ -127,6 +132,11 @@ class PackageService:
         doc = package.document
         if not doc:
             raise PackageServiceError("Documento del paquete no encontrado.", "NOT_FOUND")
+
+        self.periods.ensure_period_open(
+            doc.received_at or package.created_at,
+            accion="generar paquetes digitales",
+        )
 
         manifest = self._build_manifest(package)
         files_added: list[str] = []
@@ -185,7 +195,7 @@ class PackageService:
         estado: str,
         *,
         observaciones: str | None = None,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
     ) -> dict:
         if estado not in PackageStatus:
             raise PackageServiceError(f"Estado inválido: {estado}", "INVALID_STATUS")

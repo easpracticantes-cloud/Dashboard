@@ -1,59 +1,159 @@
 /**
- * Adaptación visual del módulo Contabilidad al design system SIG (EAS).
- * Las pantallas originales usaban tema oscuro "cosmos"; aquí se remapean a tokens del shell.
+ * Contabilidad AP — design system visual (EAS).
+ * Solo presentación: no altera reglas de negocio.
  */
 
+/* ── Page chrome ─────────────────────────────────────────── */
+.contab .cosmos-page {
+  color: var(--eas-ink);
+  font-family: inherit;
+  display: grid;
+  gap: 1rem;
+}
+
 .contab .page-hero,
-.contab .hero-glow,
-.contab .label-caps {
+.contab .viewer-hero {
+  display: block !important;
+  position: relative;
+  overflow: hidden;
+  padding: 1.25rem 1.35rem 1.35rem !important;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, #1a3d2c 8%, #fff) 0%, #fff 55%, color-mix(in srgb, #1f7a4c 6%, #fff) 100%) !important;
+  border: 1px solid var(--eas-line-soft) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 12px 28px rgba(20, 38, 28, 0.07) !important;
+}
+
+.contab .hero-glow {
   display: none !important;
+}
+
+.contab .label-caps {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.68rem !important;
+  font-weight: 750 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--eas-leaf) !important;
 }
 
 .contab .page-title {
-  display: none !important;
+  display: block !important;
+  margin: 0 0 0.35rem !important;
+  font-family: 'Montserrat', 'Sora', sans-serif !important;
+  font-size: clamp(1.35rem, 2.2vw, 1.75rem) !important;
+  font-weight: 780 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--eas-ink) !important;
+  line-height: 1.2 !important;
 }
 
 .contab .page-lead {
-  display: none !important;
+  display: block !important;
+  margin: 0 !important;
+  max-width: 62ch;
+  font-size: 0.92rem !important;
+  color: var(--eas-muted) !important;
+  line-height: 1.45 !important;
 }
 
-.contab .cosmos-page,
-.contab .dash,
-.contab .docs-page,
-.contab .autobits-page,
-.contab .crossings-page,
-.contab .payments-page,
-.contab .packages-page,
-.contab .remediations-page,
-.contab .processing-page {
-  color: var(--eas-ink);
-  font-family: inherit;
+.contab .hero-row,
+.contab .docs-head-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
+.contab .hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Period banner */
+.contab .period-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.1rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid var(--eas-line-soft);
+  background: color-mix(in srgb, var(--eas-surface) 96%, #fff);
+}
+
+.contab .period-banner.open {
+  border-color: color-mix(in srgb, #1f7a4c 35%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, #1f7a4c 10%, #fff), #fff);
+}
+
+.contab .period-banner.closed {
+  border-color: color-mix(in srgb, #c0392b 30%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, #c0392b 8%, #fff), #fff);
+}
+
+.contab .period-banner .period-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #1f7a4c;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #1f7a4c 18%, transparent);
+}
+
+.contab .period-banner.closed .period-dot {
+  background: #c0392b;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #c0392b 18%, transparent);
+}
+
+.contab .period-banner strong {
+  font-size: 0.9rem;
+}
+
+.contab .period-banner .period-hint {
+  font-size: 0.8rem;
+  color: var(--eas-muted);
+}
+
+/* Sheets / cards */
 .contab .sheet,
 .contab .card,
 .contab .panel,
 .contab .start-panel,
 .contab .kpi-card,
 .contab .filters-bar {
-  background: color-mix(in srgb, var(--eas-surface) 92%, #fff) !important;
+  background: color-mix(in srgb, var(--eas-surface) 94%, #fff) !important;
   border: 1px solid var(--eas-line-soft) !important;
   border-radius: 16px !important;
-  box-shadow: 0 10px 24px rgba(20, 38, 28, 0.06) !important;
+  box-shadow: 0 10px 24px rgba(20, 38, 28, 0.055) !important;
   color: var(--eas-ink) !important;
+}
+
+.contab .sheet-pad {
+  padding: 1.1rem 1.2rem !important;
+}
+
+.contab .sheet-hover:hover {
+  border-color: color-mix(in srgb, var(--eas-leaf) 35%, var(--eas-line-soft)) !important;
 }
 
 .contab .filters-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
-  padding: 0.85rem;
-  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0;
+  align-items: center;
 }
 
 .contab .select,
 .contab .input,
-.contab input,
+.contab input:not([type='file']):not([type='checkbox']):not([type='radio']),
 .contab select,
 .contab textarea {
   height: 40px;
@@ -70,6 +170,7 @@
   min-height: 88px;
 }
 
+/* Buttons */
 .contab .btn,
 .contab button.btn,
 .contab .btn-primary,
@@ -86,6 +187,7 @@
   color: #fff !important;
   font-weight: 700;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .contab .btn-ghost,
@@ -96,41 +198,478 @@
   border: 1px solid var(--eas-line-soft) !important;
 }
 
-.contab table,
-.contab .data-table {
-  width: 100%;
-  border-collapse: collapse;
+.contab .btn-danger,
+.contab .btn-danger-outline {
+  background: color-mix(in srgb, #c0392b 10%, #fff) !important;
+  color: #8f2419 !important;
+  border: 1px solid color-mix(in srgb, #c0392b 35%, transparent) !important;
 }
 
-.contab th,
-.contab td {
-  padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid var(--eas-line-soft);
-  text-align: left;
-  font-size: 0.86rem;
+.contab .btn-success {
+  background: linear-gradient(180deg, #1f7a4c, #145a38) !important;
+  color: #fff !important;
 }
 
-.contab th {
-  font-size: 0.72rem;
-  letter-spacing: 0.06em;
+.contab .btn-sm {
+  min-height: 32px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.78rem;
+}
+
+.contab .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.contab .actions,
+.contab .row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* KPI grid */
+.contab .kpi-grid,
+.contab .kpis,
+.contab .stats-grid,
+.contab .ap-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+}
+
+.contab .ap-kpi {
+  position: relative;
+  padding: 1.05rem 1.1rem 1.15rem;
+  display: grid;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.contab .ap-kpi .kpi-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--eas-leaf) 14%, #fff);
+  color: var(--eas-forest);
+}
+
+.contab .ap-kpi .kpi-icon mat-icon {
+  font-size: 22px;
+  width: 22px;
+  height: 22px;
+}
+
+.contab .ap-kpi .kpi-val {
+  font-family: 'Montserrat', 'Sora', sans-serif;
+  font-size: 1.65rem;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--eas-ink);
+}
+
+.contab .ap-kpi .kpi-lbl {
+  font-size: 0.78rem;
+  font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--eas-muted);
 }
 
-.contab .kpi-grid,
-.contab .kpis,
-.contab .stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+.contab .ap-kpi .kpi-sub {
+  font-size: 0.8rem;
+  color: var(--eas-muted);
 }
 
-.contab .kpi-card h3,
-.contab .kpi-value {
-  font-family: 'Montserrat', 'Sora', sans-serif;
+.contab .ap-kpi.warn .kpi-icon {
+  background: color-mix(in srgb, #c98a1a 16%, #fff);
+  color: #8a5a00;
+}
+
+.contab .ap-kpi.ok .kpi-icon {
+  background: color-mix(in srgb, #1f7a4c 16%, #fff);
+  color: #145a38;
+}
+
+.contab .ap-kpi.money .kpi-val {
+  font-size: 1.25rem;
+  color: #145a38;
+}
+
+.contab .ap-kpi.accent {
+  border-color: color-mix(in srgb, #1f7a4c 40%, transparent) !important;
+  background: linear-gradient(160deg, color-mix(in srgb, #1f7a4c 8%, #fff), #fff) !important;
+}
+
+/* Tables */
+.contab .table-wrap {
+  overflow: auto;
+  padding: 0 !important;
+}
+
+.contab table,
+.contab .data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.contab .data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: color-mix(in srgb, var(--eas-forest) 5%, #fff);
+  padding: 0.85rem 0.9rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--eas-muted);
+  border-bottom: 1px solid var(--eas-line-soft);
+  white-space: nowrap;
+}
+
+.contab .data-table tbody td {
+  padding: 0.85rem 0.9rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--eas-line-soft) 80%, transparent);
+  font-size: 0.88rem;
+  vertical-align: middle;
+}
+
+.contab .data-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.contab .data-table tbody tr:hover {
+  background: color-mix(in srgb, var(--eas-leaf) 6%, transparent);
+}
+
+.contab .data-table .strong {
+  font-weight: 700;
+}
+
+.contab .data-table .mono {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+}
+
+.contab .data-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+/* Estado chips */
+.contab .badge,
+.contab .chip,
+.contab .tag,
+.contab .estado-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
   font-weight: 750;
+  background: color-mix(in srgb, var(--eas-leaf) 12%, transparent);
+  color: var(--eas-forest);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.contab .estado-chip mat-icon {
+  font-size: 14px !important;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.contab .estado-chip.ok {
+  background: color-mix(in srgb, #1f7a4c 14%, #fff);
+  color: #145a38;
+  border-color: color-mix(in srgb, #1f7a4c 28%, transparent);
+}
+
+.contab .estado-chip.final {
+  background: linear-gradient(135deg, #145a38, #1f7a4c);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 14px rgba(20, 90, 56, 0.22);
+}
+
+.contab .estado-chip.warn {
+  background: color-mix(in srgb, #c98a1a 14%, #fff);
+  color: #8a5a00;
+  border-color: color-mix(in srgb, #c98a1a 30%, transparent);
+}
+
+.contab .estado-chip.bad {
+  background: color-mix(in srgb, #c0392b 12%, #fff);
+  color: #8f2419;
+  border-color: color-mix(in srgb, #c0392b 28%, transparent);
+}
+
+.contab .estado-chip.void {
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, #6b7280 12%, #fff),
+    color-mix(in srgb, #6b7280 12%, #fff) 6px,
+    color-mix(in srgb, #6b7280 18%, #fff) 6px,
+    color-mix(in srgb, #6b7280 18%, #fff) 12px
+  );
+  color: #4b5563;
+  border-color: color-mix(in srgb, #6b7280 35%, transparent);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.contab .estado-chip.muted {
+  background: color-mix(in srgb, var(--eas-muted) 10%, #fff);
+  color: var(--eas-muted);
+  border-color: color-mix(in srgb, var(--eas-muted) 18%, transparent);
+}
+
+.contab .estado-chip.info {
+  background: color-mix(in srgb, #2f6fad 12%, #fff);
+  color: #1f4f82;
+  border-color: color-mix(in srgb, #2f6fad 26%, transparent);
+}
+
+/* Timeline / chain */
+.contab .ap-timeline {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.85rem 0.5rem 0.35rem;
+  list-style: none;
+  margin: 0;
+}
+
+.contab .ap-timeline li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.2rem 0.55rem;
+}
+
+.contab .ap-timeline li::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: calc(-50% + 18px);
+  right: calc(50% + 18px);
+  height: 3px;
+  background: color-mix(in srgb, var(--eas-line-soft) 100%, #ccc);
+  z-index: 0;
+}
+
+.contab .ap-timeline li:first-child::before {
+  display: none;
+}
+
+.contab .ap-timeline li.done::before {
+  background: #1f7a4c;
+}
+
+.contab .ap-timeline .tl-dot {
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 2px solid color-mix(in srgb, var(--eas-muted) 35%, transparent);
+  color: var(--eas-muted);
+}
+
+.contab .ap-timeline li.done .tl-dot {
+  background: #1f7a4c;
+  border-color: #1f7a4c;
+  color: #fff;
+}
+
+.contab .ap-timeline li.current .tl-dot {
+  background: #fff;
+  border-color: #1f7a4c;
+  color: #1f7a4c;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #1f7a4c 18%, transparent);
+}
+
+.contab .ap-timeline .tl-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--eas-muted);
+}
+
+.contab .ap-timeline li.done .tl-label,
+.contab .ap-timeline li.current .tl-label {
   color: var(--eas-ink);
+}
+
+.contab .ap-timeline .tl-dot mat-icon {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+@media (max-width: 900px) {
+  .contab .ap-timeline {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .contab .ap-timeline li:nth-child(4)::before {
+    display: none;
+  }
+}
+
+/* Alerts */
+.contab .ap-alert {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: start;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--eas-line-soft);
+  background: #fff;
+}
+
+.contab .ap-alert .ap-alert-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.contab .ap-alert.bad {
+  border-color: color-mix(in srgb, #c0392b 28%, transparent);
+  background: color-mix(in srgb, #c0392b 5%, #fff);
+}
+.contab .ap-alert.bad .ap-alert-icon {
+  background: color-mix(in srgb, #c0392b 14%, #fff);
+  color: #8f2419;
+}
+
+.contab .ap-alert.warn {
+  border-color: color-mix(in srgb, #c98a1a 30%, transparent);
+  background: color-mix(in srgb, #c98a1a 6%, #fff);
+}
+.contab .ap-alert.warn .ap-alert-icon {
+  background: color-mix(in srgb, #c98a1a 16%, #fff);
+  color: #8a5a00;
+}
+
+.contab .ap-alert.info {
+  border-color: color-mix(in srgb, #2f6fad 26%, transparent);
+  background: color-mix(in srgb, #2f6fad 5%, #fff);
+}
+.contab .ap-alert.info .ap-alert-icon {
+  background: color-mix(in srgb, #2f6fad 14%, #fff);
+  color: #1f4f82;
+}
+
+.contab .ap-alert.muted {
+  background: color-mix(in srgb, var(--eas-muted) 5%, #fff);
+}
+
+.contab .ap-alert strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.contab .ap-alert p {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--eas-muted);
+}
+
+/* Empty / loading / error */
+.contab .empty-state {
+  text-align: center;
+  padding: 2.5rem 1.5rem !important;
+}
+
+.contab .empty-state .empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1rem;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--eas-leaf) 12%, #fff);
+  color: var(--eas-forest);
+}
+
+.contab .empty-state h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.contab .empty-state p {
+  margin: 0 auto 1.1rem;
+  max-width: 42ch;
+  color: var(--eas-muted);
+}
+
+.contab .loading,
+.contab .ap-skeleton-wrap {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 0;
+  justify-items: stretch;
+}
+
+.contab .loading {
+  place-items: center;
+  gap: 0.65rem;
+  color: var(--eas-muted);
+  min-height: 140px;
+}
+
+.contab .skel {
+  height: 72px;
+  border-radius: 14px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--eas-muted) 8%, #fff) 0%,
+    color-mix(in srgb, var(--eas-muted) 14%, #fff) 50%,
+    color-mix(in srgb, var(--eas-muted) 8%, #fff) 100%
+  );
+  background-size: 200% 100%;
+  animation: none;
+}
+
+.contab .skel.tall {
+  height: 120px;
+}
+
+@keyframes contab-skel {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.contab .error,
+.contab .alert-error,
+.contab .alert.error {
+  color: var(--eas-danger);
+  background: #fdf2f0;
+  border: 1px solid #f0c9c4;
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
 }
 
 .contab a {
@@ -138,47 +677,112 @@
 }
 
 .contab .muted,
-.contab .hint,
-.contab .page-lead {
+.contab .hint {
   color: var(--eas-muted) !important;
 }
 
-.contab .badge,
-.contab .chip,
-.contab .tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  background: color-mix(in srgb, var(--eas-leaf) 12%, transparent);
-  color: var(--eas-forest);
+.contab .section-head {
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 750;
 }
 
-.contab .error,
-.contab .alert-error {
-  color: var(--eas-danger);
-  background: #fdf2f0;
-  border: 1px solid #f0c9c4;
-  border-radius: 10px;
-  padding: 0.65rem 0.8rem;
+.contab .section-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.contab .section-head-row .section-head {
+  margin: 0;
+}
+
+.contab .detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.85rem;
+}
+
+.contab .detail-card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--eas-muted);
+}
+
+.contab .detail-card dl {
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.contab .detail-card dt {
+  font-size: 0.72rem;
+  color: var(--eas-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.contab .detail-card dd {
+  margin: 0.1rem 0 0;
+  font-weight: 650;
 }
 
 html[data-theme='dark'] .contab .sheet,
 html[data-theme='dark'] .contab .card,
 html[data-theme='dark'] .contab .panel,
 html[data-theme='dark'] .contab .filters-bar,
-html[data-theme='dark'] .contab .kpi-card {
+html[data-theme='dark'] .contab .kpi-card,
+html[data-theme='dark'] .contab .page-hero {
   background: color-mix(in srgb, var(--eas-surface) 100%, #000) !important;
 }
 
 html[data-theme='dark'] .contab .select,
 html[data-theme='dark'] .contab .input,
-html[data-theme='dark'] .contab input,
+html[data-theme='dark'] .contab input:not([type='file']),
 html[data-theme='dark'] .contab select,
 html[data-theme='dark'] .contab textarea {
   background: rgba(238, 244, 240, 0.05) !important;
   border-color: rgba(238, 244, 240, 0.14) !important;
   color: var(--eas-ink) !important;
+}
+
+.contab .table-wrap.sticky-head,
+.contab .sticky-head {
+  max-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.contab .sticky-head thead th,
+.contab .table-wrap.sticky-head thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: color-mix(in srgb, var(--eas-surface, #fff) 96%, #e8f0eb);
+  box-shadow: 0 1px 0 var(--eas-line-soft, #e2e8e4);
+}
+
+.contab .empty-mini {
+  padding: 0.85rem 1.15rem 1.15rem;
+}
+
+.contab .alert.error,
+.contab .alert.alert-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.contab .alert.error mat-icon,
+.contab .alert.alert-error mat-icon {
+  flex-shrink: 0;
+}
+
+.contab .alert.error p,
+.contab .alert.alert-error p {
+  margin: 0.15rem 0 0;
 }

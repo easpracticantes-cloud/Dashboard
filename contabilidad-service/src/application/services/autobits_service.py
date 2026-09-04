@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import uuid
 from datetime import datetime
@@ -29,10 +30,15 @@ IMPORT_DIR = STORAGE_ROOT / "imports"
 
 
 class AutobitsServiceError(Exception):
-    def __init__(self, message: str, code: str = "AUTOBITS_ERROR"):
+    def __init__(self, message: str, code: str = "AUTOBITS_ERROR", status_code: int = 400):
         super().__init__(message)
         self.message = message
         self.code = code
+        self.status_code = status_code
+
+
+def content_sha256(content: bytes) -> str:
+    return hashlib.sha256(content).hexdigest()
 
 
 class AutobitsService:
@@ -107,11 +113,27 @@ class AutobitsService:
         content: bytes,
         filename: str,
         *,
-        imported_by: str = "ANDREA",
+        imported_by: str = "SISTEMA",
         skip_duplicates: bool = True,
         auto_cruzar: bool = True,
+        force: bool = False,
     ) -> dict:
         """Importa Excel: la IA analiza la estructura, deduce campos y luego importa."""
+        if not content:
+            raise AutobitsServiceError("El archivo llegó vacío.", "EMPTY_FILE")
+
+        file_hash = content_sha256(content)
+        if not force:
+            existing = self.repo.find_batch_by_file_hash(file_hash)
+            if existing:
+                raise AutobitsServiceError(
+                    f"Este Excel ya fue importado (lote #{existing.id}, "
+                    f"{existing.filename}). No se permiten archivos repetidos. "
+                    "Use force=true solo si necesita forzar una reimportación.",
+                    "DUPLICATE_FILE",
+                    status_code=409,
+                )
+
         preview_id, path = self.save_preview_file(content, filename)
         try:
             preview = self.adapter.preview(path)
@@ -145,6 +167,7 @@ class AutobitsService:
                 mapping,
                 imported_by=imported_by,
                 skip_duplicates=skip_duplicates,
+                file_hash=file_hash,
             )
             result["detected_mapping"] = {k: v for k, v in mapping.items() if v}
             result["sheet_name"] = preview.sheet_name
@@ -170,6 +193,7 @@ class AutobitsService:
         except Exception as exc:
             path.unlink(missing_ok=True)
             raise AutobitsServiceError(str(exc), "IMPORT_ERROR") from exc
+
     def confirm_import(
         self,
         preview_id: str,
@@ -177,12 +201,25 @@ class AutobitsService:
         *,
         period_start: str | None = None,
         period_end: str | None = None,
-        imported_by: str = "ANDREA",
+        imported_by: str = "SISTEMA",
         skip_duplicates: bool = True,
+        file_hash: str | None = None,
+        force: bool = False,
     ) -> dict:
         preview_path = self.get_preview_path(preview_id)
         if not preview_path or not preview_path.exists():
             raise AutobitsServiceError("La vista previa expiró o no existe.", "PREVIEW_NOT_FOUND")
+
+        content = preview_path.read_bytes()
+        resolved_hash = file_hash or content_sha256(content)
+        if not force:
+            existing = self.repo.find_batch_by_file_hash(resolved_hash)
+            if existing:
+                raise AutobitsServiceError(
+                    f"Este Excel ya fue importado (lote #{existing.id}).",
+                    "DUPLICATE_FILE",
+                    status_code=409,
+                )
 
         try:
             parsed = self.adapter.parse(preview_path, mapping, validate=True)
@@ -199,7 +236,7 @@ class AutobitsService:
         archive_name = preview_path.name.split("_", 1)[-1]
         archive_path = IMPORT_DIR / f"{now.year}" / f"{now.month:02d}" / f"{preview_id}_{archive_name}"
         archive_path.parent.mkdir(parents=True, exist_ok=True)
-        archive_path.write_bytes(preview_path.read_bytes())
+        archive_path.write_bytes(content)
 
         batch = self.repo.create_batch(
             filename=archive_name,
@@ -209,6 +246,7 @@ class AutobitsService:
             total_rows=len(parsed.rows) + parsed.skipped_empty,
             storage_path=str(archive_path),
             imported_by=imported_by,
+            file_hash=resolved_hash,
         )
 
         imported = 0
@@ -300,7 +338,7 @@ class AutobitsService:
                 data["raw"] = {}
         return data
 
-    def mark_batch_ready_for_update(self, batch_id: int, usuario: str = "ANDREA") -> dict:
+    def mark_batch_ready_for_update(self, batch_id: int, usuario: str = "SISTEMA") -> dict:
         batch = self.repo.get_batch(batch_id)
         if not batch:
             raise AutobitsServiceError("Lote de importación no encontrado.", "NOT_FOUND")
@@ -342,6 +380,7 @@ class AutobitsService:
             "skipped_rows": batch.skipped_rows,
             "error_count": batch.error_count,
             "status": batch.status,
+            "file_hash": batch.file_hash,
             "imported_by": batch.imported_by,
             "imported_at": batch.imported_at.isoformat() if batch.imported_at else "",
             "column_mapping": mapping_from_json(batch.column_mapping_json),

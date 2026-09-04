@@ -11,6 +11,7 @@ from domain.enums import (
     PaymentStatus,
     RemediationStatus,
 )
+from domain.utils.money import money_sum, money_to_float
 from domain.utils.period_utils import recent_weeks, resolve_period
 from infrastructure.persistence.models import (
     AccountCrossingModel,
@@ -76,50 +77,66 @@ class DashboardService:
         docs = docs_q.all()
         doc_ids = [d.id for d in docs]
 
-        remediations_q = self.db.query(RemediationModel).filter(
-            RemediationModel.created_at >= start,
-            RemediationModel.created_at <= end,
-        )
+        # Sin documentos en el período (o tras aplicar filtros) las entidades
+        # relacionadas también quedan vacías: devolver todo el período daría KPIs
+        # que no corresponden al filtro aplicado.
         if doc_ids:
-            remediations_q = remediations_q.filter(RemediationModel.document_id.in_(doc_ids))
-        remediations = remediations_q.all()
+            remediations = (
+                self.db.query(RemediationModel)
+                .filter(
+                    RemediationModel.created_at >= start,
+                    RemediationModel.created_at <= end,
+                    RemediationModel.document_id.in_(doc_ids),
+                )
+                .all()
+            )
+            payments = (
+                self.db.query(PaymentModel)
+                .filter(
+                    PaymentModel.created_at >= start,
+                    PaymentModel.created_at <= end,
+                    PaymentModel.document_id.in_(doc_ids),
+                )
+                .all()
+            )
+            packages = (
+                self.db.query(DigitalPackageModel)
+                .filter(
+                    DigitalPackageModel.created_at >= start,
+                    DigitalPackageModel.created_at <= end,
+                    DigitalPackageModel.document_id.in_(doc_ids),
+                )
+                .all()
+            )
+            crossings = (
+                self.db.query(AccountCrossingModel)
+                .filter(
+                    AccountCrossingModel.created_at >= start,
+                    AccountCrossingModel.created_at <= end,
+                    AccountCrossingModel.document_id.in_(doc_ids),
+                )
+                .all()
+            )
+        else:
+            remediations = []
+            payments = []
+            packages = []
+            crossings = []
 
-        payments_q = self.db.query(PaymentModel).filter(
-            PaymentModel.created_at >= start,
-            PaymentModel.created_at <= end,
+        valor_docs = money_sum(d.total for d in docs)
+        valor_aprobado = money_sum(
+            d.total for d in docs if d.estado == DocumentStatus.APROBADO
         )
-        if doc_ids:
-            payments_q = payments_q.filter(PaymentModel.document_id.in_(doc_ids))
-        payments = payments_q.all()
-
-        packages_q = self.db.query(DigitalPackageModel).filter(
-            DigitalPackageModel.created_at >= start,
-            DigitalPackageModel.created_at <= end,
+        valor_pendiente = money_sum(
+            p.valor for p in payments if p.estado == PaymentStatus.PENDIENTE_PAGO
         )
-        if doc_ids:
-            packages_q = packages_q.filter(DigitalPackageModel.document_id.in_(doc_ids))
-        packages = packages_q.all()
-
-        crossings_q = self.db.query(AccountCrossingModel).filter(
-            AccountCrossingModel.created_at >= start,
-            AccountCrossingModel.created_at <= end,
-        )
-        if doc_ids:
-            crossings_q = crossings_q.filter(AccountCrossingModel.document_id.in_(doc_ids))
-        crossings = crossings_q.all()
-
-        valor_docs = sum(d.total or 0 for d in docs)
-        valor_aprobado = sum(d.total or 0 for d in docs if d.estado == DocumentStatus.APROBADO)
-        valor_pendiente = sum(
-            p.valor or 0 for p in payments if p.estado == PaymentStatus.PENDIENTE_PAGO
-        )
-        valor_pagado = sum(
-            p.valor or 0
+        valor_pagado = money_sum(
+            p.valor
             for p in payments
             if p.estado in {PaymentStatus.PAGADO, PaymentStatus.COMPLETADO}
         )
-        valor_subsanar = sum(
-            r.valor_involucrado or 0
+        valor_subsanar = money_sum(
+            r.valor_involucrado
             for r in remediations
             if r.estado in {RemediationStatus.PENDIENTE, RemediationStatus.EN_PROCESO}
         )
@@ -154,10 +171,10 @@ class DashboardService:
                 "cruces_aprobados": sum(1 for c in crossings if c.estado == CrossingStatus.APROBADO),
             },
             "totales": {
-                "valor_documentos": round(valor_docs, 2),
-                "valor_aprobado": round(valor_aprobado, 2),
-                "valor_pendiente_pago": round(valor_pendiente, 2),
-                "valor_pagado": round(valor_pagado, 2),
-                "valor_por_subsanar": round(valor_subsanar, 2),
+                "valor_documentos": money_to_float(valor_docs),
+                "valor_aprobado": money_to_float(valor_aprobado),
+                "valor_pendiente_pago": money_to_float(valor_pendiente),
+                "valor_pagado": money_to_float(valor_pagado),
+                "valor_por_subsanar": money_to_float(valor_subsanar),
             },
         }

@@ -238,7 +238,7 @@ eas-priority-chip {
 }
 
 .ave-chip:hover {
-  transform: translateY(-2px);
+  transform: none;
   background: color-mix(in srgb, var(--eas-leaf) 12%, var(--eas-surface)) !important;
   box-shadow: 0 8px 16px rgba(20, 38, 28, 0.12);
 }
@@ -249,7 +249,7 @@ eas-priority-chip {
 }
 
 .sb__link:hover {
-  transform: translateX(3px);
+  transform: none;
   border-color: rgba(255, 255, 255, 0.08);
 }
 
@@ -337,7 +337,7 @@ eas-topbar .tb {
 
 .commercial-table tbody tr:hover {
   background: color-mix(in srgb, var(--eas-amber) 10%, var(--eas-mist)) !important;
-  transform: scale(1.002);
+  transform: none;
 }
 
 .commercial-table tbody tr:nth-child(even) {
@@ -416,7 +416,7 @@ eas-conversation-row,
 .conv-row:hover,
 eas-conversation-row:hover,
 .cl-row:hover {
-  transform: translateX(4px);
+  transform: none;
   box-shadow: 0 10px 22px rgba(20, 38, 28, 0.1);
 }
 
@@ -544,7 +544,7 @@ a:not(.sb__link):not(.eas-btn-primary):hover {
 }
 
 .eas-btn-action:hover {
-  transform: translateY(-2px);
+  transform: none;
   border-color: var(--eas-leaf) !important;
   color: var(--eas-leaf) !important;
 }
@@ -577,7 +577,7 @@ eas-command-palette .cp {
 .notification-row:hover {
   background: color-mix(in srgb, var(--eas-mist) 70%, transparent);
   border-color: color-mix(in srgb, var(--eas-leaf) 20%, transparent);
-  transform: translateX(3px);
+  transform: none;
 }
 
 /* ========== 84–86 Mat tables generic ========== */
@@ -667,7 +667,7 @@ html[data-theme='dark'] .eas-btn-primary {
 
 /* ========== 96 Floating action hover lift ========== */
 .ave-doll:hover {
-  transform: translateY(-4px) scale(1.04);
+  transform: none;
 }
 
 /* ========== 97 Content fade-in for routed views ========== */
@@ -679,7 +679,7 @@ router-outlet + *,
 @keyframes eas-view-in {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: none;
   }
   to {
     opacity: 1;

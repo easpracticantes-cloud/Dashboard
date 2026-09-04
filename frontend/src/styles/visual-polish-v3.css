@@ -53,11 +53,11 @@ small { opacity: 0.92; }
 }
 
 .eas-card:hover {
-  transform: translateY(-3px);
+  transform: none;
 }
 
 .eas-card:active {
-  transform: translateY(-1px) scale(0.995);
+  transform: none;
 }
 
 .eas-panel {
@@ -76,7 +76,7 @@ small { opacity: 0.92; }
 }
 
 .eas-btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
+  transform: none;
 }
 
 .eas-btn-accent {
@@ -106,7 +106,7 @@ small { opacity: 0.92; }
 .eas-btn-secondary:hover mat-icon,
 .eas-btn-ghost:hover mat-icon,
 .eas-btn-accent:hover mat-icon {
-  transform: scale(1.06);
+  transform: none;
 }
 
 /* ===== 91–120 Forms ===== */
@@ -310,11 +310,11 @@ textarea.eas-input {
 }
 
 .ai-card:hover .ai-card__icon {
-  transform: scale(1.08) rotate(-5deg);
+  transform: none;
 }
 
 .help-card:hover .help-card__icon {
-  transform: translateY(-3px) scale(1.06);
+  transform: none;
 }
 
 .reports-stat__value {
@@ -330,7 +330,7 @@ textarea.eas-input {
 }
 
 .history-item:hover > mat-icon {
-  transform: translateX(4px);
+  transform: none;
 }
 
 .client-row.is-active {
@@ -388,7 +388,7 @@ button[aria-label='Enviar mensaje'] {
 }
 
 .fp__card:hover {
-  transform: translateY(-3px);
+  transform: none;
 }
 
 /* ===== 431–470 Shared / motion / a11y ===== */
@@ -439,9 +439,9 @@ eas-avatar .eas-avatar {
 }
 
 @keyframes eas-soft-shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-2px); }
-  75% { transform: translateX(2px); }
+  0%, 100% { transform: none; }
+  25% { transform: none; }
+  75% { transform: none; }
 }
 
 .eas-input.is-invalid,
@@ -503,7 +503,7 @@ eas-page-header + div {
 }
 
 .crow:hover {
-  transform: translateY(-1px);
+  transform: none;
   box-shadow: var(--eas-shadow-sm);
 }
 
@@ -592,7 +592,7 @@ eas-page-header + div {
 }
 
 .eas-chip:hover {
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .eas-chip.is-active {
@@ -608,7 +608,7 @@ eas-page-header + div {
 }
 
 .sb__link:hover mat-icon {
-  transform: scale(1.08);
+  transform: none;
 }
 
 .sb__link.is-active,
@@ -635,7 +635,7 @@ eas-page-header + div {
 }
 
 .dash-chart:hover {
-  transform: translateY(-2px);
+  transform: none;
   box-shadow: var(--eas-shadow-md);
 }
 
@@ -656,7 +656,7 @@ eas-page-header + div {
 }
 
 .ai-card:hover {
-  transform: translateY(-3px);
+  transform: none;
   box-shadow: var(--eas-shadow-md);
 }
 
@@ -665,7 +665,7 @@ eas-page-header + div {
 }
 
 .help-card:hover {
-  transform: translateY(-2px);
+  transform: none;
 }
 
 .reports-panel {
@@ -677,7 +677,7 @@ eas-page-header + div {
 }
 
 .notif-item:hover {
-  transform: translateX(2px);
+  transform: none;
 }
 
 .history-item {
@@ -692,7 +692,7 @@ eas-page-header + div {
 
 .settings-nav button:hover,
 .settings-nav a:hover {
-  transform: translateX(2px);
+  transform: none;
 }
 
 .cd__composer {

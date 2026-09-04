@@ -1,6 +1,7 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ContabilidadUserContext } from './contabilidad-user-context';
 
 export interface PaymentSummary {
   id: number;
@@ -29,8 +30,8 @@ export interface PaymentSummary {
 @Injectable({ providedIn: 'root' })
 export class PaymentsApiService {
   private readonly base = '/contabilidad/payments';
-
-  constructor(private readonly http: HttpClient) {}
+  private readonly http = inject(HttpClient);
+  private readonly userCtx = inject(ContabilidadUserContext);
 
   list(params?: {
     limit?: number;
@@ -48,23 +49,23 @@ export class PaymentsApiService {
   }
 
   createFromCrossing(crossingId: number): Observable<PaymentSummary> {
-    return this.http.post<PaymentSummary>(this.base, {
+    return this.http.post<PaymentSummary>(this.base, this.userCtx.withUsuario({
       crossing_id: crossingId,
-      usuario: 'ANDREA',
-    });
+    }));
   }
 
   approve(id: number): Observable<PaymentSummary> {
-    return this.http.post<PaymentSummary>(`${this.base}/${id}/approve`, {
-      usuario: 'ANDREA',
-    });
+    return this.http.post<PaymentSummary>(
+      `${this.base}/${id}/approve`,
+      this.userCtx.withUsuario({})
+    );
   }
 
   markPaid(id: number, observaciones?: string): Observable<PaymentSummary> {
-    return this.http.post<PaymentSummary>(`${this.base}/${id}/mark-paid`, {
-      usuario: 'ANDREA',
-      observaciones,
-    });
+    return this.http.post<PaymentSummary>(
+      `${this.base}/${id}/mark-paid`,
+      this.userCtx.withUsuario({ observaciones })
+    );
   }
 
   uploadReceipt(
@@ -75,14 +76,30 @@ export class PaymentsApiService {
     const form = new FormData();
     form.append('archivo', file, file.name);
     form.append('contramarcado', String(contramarcado));
-    form.append('usuario', 'ANDREA');
+    form.append('usuario', this.userCtx.username());
     return this.http.post<PaymentSummary>(`${this.base}/${id}/receipt`, form);
   }
 
   complete(id: number): Observable<PaymentSummary> {
-    return this.http.post<PaymentSummary>(`${this.base}/${id}/complete`, {
-      usuario: 'ANDREA',
-    });
+    return this.http.post<PaymentSummary>(
+      `${this.base}/${id}/complete`,
+      this.userCtx.withUsuario({})
+    );
+  }
+
+  annul(id: number, motivo: string): Observable<PaymentSummary> {
+    return this.http.post<PaymentSummary>(
+      `${this.base}/${id}/annul`,
+      this.userCtx.withUsuario({ motivo })
+    );
+  }
+
+  /** Corrige el valor dejando rastro (API `/adjust`). */
+  adjust(id: number, valor: number, motivo: string): Observable<PaymentSummary> {
+    return this.http.post<PaymentSummary>(
+      `${this.base}/${id}/adjust`,
+      this.userCtx.withUsuario({ valor, motivo })
+    );
   }
 
   exportPendingUrl(): string {

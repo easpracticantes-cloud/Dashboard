@@ -57,7 +57,7 @@ public abstract class PromptingGenerativeAiAdapter implements GenerativeAiPort {
 
     @Override
     public QuoteInterpretation interpretQuote(String message) {
-        String catalogIndex = contextRetriever.buildCompactContext(message, null, 8, 3);
+        String catalogIndex = contextRetriever.buildCompactContext(message, null, 8, 3, true);
         String system = """
                 Eres un extractor de datos para Escuela Aves Salento (tours en Quindío, Colombia).
                 Devuelve SOLO JSON válido con estas claves:

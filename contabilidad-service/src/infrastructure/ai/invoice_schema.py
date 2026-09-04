@@ -31,12 +31,16 @@ def build_invoice_text_prompt(ocr_text: str) -> str:
     if len(body) > 12000:
         body = body[:6000] + "\n…[truncated]…\n" + body[-4000:]
     return (
-        "Extrae datos de un documento contable colombiano a partir del siguiente texto OCR.\n\n"
+        "Extrae datos de un documento contable COLOMBIANO (factura física, cuenta de cobro, "
+        "recibo o comprobante) a partir del siguiente texto OCR.\n\n"
         "Responde SOLO con JSON valido. No agregues explicaciones.\n"
         "No inventes datos. Si un campo no aparece claramente, usa null.\n"
+        "Busca con cuidado: NIT/CC, número de factura o CDC, fecha de emisión, "
+        "razón social del emisor, subtotal, IVA y TOTAL A PAGAR (suele estar abajo).\n"
+        "Acepta montos con puntos de miles y coma decimal (ej. 1.250.000 o 1.250.000,00).\n"
         "Si hay ambiguedad, requiere_revision debe ser true.\n"
         "Clasifica tipo_documento: factura, cuenta_de_cobro, recibo, comprobante o desconocido.\n"
-        "Los montos deben ser numericos si se pueden identificar (sin simbolo $).\n"
+        "Los montos deben ser numericos (sin simbolo $).\n"
         'Si identificas numero de compra u orden de compra, ponlo en "compra".\n'
         'Si identificas numero de reserva, booking o confirmacion, ponlo en "reserva".\n'
         "Si faltan campos importantes, agregalos en campos_faltantes.\n\n"
@@ -51,11 +55,13 @@ def build_invoice_text_prompt(ocr_text: str) -> str:
 
 INVOICE_VISION_PROMPT = (
     "Eres un asistente contable. Analiza la IMAGEN de este documento contable colombiano "
-    "(factura, cuenta de cobro, recibo o comprobante).\n\n"
+    "(factura física impresa, cuenta de cobro, recibo o comprobante escaneado/fotografiado).\n\n"
+    "Lee TODO el documento, incluidos márgenes y pie. Prioriza: NIT, número de factura/CDC, "
+    "fecha, razón social del emisor, subtotal, IVA y TOTAL.\n"
     "Responde SOLO con JSON valido. No inventes datos. Si un campo no se ve claro, usa null.\n"
     "Clasifica tipo_documento: factura, cuenta_de_cobro, recibo, comprobante o desconocido.\n"
     'Si ves numero de compra/orden, usa "compra". Si ves reserva/booking, usa "reserva".\n'
-    "Montos numericos sin simbolo $.\n\n"
+    "Montos numericos sin simbolo $. Acepta formato colombiano de miles.\n\n"
     "Usa exactamente esta estructura:\n"
     f"{INVOICE_JSON_SCHEMA}"
 )

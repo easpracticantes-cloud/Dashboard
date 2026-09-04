@@ -1,11 +1,15 @@
-# Frontend en Render (Static Site) — SPA routing
+# Frontend SPA routing — histórico Render
 
-## Problema
+> **Producción actual:** Nginx del contenedor `frontend` (`try_files` en `frontend/nginx.conf`).  
+> Ver [`docs/ORACLE_DEPLOYMENT.md`](../docs/ORACLE_DEPLOYMENT.md).  
+> `render.yaml` está en `docs/historical/`.
+
+## Problema (Render Static Site)
 Al recargar `/app/dashboard` (F5), Render devolvía **Not Found** porque buscaba un archivo físico. Angular Router necesita que **todas** las rutas sirvan `index.html`.
 
 ## Solución en este repo
 
-1. **`render.yaml`** (raíz): rewrite oficial de Render  
+1. **Histórico `docs/historical/render.yaml`**: rewrite oficial de Render  
    `/*` → `/index.html`
 2. **`frontend/public/_redirects`**:  
    `/*    /index.html   200`  

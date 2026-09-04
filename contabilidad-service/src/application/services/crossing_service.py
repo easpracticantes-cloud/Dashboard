@@ -6,6 +6,7 @@ import json
 
 from sqlalchemy.orm import Session
 
+from application.services.period_service import PeriodClosedError, PeriodService
 from domain.autobits.business_key import business_key_from_record
 from domain.autobits.observaciones import (
     estado_compra_from_record,
@@ -40,6 +41,7 @@ class CrossingService:
         self.autobits_repo = AutobitsRepository(db)
         self.crossing_repo = CrossingRepository(db)
         self.audit = AuditRepository(db)
+        self.periods = PeriodService(db)
         self.matcher = MatchingEngine()
         self.rules = RuleEngine()
 
@@ -235,7 +237,7 @@ class CrossingService:
         *,
         batch_id: int | None = None,
         use_latest: bool = True,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
     ) -> dict:
         """
         Genera/actualiza el cruce de cuentas desde Autobits.
@@ -431,10 +433,12 @@ class CrossingService:
         self,
         *,
         batch_id: int | None = None,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
     ) -> dict:
         """Genera pagos pendientes desde filas APROBADAS del Excel vigente."""
         from application.services.payment_service import PaymentService
+
+        self.periods.ensure_period_open(accion="generar pagos")
 
         resolved = batch_id
         if not resolved:
@@ -457,6 +461,8 @@ class CrossingService:
             try:
                 payment_svc.create_from_crossing(crossing.id, usuario=usuario)
                 created += 1
+            except PeriodClosedError:
+                raise
             except Exception as exc:
                 msg = getattr(exc, "message", str(exc))
                 if "DUPLICATE" in str(getattr(exc, "code", "")):
@@ -501,15 +507,17 @@ class CrossingService:
                 crossing.observaciones = new_obs
                 changed = True
 
-        new_estado = resolve_crossing_estado(
-            factura_cdc=crossing.factura_cdc,
-            fecha_pago=crossing.fecha_pago,
-            observaciones=new_obs or crossing.observaciones,
-            estado_compra=estado_compra,
-        )
-        if crossing.estado != new_estado:
-            crossing.estado = new_estado
-            changed = True
+        # PAGADO solo lo pone mark_paid: una sync Autobits no debe degradarlo.
+        if crossing.estado != CrossingStatus.PAGADO:
+            new_estado = resolve_crossing_estado(
+                factura_cdc=crossing.factura_cdc,
+                fecha_pago=crossing.fecha_pago,
+                observaciones=new_obs or crossing.observaciones,
+                estado_compra=estado_compra,
+            )
+            if crossing.estado != new_estado:
+                crossing.estado = new_estado
+                changed = True
         return changed
 
     def complete_row(
@@ -519,12 +527,22 @@ class CrossingService:
         factura_cdc: str | None = None,
         fecha_pago: str | None = None,
         observaciones: str | None = None,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
     ) -> dict:
-        """Completa el cruce como en el Excel: FACTURA/CDC (texto) y FECHA DE PAGO."""
+        """Completa FACTURA/CDC y FECHA DE PAGO (metadatos).
+
+        ``fecha_pago`` no confirma pago bancario. El estado operativo se recalcula
+        con ``resolve_crossing_estado`` salvo si el cruce ya está ``PAGADO`` por
+        ``mark_paid`` (ese estado se preserva).
+        """
         crossing = self.crossing_repo.get_by_id(crossing_id)
         if not crossing:
             raise CrossingServiceError("Cruce no encontrado.", "NOT_FOUND")
+
+        self.periods.ensure_period_open(
+            crossing.fecha_ejecucion or crossing.created_at,
+            accion="completar cruces",
+        )
 
         if factura_cdc is not None:
             crossing.factura_cdc = factura_cdc.strip() or None
@@ -541,12 +559,14 @@ class CrossingService:
                 if observaciones is None and not (crossing.observaciones or "").strip():
                     crossing.observaciones = observaciones_from_record(record)
 
-        crossing.estado = resolve_crossing_estado(
-            factura_cdc=crossing.factura_cdc,
-            fecha_pago=crossing.fecha_pago,
-            observaciones=crossing.observaciones,
-            estado_compra=estado_compra,
-        )
+        # fecha_pago / factura / obs no confirman banco; no degradar PAGADO de mark_paid.
+        if crossing.estado != CrossingStatus.PAGADO:
+            crossing.estado = resolve_crossing_estado(
+                factura_cdc=crossing.factura_cdc,
+                fecha_pago=crossing.fecha_pago,
+                observaciones=crossing.observaciones,
+                estado_compra=estado_compra,
+            )
 
         crossing.approved_by = usuario
         self.audit.log(
@@ -587,10 +607,15 @@ class CrossingService:
         ]
         return data
 
-    def approve(self, crossing_id: int, usuario: str = "ANDREA") -> dict:
+    def approve(self, crossing_id: int, usuario: str = "SISTEMA") -> dict:
         crossing = self.crossing_repo.get_by_id(crossing_id)
         if not crossing:
             raise CrossingServiceError("Cruce no encontrado.", "NOT_FOUND")
+
+        self.periods.ensure_period_open(
+            crossing.fecha_ejecucion or crossing.created_at,
+            accion="aprobar cruces",
+        )
 
         self.crossing_repo.update_estado(
             crossing,
@@ -610,8 +635,9 @@ class CrossingService:
         self.db.refresh(crossing)
         return self.to_dict(crossing, crossing.document)
 
-    def approve_all_in_revision(self, usuario: str = "ANDREA") -> dict:
+    def approve_all_in_revision(self, usuario: str = "SISTEMA") -> dict:
         """Aprueba en lote todos los cruces EN_REVISION (acción rápida para la jefa)."""
+        self.periods.ensure_period_open(accion="aprobar cruces")
         items, _ = self.crossing_repo.list_crossings(
             limit=500,
             offset=0,
@@ -638,7 +664,7 @@ class CrossingService:
             self.db.commit()
         return {"approved": approved}
 
-    def reject(self, crossing_id: int, motivo: str, usuario: str = "ANDREA") -> dict:
+    def reject(self, crossing_id: int, motivo: str, usuario: str = "SISTEMA") -> dict:
         crossing = self.crossing_repo.get_by_id(crossing_id)
         if not crossing:
             raise CrossingServiceError("Cruce no encontrado.", "NOT_FOUND")
@@ -680,7 +706,7 @@ class CrossingService:
         self,
         crossing_id: int,
         autobits_record_id: int,
-        usuario: str = "ANDREA",
+        usuario: str = "SISTEMA",
     ) -> dict:
         crossing = self.crossing_repo.get_by_id(crossing_id)
         record = self.autobits_repo.get_record(autobits_record_id)

@@ -7,6 +7,7 @@ import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.QuotationResponse;
 import com.escuelaaves.sig.domain.ai.model.NaturalLanguageQuotation;
 import com.escuelaaves.sig.domain.ai.model.QuoteInterpretation;
 import com.escuelaaves.sig.domain.ai.model.TourPrice;
+import com.escuelaaves.sig.domain.ai.port.AiProviderFactory;
 import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
 import com.escuelaaves.sig.domain.ai.port.TourPricingPort;
 import com.escuelaaves.sig.domain.model.IntegrationCode;
@@ -35,6 +36,9 @@ import static org.mockito.Mockito.*;
 class AIServiceTest {
 
     @Mock
+    private AiProviderFactory aiProviderFactory;
+
+    @Mock
     private GenerativeAiPort generativeAiPort;
 
     @Mock
@@ -44,13 +48,15 @@ class AIServiceTest {
 
     @BeforeEach
     void setUp() {
-        aiService = new AIService(generativeAiPort, tourPricingPort);
+        lenient().when(aiProviderFactory.getActiveProvider()).thenReturn(generativeAiPort);
+        aiService = new AIService(aiProviderFactory, tourPricingPort);
     }
 
     @Test
     @DisplayName("chat delega en GenerativeAiPort y envuelve la respuesta")
     void chat_delegatesToPort() {
         when(generativeAiPort.chat(anyString(), anyString())).thenReturn("Hola desde Gemini");
+        when(generativeAiPort.providerId()).thenReturn("gemini");
 
         ChatResponse response = aiService.chat(new ChatRequest("Hola", null));
 

@@ -44,8 +44,8 @@ html[data-theme='dark'] .tb {
 .tb__icon-btn:hover {
   background: var(--eas-hover-surface);
   border-color: var(--eas-line-soft);
-  box-shadow: 0 6px 14px rgba(20, 38, 28, 0.08);
-  transform: translateY(-1px);
+  box-shadow: none;
+  transform: none;
 }
 
 .tb__sync {
@@ -69,8 +69,8 @@ html[data-theme='dark'] .tb {
 .tb__sync:hover:not(:disabled) {
   border-color: rgba(31, 122, 76, 0.35);
   background: rgba(31, 122, 76, 0.06);
-  box-shadow: 0 8px 18px rgba(31, 122, 76, 0.15);
-  transform: translateY(-1px);
+  box-shadow: none;
+  transform: none;
 }
 
 .tb__sync:disabled {
@@ -85,7 +85,7 @@ html[data-theme='dark'] .tb {
 }
 
 .tb__sync-spin {
-  animation: tb-spin 1s linear infinite;
+  animation: none;
 }
 
 @keyframes tb-spin {
@@ -139,9 +139,7 @@ html[data-theme='dark'] .tb {
 
 .tb__search:hover {
   border-color: rgba(31, 122, 76, 0.35);
-  box-shadow:
-    0 0 0 3px rgba(31, 122, 76, 0.08),
-    0 6px 14px rgba(20, 38, 28, 0.05);
+  box-shadow: none;
 }
 
 .tb__search mat-icon {
@@ -194,7 +192,7 @@ html[data-theme='dark'] .tb {
 .tb__user:hover {
   background: var(--eas-hover-surface);
   border-color: var(--eas-line-soft);
-  box-shadow: var(--eas-shadow-sm);
+  box-shadow: none;
 }
 
 .tb__user-text {

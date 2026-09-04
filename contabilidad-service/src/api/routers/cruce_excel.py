@@ -3,10 +3,11 @@
 import csv
 import io
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
+from api.deps import resolve_usuario
 from application.services.cruce_excel_service import (
     CruceExcelService,
     CruceExcelServiceError,
@@ -21,9 +22,11 @@ _EXTENSIONES = (".xlsx", ".xlsm")
 
 @router.post("/upload")
 async def upload_cruce(
+    request: Request,
     archivo: UploadFile = File(...),
     aplicar: bool = Form(True),
-    usuario: str = Form("ANDREA"),
+    force: bool = Form(False),
+    usuario: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     """Sube el Excel de cruce, lo compara con Autobits y reporta lo que falta."""
@@ -41,10 +44,14 @@ async def upload_cruce(
             content,
             archivo.filename or "cruce.xlsx",
             aplicar=aplicar,
-            usuario=usuario,
+            usuario=resolve_usuario(request, usuario),
+            force=force,
         )
     except CruceExcelServiceError as exc:
-        raise HTTPException(status_code=400, detail=exc.message) from exc
+        raise HTTPException(
+            status_code=getattr(exc, "status_code", 400) or 400,
+            detail=exc.message,
+        ) from exc
 
 
 @router.get("/pendientes")

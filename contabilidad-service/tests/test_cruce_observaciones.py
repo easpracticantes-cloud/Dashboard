@@ -1,4 +1,4 @@
-"""Tests: observaciones Autobits → estado de cruce."""
+"""Tests: observaciones Autobits → estado de cruce (sin confirmar PAGADO bancario)."""
 
 import io
 import sys
@@ -32,7 +32,8 @@ def test_extract_obs_from_columna_30():
         "Columna_30": "SE PAGO EN EFECTIVO",
     }
     assert extract_observaciones_from_raw(raw) == "SE PAGO EN EFECTIVO"
-    assert infer_crossing_status(extract_observaciones_from_raw(raw))[0] == CrossingStatus.PAGADO
+    # Nota de pago = señal operativa (APROBADO), nunca confirmación bancaria.
+    assert infer_crossing_status(extract_observaciones_from_raw(raw))[0] == CrossingStatus.APROBADO
 
 
 def test_infer_pendiente_y_vacio():
@@ -42,14 +43,38 @@ def test_infer_pendiente_y_vacio():
     assert infer_crossing_status("  ")[0] == CrossingStatus.PENDIENTE
 
 
-def test_resolve_prioriza_fecha_pago_y_factura():
+def test_infer_transferencia_no_es_pagado():
+    """B) Señales de transferencia/pago no confirman CrossingStatus.PAGADO."""
+    estado, _ = infer_crossing_status("transferencia realizada")
+    assert estado == CrossingStatus.APROBADO
+    assert estado != CrossingStatus.PAGADO
+
+
+def test_resolve_fecha_pago_no_confirma_pagado():
+    """A) fecha_pago es metadato: no produce PAGADO."""
     assert (
         resolve_crossing_estado(
             factura_cdc=None,
             fecha_pago="2026-08-01",
             observaciones="pendiente",
         )
-        == CrossingStatus.PAGADO
+        == CrossingStatus.PENDIENTE
+    )
+    assert (
+        resolve_crossing_estado(
+            factura_cdc=None,
+            fecha_pago="2026-08-01",
+            observaciones=None,
+        )
+        != CrossingStatus.PAGADO
+    )
+    assert (
+        resolve_crossing_estado(
+            factura_cdc="FV 1",
+            fecha_pago="2026-08-01",
+            observaciones="efectivo",
+        )
+        == CrossingStatus.APROBADO
     )
     assert (
         resolve_crossing_estado(
@@ -65,7 +90,15 @@ def test_resolve_prioriza_fecha_pago_y_factura():
             fecha_pago=None,
             observaciones="efectivo",
         )
-        == CrossingStatus.PAGADO
+        == CrossingStatus.APROBADO
+    )
+    assert (
+        resolve_crossing_estado(
+            factura_cdc=None,
+            fecha_pago=None,
+            observaciones="efectivo",
+        )
+        != CrossingStatus.PAGADO
     )
 
 
@@ -101,6 +134,7 @@ def client():
 
 
 def test_seed_respeta_observaciones_autobits(client):
+    """E) Observación de pago en Autobits no confirma PAGADO."""
     fake = ExcelAIAnalysis(
         mapping={
             "proveedor": "Nombre Proveedor (Orden de Compra)",
@@ -142,16 +176,17 @@ def test_seed_respeta_observaciones_autobits(client):
     assert by_oc["COM-OBS-001"]["estado"] == "PENDIENTE"
     assert by_oc["COM-OBS-001"]["observaciones"] == "pendiente"
 
-    assert by_oc["COM-OBS-002"]["estado"] == "PAGADO"
+    assert by_oc["COM-OBS-002"]["estado"] == "APROBADO"
+    assert by_oc["COM-OBS-002"]["estado"] != "PAGADO"
     assert "efectivo" in (by_oc["COM-OBS-002"]["observaciones"] or "").lower()
 
     assert by_oc["COM-OBS-003"]["estado"] == "PENDIENTE"
     assert by_oc["COM-OBS-003"]["observaciones"] in (None, "")
 
-    # Re-seed no debe romper estados ya inferidos
+    # Re-seed conserva estado operativo (APROBADO por señal, no PAGADO)
     sync = client.post("/api/crossings/seed-from-autobits", json={"usuario": "ANDREA"})
     assert sync.status_code == 200
     assert sync.json().get("updated") is not None
     again = {i["numero_compra"]: i for i in client.get("/api/crossings?limit=50").json()["items"]}
-    assert again["COM-OBS-002"]["estado"] == "PAGADO"
+    assert again["COM-OBS-002"]["estado"] == "APROBADO"
     assert again["COM-OBS-001"]["observaciones"] == "pendiente"
