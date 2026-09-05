@@ -139,6 +139,13 @@ export class CrossingsApiService {
     );
   }
 
+  runMatching(batchId?: number): Observable<{ matched?: number; created?: number; updated?: number }> {
+    return this.http.post<{ matched?: number; created?: number; updated?: number }>(
+      `${this.base}/run`,
+      this.userCtx.withUsuario({ batch_id: batchId ?? null, force: true })
+    );
+  }
+
   reject(id: number, motivo: string): Observable<CrossingSummary> {
     return this.http.post<CrossingSummary>(
       `${this.base}/${id}/reject`,

@@ -1,0 +1,276 @@
+<div class="wiz">
+  <header class="wiz__hero">
+    <p class="wiz__eyebrow">Contabilidad · semana operativa</p>
+    <h2>Paso a paso</h2>
+    <p class="wiz__lead">
+      1) Autobits trae compra, fecha, cliente y valor.
+      2) El Excel de cruces dice qué FACTURA/CDC y fecha de pago ya están.
+      3) Las facturas se cruzan contra Autobits — hasta 25 a la vez.
+    </p>
+    <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando">
+      {{ limpiando ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
+    </button>
+  </header>
+
+  @if (error) {
+    <p class="wiz__alert wiz__alert--bad">{{ error }}</p>
+  }
+  @if (aviso) {
+    <p class="wiz__alert">{{ aviso }}</p>
+  }
+
+  <ol class="wiz__steps">
+    @for (s of steps; track s.n) {
+      <li [class.is-on]="paso === s.n" [class.is-done]="paso > s.n">
+        <span class="wiz__num">{{ s.n }}</span>
+        <div>
+          <strong>{{ s.title }}</strong>
+          <small>{{ s.hint }}</small>
+        </div>
+      </li>
+    }
+  </ol>
+
+  @if (autobits || comparacion.length || documentos.length) {
+    <ul class="wiz__kpis">
+      <li><strong>{{ kpis.autobits }}</strong><span>Autobits</span></li>
+      <li><strong>{{ kpis.cruce }}</strong><span>Filas cruce</span></li>
+      <li><strong>{{ kpis.incompletas }}</strong><span>Faltan datos</span></li>
+      <li><strong>{{ kpis.completas }}</strong><span>Completas</span></li>
+      <li><strong>{{ kpis.facturas }}</strong><span>Facturas</span></li>
+    </ul>
+  }
+
+  <section class="wiz__card" [class.is-dim]="paso < 1">
+    <h3>1. Excel de Autobits</h3>
+    <p>Reporte de la semana. De aquí salen orden de compra, reserva, fecha, cliente y valor.</p>
+    <label class="wiz__drop">
+      <input type="file" accept=".xlsx,.xls,.xlsm,.csv" (change)="onAutobits($event)" [disabled]="subiendoAutobits" />
+      <mat-icon>upload_file</mat-icon>
+      <span>{{ subiendoAutobits ? 'Leyendo Autobits…' : 'Soltar o elegir Excel de Autobits' }}</span>
+    </label>
+    @if (autobits) {
+      <div class="wiz__meta">
+        <span>{{ autobits.batch.filename }}</span>
+        <span>{{ autobits.imported_rows }} filas</span>
+        <span>{{ autobits.batch.period_start }} → {{ autobits.batch.period_end }}</span>
+        @if (autobits.skipped_duplicates) {
+          <span>Duplicados rechazados: {{ autobits.skipped_duplicates }}</span>
+        }
+      </div>
+    }
+    @if (records.length) {
+      <div class="wiz__table-wrap">
+        <table class="wiz__table">
+          <thead>
+            <tr>
+              <th>Proveedor</th>
+              <th>Compra</th>
+              <th>Reserva</th>
+              <th>Fecha</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of records.slice(0, 8); track r.id) {
+              <tr>
+                <td>{{ r.proveedor || '—' }}</td>
+                <td>{{ r.numero_compra || '—' }}</td>
+                <td>{{ r.numero_reserva || '—' }}</td>
+                <td>{{ r.fecha || '—' }}</td>
+                <td>{{ formatCop(r.valor) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (records.length > 8) {
+        <p class="wiz__hint">Mostrando 8 de {{ records.length }} filas importadas.</p>
+      }
+    }
+  </section>
+
+  <section class="wiz__card" [class.is-dim]="paso < 2">
+    <h3>2. Excel de cruces (CRUCE DE CUENTAS)</h3>
+    <p>
+      Hojas por mes, bloques por proveedor:
+      FECHA · COMPRA · REF · VALOR · FACTURA/CDC · FECHA DE PAGO.
+      También lee VENTAS_DUSTER, CDC BOSQUE DE PALMAS y PRECOMPRA LUGER.
+    </p>
+    <label class="wiz__drop">
+      <input type="file" accept=".xlsx,.xlsm" (change)="onCruce($event)" [disabled]="subiendoCruce || !autobits" />
+      <mat-icon>compare_arrows</mat-icon>
+      <span>{{ subiendoCruce ? 'Conciliando…' : 'Soltar o elegir CRUCE DE CUENTAS' }}</span>
+    </label>
+    @if (cruce) {
+      <div class="wiz__meta">
+        <span>{{ cruce.archivo }}</span>
+        <span>{{ cruce.lectura.filas_leidas }} filas leídas</span>
+        <span>{{ cruce.conciliacion.emparejadas }} emparejadas</span>
+        <span>{{ cruce.pendientes.total }} pendientes</span>
+        @for (h of cruce.lectura.hojas; track h.nombre) {
+          <span>{{ h.nombre }} · {{ h.filas }}</span>
+        }
+      </div>
+    }
+  </section>
+
+  @if (comparacion.length) {
+    <section class="wiz__card">
+      <div class="wiz__row">
+        <div>
+          <h3>Qué falta y en qué lado</h3>
+          <p class="wiz__hint">
+            Autobits a la izquierda, Excel a la derecha. Copiar pega una fila lista para el bloque:
+            FECHA · COMPRA · REF · VALOR · FACTURA/CDC · FECHA DE PAGO.
+          </p>
+        </div>
+        <div class="wiz__row-actions">
+          <label class="wiz__check">
+            <input type="checkbox" [(ngModel)]="soloPendientes" />
+            Solo lo que falta
+          </label>
+          <button type="button" class="wiz__copy" (click)="copiarPendientes()">Copiar pendientes</button>
+        </div>
+      </div>
+      <div class="wiz__table-wrap">
+        <table class="wiz__table wiz__table--cmp">
+          <thead>
+            <tr>
+              <th>Proveedor</th>
+              <th>Autobits</th>
+              <th>Excel de cruce</th>
+              <th>Falta / lado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of comparacionVista; track $index) {
+              <tr>
+                <td>{{ row.proveedor || '—' }}</td>
+                <td>
+                  <div>{{ texto(row.lado_autobits['compra']) }} · {{ texto(row.lado_autobits['reserva']) }}</div>
+                  <small>{{ texto(row.lado_autobits['fecha']) }} · {{ dinero(row.lado_autobits['valor']) }}</small>
+                </td>
+                <td>
+                  <div>{{ texto(row.lado_excel['factura'] || row.lado_excel['compra']) }}</div>
+                  <small>
+                    {{ texto(row.lado_excel['hoja']) }}
+                    {{ texto(row.lado_excel['celda_factura'] || row.lado_excel['celda_pago'] || row.lado_excel['celda_compra']) }}
+                    · {{ texto(row.lado_excel['fecha_pago']) }}
+                  </small>
+                </td>
+                <td>
+                  @for (f of row.faltas; track f) {
+                    <div class="wiz__miss">{{ f }}</div>
+                  }
+                  @if (!row.faltas.length) {
+                    <span class="wiz__ok">Completo</span>
+                  }
+                  @if (row.accion) {
+                    <small>{{ row.accion }}</small>
+                  }
+                </td>
+                <td>
+                  <button type="button" class="wiz__copy" (click)="copiar(row.copiar)">Copiar</button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  <section class="wiz__card" [class.is-dim]="paso < 3">
+    <h3>3. Facturas de la semana</h3>
+    <p>
+      Puedes soltar las 70. Se analizan en bloques de 25, varias al mismo tiempo.
+      Duplicados se rechazan. Se cruzan con Autobits (compra, fecha, cliente).
+    </p>
+    <label class="wiz__drop">
+      <input
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        multiple
+        (change)="onFacturas($event)"
+        [disabled]="subiendoFacturas || !autobits"
+      />
+      <mat-icon>photo_library</mat-icon>
+      <span>{{ subiendoFacturas ? 'Subiendo y encolando OCR…' : 'Soltar facturas (PDF o foto), hasta 25 por bloque' }}</span>
+    </label>
+    @if (packMsg) {
+      <p class="wiz__hint">{{ packMsg }}</p>
+    }
+    @if (facturaItems.length) {
+      <ul class="wiz__files">
+        @for (it of facturaItems; track it.filename) {
+          <li [class.is-bad]="!it.ok">
+            <strong>{{ it.filename }}</strong>
+            <small>{{ it.ok ? (it.document?.estado || 'en cola') : it.error }}</small>
+          </li>
+        }
+      </ul>
+    }
+    @if (documentos.length) {
+      <h4 class="wiz__sub">Ya importadas</h4>
+      <div class="wiz__table-wrap">
+        <table class="wiz__table">
+          <thead>
+            <tr>
+              <th>Archivo</th>
+              <th>N° factura</th>
+              <th>Proveedor</th>
+              <th>Total</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of documentos; track d.id) {
+              <tr>
+                <td>{{ d.filename }}</td>
+                <td>{{ d.numero_documento || '—' }}</td>
+                <td>{{ d.proveedor_nombre || '—' }}</td>
+                <td>{{ formatCop(d.total) }}</td>
+                <td>{{ d.estado }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  @if (crossings.length) {
+    <section class="wiz__card">
+      <h3>Relación factura ↔ Autobits</h3>
+      <p class="wiz__hint">Queda lista para el contramarcado que pediremos a la IA después.</p>
+      <div class="wiz__table-wrap">
+        <table class="wiz__table">
+          <thead>
+            <tr>
+              <th>Proveedor</th>
+              <th>Compra / reserva</th>
+              <th>Fecha Autobits</th>
+              <th>Valor Autobits</th>
+              <th>Factura</th>
+              <th>Match</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of crossings; track c.id) {
+              <tr>
+                <td>{{ c.proveedor || '—' }}</td>
+                <td>{{ c.numero_compra || '—' }} · {{ c.numero_reserva || '—' }}</td>
+                <td>{{ c.fecha_ejecucion || '—' }}</td>
+                <td>{{ formatCop(c.valor_autobits) }}</td>
+                <td>{{ c.factura_cdc || c.document_numero || '—' }}</td>
+                <td>{{ c.match_type }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</div>

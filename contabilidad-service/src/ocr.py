@@ -33,6 +33,12 @@ PALABRAS_CLAVE_FACTURA = [
     "Proveedor",
     "Resolución",
     "Resolucion",
+    "FPOS",
+    "FE POS",
+    "FV POS",
+    "Cuenta de Cobro",
+    "Régimen",
+    "Regimen",
 ]
 
 
@@ -97,18 +103,22 @@ def extraer_texto_imagen(ruta_imagen):
         if imagen.mode not in ("RGB", "L"):
             imagen = imagen.convert("RGB")
 
-        # Upscale textos muy pequeños (fotos de celular)
+        # Fotos de celular / facturas físicas: subir a 1800px mínimo
         w, h = imagen.size
-        if max(w, h) < 1200:
-            scale = 1200 / max(w, h)
+        if max(w, h) < 1800:
+            scale = 1800 / max(w, h)
             imagen = imagen.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
-        lang = (get_settings().tesseract_lang or "spa").strip() or "spa"
+        lang = (get_settings().tesseract_lang or "spa+eng").strip() or "spa+eng"
+        if "eng" not in lang and "spa" in lang:
+            lang = "spa+eng"
         configs = [
             "--oem 3 --psm 6",
             "--oem 3 --psm 4",
             "--oem 3 --psm 3",
             "--oem 3 --psm 11",
+            "--oem 3 --psm 1",
+            "--oem 3 --psm 12",
         ]
         mejores = []
         for cfg in configs:
@@ -169,9 +179,18 @@ def extraer_texto_con_fallback(ruta_original, ruta_preprocesada=None):
     caracteres_preprocesada = 0
 
     if ruta_preprocesada and Path(ruta_preprocesada).exists():
-        texto_preprocesado = extraer_texto_imagen(ruta_preprocesada)
-        puntaje_preprocesado = calcular_puntaje_ocr(texto_preprocesado)
-        caracteres_preprocesada = puntaje_preprocesado["caracteres"]
+        from preprocesamiento import variantes_preprocesadas
+
+        candidatos = []
+        for variante in variantes_preprocesadas(ruta_preprocesada) or [Path(ruta_preprocesada)]:
+            texto_v = extraer_texto_imagen(variante)
+            if texto_v:
+                candidatos.append((calcular_puntaje_ocr(texto_v), texto_v))
+        if candidatos:
+            puntaje_preprocesado, texto_preprocesado = max(
+                candidatos, key=lambda item: item[0]["puntaje"]
+            )
+            caracteres_preprocesada = puntaje_preprocesado["caracteres"]
 
     mejora_caracteres = caracteres_preprocesada - caracteres_original
     mejora_porcentaje = 0

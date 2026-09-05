@@ -1,4 +1,4 @@
-"""Purge de Excels Autobits/Cruce y datos derivados (sin borrar facturas subidas)."""
+"""Purge de Excels Autobits/Cruce, facturas importadas y datos derivados."""
 
 from __future__ import annotations
 
@@ -11,9 +11,12 @@ from config.settings import get_settings
 from infrastructure.persistence.models import (
     AccountCrossingModel,
     AutobitsRecordModel,
+    DigitalPackageModel,
+    DocumentModel,
     ImportBatchModel,
     PaymentModel,
     PaymentReceiptModel,
+    ProcessingJobModel,
     PurchaseModel,
     RemediationModel,
     ReservationModel,
@@ -144,6 +147,11 @@ class ExcelPurgeService:
             )
 
         deleted["files"] = self._wipe_disk(storage_paths)
+        docs = self.purge_documents(commit=False)
+        deleted["documents"] = docs.get("documents", 0)
+        deleted["jobs"] = docs.get("jobs", 0)
+        deleted["packages"] = docs.get("packages", 0)
+        deleted["files"] += docs.get("files", 0)
 
         self.audit.log(
             "PURGE_EXCELS",
@@ -154,6 +162,63 @@ class ExcelPurgeService:
         )
         self.db.commit()
         return {"ok": True, "deleted": deleted}
+
+    def purge_documents(self, *, commit: bool = True) -> dict:
+        """Borra facturas importadas y sus archivos. Deja cruces sin document_id."""
+        deleted = {"documents": 0, "jobs": 0, "packages": 0, "files": 0}
+        docs = self.db.query(DocumentModel).all()
+        if not docs:
+            if commit:
+                self.db.commit()
+            return deleted
+
+        doc_ids = [d.id for d in docs]
+        paths = [Path(d.storage_path) for d in docs if d.storage_path]
+
+        deleted["jobs"] = (
+            self.db.query(ProcessingJobModel)
+            .filter(ProcessingJobModel.document_id.in_(doc_ids))
+            .delete(synchronize_session=False)
+        )
+        self.db.query(AccountCrossingModel).filter(
+            AccountCrossingModel.document_id.in_(doc_ids)
+        ).update({AccountCrossingModel.document_id: None}, synchronize_session=False)
+        self.db.query(RemediationModel).filter(
+            RemediationModel.document_id.in_(doc_ids)
+        ).delete(synchronize_session=False)
+        deleted["packages"] = (
+            self.db.query(DigitalPackageModel)
+            .filter(DigitalPackageModel.document_id.in_(doc_ids))
+            .delete(synchronize_session=False)
+        )
+        pay_ids = [
+            p.id
+            for p in self.db.query(PaymentModel.id)
+            .filter(PaymentModel.document_id.in_(doc_ids))
+            .all()
+        ]
+        if pay_ids:
+            self.db.query(PaymentReceiptModel).filter(
+                PaymentReceiptModel.payment_id.in_(pay_ids)
+            ).delete(synchronize_session=False)
+            self.db.query(PaymentModel).filter(PaymentModel.id.in_(pay_ids)).delete(
+                synchronize_session=False
+            )
+        deleted["documents"] = (
+            self.db.query(DocumentModel)
+            .filter(DocumentModel.id.in_(doc_ids))
+            .delete(synchronize_session=False)
+        )
+        for p in paths:
+            try:
+                if p.exists() and p.is_file():
+                    p.unlink()
+                    deleted["files"] += 1
+            except OSError:
+                pass
+        if commit:
+            self.db.commit()
+        return deleted
 
     def _wipe_disk(self, batch_paths: list[Path]) -> int:
         removed = 0

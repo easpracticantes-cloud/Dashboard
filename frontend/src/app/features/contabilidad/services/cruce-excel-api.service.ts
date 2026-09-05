@@ -21,6 +21,12 @@ export interface PendienteItem {
   numero_reserva?: string | null;
   valor?: number | null;
   origen: string;
+  hoja?: string | null;
+  fila?: number | null;
+  celda?: string | null;
+  lado_autobits?: Record<string, unknown>;
+  lado_excel?: Record<string, unknown>;
+  copiar?: string;
 }
 
 export interface PendientesResumen {
@@ -45,6 +51,13 @@ export interface PendientesResponse {
   has_autobits: boolean;
   batch: CruceBatchInfo | null;
   pendientes: PendientesData;
+  comparacion?: ComparacionFila[];
+  ultimo_cruce?: {
+    archivo?: string;
+    aplicado?: boolean;
+    timestamp?: string;
+    sobrantes?: number;
+  } | null;
 }
 
 export interface ConflictoCruce {
@@ -54,6 +67,16 @@ export interface ConflictoCruce {
   en_excel: string;
   proveedor?: string | null;
   numero_compra?: string | null;
+}
+
+export interface ComparacionFila {
+  crossing_id?: number | null;
+  proveedor?: string | null;
+  lado_autobits: Record<string, unknown>;
+  lado_excel: Record<string, unknown>;
+  faltas: string[];
+  accion?: string;
+  copiar: string;
 }
 
 export interface CruceUploadResult {
@@ -74,6 +97,7 @@ export interface CruceUploadResult {
     actualizadas: number;
     conflictos: ConflictoCruce[];
   };
+  comparacion?: ComparacionFila[];
   pendientes: PendientesData;
 }
 

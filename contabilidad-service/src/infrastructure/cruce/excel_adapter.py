@@ -11,11 +11,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 
 from domain.cruce.fields import (
     CruceParseResult,
     ParsedCruceRow,
     fold,
+    header_specificity,
     is_header_text,
     looks_like_invoice,
     looks_like_provider,
@@ -25,8 +27,23 @@ from domain.cruce.fields import (
     to_text,
 )
 
-MAX_BLOCK_GAP = 2
+# Un hueco de columna vacía separa bloques laterales (proveedor A | proveedor B).
+MAX_BLOCK_GAP = 1
 PROVIDER_LOOKBACK = 8
+_MESES = {
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+}
 
 
 class CruceImportError(Exception):
@@ -77,13 +94,32 @@ class CruceExcelAdapter:
     def _parse_sheet(self, name: str, matrix: list[list]) -> list[ParsedCruceRow]:
         out: list[ParsedCruceRow] = []
         bloques: list[tuple[dict[str, int], str | None]] = []
+        tabla: dict[str, int] | None = None
+        tabla_proveedor: str | None = None
 
         for idx, row in enumerate(matrix):
+            if self._looks_like_autobits_table(row):
+                tabla = self._map_table_columns(row)
+                tabla_proveedor = self._table_provider(name, row)
+                bloques = []
+                continue
+
             if self._is_header_row(row):
+                tabla = None
                 bloques = [
                     (block, self._provider_above(matrix, idx, block))
                     for block in self._extract_blocks(row)
                 ]
+                continue
+
+            if tabla:
+                parsed = self._row_from_block(
+                    name, idx + 1, row, tabla, tabla_proveedor
+                )
+                if parsed and not parsed.is_empty():
+                    if parsed.nit and fold(parsed.nit) in _MESES:
+                        parsed.nit = None
+                    out.append(parsed)
                 continue
 
             if not bloques:
@@ -97,6 +133,50 @@ class CruceExcelAdapter:
                     out.append(parsed)
         return out
 
+    def _looks_like_autobits_table(self, row: list) -> bool:
+        """VENTAS_DUSTER / CDC BOSQUE: una tabla Autobits, no bloques laterales."""
+        folded = [fold(c) for c in row if c is not None]
+        joined = " | ".join(folded)
+        if "codigo orden de compra" not in joined:
+            return False
+        return any(
+            token in joined
+            for token in (
+                "nit/cc",
+                "nombre proveedor",
+                "precio eas",
+                "codigo reserva",
+            )
+        )
+
+    def _map_table_columns(self, row: list) -> dict[str, int]:
+        mapping: dict[str, int] = {}
+        headers: dict[str, object] = {}
+        for idx, cell in enumerate(row):
+            if cell is None:
+                continue
+            campo = match_block_field(cell)
+            if not campo:
+                continue
+            if campo in mapping:
+                if header_specificity(campo, cell) > header_specificity(campo, headers[campo]):
+                    mapping[campo] = idx
+                    headers[campo] = cell
+                continue
+            mapping[campo] = idx
+            headers[campo] = cell
+        return mapping
+
+    def _table_provider(self, sheet: str, row: list) -> str | None:
+        folded_sheet = fold(sheet)
+        if "bosque" in folded_sheet:
+            return "PARQUE NATURAL Y CULTURAL BOSQUE DE PALMAS SAS"
+        if "duster" in folded_sheet:
+            return "VENTAS DUSTER"
+        if "luger" in folded_sheet:
+            return "PRECOMPRA LUGER"
+        return None
+
     def _is_header_row(self, row: list) -> bool:
         campos = {match_block_field(cell) for cell in row if cell is not None}
         campos.discard(None)
@@ -105,26 +185,36 @@ class CruceExcelAdapter:
         return bool(campos & {"valor", "factura", "pago", "fecha"})
 
     def _extract_blocks(self, row: list) -> list[dict[str, int]]:
-        indexados: list[tuple[int, str]] = []
+        indexados: list[tuple[int, str, object]] = []
         for idx, cell in enumerate(row):
             if cell is None:
                 continue
             campo = match_block_field(cell)
             if campo:
-                indexados.append((idx, campo))
+                indexados.append((idx, campo, cell))
         if not indexados:
             return []
 
         bloques: list[dict[str, int]] = []
         actual: dict[str, int] = {}
+        headers: dict[str, object] = {}
         anterior: int | None = None
-        for idx, campo in indexados:
+        for idx, campo, cell in indexados:
+            mismo_bloque = anterior is not None and idx - anterior <= MAX_BLOCK_GAP
+            if campo in actual and mismo_bloque:
+                if header_specificity(campo, cell) > header_specificity(campo, headers.get(campo)):
+                    actual[campo] = idx
+                    headers[campo] = cell
+                anterior = idx
+                continue
             corta = anterior is not None and (idx - anterior > MAX_BLOCK_GAP or campo in actual)
             if corta:
                 if self._block_is_useful(actual):
                     bloques.append(actual)
                 actual = {}
+                headers = {}
             actual[campo] = idx
+            headers[campo] = cell
             anterior = idx
         if self._block_is_useful(actual):
             bloques.append(actual)
@@ -204,6 +294,12 @@ class CruceExcelAdapter:
         if proveedor and looks_like_invoice(proveedor):
             proveedor = None
 
+        def celda(campo: str) -> str | None:
+            idx = block.get(campo)
+            if idx is None:
+                return None
+            return f"{sheet}!{get_column_letter(idx + 1)}{row_number}"
+
         return ParsedCruceRow(
             sheet=sheet,
             row_number=row_number,
@@ -218,6 +314,9 @@ class CruceExcelAdapter:
             fecha_ejecucion=to_date(get("fecha")),
             estado_compra=to_text(get("estado")),
             observaciones=to_text(get("observaciones")),
+            celda_factura=celda("factura"),
+            celda_pago=celda("pago"),
+            celda_compra=celda("compra"),
         )
 
     def _texto_pago(self, value) -> str | None:

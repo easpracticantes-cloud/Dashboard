@@ -103,11 +103,17 @@ class DocumentService:
         dest_dir = STORAGE_ROOT / str(now.year) / f"{now.month:02d}" / tipo_folder
         dest_dir.mkdir(parents=True, exist_ok=True)
 
+        dup = self.duplicates.check_bytes(file_content)
+        if dup.is_duplicate:
+            raise DocumentUploadError(
+                dup.reason or "Archivo duplicado. No se permite volver a importarlo.",
+                "DUPLICATE_FILE",
+            )
+
         unique_name = f"{uuid.uuid4().hex[:8]}_{safe_name}"
         dest_path = dest_dir / unique_name
         dest_path.write_bytes(file_content)
 
-        dup = self.duplicates.check_file(dest_path)
         doc = self.repo.create_from_file(
             dest_path,
             origen=origen,
@@ -117,20 +123,9 @@ class DocumentService:
         if tipo:
             doc.tipo = tipo.upper()
 
-        if dup.is_duplicate:
-            doc.estado = DocumentStatus.DUPLICADO
-            doc.observaciones = dup.reason
-            doc.requiere_revision = True
-            self.audit.log(
-                "DUPLICADO_DETECTADO",
-                "Document",
-                str(doc.id),
-                valor_nuevo=dup.reason,
-            )
-
         self.db.commit()
         self.db.refresh(doc)
-        return doc, dup if dup.is_duplicate else None
+        return doc, None
 
     def update_estado(self, doc_id: int, nuevo_estado: str, usuario: str = "SISTEMA") -> DocumentModel:
         doc = self.repo.get_by_id(doc_id)

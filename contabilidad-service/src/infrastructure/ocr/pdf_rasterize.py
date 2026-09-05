@@ -12,7 +12,7 @@ def is_pdf(path: Path | str) -> bool:
     return Path(path).suffix.lower() == ".pdf"
 
 
-def rasterize_pdf_first_page(path: Path | str, dest: Path | str, *, dpi: int = 200) -> Path | None:
+def rasterize_pdf_first_page(path: Path | str, dest: Path | str, *, dpi: int = 300) -> Path | None:
     """Renderiza la primera página del PDF a PNG. Devuelve dest o None si falla."""
     src = Path(path)
     out = Path(dest)

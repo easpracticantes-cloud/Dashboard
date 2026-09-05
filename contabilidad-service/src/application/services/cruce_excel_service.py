@@ -58,6 +58,12 @@ class _Pendiente:
     numero_reserva: str | None = None
     valor: float | None = None
     origen: str = "sistema"
+    hoja: str | None = None
+    fila: int | None = None
+    celda: str | None = None
+    lado_autobits: dict | None = None
+    lado_excel: dict | None = None
+    copiar: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -70,6 +76,12 @@ class _Pendiente:
             "numero_reserva": self.numero_reserva,
             "valor": self.valor,
             "origen": self.origen,
+            "hoja": self.hoja,
+            "fila": self.fila,
+            "celda": self.celda,
+            "lado_autobits": self.lado_autobits or {},
+            "lado_excel": self.lado_excel or {},
+            "copiar": self.copiar or "",
         }
 
 
@@ -236,6 +248,7 @@ class CruceExcelService:
                 "actualizadas": aplicados,
                 "conflictos": conflictos,
             },
+            "comparacion": self._comparacion(crossings, emparejados, sobrantes),
             "pendientes": pendientes,
             "file_hash": file_hash,
         }
@@ -255,15 +268,33 @@ class CruceExcelService:
                 "has_autobits": False,
                 "batch": None,
                 "pendientes": self._vacio(),
+                "comparacion": [],
             }
 
         crossings = self._crossings_del_batch(batch.id)
         pendientes = self._detectar_pendientes(crossings)
         pendientes = self._fusionar_snapshot(batch.id, crossings, pendientes)
+        snap = self._leer_snapshot(batch.id)
+        sobrantes_info = list((pendientes.get("por_tipo") or {}).get("SOBRA_EN_CRUCE") or [])
+        falta_ids: set[int] = set()
+        for raw in (snap or {}).get("falta_crossing_ids") or []:
+            try:
+                falta_ids.add(int(raw))
+            except (TypeError, ValueError):
+                continue
         return {
             "has_autobits": True,
             "batch": self._batch_dict(batch),
             "pendientes": pendientes,
+            "comparacion": self._comparacion(crossings, {}, [], falta_ids=falta_ids),
+            "ultimo_cruce": {
+                "archivo": (snap or {}).get("archivo"),
+                "aplicado": (snap or {}).get("aplicado"),
+                "timestamp": (snap or {}).get("timestamp"),
+                "sobrantes": len(sobrantes_info),
+            }
+            if snap
+            else None,
         }
 
     # -- interno -----------------------------------------------------------
@@ -536,6 +567,7 @@ class CruceExcelService:
         por_tipo: dict[str, list[dict]] = {tipo: [] for tipo in TIPOS_PENDIENTE}
 
         for crossing in crossings:
+            row = (emparejados or {}).get(crossing.id)
             if crossing.estado == CrossingStatus.PAGADO:
                 # Ya cerrada; solo interesa que tenga soporte documental.
                 if not crossing.factura_cdc and not crossing.document_id:
@@ -544,6 +576,7 @@ class CruceExcelService:
                             "SIN_FACTURA",
                             "Pagada sin FACTURA/CDC registrada",
                             crossing,
+                            row,
                         )
                     )
                 continue
@@ -554,6 +587,7 @@ class CruceExcelService:
                         "SIN_FACTURA",
                         "Sin número de factura o cuenta de cobro",
                         crossing,
+                        row,
                     )
                 )
 
@@ -563,6 +597,7 @@ class CruceExcelService:
                         "SIN_FECHA_PAGO",
                         "Sin fecha de pago",
                         crossing,
+                        row,
                     )
                 )
 
@@ -572,6 +607,7 @@ class CruceExcelService:
                         "SIN_SOPORTE",
                         "No se ha cargado la factura del proveedor",
                         crossing,
+                        row,
                     )
                 )
 
@@ -582,6 +618,7 @@ class CruceExcelService:
                         "DIFERENCIA_VALOR",
                         f"Diferencia de {abs(diferencia):,.0f} entre factura y Autobits",
                         crossing,
+                        row,
                     )
                 )
 
@@ -597,23 +634,38 @@ class CruceExcelService:
                         "FALTA_EN_CRUCE",
                         "Está en Autobits pero no aparece en el Excel de cruce",
                         crossing,
+                        None,
                     )
                 )
 
             for row in sobrantes or []:
+                celda = row.celda_compra or row.celda_factura or f"{row.sheet}!fila {row.row_number}"
                 por_tipo["SOBRA_EN_CRUCE"].append(
                     _Pendiente(
                         tipo="SOBRA_EN_CRUCE",
-                        titulo="Está en el cruce pero no en el Excel de Autobits",
-                        detalle=(
-                            f"Hoja {row.sheet}, fila {row.row_number}"
-                            + (f" · factura {row.factura_cdc}" if row.factura_cdc else "")
-                        ),
+                        titulo="Está en el Excel de cruce pero no en Autobits",
+                        detalle=f"Falta en Autobits · pégalo o búscalo en {celda}",
                         proveedor=row.proveedor,
                         numero_compra=row.numero_compra,
                         numero_reserva=row.numero_reserva,
                         valor=row.valor,
                         origen="excel_cruce",
+                        hoja=row.sheet,
+                        fila=row.row_number,
+                        celda=celda,
+                        lado_excel={
+                            "hoja": row.sheet,
+                            "fila": row.row_number,
+                            "celda_compra": row.celda_compra,
+                            "celda_factura": row.celda_factura,
+                            "celda_pago": row.celda_pago,
+                            "compra": row.numero_compra,
+                            "reserva": row.numero_reserva,
+                            "factura": row.factura_cdc,
+                            "fecha_pago": row.fecha_pago,
+                            "valor": row.valor,
+                        },
+                        copiar=self._copiar_fila(row),
                     ).to_dict()
                 )
 
@@ -645,14 +697,202 @@ class CruceExcelService:
         tipo: str,
         detalle: str,
         crossing: AccountCrossingModel,
+        row: ParsedCruceRow | None = None,
     ) -> dict:
+        celda = None
+        if row:
+            if tipo == "SIN_FACTURA":
+                celda = row.celda_factura
+            elif tipo == "SIN_FECHA_PAGO":
+                celda = row.celda_pago
+            else:
+                celda = row.celda_compra or row.celda_factura
+        lado_excel = None
+        if row:
+            lado_excel = {
+                "hoja": row.sheet,
+                "fila": row.row_number,
+                "celda_compra": row.celda_compra,
+                "celda_factura": row.celda_factura,
+                "celda_pago": row.celda_pago,
+                "compra": row.numero_compra,
+                "reserva": row.numero_reserva,
+                "factura": row.factura_cdc,
+                "fecha_pago": row.fecha_pago,
+                "valor": row.valor,
+            }
+        copiar = self._copiar_excel(
+            fecha=crossing.fecha_ejecucion,
+            compra=crossing.numero_compra,
+            reserva=crossing.numero_reserva,
+            valor=crossing.valor_autobits,
+            factura=(row.factura_cdc if row else crossing.factura_cdc),
+            pago=(row.fecha_pago if row else crossing.fecha_pago),
+        )
+        extra = detalle
+        if tipo == "SIN_FACTURA" and celda:
+            extra = f"Falta FACTURA/CDC en el Excel · celda {celda}"
+        elif tipo == "SIN_FECHA_PAGO" and celda:
+            extra = f"Falta FECHA DE PAGO en el Excel · celda {celda}"
+        elif tipo == "FALTA_EN_CRUCE":
+            extra = (
+                f"Está en Autobits y no en el cruce. Copia: {crossing.numero_compra or ''} "
+                f"{crossing.numero_reserva or ''} {crossing.valor_autobits or ''}"
+            )
         return _Pendiente(
             tipo=tipo,
             titulo=TIPOS_PENDIENTE[tipo],
-            detalle=detalle,
+            detalle=extra,
             crossing_id=crossing.id,
             proveedor=crossing.proveedor_nombre,
             numero_compra=crossing.numero_compra,
             numero_reserva=crossing.numero_reserva,
             valor=crossing.valor_autobits,
+            hoja=row.sheet if row else None,
+            fila=row.row_number if row else None,
+            celda=celda,
+            lado_autobits={
+                "proveedor": crossing.proveedor_nombre,
+                "nit": crossing.nit,
+                "compra": crossing.numero_compra,
+                "reserva": crossing.numero_reserva,
+                "fecha": crossing.fecha_ejecucion,
+                "concepto": crossing.concepto,
+                "valor": crossing.valor_autobits,
+                "factura_sistema": crossing.factura_cdc,
+                "fecha_pago_sistema": crossing.fecha_pago,
+            },
+            lado_excel=lado_excel,
+            copiar=copiar,
         ).to_dict()
+
+    def _copiar_excel(
+        self,
+        *,
+        fecha: str | None = None,
+        compra: str | None = None,
+        reserva: str | None = None,
+        valor: float | None = None,
+        factura: str | None = None,
+        pago: str | None = None,
+    ) -> str:
+        """Una fila lista para pegar en el bloque del Excel de cruce.
+
+        Orden real de las hojas mensuales:
+        FECHA DE EJECUCIÓN | ORDEN DE COMPRA | REF. | VALOR | FACTURA/CDC | FECHA DE PAGO
+        """
+        monto = ""
+        if valor is not None:
+            monto = str(int(valor)) if float(valor).is_integer() else str(valor)
+        return "\t".join(
+            [
+                fecha or "",
+                compra or "",
+                reserva or "",
+                monto,
+                factura or "",
+                pago or "",
+            ]
+        )
+
+    def _copiar_fila(self, row: ParsedCruceRow) -> str:
+        return self._copiar_excel(
+            fecha=row.fecha_ejecucion,
+            compra=row.numero_compra,
+            reserva=row.numero_reserva,
+            valor=row.valor,
+            factura=row.factura_cdc,
+            pago=row.fecha_pago,
+        )
+
+    def _comparacion(
+        self,
+        crossings: list[AccountCrossingModel],
+        emparejados: dict[int, ParsedCruceRow],
+        sobrantes: list[ParsedCruceRow],
+        falta_ids: set[int] | None = None,
+    ) -> list[dict]:
+        filas: list[dict] = []
+        for crossing in crossings:
+            row = emparejados.get(crossing.id)
+            faltas: list[str] = []
+            if not (crossing.factura_cdc or (row.factura_cdc if row else None)):
+                faltas.append(
+                    f"FACTURA/CDC en Excel"
+                    + (f" · {row.celda_factura}" if row and row.celda_factura else "")
+                )
+            if not (crossing.fecha_pago or (row.fecha_pago if row else None)):
+                faltas.append(
+                    f"FECHA DE PAGO en Excel"
+                    + (f" · {row.celda_pago}" if row and row.celda_pago else "")
+                )
+            if crossing.document_id is None:
+                faltas.append("Soporte de factura (PDF/foto) en el paso 3")
+            if row is None:
+                if emparejados or (falta_ids is not None and crossing.id in falta_ids):
+                    faltas.append("Esta fila de Autobits no está en el Excel de cruce")
+            filas.append(
+                {
+                    "crossing_id": crossing.id,
+                    "proveedor": crossing.proveedor_nombre,
+                    "lado_autobits": {
+                        "compra": crossing.numero_compra,
+                        "reserva": crossing.numero_reserva,
+                        "fecha": crossing.fecha_ejecucion,
+                        "concepto": crossing.concepto,
+                        "valor": crossing.valor_autobits,
+                    },
+                    "lado_excel": {
+                        "hoja": row.sheet if row else None,
+                        "fila": row.row_number if row else None,
+                        "celda_factura": row.celda_factura if row else None,
+                        "celda_pago": row.celda_pago if row else None,
+                        "factura": (row.factura_cdc if row else None) or crossing.factura_cdc,
+                        "fecha_pago": (row.fecha_pago if row else None) or crossing.fecha_pago,
+                        "valor": row.valor if row else None,
+                    },
+                    "faltas": faltas,
+                    "accion": (
+                        "Pega en el Excel"
+                        if row is None
+                        else (
+                            f"Completa {row.celda_factura or row.celda_pago or row.sheet}"
+                            if faltas
+                            else f"Ya está en {row.sheet}"
+                        )
+                    ),
+                    "copiar": self._copiar_fila(row)
+                    if row
+                    else self._copiar_excel(
+                        fecha=crossing.fecha_ejecucion,
+                        compra=crossing.numero_compra,
+                        reserva=crossing.numero_reserva,
+                        valor=crossing.valor_autobits,
+                        factura=crossing.factura_cdc,
+                        pago=crossing.fecha_pago,
+                    ),
+                }
+            )
+        for row in sobrantes:
+            filas.append(
+                {
+                    "crossing_id": None,
+                    "proveedor": row.proveedor,
+                    "lado_autobits": {},
+                    "lado_excel": {
+                        "hoja": row.sheet,
+                        "fila": row.row_number,
+                        "celda_factura": row.celda_factura,
+                        "celda_pago": row.celda_pago,
+                        "factura": row.factura_cdc,
+                        "fecha_pago": row.fecha_pago,
+                        "valor": row.valor,
+                        "compra": row.numero_compra,
+                        "reserva": row.numero_reserva,
+                    },
+                    "faltas": [f"No está en Autobits · {row.celda_compra or row.sheet}"],
+                    "accion": f"Revisa {row.celda_compra or row.sheet}",
+                    "copiar": self._copiar_fila(row),
+                }
+            )
+        return filas

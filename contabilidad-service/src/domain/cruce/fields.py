@@ -57,10 +57,10 @@ BLOCK_ALIASES: dict[str, list[str]] = {
         "detalle",
     ],
     "valor": [
+        "valor guianza",
+        "precio eas",
         "valor",
         "total",
-        "precio eas",
-        "precio terceros",
         "monto",
     ],
     "factura": [
@@ -121,19 +121,62 @@ def fold(value: Any) -> str:
     return re.sub(r"\s+", " ", plain.replace("\n", " ").lower()).strip()
 
 
+# Encabezados que parecen un campo pero son totales / ruido de la hoja
+_HEADER_NOISE = (
+    "total pagad",
+    "unidades disponible",
+    "entradas a favor",
+    "ahorro de la",
+    "saldo anterior",
+    "precio terceros",
+)
+
+
+def header_specificity(campo: str, header: Any) -> int:
+    """Más alto = encabezado más preciso (p. ej. Codigo Reserva > REF.)."""
+    h = fold(header)
+    if not h:
+        return 0
+    best = 0
+    for alias in BLOCK_ALIASES.get(campo, []):
+        if h == alias:
+            best = max(best, 100 + len(alias))
+        elif h.startswith(alias):
+            best = max(best, 50 + len(alias))
+        elif len(alias) >= 12 and alias in h:
+            best = max(best, 10 + len(alias))
+    return best
+
+
 def match_block_field(header: Any) -> str | None:
     """Devuelve el campo canónico al que corresponde un encabezado."""
     h = fold(header)
     if not h:
         return None
+    if any(noise in h for noise in _HEADER_NOISE):
+        return None
     for candidate, aliases in BLOCK_ALIASES.items():
         for alias in aliases:
             if h == alias:
                 return candidate
+    starts: list[tuple[int, str]] = []
     for candidate, aliases in BLOCK_ALIASES.items():
         for alias in aliases:
-            if h.startswith(alias) or alias in h:
-                return candidate
+            if h.startswith(alias):
+                starts.append((len(alias), candidate))
+    if starts:
+        starts.sort(reverse=True)
+        return starts[0][1]
+    # Contains solo con alias largos: evita que «NIT/CC … (Orden de compra)»
+    # se lea como compra.
+    contains: list[tuple[int, str]] = []
+    for candidate, aliases in BLOCK_ALIASES.items():
+        for alias in aliases:
+            if len(alias) >= 12 and alias in h:
+                contains.append((len(alias), candidate))
+    if contains:
+        contains.sort(reverse=True)
+        return contains[0][1]
     return None
 
 
@@ -264,6 +307,9 @@ class ParsedCruceRow:
     fecha_ejecucion: str | None = None
     estado_compra: str | None = None
     observaciones: str | None = None
+    celda_factura: str | None = None
+    celda_pago: str | None = None
+    celda_compra: str | None = None
 
     def is_empty(self) -> bool:
         return not any(
@@ -320,6 +366,9 @@ class ParsedCruceRow:
             "fecha_ejecucion": self.fecha_ejecucion,
             "estado_compra": self.estado_compra,
             "observaciones": self.observaciones,
+            "celda_factura": self.celda_factura,
+            "celda_pago": self.celda_pago,
+            "celda_compra": self.celda_compra,
         }
 
 

@@ -12,11 +12,21 @@ _NIT_RE = re.compile(
 )
 _NIT_BARE_RE = re.compile(r"\b(\d{8,10}[\-]?\d)\b")
 _FACTURA_RE = re.compile(
-    r"(?:factura(?:\s+de\s+venta)?|cuenta\s+de\s+cobro|cdc)\s*"
-    r"(?:electr[oó]nica)?\s*(?:n[uú]mero|no\.?|nro\.?|#)?\s*[:.]?\s*"
-    r"([A-Z]{0,6}[\-]?\d[\w\-/]{1,20})",
+    r"(?:factura(?:\s+de\s+venta)?|cuenta\s+de\s+cobro|cdc|fpos|fv\s*pos|fe\s*pos|fe-?e?|n[uú]mero)\s*"
+    r"(?:electr[oó]nica)?\s*(?:n[uú]mero|no\.?|nro\.?|n°|nº|#|-)?\s*[:.]?\s*"
+    r"([A-Z]{0,8}[\-]?\d[\w\-/]{1,20})",
     re.IGNORECASE,
 )
+_FACTURA_POS_RE = re.compile(
+    r"\b((?:FPOS|FV\s*POS|FE\s*POS|FVPOS|FEPOS|FE-E|FE|FV|CDC)\s*[-]?\s*\d{2,8})\b",
+    re.IGNORECASE,
+)
+_FACTURA_NO_RE = re.compile(
+    r"(?:n[uú]m(?:ero)?|no\.?|nro\.?|n°|nº)\s*[:.]?\s*([A-Z]{1,6}[\s\-/]?\d{3,10})",
+    re.IGNORECASE,
+)
+_COMPRA_RE = re.compile(r"\b(COM\s*\d{4,8}|COT\s*\d{4,8})\b", re.IGNORECASE)
+_RESERVA_RE = re.compile(r"\b(EAS\s*\d{4,8})\b", re.IGNORECASE)
 _FECHA_RE = re.compile(
     r"(?:fecha|f\.?\s*emisi[oó]n|expedici[oó]n)\s*[:#]?\s*"
     r"(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})",
@@ -108,11 +118,18 @@ def extract_invoice_hints(ocr_text: str) -> dict[str, Any]:
         if m2:
             hints["nit_o_identificacion"] = m2.group(1)
 
-    m = _FACTURA_RE.search(text)
+    m = _FACTURA_POS_RE.search(text) or _FACTURA_RE.search(text) or _FACTURA_NO_RE.search(text)
     if m:
-        num = m.group(1).strip()
+        num = re.sub(r"\s+", " ", m.group(1)).strip()
         if len(num) >= 3 and not num.lower().startswith("de"):
             hints["numero_factura"] = num
+
+    m = _COMPRA_RE.search(text)
+    if m:
+        hints["compra"] = re.sub(r"\s+", "", m.group(1)).upper()
+    m = _RESERVA_RE.search(text)
+    if m:
+        hints["reserva"] = re.sub(r"\s+", "", m.group(1)).upper()
 
     m = _FECHA_RE.search(text) or _FECHA_BARE_RE.search(text)
     if m:

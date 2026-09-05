@@ -6,6 +6,8 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from domain.matching.normalize import normalize_nit
+import hashlib
+
 from infrastructure.persistence.models import DocumentModel
 from infrastructure.persistence.repositories import DocumentRepository, file_hash
 
@@ -21,6 +23,23 @@ class DuplicateCheckResult:
 class DuplicateDetector:
     def __init__(self, db: Session):
         self.repo = DocumentRepository(db)
+
+    def check_bytes(self, content: bytes, exclude_id: int | None = None) -> DuplicateCheckResult:
+        """Detecta duplicado por hash de bytes, sin escribir el archivo."""
+        h = hashlib.sha256(content or b"").hexdigest()
+        existing = (
+            self.repo.db.query(DocumentModel)
+            .filter(DocumentModel.file_hash == h)
+            .first()
+        )
+        if existing and existing.id != exclude_id:
+            return DuplicateCheckResult(
+                is_duplicate=True,
+                reason=f"Este archivo ya está importado (doc #{existing.id}). No se permiten duplicados.",
+                existing_document_id=existing.id,
+                match_type="HASH",
+            )
+        return DuplicateCheckResult(is_duplicate=False)
 
     def check_file(self, path: Path, exclude_id: int | None = None) -> DuplicateCheckResult:
         """Detecta duplicado por hash de archivo."""

@@ -163,4 +163,10 @@ export class DocumentsApiService {
   delete(id: number): Observable<{ ok: boolean }> {
     return this.http.delete<{ ok: boolean }>(`${this.base}/${id}`);
   }
+
+  purgeAll(confirm = true): Observable<{ documents?: number; files?: number }> {
+    return this.http.delete<{ documents?: number; files?: number }>(
+      `${this.base}?confirm=${confirm ? 'true' : 'false'}`
+    );
+  }
 }

@@ -157,6 +157,28 @@ def _subir_cruce(client, bloques, aplicar=True):
     )
 
 
+REAL_CRUCE = Path(r"c:\Users\07sam\Downloads\CRUCE DE CUENTAS 2026.xlsx")
+
+
+def test_parse_cruce_cuentas_2026_real():
+    """El Excel real: hojas mensuales + DUSTER + BOSQUE + LUGER."""
+    if not REAL_CRUCE.exists():
+        pytest.skip("CRUCE DE CUENTAS 2026.xlsx no está en Descargas")
+    from infrastructure.cruce.excel_adapter import CruceExcelAdapter
+
+    parsed = CruceExcelAdapter().parse(REAL_CRUCE)
+    hojas = {s["nombre"]: s["filas"] for s in parsed.sheets}
+    assert any("AGOSTO" == n for n in hojas)
+    duster = [r for r in parsed.rows if "DUSTER" in r.sheet.upper()]
+    bosque = [r for r in parsed.rows if "BOSQUE" in r.sheet.upper()]
+    agosto = [r for r in parsed.rows if r.sheet == "AGOSTO"]
+    assert duster, "VENTAS_DUSTER no produjo filas"
+    assert any((r.numero_compra or "").startswith("COM") for r in duster)
+    assert not any((r.numero_compra or "").isdigit() and len(r.numero_compra or "") >= 9 for r in duster[:8])
+    assert bosque and any((r.numero_compra or "").startswith("COM") for r in bosque)
+    assert any(r.numero_compra == "COM007246" and r.factura_cdc for r in agosto)
+
+
 def test_cruce_requiere_autobits_primero(client):
     res = _subir_cruce(client, [{"proveedor": "Hotel Demo SAS", "filas": []}])
     assert res.status_code == 400
@@ -391,6 +413,110 @@ def test_pendientes_persiste_falta_en_cruce_tras_upload(client):
     assert csv_res.status_code == 200
     assert "FALTA_EN_CRUCE" in csv_res.text
     assert "COM003" in csv_res.text
+
+
+def _cruce_tabular_xlsx() -> bytes:
+    """Imita VENTAS_DUSTER / CDC BOSQUE: tabla Autobits, no bloques laterales."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "VENTAS_DUSTER"
+    ws.append(["© 2026 Autobits"])
+    ws.append(
+        [
+            "MES",
+            "NIT/CC Proveedor (Orden de Compra)",
+            "Codigo Orden de compra",
+            "Referencia (Orden de Compra)",
+            "Codigo Reserva",
+            "Fecha de ejecución (Reserva)",
+            "estado de la compra",
+            "Description servicio",
+            "PRECIO EAS",
+            "PRECIO TERCEROS",
+        ]
+    )
+    ws.append(
+        [
+            "AGOSTO",
+            "901814243",
+            "COM007551",
+            "Civitatis_2pax_EAS002999",
+            "EAS002999",
+            "2026-08-20",
+            "Activo",
+            "Transporte",
+            308000,
+            380000,
+        ]
+    )
+    ws2 = wb.create_sheet("CDC BOSQUE DE PALMAS")
+    ws2.append([None] * 10)
+    for _ in range(7):
+        ws2.append([])
+    ws2.append(
+        [
+            "NIT/CC Proveedor (Orden de Compra)",
+            "Nombre Proveedor (Orden de Compra)",
+            "Codigo Orden de compra",
+            "Comprador (Orden de Compra)",
+            "Codigo Reserva",
+            "Vendedor (Reserva)",
+            "Fecha de ejecución (Reserva)",
+            "estado de la compra",
+            "Cantidad",
+            "Total",
+        ]
+    )
+    ws2.append(
+        [
+            "901745336-5",
+            "PARQUE NATURAL Y CULTURAL BOSQUE DE PALMAS SAS",
+            "COM007648",
+            "LAURA",
+            "EAS001936",
+            "ANGIE",
+            "2026-08-21",
+            "Activo",
+            5,
+            100000,
+        ]
+    )
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def test_cruce_lee_tablas_autobits_duster_y_bosque(client):
+    assert _subir_autobits(
+        client,
+        [
+            ["901814243", "VENTAS DUSTER", "COM007551", "EAS002999", "2026-08-20", 308000, ""],
+            ["901745336-5", "PARQUE NATURAL Y CULTURAL BOSQUE DE PALMAS SAS", "COM007648", "EAS001936", "2026-08-21", 100000, ""],
+        ],
+    ).status_code == 200
+
+    res = client.post(
+        "/api/cruce-excel/upload",
+        files={
+            "archivo": (
+                "CRUCE DE CUENTAS 2026.xlsx",
+                _cruce_tabular_xlsx(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        data={"aplicar": "true"},
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["lectura"]["filas_leidas"] >= 2
+    hojas = {h["nombre"]: h["filas"] for h in data["lectura"]["hojas"]}
+    assert hojas.get("VENTAS_DUSTER", 0) >= 1
+    assert hojas.get("CDC BOSQUE DE PALMAS", 0) >= 1
+    assert data["conciliacion"]["emparejadas"] == 2
+    items = client.get("/api/crossings").json()["items"]
+    por = {i["numero_compra"]: i for i in items}
+    assert por["COM007551"]["numero_reserva"] == "EAS002999"
+    assert por["COM007648"]["valor_autobits"] == 100000
 
 
 def test_reupload_cruce_actualiza_snapshot_falta(client):

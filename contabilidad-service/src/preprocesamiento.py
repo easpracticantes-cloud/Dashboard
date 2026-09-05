@@ -3,8 +3,8 @@
 from pathlib import Path
 
 
-ANCHO_MINIMO = 1400
-ANCHO_MAXIMO = 2800
+ANCHO_MINIMO = 1800
+ANCHO_MAXIMO = 3200
 
 
 def preprocesar_imagen(ruta_entrada, ruta_salida):
@@ -66,19 +66,36 @@ def preprocesar_imagen(ruta_entrada, ruta_salida):
         except Exception:
             pass
 
-        clahe = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8))
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
         gris = clahe.apply(gris)
-        gris = cv2.bilateralFilter(gris, 5, 50, 50)
+        gris = cv2.fastNlMeansDenoising(gris, None, 11, 7, 21)
+        gris = cv2.bilateralFilter(gris, 7, 60, 60)
 
-        # Variante binaria + mezcla suave para texto fino
+        # Variante binaria + mezcla para texto impreso / foto
         binaria = cv2.adaptiveThreshold(
-            gris, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 11
+            gris, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 35, 9
         )
-        mezcla = cv2.addWeighted(gris, 0.55, binaria, 0.45, 0)
+        kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+        nitida = cv2.filter2D(gris, -1, kernel)
+        mezcla = cv2.addWeighted(nitida, 0.6, binaria, 0.4, 0)
+
+        # Otsu + inversión: facturas físicas a color / foto con sombra
+        _, otsu = cv2.threshold(gris, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        invertida = cv2.bitwise_not(otsu)
 
         ruta_salida.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(ruta_salida), mezcla)
+        stem = ruta_salida.with_suffix("")
+        cv2.imwrite(str(Path(str(stem) + "_otsu.png")), otsu)
+        cv2.imwrite(str(Path(str(stem) + "_inv.png")), invertida)
         return True
     except Exception as error:
         print(f"ERROR en preprocesamiento: {error}")
         return False
+
+
+def variantes_preprocesadas(ruta_salida) -> list:
+    """Rutas de variantes generadas junto a la imagen principal."""
+    dest = Path(ruta_salida)
+    stem = dest.with_suffix("")
+    return [p for p in (dest, Path(str(stem) + "_otsu.png"), Path(str(stem) + "_inv.png")) if p.exists()]

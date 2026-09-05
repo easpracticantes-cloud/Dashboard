@@ -199,10 +199,11 @@ class ProcessBatchResponse(BaseModel):
 
 
 BATCH_PACK_SIZE = 25
+BATCH_MAX_WORKERS = 8
 
 
 def _process_document_ids_in_packs(document_ids: list[int], pack_size: int = BATCH_PACK_SIZE) -> None:
-    """Procesa IDs en paquetes; dentro del paquete hasta 3 en paralelo."""
+    """Procesa IDs en paquetes de 25; dentro del paquete hasta 8 en paralelo."""
     import logging
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -212,7 +213,7 @@ def _process_document_ids_in_packs(document_ids: list[int], pack_size: int = BAT
 
     logger = logging.getLogger(__name__)
     processor = get_document_processing_service()
-    size = max(1, min(int(pack_size or BATCH_PACK_SIZE), 50))
+    size = max(1, min(int(pack_size or BATCH_PACK_SIZE), BATCH_PACK_SIZE))
     ids = [int(i) for i in document_ids if i]
 
     for offset in range(0, len(ids), size):
@@ -235,7 +236,7 @@ def _process_document_ids_in_packs(document_ids: list[int], pack_size: int = BAT
         finally:
             db.close()
 
-        with ThreadPoolExecutor(max_workers=min(3, len(pack))) as pool:
+        with ThreadPoolExecutor(max_workers=min(BATCH_MAX_WORKERS, len(pack))) as pool:
             futures = {pool.submit(processor.process_by_id, doc_id, None): doc_id for doc_id in pack}
             for fut in as_completed(futures):
                 doc_id = futures[fut]
@@ -292,12 +293,14 @@ async def upload_documents_batch(
             )
         except DocumentUploadError as e:
             err_count += 1
+            if e.code == "DUPLICATE_FILE":
+                dup_count += 1
             items.append(BatchUploadItem(filename=filename, ok=False, error=e.message))
         except Exception as e:
             err_count += 1
             items.append(BatchUploadItem(filename=filename, ok=False, error=str(e)))
 
-    size = max(1, min(int(pack_size or BATCH_PACK_SIZE), 50))
+    size = max(1, min(int(pack_size or BATCH_PACK_SIZE), BATCH_PACK_SIZE))
     packs = (len(queued_ids) + size - 1) // size if queued_ids else 0
 
     if auto_procesar and queued_ids:
@@ -318,9 +321,24 @@ async def upload_documents_batch(
                 ),
             )
         background_tasks.add_task(_process_document_ids_in_packs, list(queued_ids), size)
+
+        def _cruzar_despues() -> None:
+            from application.services.crossing_service import CrossingService
+            from infrastructure.persistence.database import SessionLocal
+
+            db_match = SessionLocal()
+            try:
+                CrossingService(db_match).run_matching(force=True, usuario="SISTEMA")
+            except Exception:
+                pass
+            finally:
+                db_match.close()
+
+        background_tasks.add_task(_cruzar_despues)
         mensaje = (
-            f"{len(queued_ids)} factura(s) en cola · {packs} paquete(s) de hasta {size}. "
-            "El análisis corre en segundo plano; refresque la lista para ver resultados."
+            f"{len(queued_ids)} factura(s) en cola · {packs} paquete(s) de hasta {size} "
+            f"(hasta {min(BATCH_MAX_WORKERS, size)} a la vez). "
+            "Luego se cruzan solas con Autobits (fecha, cliente, compra)."
         )
     else:
         mensaje = f"{len(queued_ids)} archivo(s) guardados sin procesar automáticamente."
@@ -363,7 +381,7 @@ def process_documents_batch(
     if errores:
         raise HTTPException(status_code=503, detail=" ".join(errores))
 
-    size = max(1, min(int(body.pack_size or BATCH_PACK_SIZE), 50))
+    size = max(1, min(int(body.pack_size or BATCH_PACK_SIZE), BATCH_PACK_SIZE))
     packs = (len(valid) + size - 1) // size
     background_tasks.add_task(_process_document_ids_in_packs, list(valid), size)
     return ProcessBatchResponse(
@@ -420,6 +438,16 @@ def update_estado(
     except DocumentUploadError as e:
         raise HTTPException(status_code=404, detail=e.message) from e
     return _to_summary(doc)
+
+
+@router.delete("")
+def purge_documents(request: Request, confirm: bool = False, db: Session = Depends(get_db)):
+    """Elimina todas las facturas ya importadas."""
+    from application.services.excel_purge_service import ExcelPurgeService
+
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Pase confirm=true para vaciar las facturas.")
+    return ExcelPurgeService(db).purge_documents()
 
 
 @router.delete("/{document_id}")

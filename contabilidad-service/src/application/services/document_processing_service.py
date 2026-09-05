@@ -447,17 +447,37 @@ class DocumentProcessingService:
                             )
                             metodo = f"{resolve_ai_provider_name().upper()}_VISION+OCR"
 
-            if not ai_result.ok:
-                document.estado = DocumentStatus.ERROR
-                job_repo.mark_failed(job, ai_result.error)
-                audit.log("IA_ERROR", "Document", str(document.id), valor_nuevo=ai_result.error)
-                db.commit()
-                return {
-                    "ok": False,
-                    "error": ai_result.error or "No se pudo extraer la factura",
-                    "document_id": document.id,
-                    "estado": DocumentStatus.ERROR,
-                }
+            if not ai_result or not ai_result.ok:
+                hints = extract_invoice_hints(ocr_result.text)
+                utiles = [
+                    hints.get("total"),
+                    hints.get("numero_factura"),
+                    hints.get("nit_o_identificacion"),
+                    hints.get("proveedor"),
+                ]
+                if any(utiles):
+                    ai_result = AIExtractionResult(
+                        ok=True,
+                        data=hints,
+                        raw_text=ocr_result.text,
+                    )
+                    metodo = f"{metodo}+OCR_JSON"
+                else:
+                    document.estado = DocumentStatus.ERROR
+                    job_repo.mark_failed(job, (ai_result.error if ai_result else "sin resultado IA"))
+                    audit.log(
+                        "IA_ERROR",
+                        "Document",
+                        str(document.id),
+                        valor_nuevo=(ai_result.error if ai_result else "sin resultado"),
+                    )
+                    db.commit()
+                    return {
+                        "ok": False,
+                        "error": (ai_result.error if ai_result else "No se pudo extraer la factura"),
+                        "document_id": document.id,
+                        "estado": DocumentStatus.ERROR,
+                    }
 
             return self._finalize_structured_extraction(
                 db=db,
