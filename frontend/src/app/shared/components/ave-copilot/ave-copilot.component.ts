@@ -7,7 +7,7 @@ import {
   EnterpriseAiService,
   QuoteDraft
 } from '../../../core/services/enterprise-ai.service';
-import { AveVoiceUiState } from '../../../core/voice/speech-types';
+import { AveVoiceUiState, friendlyVoiceError } from '../../../core/voice/speech-types';
 import { VoiceInputService } from '../../../core/voice/voice-input.service';
 import { VoiceOutputService } from '../../../core/voice/voice-output.service';
 import { AveQuoteReviewComponent } from './ave-quote-review.component';
@@ -162,7 +162,7 @@ export class AveCopilotComponent {
   async toggleMic(): Promise<void> {
     this.voiceHint.set('');
     if (!this.voiceIn.supported()) {
-      this.voiceHint.set('Este navegador no soporta dictado. Usa Chrome o Edge.');
+      this.voiceHint.set(friendlyVoiceError('unsupported'));
       return;
     }
     if (this.voiceIn.state() === 'listening') {

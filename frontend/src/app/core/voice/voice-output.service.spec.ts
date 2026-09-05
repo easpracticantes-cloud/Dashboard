@@ -10,7 +10,7 @@ describe('Voice helpers', () => {
 
   it('friendlyVoiceError cubre permiso y soporte', () => {
     expect(friendlyVoiceError('not-allowed')).toMatch(/bloqueado/i);
-    expect(friendlyVoiceError('unsupported')).toMatch(/Chrome/);
+    expect(friendlyVoiceError('unsupported')).toMatch(/API de dictado/i);
     expect(friendlyVoiceError('tts-blocked')).toMatch(/audio/i);
   });
 

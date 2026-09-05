@@ -40,11 +40,15 @@ export interface SpeechRecognitionLike {
 export type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
 
 export function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
   const w = window as Window & {
     SpeechRecognition?: SpeechRecognitionCtor;
     webkitSpeechRecognition?: SpeechRecognitionCtor;
   };
-  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+  const ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
+  return typeof ctor === 'function' ? ctor : null;
 }
 
 export function friendlyVoiceError(code: string): string {
@@ -59,11 +63,11 @@ export function friendlyVoiceError(code: string): string {
     case 'audio-capture':
       return 'No hay micrófono disponible.';
     case 'network':
-      return 'Falló la transcripción (red). Revisa la conexión e inténtalo de nuevo.';
+      return 'Falló la transcripción (red). Revisa la conexión, el permiso del micrófono o si un bloqueador impide el servicio de dictado.';
     case 'aborted':
       return 'Detuviste la grabación.';
     case 'unsupported':
-      return 'Este navegador no soporta dictado por voz. Usa Chrome o Edge en escritorio.';
+      return 'Este navegador no expone la API de dictado por voz.';
     case 'tts-blocked':
       return 'El navegador bloqueó el audio. Pulsa de nuevo para oír a Ave.';
     case 'tts-error':

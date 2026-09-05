@@ -23,7 +23,7 @@ export class VoiceInputService {
   private rejectListen: ((err: Error) => void) | null = null;
 
   supported(): boolean {
-    return getSpeechRecognitionCtor() !== null && !!navigator.mediaDevices?.getUserMedia;
+    return getSpeechRecognitionCtor() !== null;
   }
 
   async listen(lang = 'es-CO'): Promise<string> {
@@ -37,13 +37,15 @@ export class VoiceInputService {
     this.lastError.set('');
     this.state.set('listening');
 
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+    const media = navigator.mediaDevices;
+    if (media?.getUserMedia) {
+      try {
+        const stream = await media.getUserMedia({ audio: true });
         stream.getTracks().forEach((t) => t.stop());
-      });
-    } catch {
-      this.fail('denied');
-      throw new Error(friendlyVoiceError('denied'));
+      } catch {
+        this.fail('denied');
+        throw new Error(friendlyVoiceError('denied'));
+      }
     }
 
     const Ctor = getSpeechRecognitionCtor();
