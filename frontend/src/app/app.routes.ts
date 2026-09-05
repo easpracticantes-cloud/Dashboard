@@ -21,25 +21,14 @@ export const routes: Routes = [
         loadChildren: () => import('./features/dashboard/dashboard.routes').then((m) => m.DASHBOARD_ROUTES)
       },
       {
-        path: 'conversations',
-        loadChildren: () => import('./features/conversations/conversations.routes').then((m) => m.CONVERSATIONS_ROUTES)
+        path: 'registro',
+        loadChildren: () => import('./features/registro/registro.routes').then((m) => m.REGISTRO_ROUTES)
       },
-      {
-        path: 'clients',
-        loadChildren: () => import('./features/clients/clients.routes').then((m) => m.CLIENTS_ROUTES)
-      },
-      {
-        path: 'quotes',
-        loadChildren: () => import('./features/quotes/quotes.routes').then((m) => m.QUOTES_ROUTES)
-      },
-      {
-        path: 'reservations',
-        loadChildren: () => import('./features/reservations/reservations.routes').then((m) => m.RESERVATIONS_ROUTES)
-      },
-      {
-        path: 'sales',
-        loadChildren: () => import('./features/sales/sales.routes').then((m) => m.SALES_ROUTES)
-      },
+      { path: 'conversations', redirectTo: 'registro', pathMatch: 'prefix' },
+      { path: 'clients', redirectTo: 'registro', pathMatch: 'prefix' },
+      { path: 'quotes', redirectTo: 'registro', pathMatch: 'prefix' },
+      { path: 'reservations', redirectTo: 'registro', pathMatch: 'prefix' },
+      { path: 'sales', redirectTo: 'registro', pathMatch: 'prefix' },
       {
         path: 'contabilidad',
         canActivate: [roleGuard(['ADMINISTRADOR', 'GERENCIA', 'CONTABILIDAD', 'SUPERVISOR'])],

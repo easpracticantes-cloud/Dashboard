@@ -70,7 +70,7 @@ export class ProfileComponent implements OnInit {
   readonly quickLinks = [
     { icon: 'notifications', label: 'Notificaciones', route: '/app/notifications', hint: 'Avisos del sistema' },
     { icon: 'settings', label: 'Configuración', route: '/app/settings', hint: 'Sheets, WhatsApp y más' },
-    { icon: 'forum', label: 'Seguimiento', route: '/app/conversations', hint: 'Inbox operativo' },
+    { icon: 'table_chart', label: 'Registro', route: '/app/registro', hint: 'Excel comercial' },
     { icon: 'dashboard', label: 'Dashboard', route: '/app/dashboard', hint: 'Pulso del negocio' }
   ];
 

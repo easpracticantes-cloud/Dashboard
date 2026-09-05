@@ -17,7 +17,7 @@
         <p class="cc-kpi__label">Chats abiertos</p>
         <p class="cc-kpi__value">{{ pulse()?.openConversations ?? '—' }}</p>
       </div>
-      <a routerLink="/app/conversations" class="cc-kpi__go">Atender</a>
+      <a routerLink="/app/registro" class="cc-kpi__go">Registro</a>
     </article>
     <article class="cc-kpi">
       <span class="cc-kpi__icon cc-kpi__icon--forest"><mat-icon>payments</mat-icon></span>
@@ -26,7 +26,7 @@
         <p class="cc-kpi__value">{{ pulse()?.salesTodayCount ?? 0 }}</p>
         <p class="cc-kpi__hint">{{ pulse()?.salesTodayAmount ?? 0 | currency: 'COP':'symbol-narrow':'1.0-0' }}</p>
       </div>
-      <a routerLink="/app/sales" class="cc-kpi__go">Ver</a>
+      <a routerLink="/app/registro" class="cc-kpi__go">Ver</a>
     </article>
     <article class="cc-kpi">
       <span class="cc-kpi__icon cc-kpi__icon--amber"><mat-icon>trending_up</mat-icon></span>
@@ -44,7 +44,7 @@
         <p class="cc-kpi__value">{{ responseLagHours() | number: '1.0-1' }}h</p>
         <p class="cc-kpi__hint">Proxy de respuesta</p>
       </div>
-      <a routerLink="/app/conversations" class="cc-kpi__go">Inbox</a>
+      <a routerLink="/app/registro" class="cc-kpi__go">Registro</a>
     </article>
   </div>
 
@@ -76,7 +76,7 @@
     <section class="cc-panel">
       <div class="cc-panel__head">
         <h3>Agenda de hoy</h3>
-        <a routerLink="/app/reservations" class="cc-panel__link">Reservas</a>
+        <a routerLink="/app/registro" class="cc-panel__link">Registro</a>
       </div>
       <div class="cc-agenda">
         @for (r of agenda(); track r.id) {

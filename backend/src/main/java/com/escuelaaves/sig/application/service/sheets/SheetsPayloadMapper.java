@@ -641,7 +641,7 @@ public class SheetsPayloadMapper {
             cols.putIfAbsent("proximoSeguimiento", i);
         } else if (h.equals("DISC")) {
             cols.putIfAbsent("disc", i);
-        } else if (h.equals("PRIORIZAR")) {
+        } else if (h.equals("PRIORIZAR") || h.equals("PRIORIDAD")) {
             cols.putIfAbsent("priorizar", i);
         } else if (h.equals("PENDIENTE")) {
             cols.putIfAbsent("pendiente", i);
@@ -653,7 +653,7 @@ public class SheetsPayloadMapper {
             cols.putIfAbsent("buena", i);
         } else if (h.equals("REGULAR")) {
             cols.putIfAbsent("regular", i);
-        } else if (h.equals("REGISTRADO") || h.equals("REGISTRADA")) {
+        } else if (h.equals("REGISTRADO") || h.equals("REGISTRADA") || h.startsWith("REGISTRADA ")) {
             cols.putIfAbsent("registrado", i);
         }
     }

@@ -87,18 +87,27 @@ public class SheetsWriteService {
         putIfKey(fields, "FECHA SERVICIO", body, "fechaServicio");
         putIfKey(fields, "DISC", body, "disc");
         putIfKey(fields, "PRIORIZAR", body, "priorizar");
+        putIfKey(fields, "PRIORIDAD", body, "priorizar");
         putIfKey(fields, "PENDIENTE", body, "pendiente");
         putIfKey(fields, "OBJECION", body, "objecion");
         putIfKey(fields, "EXCELENTE", body, "excelente");
         putIfKey(fields, "BUENA", body, "buena");
         putIfKey(fields, "REGULAR", body, "regular");
         putIfKey(fields, "REGISTRADO", body, "registrado");
+        putIfKey(fields, "REGISTRADA", body, "registrado");
         putIfKey(fields, "FECHA COTIZADO", body, "fechaCotizado");
+        putIfKey(fields, "FECHA PROXIMO SEGUIMIENTO", body, "proximoSeguimiento");
         if (body.containsKey("cotizado")) {
             fields.put("COTIZADO", boolLabel(body.get("cotizado")));
         }
         if (body.containsKey("encuesta")) {
-            fields.put("ENCUESTA", boolLabel(body.get("encuesta")));
+            Object raw = body.get("encuesta");
+            String label = str(raw);
+            if (label.equalsIgnoreCase("PENDIENTE")) {
+                fields.put("ENCUESTA", "PENDIENTE");
+            } else {
+                fields.put("ENCUESTA", boolLabel(raw));
+            }
         }
         if (body.containsKey("monto")) {
             fields.put("MONTO", body.get("monto") == null ? "" : body.get("monto"));
@@ -106,6 +115,59 @@ public class SheetsWriteService {
 
         SheetRowWriteResultDto result = write(new SheetRowWriteRequest("updaterow", sheetName, match, fields));
         patchSeguimientoCache(body, celular, fecha);
+        return result;
+    }
+
+    public SheetRowWriteResultDto appendSeguimiento(Map<String, Object> body) {
+        String sheetName = str(body.get("hojaOrigen"));
+        if (blank(sheetName)) {
+            throw new BadRequestException("Elija la hoja del Excel a la que quiere agregar la fila.");
+        }
+        if (blank(str(body.get("cliente"))) && blank(str(body.get("celular"))) && blank(str(body.get("solicitud")))) {
+            throw new BadRequestException("Indique al menos cliente, celular o solicitud.");
+        }
+
+        Map<String, Object> fields = new LinkedHashMap<>();
+        putIfKey(fields, "FECHA", body, "fecha");
+        putIfKey(fields, "TIPO", body, "tipo");
+        putIfKey(fields, "CANAL", body, "canal");
+        putIfKey(fields, "CLIENTE", body, "cliente");
+        putIfKey(fields, "CELULAR", body, "celular");
+        putIfKey(fields, "DISC", body, "disc");
+        putIfKey(fields, "SOLICITUD", body, "solicitud");
+        putIfKey(fields, "RESPUESTA", body, "respuesta");
+        putIfKey(fields, "SEMAFORO", body, "semaforo");
+        putIfKey(fields, "FECHA COTIZADO", body, "fechaCotizado");
+        putIfKey(fields, "NOTAS", body, "notas");
+        putIfKey(fields, "PROXIMO SEGUIMIENTO", body, "proximoSeguimiento");
+        putIfKey(fields, "FECHA PROXIMO SEGUIMIENTO", body, "proximoSeguimiento");
+        putIfKey(fields, "PRIORIZAR", body, "priorizar");
+        putIfKey(fields, "PRIORIDAD", body, "priorizar");
+        putIfKey(fields, "PENDIENTE", body, "pendiente");
+        putIfKey(fields, "ASIGNADO", body, "asignado");
+        putIfKey(fields, "FECHA SERVICIO", body, "fechaServicio");
+        putIfKey(fields, "REGISTRADO", body, "registrado");
+        putIfKey(fields, "REGISTRADA", body, "registrado");
+        putIfKey(fields, "OBJECION", body, "objecion");
+        if (body.containsKey("encuesta")) {
+            Object raw = body.get("encuesta");
+            String label = str(raw);
+            if (label.equalsIgnoreCase("PENDIENTE")) {
+                fields.put("ENCUESTA", "PENDIENTE");
+            } else {
+                fields.put("ENCUESTA", boolLabel(raw));
+            }
+        }
+        if (body.containsKey("cotizado")) {
+            fields.put("COTIZADO", boolLabel(body.get("cotizado")));
+        }
+
+        SheetRowWriteResultDto result = write(new SheetRowWriteRequest("appendrow", sheetName, Map.of(), fields));
+        try {
+            sheetsSyncService.prependSeguimientoRow(body);
+        } catch (Exception ex) {
+            log.warn("[SheetsWrite] No se pudo agregar la fila al cache: {}", ex.getMessage());
+        }
         return result;
     }
 

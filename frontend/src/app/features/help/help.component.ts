@@ -26,15 +26,15 @@ export class HelpComponent {
 
   readonly topics: HelpTopic[] = [
     {
-      icon: 'forum',
-      title: 'Conversaciones y WhatsApp',
-      body: 'Filtra por estado, usa vistas Mías/Sin asignar/Estancadas y aplica acciones masivas.',
-      route: '/app/conversations',
-      routeLabel: 'Ir a Seguimiento',
+      icon: 'table_chart',
+      title: 'Registro del Excel',
+      body: 'Agrega o edita filas del workbook (fecha, cliente, semáforo, prioridad) y se guarda en la hoja.',
+      route: '/app/registro',
+      routeLabel: 'Ir a Registro',
       steps: [
-        'Abre Seguimiento y elige una vista rápida.',
-        'Selecciona varias filas con el checkbox.',
-        'Cambia estado o asigna asesor en lote.'
+        'Abre Registro y elige la hoja.',
+        'Pulsa Nueva fila o Editar.',
+        'Guarda para escribir en Google Sheets.'
       ]
     },
     {
@@ -60,15 +60,15 @@ export class HelpComponent {
       icon: 'request_quote',
       title: 'Pipeline comercial',
       body: 'Clona cotizaciones, extiende validez, convierte a reserva y luego a venta.',
-      route: '/app/quotes',
-      routeLabel: 'Ver Cotizaciones'
+      route: '/app/registro',
+      routeLabel: 'Ver Registro'
     },
     {
       icon: 'auto_awesome',
       title: 'Asistente de IA',
       body: 'En cada chat puedes sugerir respuesta, resumir y generar cotización en PDF.',
-      route: '/app/conversations',
-      routeLabel: 'Probar en un chat'
+      route: '/app/registro',
+      routeLabel: 'Abrir registro'
     },
     {
       icon: 'person',

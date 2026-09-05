@@ -1233,6 +1233,31 @@ public class SheetsSyncService {
         dashboardCache.set(new CacheEntry(patched, cached.loadedAt()));
     }
 
+    public void prependSeguimientoRow(Map<String, Object> fields) {
+        CacheEntry cached = dashboardCache.get();
+        if (cached == null || cached.dto() == null) {
+            return;
+        }
+        SeguimientoWhatsappDto empty = new SeguimientoWhatsappDto(
+                "", "", "", "", "", "", "", "", false, "", "", false, "", "",
+                pickStr(fields, "hojaOrigen", ""),
+                "", "", "", "", "", "", "", "", "", null
+        );
+        List<SeguimientoWhatsappDto> next = new ArrayList<>();
+        next.add(mergeSeguimiento(empty, fields));
+        if (cached.dto().seguimientoWhatsapp() != null) {
+            next.addAll(cached.dto().seguimientoWhatsapp());
+        }
+        SheetsDashboardDto d = cached.dto();
+        SheetsDashboardDto patched = new SheetsDashboardDto(
+                d.meta(), d.kpis(), d.porSemaforo(), d.porCanal(), d.porHoja(), d.porMes(), d.evolucionMensual(),
+                List.copyOf(next), d.ventas(), d.resumenPaises(), d.paisesDetalle(), d.hojas(), d.toques(),
+                d.piezasPub(), d.b2bAgencias(), d.b2bTabla(), d.estadisticas(), d.despliegueSemanal(),
+                d.planComercial(), d.rawSheets(), d.b2bStatus(), d.b2bMensaje(), d.success(), d.message()
+        );
+        dashboardCache.set(new CacheEntry(patched, cached.loadedAt()));
+    }
+
     public void patchVentaRow(String hojaOrigen, String celular, String fechaCot, Map<String, Object> fields) {
         CacheEntry cached = dashboardCache.get();
         if (cached == null || cached.dto() == null || cached.dto().ventas() == null) {

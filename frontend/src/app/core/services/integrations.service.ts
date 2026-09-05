@@ -33,6 +33,21 @@ export class IntegrationsService {
     return this.api.post<SheetsSyncResult>('/integrations/sheets/sync', {}).pipe(catchError(() => of(null)));
   }
 
+  appendSeguimiento(row: Partial<SeguimientoWhatsapp> & Record<string, unknown>): Observable<SheetRowWriteResult> {
+    return this.api.post<SheetRowWriteResult>('/integrations/sheets/seguimiento', row).pipe(
+      catchError((err) =>
+        throwError(() => ({
+          message:
+            err?.error?.message ||
+            err?.error?.detail ||
+            err?.error?.error ||
+            err?.message ||
+            'No se pudo agregar la fila al Excel'
+        }))
+      )
+    );
+  }
+
   updateSeguimiento(row: Partial<SeguimientoWhatsapp> & Record<string, unknown>): Observable<SheetRowWriteResult> {
     return this.api.put<SheetRowWriteResult>('/integrations/sheets/seguimiento', row).pipe(
       catchError((err) =>

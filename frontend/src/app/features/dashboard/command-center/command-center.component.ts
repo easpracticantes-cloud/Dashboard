@@ -37,9 +37,9 @@ export class CommandCenterComponent implements OnInit {
     }
     const max = Math.max(f.quotes, f.reservations, f.sales, 1);
     return [
-      { key: 'Cotizaciones', value: f.quotes, pct: (f.quotes / max) * 100, route: '/app/quotes' },
-      { key: 'Reservas', value: f.reservations, pct: (f.reservations / max) * 100, route: '/app/reservations' },
-      { key: 'Ventas', value: f.sales, pct: (f.sales / max) * 100, route: '/app/sales' }
+      { key: 'Cotizaciones', value: f.quotes, pct: (f.quotes / max) * 100, route: '/app/registro' },
+      { key: 'Reservas', value: f.reservations, pct: (f.reservations / max) * 100, route: '/app/registro' },
+      { key: 'Ventas', value: f.sales, pct: (f.sales / max) * 100, route: '/app/registro' }
     ];
   });
 

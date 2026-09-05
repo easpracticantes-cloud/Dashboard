@@ -18,16 +18,10 @@ const ALL_ROLES: RoleCode[] = [
   'ASESOR'
 ];
 
-const WITHOUT_CONTABILIDAD: RoleCode[] = ALL_ROLES.filter((role) => role !== 'CONTABILIDAD');
-
 /** Sidebar alineado al workbook Google Sheets. */
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard Sheets', icon: 'space_dashboard', route: '/app/dashboard', roles: ALL_ROLES },
-  { label: 'Seguimiento', icon: 'forum', route: '/app/conversations', roles: WITHOUT_CONTABILIDAD },
-  { label: 'Clientes', icon: 'diversity_3', route: '/app/clients', roles: ALL_ROLES },
-  { label: 'Cotizaciones', icon: 'request_quote', route: '/app/quotes', roles: ALL_ROLES },
-  { label: 'Reservas', icon: 'event_available', route: '/app/reservations', roles: ALL_ROLES },
-  { label: 'Ventas', icon: 'payments', route: '/app/sales', roles: ALL_ROLES },
+  { label: 'Registro', icon: 'table_chart', route: '/app/registro', roles: ALL_ROLES },
   {
     label: 'Contabilidad',
     icon: 'account_balance',

@@ -62,7 +62,7 @@ export class CommandPaletteComponent implements OnInit {
                 title: c.name,
                 subtitle: [c.phone, c.email].filter(Boolean).join(' · ') || 'Cliente CRM',
                 icon: 'person',
-                route: '/app/clients',
+                route: '/app/registro',
                 queryParams: { q: c.name }
               }));
               const convItems: CommandItem[] = conversations.slice(0, 6).map((c) => ({
@@ -71,8 +71,8 @@ export class CommandPaletteComponent implements OnInit {
                 title: c.clientName || 'Conversación',
                 subtitle: c.lastMessagePreview || c.status || 'Inbox',
                 icon: 'forum',
-                route: '/app/conversations',
-                queryParams: { id: c.id }
+                route: '/app/registro',
+                queryParams: { q: c.clientName || c.lastMessagePreview || '' }
               }));
               return [...nav, ...clientItems, ...convItems];
             })
@@ -126,25 +126,15 @@ export class CommandPaletteComponent implements OnInit {
         title: 'Agenda / reservas de hoy',
         subtitle: 'Operación del día',
         icon: 'event_available',
-        route: '/app/reservations'
+        route: '/app/registro'
       },
       {
-        id: 'action-inbox-unassigned',
+        id: 'action-registro',
         kind: 'action',
-        title: 'Inbox sin asignar',
-        subtitle: 'Seguimiento',
-        icon: 'person_off',
-        route: '/app/conversations',
-        queryParams: { view: 'unassigned' }
-      },
-      {
-        id: 'action-inbox-stale',
-        kind: 'action',
-        title: 'Conversaciones estancadas',
-        subtitle: 'Seguimiento',
-        icon: 'hourglass_top',
-        route: '/app/conversations',
-        queryParams: { view: 'stale' }
+        title: 'Nueva fila en el Excel',
+        subtitle: 'Registro comercial',
+        icon: 'table_chart',
+        route: '/app/registro'
       },
       {
         id: 'action-reports',

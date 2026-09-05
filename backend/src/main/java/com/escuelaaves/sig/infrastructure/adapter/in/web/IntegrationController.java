@@ -57,6 +57,12 @@ public class IntegrationController {
         return ResponseEntity.ok(sheetsWriteService.updateSeguimiento(body));
     }
 
+    @PostMapping("/sheets/seguimiento")
+    @Operation(summary = "Agrega una fila de seguimiento al Excel (Google Sheets)")
+    public ResponseEntity<SheetRowWriteResultDto> appendSeguimiento(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(sheetsWriteService.appendSeguimiento(body));
+    }
+
     @PutMapping("/sheets/venta")
     @Operation(summary = "Actualiza una venta tipada en Google Sheets y en el cache del dashboard")
     public ResponseEntity<SheetRowWriteResultDto> updateVenta(@RequestBody Map<String, Object> body) {
