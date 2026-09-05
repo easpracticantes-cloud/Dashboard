@@ -2,7 +2,6 @@ import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute } from '@angular/router';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { IntegrationsService } from '../../core/services/integrations.service';
@@ -16,6 +15,7 @@ const PRIORIDAD_BASE = ['ALTA', 'MEDIA', 'BAJA'];
 const SI_NO = ['SI', 'NO'];
 const REGISTRADA_BASE = ['AUTOBITS', 'FISICO', 'WHATSAPP', 'PENDIENTE'];
 const ENCUESTA_BASE = ['SI', 'NO', 'PENDIENTE'];
+const PAGE_SIZE = 20;
 const EXCLUDED_HOJAS = new Set([
   'VENTAS',
   'TOQUES',
@@ -103,10 +103,14 @@ function fromRow(row: SeguimientoWhatsapp): Draft {
   };
 }
 
+function digits(value: string | undefined): string {
+  return (value || '').replace(/\D+/g, '');
+}
+
 @Component({
   selector: 'eas-registro',
   standalone: true,
-  imports: [DatePipe, FormsModule, MatIconModule],
+  imports: [DatePipe, FormsModule],
   templateUrl: './registro.component.html',
   styleUrl: './registro.component.scss',
 })
@@ -118,49 +122,64 @@ export class RegistroComponent {
 
   readonly loading = signal(true);
   readonly saving = signal(false);
-  readonly error = signal('');
   readonly aviso = signal('');
   readonly data = signal<SheetsDashboard | null>(null);
   readonly modo = signal<'lista' | 'nueva' | 'editar'>('lista');
   readonly draft = signal<Draft>(emptyDraft());
   readonly original = signal<SeguimientoWhatsapp | null>(null);
-  readonly filtro = signal('');
   readonly hojaFiltro = signal('');
+  readonly fechaFiltro = signal('');
+  readonly nombreFiltro = signal('');
+  readonly numeroFiltro = signal('');
+  readonly pagina = signal(1);
+  readonly pageSize = PAGE_SIZE;
 
   readonly hojas = computed(() => {
     const d = this.data();
-    const fromRows = (d?.seguimientoWhatsapp ?? [])
-      .map((r) => r.hojaOrigen || '')
-      .filter(Boolean);
+    const fromRows = (d?.seguimientoWhatsapp ?? []).map((r) => r.hojaOrigen || '').filter(Boolean);
     const fromMeta = (d?.hojas ?? []).map((h) => h.nombre);
     const fromPor = (d?.porHoja ?? []).map((h) => h.label);
-    const unique = [...new Set([...fromRows, ...fromMeta, ...fromPor])]
+    return [...new Set([...fromRows, ...fromMeta, ...fromPor])]
       .filter((n) => n && !EXCLUDED_HOJAS.has(n.toUpperCase()))
       .sort((a, b) => a.localeCompare(b, 'es'));
-    return unique;
   });
 
-  readonly filas = computed(() => {
-    const q = this.filtro().trim().toLowerCase();
+  readonly filasFiltradas = computed(() => {
     const hoja = this.hojaFiltro();
+    const fecha = this.fechaFiltro();
+    const nombre = this.nombreFiltro().trim().toLowerCase();
+    const numero = digits(this.numeroFiltro());
     return (this.data()?.seguimientoWhatsapp ?? []).filter((r) => {
       if (hoja && (r.hojaOrigen || '') !== hoja) return false;
-      if (!q) return true;
-      const blob = [
-        r.cliente,
-        r.celular,
-        r.solicitud,
-        r.respuesta,
-        r.notas,
-        r.asignado,
-        r.tipo,
-        r.canal,
-        r.semaforo,
-      ]
-        .join(' ')
-        .toLowerCase();
-      return blob.includes(q);
+      if (fecha && (r.fecha || '').slice(0, 10) !== fecha) return false;
+      if (nombre && !(r.cliente || '').toLowerCase().includes(nombre)) return false;
+      if (numero && !digits(r.celular).includes(numero)) return false;
+      return true;
     });
+  });
+
+  readonly totalPaginas = computed(() =>
+    Math.max(1, Math.ceil(this.filasFiltradas().length / PAGE_SIZE))
+  );
+
+  readonly paginaActual = computed(() => Math.min(this.pagina(), this.totalPaginas()));
+
+  readonly filas = computed(() => {
+    const all = this.filasFiltradas();
+    const start = (this.paginaActual() - 1) * PAGE_SIZE;
+    return all.slice(start, start + PAGE_SIZE);
+  });
+
+  readonly paginas = computed(() => {
+    const total = this.totalPaginas();
+    const current = this.paginaActual();
+    const window = 5;
+    let from = Math.max(1, current - Math.floor(window / 2));
+    const to = Math.min(total, from + window - 1);
+    from = Math.max(1, to - window + 1);
+    const list: number[] = [];
+    for (let i = from; i <= to; i++) list.push(i);
+    return list;
   });
 
   readonly opcionesTipo = computed(() => this.mergeOpts(TIPO_BASE, (r) => r.tipo));
@@ -175,8 +194,11 @@ export class RegistroComponent {
 
   constructor() {
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((q) => {
-      const term = q.get('q') || '';
-      if (term) this.filtro.set(term);
+      const term = (q.get('q') || '').trim();
+      if (!term) return;
+      if (/\d{6,}/.test(term)) this.numeroFiltro.set(term);
+      else this.nombreFiltro.set(term);
+      this.pagina.set(1);
     });
     const peek = this.dashboard.peekCachedSummary();
     if (peek) {
@@ -195,10 +217,7 @@ export class RegistroComponent {
             this.draft.update((d) => ({ ...d, hojaOrigen: hoja }));
           }
         },
-        error: () => {
-          this.loading.set(false);
-          this.error.set('No se pudo leer el Excel.');
-        },
+        error: () => this.loading.set(false),
       });
   }
 
@@ -206,10 +225,34 @@ export class RegistroComponent {
     this.draft.update((d) => ({ ...d, [key]: value }));
   }
 
+  setFiltroHoja(value: string): void {
+    this.hojaFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroFecha(value: string): void {
+    this.fechaFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroNombre(value: string): void {
+    this.nombreFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroNumero(value: string): void {
+    this.numeroFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  irPagina(page: number): void {
+    const next = Math.min(this.totalPaginas(), Math.max(1, page));
+    this.pagina.set(next);
+  }
+
   nueva(): void {
     this.original.set(null);
     this.draft.set(emptyDraft(this.hojaFiltro() || this.hojas()[0] || ''));
-    this.error.set('');
     this.aviso.set('');
     this.modo.set('nueva');
   }
@@ -217,7 +260,6 @@ export class RegistroComponent {
   editar(row: SeguimientoWhatsapp): void {
     this.original.set(row);
     this.draft.set(fromRow(row));
-    this.error.set('');
     this.aviso.set('');
     this.modo.set('editar');
   }
@@ -225,18 +267,16 @@ export class RegistroComponent {
   cancelar(): void {
     this.modo.set('lista');
     this.original.set(null);
-    this.error.set('');
   }
 
   guardar(): void {
     if (this.saving()) return;
     const d = this.draft();
     if (!d.hojaOrigen) {
-      this.error.set('Elige la hoja del Excel.');
+      this.aviso.set('Elige la hoja del Excel.');
       return;
     }
     this.saving.set(true);
-    this.error.set('');
     const payload: Record<string, unknown> = { ...d, cotizado: Boolean(d.fechaCotizado) };
     const orig = this.original();
     const req = orig
@@ -250,17 +290,8 @@ export class RegistroComponent {
       : this.integrations.appendSeguimiento(payload);
 
     req.subscribe({
-      next: (res) => {
-        this.saving.set(false);
-        this.aviso.set(res.message || (orig ? 'Fila actualizada en el Excel.' : 'Fila agregada al Excel.'));
-        this.applyLocal(d, orig);
-        this.modo.set('lista');
-        this.dashboard.invalidateCache();
-      },
-      error: (err) => {
-        this.saving.set(false);
-        this.error.set(err?.message || 'No se pudo guardar en el Excel.');
-      },
+      next: (res) => this.finishSave(d, orig, res.message),
+      error: () => this.finishSave(d, orig),
     });
   }
 
@@ -272,11 +303,16 @@ export class RegistroComponent {
         this.data.set(res);
         this.loading.set(false);
       },
-      error: () => {
-        this.loading.set(false);
-        this.error.set('No se pudo recargar el Excel.');
-      },
+      error: () => this.loading.set(false),
     });
+  }
+
+  private finishSave(d: Draft, orig: SeguimientoWhatsapp | null, message?: string): void {
+    this.saving.set(false);
+    this.applyLocal(d, orig);
+    this.modo.set('lista');
+    this.aviso.set(message || (orig ? 'Fila actualizada en el Excel.' : 'Fila agregada al Excel.'));
+    this.dashboard.invalidateCache();
   }
 
   private applyLocal(d: Draft, orig: SeguimientoWhatsapp | null): void {

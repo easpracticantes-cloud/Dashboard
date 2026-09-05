@@ -1,14 +1,14 @@
 .reg {
   display: grid;
   gap: 1.1rem;
-  color: var(--eas-ink, #1c2b24);
+  color: var(--eas-ink);
 }
 
 .reg__hero {
   padding: 1.2rem 1.3rem;
-  border: 1px solid #d7e2db;
+  border: 1px solid var(--eas-line-soft);
   border-radius: 18px;
-  background: #f4f8f5;
+  background: var(--eas-surface-2);
 }
 
 .reg__eyebrow {
@@ -17,7 +17,7 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 750;
-  color: #1f7a4c;
+  color: var(--eas-leaf);
 }
 
 .reg__hero h2 {
@@ -25,12 +25,13 @@
   font-family: Montserrat, Sora, sans-serif;
   font-size: 1.55rem;
   font-weight: 780;
+  color: var(--eas-ink);
 }
 
 .reg__lead {
   margin: 0 0 0.9rem;
   max-width: 68ch;
-  color: #5c6b63;
+  color: var(--eas-muted);
   line-height: 1.45;
 }
 
@@ -43,10 +44,11 @@
 
 .reg__btn,
 .reg__ghost,
-.reg__copy {
-  border: 1px solid #c5d3cb;
-  background: #fff;
-  color: #1a3d2c;
+.reg__copy,
+.reg__page {
+  border: 1px solid var(--eas-line);
+  background: var(--eas-surface);
+  color: var(--eas-ink);
   border-radius: 10px;
   padding: 0.5rem 0.85rem;
   font-weight: 650;
@@ -54,34 +56,44 @@
 }
 
 .reg__btn {
-  background: #1f7a4c;
-  border-color: #1f7a4c;
-  color: #fff;
+  background: var(--eas-leaf);
+  border-color: var(--eas-leaf);
+  color: var(--eas-on-brand);
+}
+
+.reg__btn:disabled,
+.reg__ghost:disabled,
+.reg__page:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.reg__page.is-on {
+  background: var(--eas-leaf);
+  border-color: var(--eas-leaf);
+  color: var(--eas-on-brand);
 }
 
 .reg__alert {
   margin: 0;
   padding: 0.7rem 0.9rem;
   border-radius: 12px;
-  background: #eef6f1;
-  border: 1px solid #cfe0d6;
-}
-
-.reg__alert--bad {
-  background: #fdecec;
-  border-color: #f0c6c6;
+  background: var(--eas-success-bg);
+  border: 1px solid var(--eas-success-border);
+  color: var(--eas-ink);
 }
 
 .reg__card {
   padding: 1.1rem 1.2rem 1.25rem;
-  border: 1px solid #d7e2db;
+  border: 1px solid var(--eas-line-soft);
   border-radius: 16px;
-  background: #fff;
+  background: var(--eas-surface);
 }
 
 .reg__card h3 {
   margin: 0 0 0.8rem;
   font-size: 1.08rem;
+  color: var(--eas-ink);
 }
 
 .reg__grid {
@@ -102,7 +114,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   font-weight: 750;
-  color: #5c6b63;
+  color: var(--eas-muted);
 }
 
 .reg__grid input,
@@ -110,15 +122,25 @@
 .reg__toolbar input,
 .reg__toolbar select {
   min-height: 40px;
-  border: 1px solid #c5d3cb;
+  border: 1px solid var(--eas-line);
   border-radius: 10px;
   padding: 0.4rem 0.6rem;
   font: inherit;
   text-transform: none;
   letter-spacing: normal;
   font-weight: 500;
-  color: #1c2b24;
-  background: #fff;
+  color: var(--eas-ink);
+  background: var(--eas-surface-2);
+  color-scheme: inherit;
+}
+
+.reg__grid input::placeholder,
+.reg__toolbar input::placeholder {
+  color: var(--eas-placeholder);
+}
+
+.reg__form-actions {
+  margin-top: 1rem;
 }
 
 .reg__toolbar {
@@ -130,17 +152,17 @@
 }
 
 .reg__search {
-  flex: 1 1 220px;
+  flex: 1 1 160px;
 }
 
 .reg__count {
   font-size: 0.82rem;
-  color: #66756c;
+  color: var(--eas-muted);
 }
 
 .reg__table-wrap {
   overflow: auto;
-  border: 1px solid #e2ebe5;
+  border: 1px solid var(--eas-line-soft);
   border-radius: 12px;
 }
 
@@ -149,12 +171,13 @@
   min-width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
+  color: var(--eas-ink);
 }
 
 .reg__table th,
 .reg__table td {
   padding: 0.55rem 0.65rem;
-  border-bottom: 1px solid #edf3ef;
+  border-bottom: 1px solid var(--eas-line-soft);
   text-align: left;
   vertical-align: top;
   white-space: nowrap;
@@ -164,15 +187,28 @@
 }
 
 .reg__table th {
-  background: #f4f8f5;
+  background: var(--eas-mist);
   font-size: 0.68rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  color: var(--eas-muted);
+}
+
+.reg__table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--eas-mist) 55%, transparent);
 }
 
 .reg__hint {
   margin: 0.8rem 0 0;
-  color: #66756c;
+  color: var(--eas-muted);
+}
+
+.reg__pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  margin-top: 0.9rem;
 }
 
 @media (max-width: 900px) {
@@ -182,5 +218,15 @@
 
   .reg__wide {
     grid-column: span 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .reg__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reg__wide {
+    grid-column: span 1;
   }
 }

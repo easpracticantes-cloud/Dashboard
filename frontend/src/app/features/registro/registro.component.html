@@ -13,9 +13,6 @@
     </div>
   </header>
 
-  @if (error()) {
-    <p class="reg__alert reg__alert--bad">{{ error() }}</p>
-  }
   @if (aviso()) {
     <p class="reg__alert">{{ aviso() }}</p>
   }
@@ -57,11 +54,18 @@
         </label>
         <label class="reg__wide">
           Cliente
-          <input type="text" [ngModel]="draft().cliente" (ngModelChange)="patch('cliente', $event)" />
+          <input type="text" [ngModel]="draft().cliente" (ngModelChange)="patch('cliente', $event)" placeholder="Nombre del cliente" />
         </label>
-        <label>
-          Celular
-          <input type="text" [ngModel]="draft().celular" (ngModelChange)="patch('celular', $event)" />
+        <label class="reg__wide">
+          Teléfono
+          <input
+            type="tel"
+            inputmode="tel"
+            autocomplete="tel"
+            [ngModel]="draft().celular"
+            (ngModelChange)="patch('celular', $event)"
+            placeholder="300 123 4567"
+          />
         </label>
         <label>
           DISC
@@ -173,18 +177,26 @@
     <div class="reg__toolbar">
       <label>
         Hoja
-        <select [ngModel]="hojaFiltro()" (ngModelChange)="hojaFiltro.set($event)">
+        <select [ngModel]="hojaFiltro()" (ngModelChange)="setFiltroHoja($event)">
           <option value="">Todas</option>
           @for (h of hojas(); track h) {
             <option [value]="h">{{ h }}</option>
           }
         </select>
       </label>
-      <label class="reg__search">
-        Buscar
-        <input type="search" [ngModel]="filtro()" (ngModelChange)="filtro.set($event)" placeholder="Cliente, celular, solicitud…" />
+      <label>
+        Fecha
+        <input type="date" [ngModel]="fechaFiltro()" (ngModelChange)="setFiltroFecha($event)" />
       </label>
-      <span class="reg__count">{{ filas().length }} filas</span>
+      <label class="reg__search">
+        Nombre
+        <input type="search" [ngModel]="nombreFiltro()" (ngModelChange)="setFiltroNombre($event)" placeholder="Cliente" />
+      </label>
+      <label class="reg__search">
+        Número
+        <input type="search" [ngModel]="numeroFiltro()" (ngModelChange)="setFiltroNumero($event)" placeholder="Teléfono" />
+      </label>
+      <span class="reg__count">{{ filasFiltradas().length }} filas</span>
     </div>
 
     <div class="reg__table-wrap">
@@ -196,7 +208,7 @@
             <th>Tipo</th>
             <th>Canal</th>
             <th>Cliente</th>
-            <th>Celular</th>
+            <th>Teléfono</th>
             <th>DISC</th>
             <th>Solicitud</th>
             <th>Respuesta</th>
@@ -245,8 +257,26 @@
         </tbody>
       </table>
     </div>
-    @if (!loading() && !filas().length) {
+    @if (!loading() && !filasFiltradas().length) {
       <p class="reg__hint">No hay filas con ese filtro. Agrega una o recarga el Excel.</p>
+    }
+    @if (filasFiltradas().length) {
+      <nav class="reg__pager" aria-label="Paginación">
+        <button type="button" class="reg__ghost" (click)="irPagina(paginaActual() - 1)" [disabled]="paginaActual() <= 1">
+          Anterior
+        </button>
+        @for (p of paginas(); track p) {
+          <button type="button" class="reg__page" [class.is-on]="p === paginaActual()" (click)="irPagina(p)">
+            {{ p }}
+          </button>
+        }
+        <button type="button" class="reg__ghost" (click)="irPagina(paginaActual() + 1)" [disabled]="paginaActual() >= totalPaginas()">
+          Siguiente
+        </button>
+        <span class="reg__count">
+          Página {{ paginaActual() }} de {{ totalPaginas() }}
+        </span>
+      </nav>
     }
   </section>
 </div>
