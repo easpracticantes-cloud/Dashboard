@@ -96,17 +96,15 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health():
-    """Estado de Tesseract y del motor IA (Gemini u Ollama)."""
+    """Estado de Tesseract y de Claude."""
     from config.settings import get_settings
     from infrastructure.ai.ai_factory import resolve_ai_provider_name
 
     settings = get_settings()
     errores = verificar_dependencias()
     provider = resolve_ai_provider_name()
-    ai_ok = not any("Gemini" in e or "Ollama" in e for e in errores)
-    key_set = bool((settings.gemini_api_key or "").strip()) if provider == "gemini" else bool(
-        (settings.ollama_api_key or "").strip() or "localhost" in (settings.ollama_url or "")
-    )
+    ai_ok = not any("Claude" in e or "Anthropic" in e for e in errores)
+    key_set = bool((settings.anthropic_api_key or "").strip())
     return {
         "ok": len(errores) == 0,
         "errores": errores,
@@ -114,15 +112,13 @@ def health():
         "ai_provider": provider,
         "ai": ai_ok,
         "ai_key_configured": key_set,
-        "ai_model": settings.gemini_model if provider == "gemini" else settings.ollama_model,
-        "vision_fallback": bool(settings.gemini_vision_on_weak_ocr) and provider == "gemini",
-        # Compat UI antigua: "ollama" = motor IA disponible
+        "ai_model": settings.ai_model_fast,
+        "vision_fallback": bool(settings.claude_vision_on_weak_ocr) and key_set,
         "ollama": ai_ok,
-        "gemini": provider == "gemini" and ai_ok,
         "hint": (
             None
             if ai_ok
-            else "En Contabilidad usa AI_PROVIDER=gemini (o APP_AI_PROVIDER) y la misma GEMINI_API_KEY/GEMINI_MODEL del backend."
+            else "Define ANTHROPIC_API_KEY y ANTHROPIC_WORKSPACE_ID, luego reinicia Contabilidad."
         ),
     }
 

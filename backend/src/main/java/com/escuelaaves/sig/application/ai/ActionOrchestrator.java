@@ -53,11 +53,12 @@ public class ActionOrchestrator {
         String error = null;
         try {
             ActionPlanInterpreter.InterpretedPlan plan = interpreter.interpret(instruction, contextJson);
-            boolean hasMutating = plan.actions().stream().anyMatch(a -> a.tool().mutating());
+            boolean needsConfirm = plan.actions().stream().anyMatch(a -> a.tool().requiresExplicitConfirm());
             boolean executeMutations = !dryRun && confirm;
-            if (hasMutating && !dryRun && !confirm) {
+            if (needsConfirm && !dryRun && !confirm) {
                 throw new BadRequestException(
-                        "El plan incluye acciones mutantes. Envía confirm=true para ejecutar, o dryRun=true para simular."
+                        "El plan incluye acciones MUTATING/EXTERNAL. "
+                                + "Confirma esa acción concreta (confirm=true) o usa dryRun=true."
                 );
             }
 

@@ -52,7 +52,7 @@ class ActionOrchestratorTest {
                 aiProviderFactory,
                 observabilityPort
         );
-        when(aiProviderFactory.activeType()).thenReturn(AiProviderType.GEMINI);
+        when(aiProviderFactory.activeType()).thenReturn(AiProviderType.CLAUDE);
         lenient().when(aiProviderFactory.getActiveProvider()).thenReturn(generativeAiPort);
         lenient().when(generativeAiPort.chat(anyString(), anyString())).thenReturn("Resumen OK");
     }

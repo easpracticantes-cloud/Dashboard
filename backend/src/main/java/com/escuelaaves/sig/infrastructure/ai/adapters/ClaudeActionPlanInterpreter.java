@@ -20,7 +20,7 @@ import java.util.Map;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class GeminiActionPlanInterpreter implements ActionPlanInterpreter {
+public class ClaudeActionPlanInterpreter implements ActionPlanInterpreter {
 
     private final AiProviderFactory aiProviderFactory;
     private final ObjectMapper objectMapper;

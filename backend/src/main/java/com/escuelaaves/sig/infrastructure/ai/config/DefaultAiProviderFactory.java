@@ -16,22 +16,13 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Resuelve el proveedor de IA configurado. Si está DISABLED, hace failover a otro READY
- * (Claude → Gemini u otros) para que el chat general no quede atrapado en un stub local.
+ * Resuelve el proveedor de IA. Solo Claude (Anthropic) está habilitado.
  */
 @Slf4j
 @Component
 public class DefaultAiProviderFactory implements AiProviderFactory {
 
-    private static final List<AiProviderType> FAILOVER_ORDER = List.of(
-            AiProviderType.CLAUDE,
-            AiProviderType.GEMINI,
-            AiProviderType.OPENAI,
-            AiProviderType.DEEPSEEK
-    );
-
     private final Map<AiProviderType, GenerativeAiPort> providers = new EnumMap<>(AiProviderType.class);
-    private final AiProviderType preferredType;
 
     public DefaultAiProviderFactory(
             List<GenerativeAiPort> allProviders,
@@ -41,88 +32,48 @@ public class DefaultAiProviderFactory implements AiProviderFactory {
             AiProviderType type = AiProviderType.from(port.providerId());
             providers.put(type, port);
         }
-        this.preferredType = AiProviderType.from(provider);
-        log.info("[AI] Preferido={} (config={}) registrados={}",
-                preferredType.id(), provider, providers.keySet());
-
-        GenerativeAiPort preferred = providers.get(preferredType);
-        if (preferred != null && !isUsable(preferred)) {
-            Optional<GenerativeAiPort> alt = findAlternateReady(preferred);
-            if (alt.isPresent()) {
-                log.warn("[AI] Preferido '{}' DISABLED → failover a '{}'",
-                        preferredType.id(), alt.get().providerId());
-            } else {
-                log.warn("[AI] Preferido '{}' DISABLED y no hay otro proveedor READY. "
-                                + "Define ANTHROPIC_API_KEY o GEMINI_API_KEY.",
-                        preferredType.id());
-            }
+        log.info("[AI] Proveedor=claude (config={}) registrados={}", provider, providers.keySet());
+        GenerativeAiPort claude = providers.get(AiProviderType.CLAUDE);
+        if (claude == null || !isUsable(claude)) {
+            log.warn("[AI] Claude DISABLED. Define ANTHROPIC_API_KEY y, si aplica, ANTHROPIC_WORKSPACE_ID.");
         }
     }
 
     @Override
     public GenerativeAiPort getActiveProvider() {
-        GenerativeAiPort preferred = providers.get(preferredType);
-        if (preferred != null && isUsable(preferred)) {
-            return preferred;
-        }
-        Optional<GenerativeAiPort> alt = findAlternateReady(preferred);
-        if (alt.isPresent()) {
-            return alt.get();
-        }
-        if (preferred != null) {
-            // Deja que el adapter lance el error de configuración al llamar chat()
-            return preferred;
+        GenerativeAiPort claude = providers.get(AiProviderType.CLAUDE);
+        if (claude != null) {
+            return claude;
         }
         throw new BadRequestException(
-                "No hay proveedor de IA registrado. Configura APP_AI_PROVIDER=anthropic y ANTHROPIC_API_KEY."
+                "No hay proveedor Claude registrado. Configura APP_AI_PROVIDER=anthropic y ANTHROPIC_API_KEY."
         );
     }
 
     @Override
     public GenerativeAiPort getProvider(AiProviderType type) {
-        GenerativeAiPort port = providers.get(type);
-        if (port == null) {
-            throw new BadRequestException("Proveedor IA no registrado: " + type);
+        if (type != AiProviderType.CLAUDE) {
+            throw new BadRequestException("Solo Claude está habilitado. Proveedor pedido: " + type);
         }
-        return port;
+        return getActiveProvider();
     }
 
     @Override
     public AiProviderType activeType() {
-        GenerativeAiPort active = getActiveProvider();
-        return AiProviderType.from(active.providerId());
+        return AiProviderType.CLAUDE;
     }
 
     @Override
     public Optional<GenerativeAiPort> findAlternateReady(GenerativeAiPort exclude) {
-        String excludeId = exclude != null ? exclude.providerId() : null;
-        for (AiProviderType type : FAILOVER_ORDER) {
-            GenerativeAiPort port = providers.get(type);
-            if (port == null || !isUsable(port)) {
-                continue;
-            }
-            if (excludeId != null && excludeId.equalsIgnoreCase(port.providerId())) {
-                continue;
-            }
-            return Optional.of(port);
-        }
-        for (GenerativeAiPort port : providers.values()) {
-            if (port != null && isUsable(port)
-                    && (excludeId == null || !excludeId.equalsIgnoreCase(port.providerId()))) {
-                return Optional.of(port);
-            }
-        }
         return Optional.empty();
     }
 
     @Override
     public List<GenerativeAiPort> readyProviders() {
         List<GenerativeAiPort> ready = new ArrayList<>();
-        for (AiProviderType type : FAILOVER_ORDER) {
-            GenerativeAiPort port = providers.get(type);
-            if (port != null && isUsable(port)) {
-                ready.add(port);
-            }
+        GenerativeAiPort claude = providers.get(AiProviderType.CLAUDE);
+        if (claude != null && isUsable(claude)) {
+            ready.add(claude);
         }
         return ready;
     }

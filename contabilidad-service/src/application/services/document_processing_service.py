@@ -135,9 +135,9 @@ class DocumentProcessingService:
             if ocr_debil:
                 vision_fn = getattr(self.ai, "extract_custom_from_image", None)
                 use_vision = (
-                    bool(getattr(settings, "gemini_vision_on_weak_ocr", True))
+                    bool(getattr(settings, "claude_vision_on_weak_ocr", True))
                     and callable(vision_fn)
-                    and resolve_ai_provider_name() == "gemini"
+                    and resolve_ai_provider_name() == "anthropic"
                 )
                 if not use_vision:
                     error = (
@@ -152,16 +152,16 @@ class DocumentProcessingService:
                     return resultado
 
                 logger.info(
-                    "OCR debil (%s chars) — Gemini vision sobre %s",
+                    "OCR debil (%s chars) — Claude vision sobre %s",
                     resultado["caracteres_ocr"],
                     nombre_archivo,
                 )
                 ai_result = vision_fn(ruta_imagen, solicitud_usuario)
-                resultado["metodo_ocr"] = "GEMINI_VISION"
+                resultado["metodo_ocr"] = "CLAUDE_VISION"
                 if not ai_result.ok:
                     error = (
                         f"OCR debil ({resultado['caracteres_ocr']} caracteres) y "
-                        f"vision Gemini fallo: {ai_result.error}"
+                        f"vision Claude fallo: {ai_result.error}"
                     )
                     resultado["error"] = error
                     document.estado = DocumentStatus.REQUIERE_REVISION
@@ -236,7 +236,7 @@ class DocumentProcessingService:
 
     def _vision_enabled(self) -> bool:
         vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
-        return bool(getattr(settings, "gemini_vision_on_weak_ocr", True)) and callable(vision_fn)
+        return bool(getattr(settings, "claude_vision_on_weak_ocr", True)) and callable(vision_fn)
 
     def _ocr_parece_basura(self, text: str) -> bool:
         """OCR con muchos caracteres pero sin señales de factura → forzar visión."""
@@ -405,7 +405,7 @@ class DocumentProcessingService:
                 error = (
                     f"OCR debil ({len(ocr_result.text.strip())} caracteres) y "
                     "no hay proveedor de vision disponible. "
-                    "Sube JPG/PNG nitido o configura Gemini/Anthropic."
+                    "Sube JPG/PNG nitido o configura ANTHROPIC_API_KEY."
                 )
                 document.estado = DocumentStatus.REQUIERE_REVISION
                 job_repo.mark_requires_review(job)
@@ -540,17 +540,17 @@ class DocumentProcessingService:
             if len(ocr_result.text.strip()) < settings.min_caracteres_ocr:
                 vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
                 use_vision = (
-                    bool(getattr(settings, "gemini_vision_on_weak_ocr", True))
+                    bool(getattr(settings, "claude_vision_on_weak_ocr", True))
                     and callable(vision_fn)
-                    and resolve_ai_provider_name() == "gemini"
+                    and resolve_ai_provider_name() == "anthropic"
                 )
                 if use_vision:
-                    logger.info("Batch OCR debil — Gemini vision sobre %s", ruta_imagen.name)
+                    logger.info("Batch OCR debil — Claude vision sobre %s", ruta_imagen.name)
                     ai_result = vision_fn(ruta_imagen)
                     if ai_result.ok:
                         ocr_result = type(ocr_result)(
                             text=ocr_result.text or "(vision)",
-                            method="GEMINI_VISION",
+                            method="CLAUDE_VISION",
                             chars_original=ocr_result.chars_original,
                             chars_preprocessed=ocr_result.chars_preprocessed,
                             preprocessed_path=ocr_result.preprocessed_path,
@@ -566,7 +566,7 @@ class DocumentProcessingService:
                     db.commit()
                     return {"ok": False, "estado": "revisar", "document_id": document.id}
 
-            if ocr_result.method != "GEMINI_VISION":
+            if ocr_result.method != "CLAUDE_VISION":
                 ai_result = self.ai.extract_invoice(ocr_result.text)
             if not ai_result or not ai_result.ok:
                 document.estado = DocumentStatus.ERROR

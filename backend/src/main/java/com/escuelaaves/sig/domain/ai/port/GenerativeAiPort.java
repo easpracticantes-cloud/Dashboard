@@ -15,7 +15,7 @@ import com.escuelaaves.sig.domain.model.IntegrationStatus;
 
 /**
  * Fachada del proveedor de IA generativa (Strategy).
- * Compone los puertos finos para no forzar a la aplicación a conocer Gemini/OpenAI/etc.
+ * Compone los puertos finos para no forzar a la aplicación a conocer el vendor.
  */
 public interface GenerativeAiPort extends
         GenerativeChatProvider,
@@ -33,7 +33,7 @@ public interface GenerativeAiPort extends
 
     IntegrationStatus status();
 
-    /** Identificador del proveedor: gemini | openai | claude | deepseek */
+    /** Identificador del proveedor: claude | openai | deepseek */
     String providerId();
 
     String summarizeConversation(String conversationText);

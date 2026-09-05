@@ -22,7 +22,6 @@ public class IntegrationStatusService {
             "GOOGLE_SHEETS", "Exportacion de datos operativos a hojas de calculo",
             "GOOGLE_DRIVE", "Almacenamiento de documentos y adjuntos",
             "CLAUDE_AI", "Asistente de IA para sugerencias y analisis",
-            "GEMINI_AI", "Google Gemini — chat, cotizaciones e interpretacion",
             "N8N", "Automatizacion de flujos de trabajo",
             "EMAIL", "Notificaciones y recuperacion de contrasena por correo",
             "ACCOUNTING", "Sincronizacion con el sistema contable"

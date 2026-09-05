@@ -21,7 +21,7 @@
           </span>
           <span class="estado-chip" [class]="(health.ai ?? health.ollama) ? 'ok' : 'bad'">
             <mat-icon>psychology</mat-icon>
-            {{ health.ai_provider === 'gemini' ? 'Gemini' : 'Motor IA' }}
+            Claude
             {{ (health.ai ?? health.ollama) ? 'OK' : 'fallo' }}
           </span>
         }

@@ -69,7 +69,7 @@ export class AiComponent implements OnInit {
   ngOnInit(): void {
     this.ai.status().subscribe({
       next: (s) => this.providerStatus.set(s),
-      error: () => this.providerStatus.set({ status: 'UNKNOWN', provider: 'gemini' })
+      error: () => this.providerStatus.set({ status: 'UNKNOWN', provider: 'claude' })
     });
     this.loadRules();
   }

@@ -67,19 +67,11 @@ app:
     connect-timeout-seconds: ${CONTABLE_CONNECT_TIMEOUT_SECONDS:20}
     read-timeout-seconds: ${CONTABLE_READ_TIMEOUT_SECONDS:120}
   ai:
-    # gemini | anthropic | claude | openai | deepseek
+    # anthropic | claude
     provider: ${APP_AI_PROVIDER:${AI_PROVIDER:anthropic}}
     quote:
       base-price-per-person: ${AI_QUOTE_BASE_PRICE:75000}
       min-confidence: ${AI_QUOTE_MIN_CONFIDENCE:25}
-    gemini:
-      # Nunca hardcodear la key: definir GEMINI_API_KEY en entorno / .env
-      api-key: ${GEMINI_API_KEY:}
-      model: ${GEMINI_MODEL:gemini-2.0-flash}
-      base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
-      fallback-models: ${GEMINI_FALLBACK_MODELS:gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-latest,gemini-flash-latest}
-      connect-timeout-seconds: ${GEMINI_CONNECT_TIMEOUT_SECONDS:15}
-      read-timeout-seconds: ${GEMINI_READ_TIMEOUT_SECONDS:90}
     anthropic:
       api-key: ${ANTHROPIC_API_KEY:}
       # Requerido si la key es identity-linked (header anthropic-workspace-id)

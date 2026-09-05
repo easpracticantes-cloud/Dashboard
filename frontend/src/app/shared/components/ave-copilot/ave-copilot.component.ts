@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -7,6 +7,9 @@ import {
   EnterpriseAiService,
   QuoteDraft
 } from '../../../core/services/enterprise-ai.service';
+import { AveVoiceUiState } from '../../../core/voice/speech-types';
+import { VoiceInputService } from '../../../core/voice/voice-input.service';
+import { VoiceOutputService } from '../../../core/voice/voice-output.service';
 import { AveQuoteReviewComponent } from './ave-quote-review.component';
 
 interface ChatBubble {
@@ -31,6 +34,8 @@ interface ChatBubble {
 export class AveCopilotComponent {
   private readonly ai = inject(EnterpriseAiService);
   private readonly sanitizer = inject(DomSanitizer);
+  readonly voiceIn = inject(VoiceInputService);
+  readonly voiceOut = inject(VoiceOutputService);
 
   @ViewChild('scroller') scroller?: ElementRef<HTMLDivElement>;
   @ViewChild('inputEl') inputEl?: ElementRef<HTMLTextAreaElement>;
@@ -41,6 +46,30 @@ export class AveCopilotComponent {
   readonly quoteDraft = signal<QuoteDraft | null>(null);
   readonly stickToBottom = signal(true);
   readonly showSuggestions = signal(true);
+  readonly voiceHint = signal('');
+
+  readonly voiceUi = computed<AveVoiceUiState>(() => {
+    if (this.voiceIn.state() === 'listening') return 'listening';
+    if (this.sending() || this.voiceIn.state() === 'processing') return 'processing';
+    if (this.voiceOut.state() === 'speaking' || this.voiceOut.state() === 'paused') return 'speaking';
+    if (this.voiceIn.state() === 'error' || this.voiceOut.state() === 'error') return 'error';
+    return 'idle';
+  });
+
+  readonly voiceStatusLabel = computed(() => {
+    switch (this.voiceUi()) {
+      case 'listening':
+        return this.voiceIn.interim() ? `Escuchando… ${this.voiceIn.interim()}` : 'Escuchando…';
+      case 'processing':
+        return 'Procesando…';
+      case 'speaking':
+        return this.voiceOut.state() === 'paused' ? 'Voz en pausa' : 'Ave está respondiendo…';
+      case 'error':
+        return this.voiceIn.lastError() || this.voiceOut.lastError() || this.voiceHint();
+      default:
+        return this.voiceHint();
+    }
+  });
 
   private readonly welcome: ChatBubble = {
     id: 'welcome',
@@ -82,6 +111,9 @@ export class AveCopilotComponent {
   newConversation(): void {
     this.abortStream?.abort();
     this.abortStream = null;
+    this.voiceIn.abort();
+    this.voiceOut.stop();
+    this.voiceHint.set('');
     this.sessionId = null;
     this.lastQuote = null;
     this.lastUserText = '';
@@ -125,6 +157,54 @@ export class AveCopilotComponent {
     }
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
     this.stickToBottom.set(dist < 80);
+  }
+
+  async toggleMic(): Promise<void> {
+    this.voiceHint.set('');
+    if (!this.voiceIn.supported()) {
+      this.voiceHint.set('Este navegador no soporta dictado. Usa Chrome o Edge.');
+      return;
+    }
+    if (this.voiceIn.state() === 'listening') {
+      this.voiceIn.stop();
+      return;
+    }
+    if (this.sending()) {
+      return;
+    }
+    this.voiceOut.stop();
+    try {
+      const text = await this.voiceIn.listen();
+      if (!text) {
+        this.voiceHint.set(this.voiceIn.lastError() || 'No capturé audio. Inténtalo de nuevo.');
+        this.voiceIn.reset();
+        return;
+      }
+      this.draft = text;
+      this.send();
+    } catch (err) {
+      this.voiceHint.set((err as Error)?.message || 'No pude usar el micrófono.');
+      this.voiceIn.reset();
+    }
+  }
+
+  toggleVoiceOut(): void {
+    this.voiceOut.toggle();
+    if (!this.voiceOut.enabled()) {
+      this.voiceHint.set('Voz de Ave: apagada');
+    } else {
+      this.voiceHint.set('Voz de Ave: encendida');
+    }
+  }
+
+  toggleSpeakPlayback(): void {
+    if (this.voiceOut.state() === 'speaking') {
+      this.voiceOut.pause();
+      return;
+    }
+    if (this.voiceOut.state() === 'paused') {
+      this.voiceOut.resume();
+    }
   }
 
   send(): void {
@@ -207,7 +287,11 @@ export class AveCopilotComponent {
       this.quoteDraft.set(res.quoteDraft);
     }
     this.sending.set(false);
+    this.voiceIn.reset();
     this.scrollBottom(true);
+    if (res.success !== false && res.reply) {
+      this.voiceOut.speak(res.reply);
+    }
     queueMicrotask(() => this.inputEl?.nativeElement?.focus());
   }
 
@@ -227,6 +311,7 @@ export class AveCopilotComponent {
       )
     );
     this.sending.set(false);
+    this.voiceIn.reset();
     this.scrollBottom(true);
   }
 

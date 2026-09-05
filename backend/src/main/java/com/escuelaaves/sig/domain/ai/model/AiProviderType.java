@@ -1,12 +1,11 @@
 package com.escuelaaves.sig.domain.ai.model;
 
 /**
- * Proveedor de IA activo (Strategy + Factory).
+ * Proveedor de IA activo. El único motor soportado es Claude (Anthropic).
  */
 public enum AiProviderType {
-    GEMINI,
-    OPENAI,
     CLAUDE,
+    OPENAI,
     DEEPSEEK;
 
     public static AiProviderType from(String raw) {
@@ -15,10 +14,8 @@ public enum AiProviderType {
         }
         return switch (raw.trim().toLowerCase()) {
             case "openai" -> OPENAI;
-            case "claude", "anthropic" -> CLAUDE;
             case "deepseek" -> DEEPSEEK;
-            case "gemini", "google" -> GEMINI;
-            default -> GEMINI;
+            default -> CLAUDE;
         };
     }
 

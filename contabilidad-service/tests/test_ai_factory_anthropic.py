@@ -1,4 +1,4 @@
-"""Smoke: resolución de proveedor Anthropic / Gemini."""
+"""Smoke: resolución de proveedor Anthropic / Claude."""
 
 import sys
 from pathlib import Path
@@ -9,23 +9,15 @@ sys.path.insert(0, str(SRC))
 from infrastructure.ai import ai_factory
 
 
-def test_resolve_anthropic_aliases(monkeypatch):
+def test_resolve_always_anthropic(monkeypatch):
     class S:
-        ai_provider = "claude"
-        anthropic_api_key = "sk-test"
-        gemini_api_key = ""
+        ai_provider = "anthropic"
+        anthropic_api_key = ""
         ollama_api_key = ""
 
     monkeypatch.setattr(ai_factory, "get_settings", lambda: S())
     assert ai_factory.resolve_ai_provider_name() == "anthropic"
 
 
-def test_resolve_auto_prefers_anthropic(monkeypatch):
-    class S:
-        ai_provider = "auto"
-        anthropic_api_key = "sk-test"
-        gemini_api_key = "g"
-        ollama_api_key = ""
-
-    monkeypatch.setattr(ai_factory, "get_settings", lambda: S())
+def test_resolve_claude_alias_is_anthropic():
     assert ai_factory.resolve_ai_provider_name() == "anthropic"

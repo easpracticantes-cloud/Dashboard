@@ -6,14 +6,13 @@ export interface HealthResponse {
   ok: boolean;
   errores: string[];
   tesseract: boolean;
-  /** Motor IA disponible (Gemini u Ollama). Compat: se llama ollama. */
+  /** Motor IA disponible. Compat: se llama ollama. */
   ollama: boolean;
   ai?: boolean;
   ai_provider?: string;
   ai_model?: string;
   ai_key_configured?: boolean;
   vision_fallback?: boolean;
-  gemini?: boolean;
   hint?: string | null;
 }
 

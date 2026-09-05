@@ -77,7 +77,7 @@ Obligatorio en producción:
 - `JWT_SECRET` ≥ 32 chars
 - `CORS_ALLOWED_ORIGINS=https://tu-dominio.com`
 - `GOOGLE_CLIENT_ID` / `GOOGLE_ALLOWED_EMAILS`
-- `GEMINI_API_KEY` y/o `ANTHROPIC_API_KEY`
+- `ANTHROPIC_API_KEY` y `ANTHROPIC_WORKSPACE_ID`
 - `CONTABLE_API_BASE=http://contabilidad:8787`
 - `SEED_ENABLED=false` (salvo primer bootstrap consciente)
 - `PUBLIC_HTTP_PORT=80`

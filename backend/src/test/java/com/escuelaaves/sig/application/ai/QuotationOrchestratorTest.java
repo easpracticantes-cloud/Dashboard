@@ -56,7 +56,7 @@ class QuotationOrchestratorTest {
                 checklistPort, recommendationPort, observabilityPort
         );
         when(aiProviderFactory.getActiveProvider()).thenReturn(generativeAiPort);
-        when(generativeAiPort.providerId()).thenReturn("gemini");
+        when(generativeAiPort.providerId()).thenReturn("claude");
     }
 
     @Test

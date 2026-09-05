@@ -19,28 +19,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class DefaultAiProviderFactoryTest {
 
     @Test
-    void failsoverFromDisabledAnthropicToReadyGemini() {
+    void usesClaudeEvenIfDisabled() {
         GenerativeAiPort claude = stub("claude", IntegrationStatus.DISABLED);
-        GenerativeAiPort gemini = stub("gemini", IntegrationStatus.READY);
 
-        DefaultAiProviderFactory factory = new DefaultAiProviderFactory(
-                List.of(claude, gemini),
-                "anthropic"
-        );
+        DefaultAiProviderFactory factory = new DefaultAiProviderFactory(List.of(claude), "anthropic");
 
-        assertEquals("gemini", factory.getActiveProvider().providerId());
-        assertEquals("gemini", factory.activeType().id());
+        assertEquals("claude", factory.getActiveProvider().providerId());
+        assertEquals("claude", factory.activeType().id());
     }
 
     @Test
-    void prefersConfiguredAnthropicWhenReady() {
+    void prefersClaudeWhenReady() {
         GenerativeAiPort claude = stub("claude", IntegrationStatus.READY);
-        GenerativeAiPort gemini = stub("gemini", IntegrationStatus.READY);
 
-        DefaultAiProviderFactory factory = new DefaultAiProviderFactory(
-                List.of(claude, gemini),
-                "anthropic"
-        );
+        DefaultAiProviderFactory factory = new DefaultAiProviderFactory(List.of(claude), "anthropic");
 
         assertEquals("claude", factory.getActiveProvider().providerId());
     }
@@ -49,7 +41,7 @@ class DefaultAiProviderFactoryTest {
         return new GenerativeAiPort() {
             @Override
             public IntegrationCode code() {
-                return "claude".equals(id) ? IntegrationCode.CLAUDE_AI : IntegrationCode.GEMINI_AI;
+                return IntegrationCode.CLAUDE_AI;
             }
 
             @Override

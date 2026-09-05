@@ -1,4 +1,4 @@
-"""Schema y prompts compartidos de extracción de factura (Gemini / Ollama)."""
+"""Schema y prompts compartidos de extracción de factura (Claude)."""
 
 from __future__ import annotations
 

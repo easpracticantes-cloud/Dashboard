@@ -47,9 +47,6 @@ services:
       SHEETS_SYNC_INTERVAL_MS: ${SHEETS_SYNC_INTERVAL_MS:-300000}
       APP_AI_PROVIDER: ${APP_AI_PROVIDER:-anthropic}
       AI_PROVIDER: ${APP_AI_PROVIDER:-anthropic}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
-      GEMINI_FALLBACK_MODELS: ${GEMINI_FALLBACK_MODELS:-gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-latest,gemini-flash-latest}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
       AI_MODEL_FAST: ${AI_MODEL_FAST:-claude-haiku-4-5-20251001}
@@ -91,10 +88,7 @@ services:
       STORAGE_PROVIDER: local
       AI_PROVIDER: ${APP_AI_PROVIDER:-anthropic}
       APP_AI_PROVIDER: ${APP_AI_PROVIDER:-anthropic}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
-      GEMINI_FALLBACK_MODELS: ${GEMINI_FALLBACK_MODELS:-gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-latest,gemini-flash-latest}
-      GEMINI_VISION_ON_WEAK_OCR: ${GEMINI_VISION_ON_WEAK_OCR:-true}
+      CLAUDE_VISION_ON_WEAK_OCR: ${CLAUDE_VISION_ON_WEAK_OCR:-true}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
       AI_MODEL_FAST: ${AI_MODEL_FAST:-claude-haiku-4-5-20251001}

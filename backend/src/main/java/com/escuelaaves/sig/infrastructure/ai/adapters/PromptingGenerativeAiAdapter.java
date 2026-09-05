@@ -19,7 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Prompts y parseo compartidos entre Gemini y Anthropic.
+ * Prompts y parseo compartidos del proveedor Claude.
  * Cada proveedor solo implementa {@link #generateText}.
  */
 @Slf4j

@@ -1,4 +1,4 @@
-"""Análisis de Excel Autobits con IA (Gemini u Ollama)."""
+"""Análisis de Excel Autobits con IA (Claude)."""
 
 from __future__ import annotations
 
@@ -8,10 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from domain.autobits.fields import AUTOBITS_FIELDS, suggest_mapping
-from infrastructure.ai.ai_factory import resolve_ai_provider_name
-from infrastructure.ai.gemini_client import GeminiClient, GeminiClientError
-from infrastructure.ai.ollama_client import chat, verificar_ollama
-from infrastructure.ai.ollama_config import ollama_model, ollama_timeout
+from infrastructure.ai.anthropic_client import AnthropicClient, AnthropicClientError
 
 
 @dataclass
@@ -58,17 +55,13 @@ def _extract_json(text: str) -> dict:
 
 
 class ExcelAIAnalyzer:
-    """Usa Gemini u Ollama para entender cualquier estructura de Excel Autobits."""
+    """Usa Claude para entender cualquier estructura de Excel Autobits."""
 
     def __init__(self):
-        self.provider_name = resolve_ai_provider_name()
-        self.timeout = ollama_timeout()
-        self.model = ollama_model()
+        self.client = AnthropicClient()
 
     def available(self) -> bool:
-        if self.provider_name == "gemini":
-            return GeminiClient().verify()
-        return verificar_ollama()
+        return self.client.configured()
 
     def analyze(
         self,
@@ -99,7 +92,7 @@ class ExcelAIAnalyzer:
         if not allow_fallback:
             raise ExcelAIAnalyzerError(
                 "La IA no está disponible para analizar el Excel. "
-                "Configure GEMINI_API_KEY (Render) o inicie Ollama (local).",
+                "Configure ANTHROPIC_API_KEY y ANTHROPIC_WORKSPACE_ID.",
                 "AI_UNAVAILABLE",
             )
 
@@ -198,23 +191,13 @@ Reglas:
     ) -> ExcelAIAnalysis:
         prompt = self._build_prompt(columns, sample_rows, total_rows, filename)
 
-        if self.provider_name == "gemini":
-            try:
-                data = GeminiClient().generate_json(prompt)
-            except GeminiClientError as exc:
-                raise ExcelAIAnalyzerError(
-                    f"Error al consultar Gemini para el Excel: {exc.message}",
-                    "GEMINI_ERROR",
-                ) from exc
-        else:
-            try:
-                content = chat(prompt, json_mode=True)
-            except Exception as exc:
-                raise ExcelAIAnalyzerError(
-                    f"Error al consultar Ollama para el Excel: {exc}",
-                    "OLLAMA_ERROR",
-                ) from exc
-            data = _extract_json(content)
+        try:
+            data = self.client.generate_json(prompt)
+        except AnthropicClientError as exc:
+            raise ExcelAIAnalyzerError(
+                f"Error al consultar Claude para el Excel: {exc.message}",
+                "CLAUDE_ERROR",
+            ) from exc
 
         if not data:
             raise ExcelAIAnalyzerError(

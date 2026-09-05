@@ -19,6 +19,16 @@
           <button
             type="button"
             class="ave-icon-btn"
+            [class.ave-icon-btn--on]="voiceOut.enabled()"
+            (click)="toggleVoiceOut()"
+            [attr.aria-label]="voiceOut.enabled() ? 'Apagar voz de Ave' : 'Encender voz de Ave'"
+            [title]="voiceOut.enabled() ? 'Voz de Ave: ON' : 'Voz de Ave: OFF'"
+          >
+            <mat-icon>{{ voiceOut.enabled() ? 'volume_up' : 'volume_off' }}</mat-icon>
+          </button>
+          <button
+            type="button"
+            class="ave-icon-btn"
             (click)="newConversation()"
             aria-label="Nueva conversación"
             title="Nueva conversación"
@@ -102,24 +112,52 @@
       }
 
       <footer class="ave-panel__foot">
+        @if (voiceStatusLabel()) {
+          <p class="ave-voice-status" [attr.data-state]="voiceUi()">
+            @if (voiceUi() === 'listening') {
+              <span class="ave-voice-dot" aria-hidden="true"></span>
+            }
+            {{ voiceStatusLabel() }}
+            @if (voiceUi() === 'speaking') {
+              <button type="button" class="ave-mini" (click)="toggleSpeakPlayback()">
+                {{ voiceOut.state() === 'paused' ? 'Reanudar' : 'Pausar' }}
+              </button>
+              <button type="button" class="ave-mini" (click)="voiceOut.stop()">Detener</button>
+            }
+          </p>
+        }
         <textarea
           #inputEl
           class="ave-input"
           rows="2"
           [(ngModel)]="draft"
           (keydown)="onKeydown($event)"
-          placeholder="Escribe lo que quieras… Enter envía · Shift+Enter nueva línea"
-          [disabled]="sending()"
+          placeholder="Escribe o habla con Ave… Enter envía · Shift+Enter nueva línea"
+          [disabled]="sending() || voiceUi() === 'listening'"
         ></textarea>
-        <button
-          type="button"
-          class="ave-send"
-          (click)="send()"
-          [disabled]="sending() || !draft.trim()"
-          aria-label="Enviar"
-        >
-          <mat-icon>send</mat-icon>
-        </button>
+        <div class="ave-panel__composer">
+          <button
+            type="button"
+            class="ave-mic"
+            [class.ave-mic--on]="voiceUi() === 'listening'"
+            [class.ave-mic--busy]="voiceUi() === 'processing'"
+            (click)="toggleMic()"
+            [disabled]="sending() && voiceUi() !== 'listening'"
+            [attr.aria-label]="voiceUi() === 'listening' ? 'Dejar de escuchar' : 'Hablar con Ave'"
+            title="Hablar con Ave"
+          >
+            <mat-icon>{{ voiceUi() === 'listening' ? 'stop' : 'mic' }}</mat-icon>
+          </button>
+          <button
+            type="button"
+            class="ave-send"
+            (click)="send()"
+            [disabled]="sending() || !draft.trim() || voiceUi() === 'listening'"
+            aria-label="Enviar"
+          >
+            <mat-icon>send</mat-icon>
+          </button>
+        </div>
       </footer>
     </section>
   }

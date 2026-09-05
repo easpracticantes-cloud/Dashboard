@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Acepta AI_PROVIDER (Contabilidad) y APP_AI_PROVIDER (mismo nombre que el backend SIG)
     ai_provider: str = Field(
-        default="gemini",
+        default="anthropic",
         validation_alias=AliasChoices("AI_PROVIDER", "APP_AI_PROVIDER", "ai_provider"),
     )
 
@@ -34,23 +34,14 @@ class Settings(BaseSettings):
     ollama_timeout: int = 90
     ollama_api_key: str = ""
 
-    gemini_api_key: str = Field(
-        default="",
-        validation_alias=AliasChoices("GEMINI_API_KEY", "gemini_api_key"),
+    # Si OCR < umbral, Claude visión analiza la imagen (evita "0 caracteres")
+    claude_vision_on_weak_ocr: bool = Field(
+        default=True,
+        validation_alias=AliasChoices(
+            "CLAUDE_VISION_ON_WEAK_OCR",
+            "claude_vision_on_weak_ocr",
+        ),
     )
-    gemini_model: str = Field(
-        default="gemini-2.0-flash",
-        validation_alias=AliasChoices("GEMINI_MODEL", "gemini_model"),
-    )
-    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
-    gemini_timeout: int = 90
-    # Lista separada por comas — se prueban si el modelo principal falla
-    gemini_fallback_models: str = (
-        "gemini-2.0-flash,gemini-1.5-flash,gemini-1.5-flash-latest,gemini-flash-latest"
-    )
-
-    # Si OCR < umbral, Gemini visión analiza la imagen (evita "0 caracteres")
-    gemini_vision_on_weak_ocr: bool = True
 
     # Anthropic Claude (A4)
     anthropic_api_key: str = Field(

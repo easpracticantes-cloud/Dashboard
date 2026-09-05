@@ -335,9 +335,9 @@ public class CopilotOrchestrator {
                 || lower.contains("no hay proveedor")
                 || lower.contains("api key")
                 || lower.contains("define la variable")) {
-            return "No puedo responder ahora: el proveedor de IA no está configurado. "
-                    + "Un administrador debe definir ANTHROPIC_API_KEY (recomendado, APP_AI_PROVIDER=anthropic) "
-                    + "y, si aplica, ANTHROPIC_WORKSPACE_ID; o GEMINI_API_KEY, y reiniciar el backend.";
+            return "No puedo responder ahora: Claude no está configurado. "
+                    + "Un administrador debe definir ANTHROPIC_API_KEY "
+                    + "y, si aplica, ANTHROPIC_WORKSPACE_ID, y reiniciar el backend.";
         }
         if (lower.contains("timeout") || lower.contains("timed out") || lower.contains("i/o error")) {
             return "Hubo un problema temporal de conexión con el modelo de IA (tiempo de espera). "
@@ -348,7 +348,7 @@ public class CopilotOrchestrator {
         }
         if (lower.contains("404") || lower.contains("not found") || lower.contains("ningún modelo")) {
             return "Hubo un problema con el modelo de IA configurado (modelo no disponible). "
-                    + "Revisa GEMINI_MODEL / modelos Anthropic y las claves API, luego reintenta.";
+                    + "Revisa AI_MODEL_FAST / AI_MODEL_REASONING y ANTHROPIC_API_KEY, luego reintenta.";
         }
         return "Hubo un problema temporal al contactar el modelo de IA. Inténtalo nuevamente en un momento. "
                 + "Si continúa, revisa APP_AI_PROVIDER y las claves API en el entorno del servidor.";
@@ -496,9 +496,6 @@ public class CopilotOrchestrator {
         String msg = ex != null && ex.getMessage() != null ? ex.getMessage().toLowerCase(Locale.ROOT) : "";
         if (msg.contains("anthropic") || msg.contains("claude") || msg.contains("workspace")) {
             return "Claude/Anthropic";
-        }
-        if (msg.contains("gemini")) {
-            return "Gemini";
         }
         try {
             return "Proveedor IA (" + aiProviderFactory.activeType().id() + ")";

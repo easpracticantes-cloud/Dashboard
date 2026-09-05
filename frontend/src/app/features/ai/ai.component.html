@@ -7,7 +7,7 @@
 @if (providerStatus(); as st) {
   <div class="ai-status">
     <mat-icon>auto_awesome</mat-icon>
-    <span>Proveedor <strong>{{ st['provider'] || st['activeType'] || 'gemini' }}</strong></span>
+    <span>Proveedor <strong>{{ st['provider'] || st['activeType'] || 'claude' }}</strong></span>
     <span class="ai-status__pill">{{ st['status'] || 'READY' }}</span>
   </div>
 }

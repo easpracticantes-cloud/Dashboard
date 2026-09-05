@@ -377,8 +377,81 @@
   grid-template-columns: 1fr auto;
   gap: 0.45rem;
   padding: 0.7rem 0.75rem 0.85rem;
-  border-top: 1px solid rgba(20, 38, 28, 0.08);
-  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid var(--eas-line-soft, rgba(20, 38, 28, 0.08));
+  background: color-mix(in srgb, var(--eas-surface, #fff) 92%, transparent);
+}
+
+.ave-voice-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--eas-muted, #5a6b60);
+}
+
+.ave-voice-status[data-state='listening'] {
+  color: #c25145;
+}
+
+.ave-voice-status[data-state='processing'] {
+  color: var(--eas-amber, #c9840e);
+}
+
+.ave-voice-status[data-state='speaking'] {
+  color: var(--eas-leaf, #1f7a4c);
+}
+
+.ave-voice-status[data-state='error'] {
+  color: #9b1c1c;
+}
+
+.ave-voice-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: #c25145;
+}
+
+.ave-panel__composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ave-mic {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--eas-line, #c5d3cb);
+  border-radius: 14px;
+  background: var(--eas-surface, #fff);
+  color: var(--eas-ink, #14261c);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.ave-mic--on {
+  background: #c25145;
+  border-color: #c25145;
+  color: #fff;
+}
+
+.ave-mic--busy {
+  opacity: 0.7;
+}
+
+.ave-mic:disabled,
+.ave-send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ave-icon-btn--on {
+  color: var(--eas-leaf, #1f7a4c);
 }
 
 .ave-input {

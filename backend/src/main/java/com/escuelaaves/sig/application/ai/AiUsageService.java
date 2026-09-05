@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Estimación de costo y registro de uso LLM (fase A1).
- * Tarifas configurables en app.ai.anthropic.*; Gemini usa estimación heurística.
+ * Tarifas configurables en app.ai.anthropic.*.
  */
 @Slf4j
 @Service
@@ -51,8 +51,7 @@ public class AiUsageService {
         if ("claude".equalsIgnoreCase(provider) || "anthropic".equalsIgnoreCase(provider)) {
             cost = estimateAnthropicCostUsd(tier != null ? tier : AiModelTier.FAST, in, out);
         } else if (total > 0) {
-            // Heurística barata para Gemini/otros hasta tener tarifas propias
-            cost = (total / 1_000_000.0) * 0.35;
+            cost = estimateAnthropicCostUsd(tier != null ? tier : AiModelTier.FAST, in, out);
         }
 
         observabilityPort.record(new AiObservabilityPort.AiUsageEvent(

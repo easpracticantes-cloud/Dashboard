@@ -41,7 +41,7 @@ import java.util.function.Supplier;
 
 /**
  * Fachada única del Enterprise AI Engine.
- * Application no conoce Gemini: resuelve proveedor vía {@link AiProviderFactory}.
+ * Application no conoce el vendor: resuelve Claude vía {@link AiProviderFactory}.
  */
 @Slf4j
 @Service

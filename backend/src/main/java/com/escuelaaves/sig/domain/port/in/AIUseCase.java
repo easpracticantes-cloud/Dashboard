@@ -13,7 +13,7 @@ import com.escuelaaves.sig.domain.ai.model.ReservationExtraction;
 import com.escuelaaves.sig.domain.ai.model.SentimentAnalysis;
 
 /**
- * Caso de uso de entrada del módulo de IA generativa (Gemini).
+ * Caso de uso de entrada del módulo de IA generativa (Claude).
  * Orquesta interpretación, pricing desde PostgreSQL y narrativa.
  */
 public interface AIUseCase {

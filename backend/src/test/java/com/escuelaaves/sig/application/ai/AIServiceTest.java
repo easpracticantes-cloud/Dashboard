@@ -55,13 +55,13 @@ class AIServiceTest {
     @Test
     @DisplayName("chat delega en GenerativeAiPort y envuelve la respuesta")
     void chat_delegatesToPort() {
-        when(generativeAiPort.chat(anyString(), anyString())).thenReturn("Hola desde Gemini");
-        when(generativeAiPort.providerId()).thenReturn("gemini");
+        when(generativeAiPort.chat(anyString(), anyString())).thenReturn("Hola desde Claude");
+        when(generativeAiPort.providerId()).thenReturn("claude");
 
         ChatResponse response = aiService.chat(new ChatRequest("Hola", null));
 
         assertTrue(response.success());
-        assertEquals("Hola desde Gemini", response.reply());
+        assertEquals("Hola desde Claude", response.reply());
         verify(generativeAiPort).chat(anyString(), eq("Hola"));
     }
 
@@ -150,11 +150,11 @@ class AIServiceTest {
     }
 
     @Test
-    @DisplayName("puerto Gemini reporta código GEMINI_AI")
+    @DisplayName("puerto Claude reporta código CLAUDE_AI")
     void generativePort_contractSmoke() {
-        when(generativeAiPort.code()).thenReturn(IntegrationCode.GEMINI_AI);
+        when(generativeAiPort.code()).thenReturn(IntegrationCode.CLAUDE_AI);
         when(generativeAiPort.status()).thenReturn(IntegrationStatus.READY);
-        assertEquals(IntegrationCode.GEMINI_AI, generativeAiPort.code());
+        assertEquals(IntegrationCode.CLAUDE_AI, generativeAiPort.code());
         assertEquals(IntegrationStatus.READY, generativeAiPort.status());
     }
 }
