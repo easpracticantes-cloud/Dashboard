@@ -19,7 +19,7 @@ export class VoiceOutputService {
   readonly enabled = signal(this.readEnabled());
   readonly state = signal<VoiceOutputState>('idle');
   readonly lastError = signal('');
-  readonly engine = signal<'browser' | 'elevenlabs'>('browser');
+  readonly engine = signal<'browser' | 'kokoro'>('browser');
   private queue: string[] = [];
   private premium: PremiumVoiceStatus | null = null;
   private probe: Promise<void> | null = null;
@@ -167,9 +167,9 @@ export class VoiceOutputService {
     try {
       this.state.set('speaking');
       this.lastError.set('');
-      this.engine.set('elevenlabs');
+      this.engine.set('kokoro');
       logAveVoice('tts-start', {
-        provider: this.premium?.provider || 'elevenlabs',
+        provider: this.premium?.provider || 'kokoro',
         model: this.premium?.model || null,
         state: 'speaking'
       });
@@ -189,7 +189,7 @@ export class VoiceOutputService {
         return true;
       }
       logAveVoice('tts-end', {
-        provider: 'elevenlabs',
+        provider: 'kokoro',
         model: this.premium?.model || null,
         latency: Date.now() - started,
         success: true
@@ -201,7 +201,7 @@ export class VoiceOutputService {
         return true;
       }
       const code = (err as Error)?.message === 'tts-blocked' ? 'tts-blocked' : 'tts-error';
-      logAveVoice('tts-error', { provider: 'elevenlabs', reason: code });
+      logAveVoice('tts-error', { provider: 'kokoro', reason: code });
       this.lastError.set(friendlyVoiceError(code));
       return false;
     }

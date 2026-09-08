@@ -15,11 +15,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VoiceTtsServiceTest {
 
     @Test
-    void disabledWithoutKey() {
+    void disabledWhenProviderNone() {
         VoiceTtsProperties props = new VoiceTtsProperties(
-                "elevenlabs", "", "eleven_flash_v2_5", "voice",
-                "https://api.elevenlabs.io", "pcm_24000", 3,
-                0.48, 0.78, 0.32, 10, 45);
+                "none", "kokoro", "bm_george",
+                "http://kokoro:8880", "pcm_24000", "e",
+                0.92, 10, 60);
         assertFalse(props.enabled());
         VoiceTtsService svc = new VoiceTtsService(props, HttpClient.newHttpClient(), new ObjectMapper());
         assertEquals(false, svc.status().get("enabled"));
@@ -29,28 +29,33 @@ class VoiceTtsServiceTest {
     }
 
     @Test
-    void enabledWithKeyAndVoice() {
+    void enabledKokoroWithoutApiKey() {
         VoiceTtsProperties props = new VoiceTtsProperties(
-                "elevenlabs", "sk_test", "eleven_flash_v2_5", "Rt1JHkPO27QCUX6Nd5bV",
-                "https://api.elevenlabs.io", "pcm_24000", 3,
-                0.48, 0.78, 0.32, 10, 45);
+                "kokoro", "kokoro", "bm_george",
+                "http://kokoro:8880", "pcm_24000", "e",
+                0.92, 10, 60);
         assertTrue(props.enabled());
         VoiceTtsService svc = new VoiceTtsService(props, HttpClient.newHttpClient(), new ObjectMapper());
-        assertEquals("elevenlabs", svc.status().get("provider"));
-        assertEquals("eleven_flash_v2_5", svc.status().get("model"));
+        assertEquals("kokoro", svc.status().get("provider"));
+        assertEquals("kokoro", svc.status().get("model"));
         assertEquals("pcm_24000", svc.status().get("format"));
         assertEquals(24000, svc.status().get("sampleRate"));
         assertEquals("application/octet-stream", svc.mediaType());
+        assertEquals("pcm", props.kokoroResponseFormat());
+        assertEquals("e", props.langCode());
     }
 
     @Test
-    void blankModelDefaultsToFlashConversational() {
+    void blankModelDefaultsToKokoro() {
         VoiceTtsProperties props = new VoiceTtsProperties(
-                "elevenlabs", "sk_test", "  ", "Rt1JHkPO27QCUX6Nd5bV",
-                "https://api.elevenlabs.io", "", 3,
-                0.48, 0.78, 0.32, 10, 45);
-        assertEquals("eleven_flash_v2_5", props.model());
+                "kokoro", "  ", "bm_george",
+                "", "", "",
+                0, 0, 0);
+        assertEquals("kokoro", props.model());
         assertEquals("pcm_24000", props.outputFormat());
+        assertEquals("e", props.langCode());
+        assertEquals(0.92, props.speed());
+        assertEquals("http://kokoro:8880", props.baseUrl());
         assertTrue(props.pcmOutput());
         assertEquals(24000, props.pcmSampleRate());
     }
@@ -58,10 +63,20 @@ class VoiceTtsServiceTest {
     @Test
     void mp3FormatKeepsMpegMediaType() {
         VoiceTtsProperties props = new VoiceTtsProperties(
-                "elevenlabs", "sk_test", "eleven_flash_v2_5", "voice",
-                "https://api.elevenlabs.io", "mp3_44100_128", 3,
-                0.48, 0.78, 0.32, 10, 45);
+                "kokoro", "kokoro", "bm_george",
+                "http://kokoro:8880", "mp3", "e",
+                0.92, 10, 60);
         assertEquals("audio/mpeg", props.mediaType());
+        assertEquals("mp3", props.kokoroResponseFormat());
         assertEquals(0, props.pcmSampleRate());
+    }
+
+    @Test
+    void missingVoiceDisablesPremium() {
+        VoiceTtsProperties props = new VoiceTtsProperties(
+                "kokoro", "kokoro", "  ",
+                "http://kokoro:8880", "pcm_24000", "e",
+                0.92, 10, 60);
+        assertFalse(props.enabled());
     }
 }

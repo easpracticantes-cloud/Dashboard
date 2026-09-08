@@ -24,8 +24,8 @@ describe('premium-voice.client', () => {
         ok: true,
         json: async () => ({
           enabled: true,
-          provider: 'elevenlabs',
-          model: 'eleven_flash_v2_5',
+          provider: 'kokoro',
+          model: 'kokoro',
           format: 'pcm_24000',
           sampleRate: 24000
         })
@@ -35,8 +35,8 @@ describe('premium-voice.client', () => {
       const status = await fetchPremiumVoiceStatus('http://x', 'jwt-not-logged');
       expect(status).toEqual({
         enabled: true,
-        provider: 'elevenlabs',
-        model: 'eleven_flash_v2_5',
+        provider: 'kokoro',
+        model: 'kokoro',
         format: 'pcm_24000',
         sampleRate: 24000
       });
@@ -65,7 +65,7 @@ describe('premium-voice.client', () => {
     expect(concatBytes(new Uint8Array([1]), new Uint8Array([2]))).toEqual(new Uint8Array([1, 2]));
   });
 
-  it('el frontend llama al backend propio, nunca a ElevenLabs', async () => {
+  it('el frontend llama al backend propio, nunca a un TTS externo', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal('fetch', fetchImpl);
     try {

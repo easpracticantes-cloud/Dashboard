@@ -89,18 +89,15 @@ app:
       price-reasoning-input-per-mtok: ${AI_PRICE_SONNET_INPUT:3.0}
       price-reasoning-output-per-mtok: ${AI_PRICE_SONNET_OUTPUT:15.0}
     voice:
-      provider: ${VOICE_PROVIDER:none}
-      api-key: ${VOICE_API_KEY:}
-      model: ${VOICE_MODEL:eleven_flash_v2_5}
-      voice-id: ${VOICE_ID:Rt1JHkPO27QCUX6Nd5bV}
-      base-url: ${VOICE_BASE_URL:https://api.elevenlabs.io}
+      provider: ${VOICE_PROVIDER:kokoro}
+      model: ${VOICE_MODEL:kokoro}
+      voice-id: ${VOICE_ID:bm_george}
+      base-url: ${VOICE_BASE_URL:http://kokoro:8880}
       output-format: ${VOICE_OUTPUT_FORMAT:pcm_24000}
-      optimize-streaming-latency: ${VOICE_OPTIMIZE_LATENCY:3}
-      stability: ${VOICE_STABILITY:0.48}
-      similarity: ${VOICE_SIMILARITY:0.78}
-      style: ${VOICE_STYLE:0.32}
+      lang-code: ${VOICE_LANG_CODE:e}
+      speed: ${VOICE_SPEED:0.92}
       connect-timeout-seconds: ${VOICE_CONNECT_TIMEOUT_SECONDS:10}
-      read-timeout-seconds: ${VOICE_READ_TIMEOUT_SECONDS:45}
+      read-timeout-seconds: ${VOICE_READ_TIMEOUT_SECONDS:60}
 
 management:
   endpoints:

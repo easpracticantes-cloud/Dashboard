@@ -19,7 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Capa de voz premium. No interpreta ni razona: solo sintetiza texto ya generado por Ave.
+ * Capa de voz. No interpreta ni razona: sintetiza texto ya generado por Ave (Claude).
+ * Proveedor: Kokoro local en Docker. Sin APIs TTS de pago.
  */
 @Slf4j
 @Service
@@ -91,32 +92,27 @@ public class VoiceTtsService {
                     properties.provider(), properties.model());
             throw new BadRequestException("No pude generar la voz premium.");
         } finally {
-            log.info("[Ave-voice] tts provider={} model={} success={} latencyMs={}",
-                    properties.provider(), properties.model(), success, System.currentTimeMillis() - start);
+            log.info("[Ave-voice] tts provider={} model={} voice={} success={} latencyMs={}",
+                    properties.provider(), properties.model(), properties.voiceId(),
+                    success, System.currentTimeMillis() - start);
         }
     }
 
     private HttpRequest buildRequest(String text) throws IOException {
-        Map<String, Object> settings = new LinkedHashMap<>();
-        settings.put("stability", properties.stability());
-        settings.put("similarity_boost", properties.similarity());
-        settings.put("style", properties.style());
-        settings.put("use_speaker_boost", true);
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("text", text);
-        body.put("model_id", properties.model());
-        body.put("language_code", "es");
-        body.put("voice_settings", settings);
+        body.put("model", properties.model());
+        body.put("input", text);
+        body.put("voice", properties.voiceId());
+        body.put("response_format", properties.kokoroResponseFormat());
+        body.put("speed", properties.speed());
+        body.put("lang_code", properties.langCode());
+        body.put("stream", true);
         String json = objectMapper.writeValueAsString(body);
-        String url = properties.baseUrl().replaceAll("/$", "")
-                + "/v1/text-to-speech/" + properties.voiceId()
-                + "/stream?output_format=" + properties.outputFormat()
-                + "&optimize_streaming_latency=" + properties.optimizeStreamingLatency();
+        String url = properties.baseUrl().replaceAll("/$", "") + "/v1/audio/speech";
         return HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(properties.readTimeoutSeconds()))
-                .header("xi-api-key", properties.apiKey())
                 .header("Content-Type", "application/json")
-                .header("Accept", properties.pcmOutput() ? "*/*" : "audio/mpeg")
+                .header("Accept", properties.pcmOutput() ? "application/octet-stream" : "audio/mpeg")
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
     }

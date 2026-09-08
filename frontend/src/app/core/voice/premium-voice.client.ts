@@ -66,7 +66,7 @@ export async function streamPremiumSpeech(
     signal
   });
   logAveVoice('tts-http', {
-    provider: 'elevenlabs',
+    provider: 'kokoro',
     status: res.status,
     latency: Date.now() - started,
     ok: res.ok

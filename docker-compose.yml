@@ -51,19 +51,20 @@ services:
       ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
       AI_MODEL_FAST: ${AI_MODEL_FAST:-claude-haiku-4-5-20251001}
       AI_MODEL_REASONING: ${AI_MODEL_REASONING:-claude-sonnet-4-5-20250929}
-      VOICE_PROVIDER: ${VOICE_PROVIDER:-none}
-      VOICE_API_KEY: ${VOICE_API_KEY:-${ELEVENLABS_API_KEY:-}}
-      VOICE_MODEL: ${VOICE_MODEL:-eleven_flash_v2_5}
-      VOICE_ID: ${VOICE_ID:-Rt1JHkPO27QCUX6Nd5bV}
+      VOICE_PROVIDER: ${VOICE_PROVIDER:-kokoro}
+      VOICE_MODEL: ${VOICE_MODEL:-kokoro}
+      VOICE_ID: ${VOICE_ID:-bm_george}
+      VOICE_BASE_URL: ${VOICE_BASE_URL:-http://kokoro:8880}
       VOICE_OUTPUT_FORMAT: ${VOICE_OUTPUT_FORMAT:-pcm_24000}
-      VOICE_STABILITY: ${VOICE_STABILITY:-0.48}
-      VOICE_SIMILARITY: ${VOICE_SIMILARITY:-0.78}
-      VOICE_STYLE: ${VOICE_STYLE:-0.32}
+      VOICE_LANG_CODE: ${VOICE_LANG_CODE:-e}
+      VOICE_SPEED: ${VOICE_SPEED:-0.92}
       CONTABLE_API_BASE: ${CONTABLE_API_BASE:-http://contabilidad:8787}
     depends_on:
       db:
         condition: service_healthy
       contabilidad:
+        condition: service_started
+      kokoro:
         condition: service_started
     healthcheck:
       test:
@@ -125,6 +126,31 @@ services:
       - sig_net
     # NO publicar 8787. Spring Boot llama http://contabilidad:8787 en la red Docker.
 
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.8.2
+    container_name: sig_kokoro
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      OMP_NUM_THREADS: ${KOKORO_OMP_THREADS:-2}
+    volumes:
+      - kokoro_cache:/root/.cache
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8880/health', timeout=3)"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 8
+      start_period: 90s
+    networks:
+      - sig_net
+    # NO publicar 8880. El backend llama http://kokoro:8880 en la red Docker.
+
   frontend:
     build:
       context: ./frontend
@@ -132,8 +158,8 @@ services:
     container_name: sig_frontend
     restart: unless-stopped
     ports:
-      # Único puerto público de la app (HTTP). HTTPS vía Certbot/Nginx del host o 443→80.
-      - "${PUBLIC_HTTP_PORT:-80}:80"
+      # Solo localhost: el Nginx del host hace proxy a 127.0.0.1:8080. El contenedor sigue en :80.
+      - "127.0.0.1:8080:80"
     depends_on:
       backend:
         condition: service_started
@@ -154,3 +180,4 @@ volumes:
   sig_postgres_data:
   contabilidad_data:
   contabilidad_storage:
+  kokoro_cache:
