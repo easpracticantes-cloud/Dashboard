@@ -122,6 +122,7 @@ export class RegistroComponent {
 
   readonly loading = signal(true);
   readonly saving = signal(false);
+  readonly deleting = signal(false);
   readonly aviso = signal('');
   readonly data = signal<SheetsDashboard | null>(null);
   readonly modo = signal<'lista' | 'nueva' | 'editar'>('lista');
@@ -307,6 +308,46 @@ export class RegistroComponent {
     });
   }
 
+  eliminar(row: SeguimientoWhatsapp): void {
+    if (this.deleting() || this.saving()) return;
+    const quien = row.cliente || row.celular || 'esta fila';
+    if (!confirm(`¿Eliminar del Excel la fila de ${quien}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    this.deleting.set(true);
+    this.aviso.set('');
+    this.integrations
+      .deleteSeguimiento({
+        hojaOrigen: row.hojaOrigen,
+        matchCelular: row.celular,
+        matchFecha: row.fecha,
+        matchCliente: row.cliente,
+        celular: row.celular,
+        fecha: row.fecha,
+        cliente: row.cliente,
+      })
+      .subscribe({
+        next: (res) => {
+          this.deleting.set(false);
+          this.removeLocal(row);
+          if (this.original() && this.sameRow(this.original()!, row)) {
+            this.cancelar();
+          }
+          this.aviso.set(res.message || 'Fila eliminada del Excel.');
+          this.dashboard.invalidateCache();
+        },
+        error: (err) => {
+          this.deleting.set(false);
+          this.aviso.set(err?.message || 'No se pudo eliminar la fila.');
+        },
+      });
+  }
+
+  eliminarDraft(): void {
+    const orig = this.original();
+    if (orig) this.eliminar(orig);
+  }
+
   private finishSave(d: Draft, orig: SeguimientoWhatsapp | null, message?: string): void {
     this.saving.set(false);
     this.applyLocal(d, orig);
@@ -354,6 +395,22 @@ export class RegistroComponent {
       list = [mapped, ...list];
     }
     this.data.set({ ...current, seguimientoWhatsapp: list });
+  }
+
+  private removeLocal(orig: SeguimientoWhatsapp): void {
+    const current = this.data();
+    if (!current) return;
+    const list = (current.seguimientoWhatsapp ?? []).filter((r) => !this.sameRow(r, orig));
+    this.data.set({ ...current, seguimientoWhatsapp: list });
+  }
+
+  private sameRow(a: SeguimientoWhatsapp, b: SeguimientoWhatsapp): boolean {
+    return (
+      (a.celular || '') === (b.celular || '') &&
+      (a.fecha || '').slice(0, 10) === (b.fecha || '').slice(0, 10) &&
+      (a.hojaOrigen || '') === (b.hojaOrigen || '') &&
+      (a.cliente || '') === (b.cliente || '')
+    );
   }
 
   private mergeOpts(base: string[], pick: (r: SeguimientoWhatsapp) => string | undefined): string[] {

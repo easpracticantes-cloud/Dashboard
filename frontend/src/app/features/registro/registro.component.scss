@@ -45,6 +45,7 @@
 .reg__btn,
 .reg__ghost,
 .reg__copy,
+.reg__danger,
 .reg__page {
   border: 1px solid var(--eas-line);
   background: var(--eas-surface);
@@ -63,9 +64,22 @@
 
 .reg__btn:disabled,
 .reg__ghost:disabled,
-.reg__page:disabled {
+.reg__page:disabled,
+.reg__danger:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.reg__danger {
+  border-color: color-mix(in srgb, #9b1c1c 40%, var(--eas-line));
+  color: #9b1c1c;
+  background: color-mix(in srgb, #9b1c1c 8%, var(--eas-surface));
+}
+
+.reg__row-actions {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
 }
 
 .reg__page.is-on {

@@ -95,6 +95,56 @@
     0 0 0 4px rgba(228, 160, 26, 0.18);
 }
 
+.ave-core {
+  position: absolute;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 2px solid rgba(228, 160, 26, 0.28);
+  pointer-events: none;
+  top: 2px;
+}
+
+.ave-doll__face[data-state='listening'],
+.ave-avatar--sm[data-state='listening'] {
+  border-color: #c25145;
+  box-shadow: 0 0 0 4px rgba(194, 81, 69, 0.28);
+}
+
+.ave-core[data-state='listening'] {
+  border-color: rgba(194, 81, 69, 0.7);
+}
+
+.ave-doll__face[data-state='processing'],
+.ave-avatar--sm[data-state='processing'] {
+  border-color: #c9840e;
+  box-shadow: 0 0 0 4px rgba(201, 132, 14, 0.28);
+}
+
+.ave-core[data-state='processing'] {
+  border-color: rgba(201, 132, 14, 0.7);
+}
+
+.ave-doll__face[data-state='speaking'],
+.ave-avatar--sm[data-state='speaking'] {
+  border-color: #3d9a68;
+  box-shadow: 0 0 0 4px rgba(61, 154, 104, 0.28);
+}
+
+.ave-core[data-state='speaking'] {
+  border-color: rgba(61, 154, 104, 0.75);
+}
+
+.ave-doll__face[data-state='error'],
+.ave-avatar--sm[data-state='error'] {
+  border-color: #9b1c1c;
+  box-shadow: 0 0 0 4px rgba(155, 28, 28, 0.28);
+}
+
+.ave-core[data-state='error'] {
+  border-color: rgba(155, 28, 28, 0.7);
+}
+
 .ave-doll__face img {
   width: 34px;
   height: 34px;

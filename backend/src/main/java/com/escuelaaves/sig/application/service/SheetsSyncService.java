@@ -1233,6 +1233,46 @@ public class SheetsSyncService {
         dashboardCache.set(new CacheEntry(patched, cached.loadedAt()));
     }
 
+    public void removeSeguimientoRow(String hojaOrigen, String celular, String fecha, String cliente) {
+        CacheEntry cached = dashboardCache.get();
+        if (cached == null || cached.dto() == null || cached.dto().seguimientoWhatsapp() == null) {
+            return;
+        }
+        String wantCel = digits(celular);
+        String wantFecha = fecha == null ? "" : fecha.trim();
+        if (wantFecha.length() > 10) wantFecha = wantFecha.substring(0, 10);
+        String wantHoja = hojaOrigen == null ? "" : hojaOrigen.trim();
+        String wantCliente = cliente == null ? "" : cliente.trim().toLowerCase(Locale.ROOT);
+
+        List<SeguimientoWhatsappDto> next = new ArrayList<>();
+        boolean found = false;
+        for (SeguimientoWhatsappDto row : cached.dto().seguimientoWhatsapp()) {
+            boolean matchCel = wantCel.isEmpty() || digits(row.celular()).equals(wantCel)
+                    || digits(row.celular()).endsWith(wantCel) || wantCel.endsWith(digits(row.celular()));
+            String rowFecha = row.fecha() == null ? "" : (row.fecha().length() >= 10 ? row.fecha().substring(0, 10) : row.fecha());
+            boolean matchFecha = wantFecha.isEmpty() || rowFecha.equals(wantFecha) || rowFecha.startsWith(wantFecha);
+            boolean matchHoja = wantHoja.isEmpty() || wantHoja.equalsIgnoreCase(nullToEmpty(row.hojaOrigen()));
+            String rowCliente = row.cliente() == null ? "" : row.cliente().trim().toLowerCase(Locale.ROOT);
+            boolean matchCliente = wantCliente.isEmpty() || rowCliente.equals(wantCliente);
+            if (!found && matchCel && matchFecha && matchHoja && matchCliente) {
+                found = true;
+                continue;
+            }
+            next.add(row);
+        }
+        if (!found) {
+            return;
+        }
+        SheetsDashboardDto d = cached.dto();
+        SheetsDashboardDto patched = new SheetsDashboardDto(
+                d.meta(), d.kpis(), d.porSemaforo(), d.porCanal(), d.porHoja(), d.porMes(), d.evolucionMensual(),
+                List.copyOf(next), d.ventas(), d.resumenPaises(), d.paisesDetalle(), d.hojas(), d.toques(),
+                d.piezasPub(), d.b2bAgencias(), d.b2bTabla(), d.estadisticas(), d.despliegueSemanal(),
+                d.planComercial(), d.rawSheets(), d.b2bStatus(), d.b2bMensaje(), d.success(), d.message()
+        );
+        dashboardCache.set(new CacheEntry(patched, cached.loadedAt()));
+    }
+
     public void prependSeguimientoRow(Map<String, Object> fields) {
         CacheEntry cached = dashboardCache.get();
         if (cached == null || cached.dto() == null) {

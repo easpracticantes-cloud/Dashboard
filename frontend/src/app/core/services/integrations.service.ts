@@ -63,6 +63,21 @@ export class IntegrationsService {
     );
   }
 
+  deleteSeguimiento(row: Partial<SeguimientoWhatsapp> & Record<string, unknown>): Observable<SheetRowWriteResult> {
+    return this.api.delete<SheetRowWriteResult>('/integrations/sheets/seguimiento', row).pipe(
+      catchError((err) =>
+        throwError(() => ({
+          message:
+            err?.error?.message ||
+            err?.error?.detail ||
+            err?.error?.error ||
+            err?.message ||
+            'No se pudo eliminar la fila del Excel'
+        }))
+      )
+    );
+  }
+
   updateVenta(row: Partial<VentaSheet> & Record<string, unknown>): Observable<SheetRowWriteResult> {
     return this.api.put<SheetRowWriteResult>('/integrations/sheets/venta', row).pipe(
       catchError((err) =>

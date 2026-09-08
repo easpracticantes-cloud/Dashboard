@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -61,6 +62,12 @@ public class IntegrationController {
     @Operation(summary = "Agrega una fila de seguimiento al Excel (Google Sheets)")
     public ResponseEntity<SheetRowWriteResultDto> appendSeguimiento(@RequestBody Map<String, Object> body) {
         return ResponseEntity.ok(sheetsWriteService.appendSeguimiento(body));
+    }
+
+    @DeleteMapping("/sheets/seguimiento")
+    @Operation(summary = "Elimina una fila de seguimiento en Google Sheets y en el cache del dashboard")
+    public ResponseEntity<SheetRowWriteResultDto> deleteSeguimiento(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(sheetsWriteService.deleteSeguimiento(body));
     }
 
     @PutMapping("/sheets/venta")

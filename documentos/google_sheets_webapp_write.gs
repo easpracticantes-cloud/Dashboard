@@ -17,6 +17,7 @@
  * Acciones POST (JSON body):
  *   { "action": "updateRow", "sheetName": "ENE", "match": { "celular": "...", "fecha": "..." }, "fields": { "SEMAFORO": "CALIENTE", "NOTAS": "..." }, "token": "..." }
  *   { "action": "appendRow", "sheetName": "VENTAS", "fields": { "NOMBRE": "...", "CELULAR": "..." }, "token": "..." }
+ *   { "action": "deleteRow", "sheetName": "ENE", "match": { "celular": "...", "fecha": "...", "cliente": "..." }, "token": "..." }
  *   { "action": "ping", "token": "..." }
  *
  * Si ya tienes doGet para el dashboard, NO lo borres. Solo agrega doPost + helpers.
@@ -40,6 +41,9 @@ function doPost(e) {
     }
     if (action === 'appendrow') {
       return json_(appendRow_(body));
+    }
+    if (action === 'deleterow') {
+      return json_(deleteRow_(body));
     }
     return json_({ ok: false, error: 'Acción no soportada: ' + action });
   } catch (err) {
@@ -125,6 +129,46 @@ function appendRow_(body) {
   });
   sheet.appendRow(row);
   return { ok: true, sheetName: sheetName, rowNumber: sheet.getLastRow(), appended: true };
+}
+
+function deleteRow_(body) {
+  var sheetName = String(body.sheetName || '').trim();
+  if (!sheetName) {
+    return { ok: false, error: 'sheetName requerido' };
+  }
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    return { ok: false, error: 'Hoja no encontrada: ' + sheetName };
+  }
+
+  var values = sheet.getDataRange().getValues();
+  if (!values.length) {
+    return { ok: false, error: 'Hoja vacía' };
+  }
+
+  var headerInfo = findHeaderRow_(values);
+  if (headerInfo.idx < 0) {
+    return { ok: false, error: 'No se detectó fila de encabezados' };
+  }
+
+  var match = body.match || {};
+  var rowIndex = findMatchingRow_(values, headerInfo.idx, headerInfo.headers, match);
+  if (rowIndex < 0) {
+    return { ok: false, error: 'Fila no encontrada con los criterios de match', match: match };
+  }
+  if (rowIndex <= headerInfo.idx) {
+    return { ok: false, error: 'No se puede eliminar la fila de encabezados' };
+  }
+
+  sheet.deleteRow(rowIndex + 1);
+  return {
+    ok: true,
+    sheetName: sheetName,
+    rowNumber: rowIndex + 1,
+    deleted: true,
+    message: 'Fila eliminada'
+  };
 }
 
 function findHeaderRow_(values) {

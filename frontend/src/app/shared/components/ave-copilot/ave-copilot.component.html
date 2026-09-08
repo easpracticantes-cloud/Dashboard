@@ -7,15 +7,25 @@
     <section class="ave-panel" role="dialog" aria-label="Chat con Ave">
       <header class="ave-panel__head">
         <div class="ave-panel__identity">
-          <div class="ave-avatar ave-avatar--sm">
+          <div class="ave-avatar ave-avatar--sm" [attr.data-state]="voiceUi()">
             <img src="assets/brand/mark-bird.svg" alt="" width="28" height="28" />
           </div>
           <div>
             <strong>Ave</strong>
-            <span>Asistente · pregunta lo que necesites</span>
+            <span>{{ identityCaption() }}</span>
           </div>
         </div>
         <div class="ave-panel__actions">
+          <button
+            type="button"
+            class="ave-icon-btn"
+            [class.ave-icon-btn--on]="voiceSession()"
+            (click)="toggleVoiceSession()"
+            [attr.aria-label]="voiceSession() ? 'Desactivar sesión de voz continua' : 'Activar sesión de voz continua'"
+            [title]="voiceSession() ? 'Sesión continua: ON' : 'Sesión continua: OFF'"
+          >
+            <mat-icon>{{ voiceSession() ? 'record_voice_over' : 'voice_over_off' }}</mat-icon>
+          </button>
           <button
             type="button"
             class="ave-icon-btn"
@@ -144,7 +154,7 @@
             (click)="toggleMic()"
             [disabled]="sending() && voiceUi() !== 'listening'"
             [attr.aria-label]="voiceUi() === 'listening' ? 'Dejar de escuchar' : 'Hablar con Ave'"
-            title="Hablar con Ave"
+            title="Hablar con Ave. Si Ave está hablando, esto la interrumpe."
           >
             <mat-icon>{{ voiceUi() === 'listening' ? 'stop' : 'mic' }}</mat-icon>
           </button>
@@ -165,6 +175,7 @@
   <button
     type="button"
     class="ave-doll"
+    [attr.data-state]="voiceUi()"
     [class.ave-doll--pulse]="bounce() && !open()"
     [class.ave-doll--open]="open()"
     (click)="toggle()"
@@ -172,7 +183,8 @@
   >
     <span class="ave-doll__shadow" aria-hidden="true"></span>
     <span class="ave-doll__body">
-      <span class="ave-doll__face">
+      <span class="ave-core" [attr.data-state]="voiceUi()" aria-hidden="true"></span>
+      <span class="ave-doll__face" [attr.data-state]="voiceUi()">
         <img src="assets/brand/mark-bird.svg" alt="" />
       </span>
       <span class="ave-doll__feet" aria-hidden="true"></span>

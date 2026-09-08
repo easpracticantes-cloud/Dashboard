@@ -28,20 +28,20 @@ public class SheetsWriteService {
         if (request == null || blank(request.sheetName()) || blank(request.action())) {
             throw new BadRequestException("action y sheetName son obligatorios");
         }
-        if (request.fields() == null || request.fields().isEmpty()) {
-            throw new BadRequestException("fields no puede estar vacío");
-        }
-
         String action = request.action().trim().toLowerCase(Locale.ROOT).replace("_", "");
-        if (!List.of("updaterow", "appendrow").contains(action)) {
-            throw new BadRequestException("action debe ser updateRow o appendRow");
+        boolean deleting = "deleterow".equals(action);
+        if (!List.of("updaterow", "appendrow", "deleterow").contains(action)) {
+            throw new BadRequestException("action debe ser updateRow, appendRow o deleteRow");
+        }
+        if (!deleting && (request.fields() == null || request.fields().isEmpty())) {
+            throw new BadRequestException("fields no puede estar vacío");
         }
 
         SheetRowWriteRequest normalized = new SheetRowWriteRequest(
                 action,
                 request.sheetName().trim(),
                 request.match() == null ? Map.of() : request.match(),
-                request.fields()
+                request.fields() == null ? Map.of() : request.fields()
         );
 
         SheetRowWriteResultDto result = googleSheetsPort.writeRow(normalized);
@@ -167,6 +167,34 @@ public class SheetsWriteService {
             sheetsSyncService.prependSeguimientoRow(body);
         } catch (Exception ex) {
             log.warn("[SheetsWrite] No se pudo agregar la fila al cache: {}", ex.getMessage());
+        }
+        return result;
+    }
+
+    public SheetRowWriteResultDto deleteSeguimiento(Map<String, Object> body) {
+        String sheetName = str(body.get("hojaOrigen"));
+        if (blank(sheetName)) {
+            throw new BadRequestException("hojaOrigen es obligatorio");
+        }
+        String celular = firstNonBlank(str(body.get("matchCelular")), str(body.get("celular")));
+        String fecha = firstNonBlank(str(body.get("matchFecha")), str(body.get("fecha")));
+        String clienteMatch = body.containsKey("matchCliente")
+                ? str(body.get("matchCliente"))
+                : str(body.get("cliente"));
+        if (blank(celular) && blank(fecha) && blank(clienteMatch)) {
+            throw new BadRequestException("celular, fecha o cliente son obligatorios para localizar la fila");
+        }
+
+        Map<String, String> match = new LinkedHashMap<>();
+        if (!blank(celular)) match.put("celular", celular);
+        if (!blank(fecha)) match.put("fecha", fecha.length() >= 10 ? fecha.substring(0, 10) : fecha);
+        if (!blank(clienteMatch)) match.put("cliente", clienteMatch);
+
+        SheetRowWriteResultDto result = write(new SheetRowWriteRequest("deleterow", sheetName, match, Map.of()));
+        try {
+            sheetsSyncService.removeSeguimientoRow(sheetName, celular, fecha, clienteMatch);
+        } catch (Exception ex) {
+            log.warn("[SheetsWrite] No se pudo quitar la fila del cache: {}", ex.getMessage());
         }
         return result;
     }

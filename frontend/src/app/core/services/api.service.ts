@@ -32,7 +32,10 @@ export class ApiService {
     return this.http.patch<T>(this.url(path), body);
   }
 
-  delete<T>(path: string): Observable<T> {
+  delete<T>(path: string, body?: unknown): Observable<T> {
+    if (body !== undefined) {
+      return this.http.request<T>('DELETE', this.url(path), { body });
+    }
     return this.http.delete<T>(this.url(path));
   }
 

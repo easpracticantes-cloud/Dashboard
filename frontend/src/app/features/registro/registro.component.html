@@ -169,6 +169,11 @@
           {{ saving() ? 'Guardando…' : 'Guardar en Excel' }}
         </button>
         <button type="button" class="reg__ghost" (click)="cancelar()">Cancelar</button>
+        @if (modo() === 'editar') {
+          <button type="button" class="reg__danger" (click)="eliminarDraft()" [disabled]="deleting() || saving()">
+            {{ deleting() ? 'Eliminando…' : 'Eliminar fila' }}
+          </button>
+        }
       </div>
     </section>
   }
@@ -230,7 +235,12 @@
           @for (r of filas(); track $index) {
             <tr>
               <td>
-                <button type="button" class="reg__copy" (click)="editar(r)">Editar</button>
+                <div class="reg__row-actions">
+                  <button type="button" class="reg__copy" (click)="editar(r)">Editar</button>
+                  <button type="button" class="reg__danger" (click)="eliminar(r)" [disabled]="deleting()">
+                    Eliminar
+                  </button>
+                </div>
               </td>
               <td>{{ r.fecha | date: 'dd/MM/yyyy' }}</td>
               <td>{{ r.tipo || '—' }}</td>

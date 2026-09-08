@@ -1,16 +1,21 @@
-import { Component, ElementRef, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter, map } from 'rxjs';
+import { AuthService } from '../../../core/services/auth.service';
 import {
   CopilotResponse,
   EnterpriseAiService,
   QuoteDraft
 } from '../../../core/services/enterprise-ai.service';
-import { AveVoiceUiState, friendlyVoiceError } from '../../../core/voice/speech-types';
+import { AveVoiceUiState, VoiceOutputState, friendlyVoiceError } from '../../../core/voice/speech-types';
 import { VoiceInputService } from '../../../core/voice/voice-input.service';
 import { VoiceOutputService } from '../../../core/voice/voice-output.service';
 import { AveQuoteReviewComponent } from './ave-quote-review.component';
+import { moduleLabelFromUrl } from './ave-app-context';
 
 interface ChatBubble {
   id: string;
@@ -34,6 +39,8 @@ interface ChatBubble {
 export class AveCopilotComponent {
   private readonly ai = inject(EnterpriseAiService);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
   readonly voiceIn = inject(VoiceInputService);
   readonly voiceOut = inject(VoiceOutputService);
 
@@ -47,6 +54,21 @@ export class AveCopilotComponent {
   readonly stickToBottom = signal(true);
   readonly showSuggestions = signal(true);
   readonly voiceHint = signal('');
+  /** Sesión de voz continua (modo 2). No cambia el cerebro: solo vuelve a escuchar tras la respuesta. */
+  readonly voiceSession = signal(this.readVoiceSession());
+  private readonly routeUrl = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map((e) => e.urlAfterRedirects)
+    ),
+    { initialValue: this.router.url }
+  );
+  readonly moduleLabel = computed(() => moduleLabelFromUrl(this.routeUrl()));
+  readonly identityCaption = computed(() => {
+    const role = this.auth.currentUser()?.rol;
+    const mod = this.moduleLabel();
+    return role ? `${role} · ${mod}` : mod;
+  });
 
   readonly voiceUi = computed<AveVoiceUiState>(() => {
     if (this.voiceIn.state() === 'listening') return 'listening';
@@ -67,6 +89,9 @@ export class AveCopilotComponent {
       case 'error':
         return this.voiceIn.lastError() || this.voiceOut.lastError() || this.voiceHint();
       default:
+        if (this.voiceSession()) {
+          return this.voiceHint() || 'Sesión continua activa';
+        }
         return this.voiceHint();
     }
   });
@@ -88,6 +113,27 @@ export class AveCopilotComponent {
   private lastQuote: QuoteDraft | null = null;
   private lastUserText = '';
   private abortStream: AbortController | null = null;
+  private listenBusy = false;
+  private skipAutoListen = false;
+  private awaitingSpeechEnd = false;
+  private prevOutState: VoiceOutputState = 'idle';
+  private speechWatch: ReturnType<typeof setTimeout> | null = null;
+
+  constructor() {
+    effect(() => {
+      const out = this.voiceOut.state();
+      const prev = this.prevOutState;
+      this.prevOutState = out;
+      if (!this.voiceSession() || !this.open() || this.skipAutoListen || this.listenBusy) {
+        return;
+      }
+      if (this.awaitingSpeechEnd && prev === 'speaking' && (out === 'idle' || out === 'error')) {
+        this.awaitingSpeechEnd = false;
+        this.clearSpeechWatch();
+        queueMicrotask(() => void this.listenForTurn());
+      }
+    });
+  }
 
   /** Solo ejemplos de arranque — no limitan lo que se puede escribir */
   readonly suggestions = [
@@ -105,12 +151,21 @@ export class AveCopilotComponent {
         this.scrollBottom(true);
         this.inputEl?.nativeElement?.focus();
       });
+      return;
     }
+    this.skipAutoListen = true;
+    this.awaitingSpeechEnd = false;
+    this.clearSpeechWatch();
+    this.voiceIn.abort();
+    this.voiceOut.stop();
   }
 
   newConversation(): void {
     this.abortStream?.abort();
     this.abortStream = null;
+    this.skipAutoListen = true;
+    this.awaitingSpeechEnd = false;
+    this.clearSpeechWatch();
     this.voiceIn.abort();
     this.voiceOut.stop();
     this.voiceHint.set('');
@@ -166,12 +221,51 @@ export class AveCopilotComponent {
       return;
     }
     if (this.voiceIn.state() === 'listening') {
+      this.skipAutoListen = true;
       this.voiceIn.stop();
       return;
     }
+    this.skipAutoListen = false;
+    if (this.voiceOut.state() === 'speaking' || this.voiceOut.state() === 'paused') {
+      this.awaitingSpeechEnd = false;
+      this.voiceOut.stop();
+    }
     if (this.sending()) {
+      this.abortStream?.abort();
+      this.abortStream = null;
+      this.sending.set(false);
+    }
+    if (!this.open()) {
+      this.open.set(true);
+    }
+    await this.listenForTurn();
+  }
+
+  toggleVoiceSession(): void {
+    const next = !this.voiceSession();
+    this.voiceSession.set(next);
+    try {
+      localStorage.setItem('eas-ave-voice-session', next ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+    this.voiceHint.set(next ? 'Sesión de voz continua: encendida' : 'Sesión de voz continua: apagada');
+    if (!next) {
+      this.skipAutoListen = true;
+      this.awaitingSpeechEnd = false;
+      this.clearSpeechWatch();
+    }
+  }
+
+  private async listenForTurn(): Promise<void> {
+    if (this.listenBusy || this.sending() || this.voiceIn.state() === 'listening') {
       return;
     }
+    if (!this.voiceIn.supported()) {
+      return;
+    }
+    this.listenBusy = true;
+    this.skipAutoListen = false;
     this.voiceOut.stop();
     try {
       const text = await this.voiceIn.listen();
@@ -185,6 +279,8 @@ export class AveCopilotComponent {
     } catch (err) {
       this.voiceHint.set((err as Error)?.message || 'No pude usar el micrófono.');
       this.voiceIn.reset();
+    } finally {
+      this.listenBusy = false;
     }
   }
 
@@ -291,6 +387,7 @@ export class AveCopilotComponent {
     this.scrollBottom(true);
     if (res.success !== false && res.reply) {
       this.voiceOut.speak(res.reply);
+      this.armFollowUpListen();
     }
     queueMicrotask(() => this.inputEl?.nativeElement?.focus());
   }
@@ -343,6 +440,39 @@ export class AveCopilotComponent {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       this.send();
+    }
+  }
+
+  private armFollowUpListen(): void {
+    if (!this.voiceSession() || !this.open() || this.skipAutoListen) {
+      return;
+    }
+    this.awaitingSpeechEnd = true;
+    this.clearSpeechWatch();
+    this.speechWatch = setTimeout(() => {
+      if (
+        this.awaitingSpeechEnd &&
+        this.voiceOut.state() !== 'speaking' &&
+        this.voiceOut.state() !== 'paused'
+      ) {
+        this.awaitingSpeechEnd = false;
+        void this.listenForTurn();
+      }
+    }, this.voiceOut.enabled() && this.voiceOut.supported() ? 1600 : 250);
+  }
+
+  private clearSpeechWatch(): void {
+    if (this.speechWatch) {
+      clearTimeout(this.speechWatch);
+      this.speechWatch = null;
+    }
+  }
+
+  private readVoiceSession(): boolean {
+    try {
+      return localStorage.getItem('eas-ave-voice-session') === '1';
+    } catch {
+      return false;
     }
   }
 
