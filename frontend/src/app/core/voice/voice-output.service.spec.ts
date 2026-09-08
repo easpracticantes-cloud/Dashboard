@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { friendlyVoiceError } from './speech-types';
-import { stripForSpeech, firstSentence, remainderAfterFirstSentence } from './voice-output.service';
+import { stripForSpeech, firstSentence, remainderAfterFirstSentence, isIgnorableTtsError } from './voice-output.service';
 
 describe('Voice helpers', () => {
   it('stripForSpeech quita markdown', () => {
@@ -11,6 +11,13 @@ describe('Voice helpers', () => {
     expect(friendlyVoiceError('not-allowed')).toMatch(/bloqueado/i);
     expect(friendlyVoiceError('unsupported')).toMatch(/API de dictado/i);
     expect(friendlyVoiceError('tts-blocked')).toMatch(/audio/i);
+  });
+
+  it('barge-in: canceled/interrupted no marcan error de TTS', () => {
+    expect(isIgnorableTtsError('canceled')).toBe(true);
+    expect(isIgnorableTtsError('interrupted')).toBe(true);
+    expect(isIgnorableTtsError('not-allowed')).toBe(false);
+    expect(friendlyVoiceError('tts-error')).toMatch(/voz alta/i);
   });
 
   it('parte la primera frase para hablar antes', () => {

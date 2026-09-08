@@ -4,6 +4,11 @@ import {
   VoiceInputState,
   friendlyVoiceError,
   getSpeechRecognitionCtor,
+  logAveVoice,
+  rememberSttLang,
+  speechRecognitionCtorName,
+  sttLangCandidates,
+  detectBrowserLabel
 } from './speech-types';
 
 export interface VoiceTranscript {
@@ -16,43 +21,123 @@ export class VoiceInputService {
   readonly state = signal<VoiceInputState>('idle');
   readonly interim = signal('');
   readonly lastError = signal('');
+  readonly lastErrorCode = signal('');
 
   private recognition: SpeechRecognitionLike | null = null;
   private finalText = '';
   private resolveListen: ((text: string) => void) | null = null;
   private rejectListen: ((err: Error) => void) | null = null;
+  private pendingError = '';
+  private started = false;
+  private cancelled = false;
+  private sessionGen = 0;
 
   supported(): boolean {
     return getSpeechRecognitionCtor() !== null;
   }
 
+  /**
+   * No se llama getUserMedia+stop() antes del dictado: cortar el stream
+   * y arrancar SpeechRecognition suele disparar error `network` en Chromium.
+   * SpeechRecognition pide el micrófono por su cuenta.
+   */
   async listen(lang = 'es-CO'): Promise<string> {
     if (!this.supported()) {
       this.fail('unsupported');
       throw new Error(friendlyVoiceError('unsupported'));
     }
+    this.cancelled = false;
     this.stopInternal(false);
-    this.finalText = '';
-    this.interim.set('');
-    this.lastError.set('');
-    this.state.set('listening');
+    await settle(60);
 
-    const media = navigator.mediaDevices;
-    if (media?.getUserMedia) {
+    const langs = sttLangCandidates(lang);
+    logAveVoice('listen', {
+      browser: detectBrowserLabel(),
+      ctor: speechRecognitionCtorName(),
+      langs: langs.join(','),
+      preferred: lang,
+      recognitionAvailable: true
+    });
+
+    let lastNetwork: Error | null = null;
+    for (let i = 0; i < langs.length; i++) {
+      if (this.cancelled) {
+        return '';
+      }
+      const nextLang = langs[i];
       try {
-        const stream = await media.getUserMedia({ audio: true });
-        stream.getTracks().forEach((t) => t.stop());
-      } catch {
-        this.fail('denied');
-        throw new Error(friendlyVoiceError('denied'));
+        const text = await this.listenOnce(nextLang);
+        if (text) {
+          rememberSttLang(nextLang);
+        }
+        return text;
+      } catch (err) {
+        const code = this.lastErrorCode();
+        if (this.cancelled || code === 'aborted') {
+          return '';
+        }
+        if (code !== 'network') {
+          throw err;
+        }
+        lastNetwork = err as Error;
+        const next = langs[i + 1];
+        if (!next) {
+          break;
+        }
+        logAveVoice('retry', {
+          reason: 'network',
+          fromLang: nextLang,
+          nextLang: next,
+          ctor: speechRecognitionCtorName()
+        });
+        await settle(220);
       }
     }
+    this.fail('network');
+    throw lastNetwork || new Error(friendlyVoiceError('network'));
+  }
 
+  stop(): void {
+    this.stopInternal(true);
+  }
+
+  abort(): void {
+    this.cancelled = true;
+    this.sessionGen++;
+    try {
+      this.recognition?.abort();
+    } catch {
+      /* ignore */
+    }
+    this.recognition = null;
+    this.interim.set('');
+    this.lastErrorCode.set('aborted');
+    this.lastError.set(friendlyVoiceError('aborted'));
+    this.finish('');
+    this.reset();
+  }
+
+  reset(): void {
+    if (this.state() !== 'listening') {
+      this.state.set('idle');
+    }
+  }
+
+  private listenOnce(lang: string): Promise<string> {
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor) {
       this.fail('unsupported');
-      throw new Error(friendlyVoiceError('unsupported'));
+      return Promise.reject(new Error(friendlyVoiceError('unsupported')));
     }
+
+    this.finalText = '';
+    this.interim.set('');
+    this.lastError.set('');
+    this.lastErrorCode.set('');
+    this.pendingError = '';
+    this.started = false;
+    this.state.set('listening');
+    const gen = ++this.sessionGen;
 
     return new Promise<string>((resolve, reject) => {
       this.resolveListen = resolve;
@@ -64,8 +149,19 @@ export class VoiceInputService {
       rec.interimResults = true;
       rec.maxAlternatives = 1;
 
-      rec.onstart = () => this.state.set('listening');
+      rec.onstart = () => {
+        if (gen !== this.sessionGen) return;
+        this.started = true;
+        this.state.set('listening');
+        logAveVoice('start', {
+          lang,
+          ctor: speechRecognitionCtorName(),
+          browser: detectBrowserLabel(),
+          state: this.state()
+        });
+      };
       rec.onresult = (event) => {
+        if (gen !== this.sessionGen) return;
         let interim = '';
         let finals = this.finalText;
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -80,21 +176,53 @@ export class VoiceInputService {
         this.interim.set(interim.trim());
       };
       rec.onerror = (event) => {
-        if (event.error === 'aborted') {
-          this.finish('');
+        if (gen !== this.sessionGen) return;
+        const code = event.error || 'unknown';
+        logAveVoice('error', {
+          error: code,
+          lang,
+          started: this.started,
+          ctor: speechRecognitionCtorName(),
+          browser: detectBrowserLabel(),
+          state: this.state()
+        });
+        if (code === 'aborted') {
           return;
         }
-        this.fail(event.error);
-        this.rejectListen?.(new Error(friendlyVoiceError(event.error)));
-        this.clearWaiters();
+        this.pendingError = code;
       };
       rec.onend = () => {
-        const text = (this.finalText || this.interim()).trim();
+        if (gen !== this.sessionGen) return;
+        const spoken = (this.finalText || this.interim()).trim();
         this.interim.set('');
+        logAveVoice('end', {
+          lang,
+          started: this.started,
+          ended: true,
+          hadSpeech: !!spoken,
+          error: this.pendingError || null,
+          ctor: speechRecognitionCtorName(),
+          state: this.state()
+        });
+        if (spoken && (!this.pendingError || recoverableWithTranscript(this.pendingError))) {
+          this.pendingError = '';
+          this.finish(spoken);
+          return;
+        }
         if (this.state() === 'error') {
           return;
         }
-        this.finish(text);
+        if (!this.pendingError || this.pendingError === 'no-speech' || this.pendingError === 'aborted') {
+          if (this.pendingError === 'no-speech') {
+            this.lastErrorCode.set('no-speech');
+            this.lastError.set(friendlyVoiceError('no-speech'));
+          }
+          this.finish(spoken);
+          return;
+        }
+        this.fail(this.pendingError);
+        this.rejectListen?.(new Error(friendlyVoiceError(this.pendingError)));
+        this.clearWaiters();
       };
 
       try {
@@ -107,36 +235,21 @@ export class VoiceInputService {
     });
   }
 
-  stop(): void {
-    this.stopInternal(true);
-  }
-
-  abort(): void {
-    try {
-      this.recognition?.abort();
-    } catch {
-      /* ignore */
-    }
-    this.recognition = null;
-    this.interim.set('');
-    this.finish('');
-    this.reset();
-  }
-
-  reset(): void {
-    if (this.state() !== 'listening') {
-      this.state.set('idle');
-    }
-  }
-
   private stopInternal(userStop: boolean): void {
+    this.sessionGen++;
     try {
       this.recognition?.stop();
     } catch {
       /* ignore */
     }
     this.recognition = null;
+    if (this.resolveListen) {
+      const resolve = this.resolveListen;
+      this.clearWaiters();
+      resolve('');
+    }
     if (userStop && this.state() === 'listening' && !this.finalText && !this.interim()) {
+      this.lastErrorCode.set('aborted');
       this.lastError.set(friendlyVoiceError('aborted'));
     }
   }
@@ -152,6 +265,7 @@ export class VoiceInputService {
 
   private fail(code: string): void {
     this.state.set('error');
+    this.lastErrorCode.set(code);
     this.lastError.set(friendlyVoiceError(code));
     this.recognition = null;
   }
@@ -160,4 +274,12 @@ export class VoiceInputService {
     this.resolveListen = null;
     this.rejectListen = null;
   }
+}
+
+function recoverableWithTranscript(code: string): boolean {
+  return code === 'network' || code === 'no-speech' || code === 'aborted';
+}
+
+function settle(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

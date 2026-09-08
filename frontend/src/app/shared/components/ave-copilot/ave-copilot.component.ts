@@ -12,7 +12,13 @@ import {
   EnterpriseAiService,
   QuoteDraft
 } from '../../../core/services/enterprise-ai.service';
-import { AveVoiceUiState, VoiceOutputState, friendlyVoiceError } from '../../../core/voice/speech-types';
+import {
+  AveVoiceUiState,
+  VoiceOutputState,
+  backoffMsAfterSttError,
+  friendlyVoiceError,
+  shouldRearmWakeAfterSttError
+} from '../../../core/voice/speech-types';
 import { VoiceInputService } from '../../../core/voice/voice-input.service';
 import { VoiceOutputService, firstSentence, remainderAfterFirstSentence } from '../../../core/voice/voice-output.service';
 import {
@@ -154,6 +160,7 @@ export class AveCopilotComponent {
   /** El navegador no despierta solo: el bucle de micrófono arranca tras un gesto (botón o abrir el panel). */
   private wakeLoopArmed = false;
   private wakeRearm: ReturnType<typeof setTimeout> | null = null;
+  private sttBackoffMs = 0;
 
   constructor() {
     effect(() => {
@@ -370,9 +377,10 @@ export class AveCopilotComponent {
       if (!text) {
         this.voiceHint.set(this.voiceIn.lastError() || 'No capturé audio. Inténtalo de nuevo.');
         this.voiceIn.reset();
-        this.rearmWakeListen();
+        this.rearmAfterListen(this.voiceIn.lastErrorCode());
         return;
       }
+      this.sttBackoffMs = 0;
       const parsed = stripWakePrefix(text);
       const requireWake = this.wakeWord() && !this.voiceSession() && !this.awaitingCommand;
       if (requireWake && !parsed.hadWake) {
@@ -391,9 +399,10 @@ export class AveCopilotComponent {
       this.draft = parsed.hadWake ? parsed.message : text;
       this.send();
     } catch (err) {
-      this.voiceHint.set((err as Error)?.message || 'No pude usar el micrófono.');
+      const code = this.voiceIn.lastErrorCode();
+      this.voiceHint.set((err as Error)?.message || friendlyVoiceError(code || 'unknown'));
       this.voiceIn.reset();
-      this.rearmWakeListen();
+      this.rearmAfterListen(code);
     } finally {
       this.listenBusy = false;
     }
@@ -422,6 +431,27 @@ export class AveCopilotComponent {
       return;
     }
     queueMicrotask(() => void this.listenForTurn());
+  }
+
+  private rearmAfterListen(errorCode: string): void {
+    if (!errorCode || errorCode === 'no-speech' || errorCode === 'aborted') {
+      this.rearmWakeListen();
+      return;
+    }
+    if (!shouldRearmWakeAfterSttError(errorCode)) {
+      this.sttBackoffMs = backoffMsAfterSttError(errorCode, this.sttBackoffMs);
+      if (this.sttBackoffMs > 0 && this.wakeWord() && this.wakeLoopArmed && !this.skipAutoListen) {
+        if (this.wakeRearm) {
+          clearTimeout(this.wakeRearm);
+        }
+        this.wakeRearm = setTimeout(() => {
+          this.wakeRearm = null;
+          void this.listenForTurn();
+        }, this.sttBackoffMs);
+      }
+      return;
+    }
+    this.rearmWakeListen();
   }
 
   private rearmWakeListen(): void {

@@ -113,7 +113,7 @@ export class VoiceOutputService {
       }
     };
     utter.onerror = (ev) => {
-      if (ev.error === 'canceled' || ev.error === 'interrupted') {
+      if (isIgnorableTtsError(ev.error)) {
         return;
       }
       const blocked = ev.error === 'not-allowed';
@@ -136,6 +136,10 @@ export class VoiceOutputService {
       return true;
     }
   }
+}
+
+export function isIgnorableTtsError(error: string): boolean {
+  return error === 'canceled' || error === 'interrupted';
 }
 
 export function stripForSpeech(raw: string): string {
