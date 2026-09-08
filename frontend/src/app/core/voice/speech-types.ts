@@ -124,14 +124,10 @@ export function isVoiceDebugEnabled(): boolean {
     return false;
   }
   try {
-    if (localStorage.getItem(VOICE_DEBUG_STORAGE) === '1') {
-      return true;
-    }
+    return localStorage.getItem(VOICE_DEBUG_STORAGE) === '1';
   } catch {
-    /* ignore */
+    return false;
   }
-  const host = window.location?.hostname || '';
-  return host === 'localhost' || host === '127.0.0.1';
 }
 
 /** Diagnóstico de voz: nunca tokens, JWT, transcripciones ni PII. */

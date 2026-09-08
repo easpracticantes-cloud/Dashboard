@@ -52,9 +52,14 @@ describe('stt policy', () => {
 });
 
 describe('voice diagnostics', () => {
-  it('detecta constructor y no registra secretos', () => {
+  it('solo loguea si eas-ave-voice-debug vale 1', () => {
     const spy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     try {
+      localStorage.removeItem('eas-ave-voice-debug');
+      expect(isVoiceDebugEnabled()).toBe(false);
+      logAveVoice('error', { error: 'network' });
+      expect(spy).not.toHaveBeenCalled();
+
       localStorage.setItem('eas-ave-voice-debug', '1');
       expect(isVoiceDebugEnabled()).toBe(true);
       logAveVoice('error', { error: 'network', jwt: 'secret', transcript: 'Carlos' });
@@ -63,6 +68,7 @@ describe('voice diagnostics', () => {
       expect(logged).not.toContain('secret');
       expect(logged).not.toContain('Carlos');
       expect(logged).toContain('network');
+      expect(logged).toContain('[Ave-voice]');
       expect(typeof detectBrowserLabel()).toBe('string');
       expect(['SpeechRecognition', 'webkitSpeechRecognition', null]).toContain(speechRecognitionCtorName());
     } finally {
