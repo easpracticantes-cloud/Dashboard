@@ -1,5 +1,6 @@
 package com.escuelaaves.sig.infrastructure.ai.adapters;
 
+import com.escuelaaves.sig.application.ai.AiUserSafeMessages;
 import com.escuelaaves.sig.domain.ai.port.out.AiObservabilityPort;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity.AiUsageLogEntity;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.AiUsageLogJpaRepository;
@@ -44,7 +45,7 @@ public class AiObservabilityJpaAdapter implements AiObservabilityPort {
                     .estimatedCostUsd(cost)
                     .modelTier(event.modelTier())
                     .success(event.success())
-                    .errorMessage(truncate(event.errorMessage()))
+                    .errorMessage(truncate(AiUserSafeMessages.forLog(event.errorMessage())))
                     .createdAt(Instant.now())
                     .build());
             log.info("[AI-Obs] op={} provider={} model={} tier={} tokens={} costUsd={} success={} latencyMs={}",

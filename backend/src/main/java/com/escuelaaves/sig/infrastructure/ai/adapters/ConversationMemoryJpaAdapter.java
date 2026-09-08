@@ -74,4 +74,14 @@ public class ConversationMemoryJpaAdapter implements ConversationMemoryPort {
     public Optional<String> findSession(String sessionId) {
         return sessionRepository.findById(sessionId).map(AiConversationSessionEntity::getId);
     }
+
+    @Override
+    @Transactional
+    public void deleteSession(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return;
+        }
+        messageRepository.deleteBySession_Id(sessionId);
+        sessionRepository.deleteById(sessionId);
+    }
 }

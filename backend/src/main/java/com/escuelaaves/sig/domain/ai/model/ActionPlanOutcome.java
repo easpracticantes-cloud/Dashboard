@@ -8,6 +8,17 @@ public record ActionPlanOutcome(
         List<ActionStepResult> results,
         String narrative,
         boolean executed,
-        boolean dryRun
+        boolean dryRun,
+        String confirmationId
 ) {
+    public ActionPlanOutcome(
+            String rationale,
+            List<PlannedAction> plan,
+            List<ActionStepResult> results,
+            String narrative,
+            boolean executed,
+            boolean dryRun
+    ) {
+        this(rationale, plan, results, narrative, executed, dryRun, null);
+    }
 }

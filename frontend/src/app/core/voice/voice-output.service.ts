@@ -8,6 +8,7 @@ export class VoiceOutputService {
   readonly enabled = signal(this.readEnabled());
   readonly state = signal<VoiceOutputState>('idle');
   readonly lastError = signal('');
+  private queue: string[] = [];
 
   supported(): boolean {
     return typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
@@ -30,43 +31,21 @@ export class VoiceOutputService {
   }
 
   speak(raw: string): void {
-    if (!this.enabled() || !raw.trim()) {
-      return;
-    }
-    if (!this.supported()) {
-      this.state.set('error');
-      this.lastError.set(friendlyVoiceError('unsupported'));
-      return;
-    }
+    this.queue = [];
+    this.play(raw, true);
+  }
+
+  /** Continúa hablando sin cortar el turno actual (respuesta incremental). */
+  enqueue(raw: string): void {
     const text = stripForSpeech(raw);
-    if (!text) {
+    if (!this.enabled() || !text) {
       return;
     }
-    this.stop();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = 'es-CO';
-    utter.rate = 1;
-    utter.pitch = 1;
-    utter.onstart = () => {
-      this.state.set('speaking');
-      this.lastError.set('');
-    };
-    utter.onend = () => {
-      if (this.state() !== 'paused') {
-        this.state.set('idle');
-      }
-    };
-    utter.onerror = (ev) => {
-      const blocked = ev.error === 'not-allowed' || ev.error === 'canceled';
-      this.state.set('error');
-      this.lastError.set(friendlyVoiceError(blocked ? 'tts-blocked' : 'tts-error'));
-    };
-    try {
-      window.speechSynthesis.speak(utter);
-    } catch {
-      this.state.set('error');
-      this.lastError.set(friendlyVoiceError('tts-blocked'));
+    if (this.state() === 'speaking' || this.state() === 'paused') {
+      this.queue.push(text);
+      return;
     }
+    this.play(text, false);
   }
 
   pause(): void {
@@ -86,12 +65,67 @@ export class VoiceOutputService {
   }
 
   stop(): void {
+    this.queue = [];
     if (!this.supported()) {
       this.state.set('idle');
       return;
     }
     window.speechSynthesis.cancel();
     this.state.set('idle');
+  }
+
+  private play(raw: string, reset: boolean): void {
+    if (!this.enabled() || !raw.trim()) {
+      return;
+    }
+    if (!this.supported()) {
+      this.state.set('error');
+      this.lastError.set(friendlyVoiceError('unsupported'));
+      return;
+    }
+    const text = stripForSpeech(raw);
+    if (!text) {
+      return;
+    }
+    if (reset) {
+      window.speechSynthesis.cancel();
+    }
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'es-CO';
+    utter.rate = 1.08;
+    utter.pitch = 1;
+    const voice = pickSpanishVoice();
+    if (voice) {
+      utter.voice = voice;
+    }
+    utter.onstart = () => {
+      this.state.set('speaking');
+      this.lastError.set('');
+    };
+    utter.onend = () => {
+      const next = this.queue.shift();
+      if (next) {
+        this.play(next, false);
+        return;
+      }
+      if (this.state() !== 'paused') {
+        this.state.set('idle');
+      }
+    };
+    utter.onerror = (ev) => {
+      if (ev.error === 'canceled' || ev.error === 'interrupted') {
+        return;
+      }
+      const blocked = ev.error === 'not-allowed';
+      this.state.set('error');
+      this.lastError.set(friendlyVoiceError(blocked ? 'tts-blocked' : 'tts-error'));
+    };
+    try {
+      window.speechSynthesis.speak(utter);
+    } catch {
+      this.state.set('error');
+      this.lastError.set(friendlyVoiceError('tts-blocked'));
+    }
   }
 
   private readEnabled(): boolean {
@@ -114,4 +148,30 @@ export function stripForSpeech(raw: string): string {
     .replace(/#{1,3}\s+/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+export function firstSentence(raw: string): string {
+  const text = stripForSpeech(raw);
+  const m = text.match(/^(.+?[.!?])(?:\s|$)/);
+  return m ? m[1].trim() : '';
+}
+
+export function remainderAfterFirstSentence(raw: string): string {
+  const text = stripForSpeech(raw);
+  const first = firstSentence(text);
+  if (!first) return '';
+  return text.slice(first.length).trim();
+}
+
+function pickSpanishVoice(): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !window.speechSynthesis?.getVoices) {
+    return null;
+  }
+  const voices = window.speechSynthesis.getVoices();
+  return (
+    voices.find((v) => /^es-CO/i.test(v.lang)) ||
+    voices.find((v) => /^es-419/i.test(v.lang)) ||
+    voices.find((v) => /^es/i.test(v.lang)) ||
+    null
+  );
 }

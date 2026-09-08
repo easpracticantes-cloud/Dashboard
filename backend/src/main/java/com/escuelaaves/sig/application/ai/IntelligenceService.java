@@ -178,6 +178,10 @@ public class IntelligenceService implements AIUseCase {
         return conversationMemoryPort.recentMessages(sessionId, limit);
     }
 
+    public void deleteMemorySession(String sessionId) {
+        conversationMemoryPort.deleteSession(sessionId);
+    }
+
     public Map<String, String> whatsappAutoReply(String conversationText) {
         return observe("whatsappAutoReply", "/api/v1/ai/whatsapp/auto-reply", () -> Map.of(
                 "reply", whatsAppAiAssistPort.draftAutoReply(conversationText),
@@ -190,7 +194,18 @@ public class IntelligenceService implements AIUseCase {
     }
 
     public ActionPlanOutcome executeActions(String instruction, String contextJson, boolean dryRun, boolean confirm) {
-        return actionOrchestrator.run(instruction, contextJson, dryRun, confirm);
+        return actionOrchestrator.run(instruction, contextJson, dryRun, confirm, null, null);
+    }
+
+    public ActionPlanOutcome executeActions(
+            String instruction,
+            String contextJson,
+            boolean dryRun,
+            boolean confirm,
+            String sessionId,
+            String confirmationId
+    ) {
+        return actionOrchestrator.run(instruction, contextJson, dryRun, confirm, sessionId, confirmationId);
     }
 
     public CopilotResponse copilot(CopilotRequest request) {
@@ -244,7 +259,7 @@ public class IntelligenceService implements AIUseCase {
         } finally {
             observabilityPort.record(new AiObservabilityPort.AiUsageEvent(
                     null, endpoint, operation, provider, null,
-                    System.currentTimeMillis() - start, null, success, error
+                    System.currentTimeMillis() - start, null, success, AiUserSafeMessages.forLog(error)
             ));
         }
     }

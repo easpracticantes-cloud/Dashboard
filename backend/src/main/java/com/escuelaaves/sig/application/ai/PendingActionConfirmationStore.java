@@ -13,8 +13,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Reserva de confirmaciones para la siguiente fase de Ave.
- * No se usa aún desde el chat de texto; queda listo para voz/acciones.
+ * Reserva de confirmaciones atadas a una sesión + confirmationId.
+ * Un «sí» suelto no consume el token.
  */
 @Component
 public class PendingActionConfirmationStore {

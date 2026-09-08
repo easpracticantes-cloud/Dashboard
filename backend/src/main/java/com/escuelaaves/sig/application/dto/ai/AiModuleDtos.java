@@ -113,7 +113,9 @@ public final class AiModuleDtos {
             @NotBlank String instruction,
             String contextJson,
             Boolean dryRun,
-            Boolean confirm
+            Boolean confirm,
+            String sessionId,
+            String confirmationId
     ) {
         public boolean dryRunOrDefault() {
             return dryRun == null || Boolean.TRUE.equals(dryRun);
@@ -140,14 +142,29 @@ public final class AiModuleDtos {
             String narrative,
             boolean executed,
             boolean dryRun,
-            java.util.List<String> plannedTools
+            java.util.List<String> plannedTools,
+            String confirmationId
     ) {
+        public ActionExecuteResponse(
+                String rationale,
+                java.util.List<ActionStepDto> results,
+                String narrative,
+                boolean executed,
+                boolean dryRun,
+                java.util.List<String> plannedTools
+        ) {
+            this(rationale, results, narrative, executed, dryRun, plannedTools, null);
+        }
     }
 
     public record CopilotRequest(
             @NotBlank String message,
-            String sessionId
+            String sessionId,
+            String uiContext
     ) {
+        public CopilotRequest(String message, String sessionId) {
+            this(message, sessionId, null);
+        }
     }
 
     /**

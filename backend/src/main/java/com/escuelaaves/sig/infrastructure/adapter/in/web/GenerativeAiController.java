@@ -28,6 +28,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -177,7 +178,9 @@ public class GenerativeAiController {
                 request.instruction(),
                 request.contextJson(),
                 request.dryRunOrDefault(),
-                request.confirmOrFalse()
+                request.confirmOrFalse(),
+                request.sessionId(),
+                request.confirmationId()
         );
         return ResponseEntity.ok(new ActionExecuteResponse(
                 outcome.rationale(),
@@ -187,7 +190,8 @@ public class GenerativeAiController {
                 outcome.narrative(),
                 outcome.executed(),
                 outcome.dryRun(),
-                outcome.plan().stream().map(p -> p.tool().name()).toList()
+                outcome.plan().stream().map(p -> p.tool().name()).toList(),
+                outcome.confirmationId()
         ));
     }
 
@@ -258,6 +262,14 @@ public class GenerativeAiController {
     public ResponseEntity<?> memoryMessages(
             @org.springframework.web.bind.annotation.PathVariable String sessionId) {
         return ResponseEntity.ok(intelligenceService.memoryMessages(sessionId, 40));
+    }
+
+    @DeleteMapping("/memory/{sessionId}")
+    @Operation(summary = "Borra la sesión de memoria conversacional de Ave")
+    public ResponseEntity<Void> deleteMemory(
+            @org.springframework.web.bind.annotation.PathVariable String sessionId) {
+        intelligenceService.deleteMemorySession(sessionId);
+        return ResponseEntity.noContent().build();
     }
 
     private static String required(Map<String, String> body, String key) {

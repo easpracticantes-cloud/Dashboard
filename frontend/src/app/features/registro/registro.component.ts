@@ -6,6 +6,7 @@ import { ActivatedRoute } from '@angular/router';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { IntegrationsService } from '../../core/services/integrations.service';
 import { SeguimientoWhatsapp, SheetsDashboard } from '../../core/models/sheets-dashboard.model';
+import { AveUiContextService } from '../../shared/components/ave-copilot/ave-ui-context.service';
 
 const TIPO_BASE = ['B2B', 'B2C', 'AGENCIA', 'PARTICULAR'];
 const CANAL_BASE = ['RESERVAS', 'WHATSAPP', 'INSTAGRAM', 'WEB', 'EMAIL', 'TELEFONO'];
@@ -119,6 +120,7 @@ export class RegistroComponent {
   private readonly integrations = inject(IntegrationsService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
+  private readonly aveUi = inject(AveUiContextService);
 
   readonly loading = signal(true);
   readonly saving = signal(false);
@@ -194,6 +196,7 @@ export class RegistroComponent {
   readonly opcionesEncuesta = ENCUESTA_BASE;
 
   constructor() {
+    this.destroyRef.onDestroy(() => this.aveUi.clearEntity());
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((q) => {
       const term = (q.get('q') || '').trim();
       if (!term) return;
@@ -256,6 +259,7 @@ export class RegistroComponent {
     this.draft.set(emptyDraft(this.hojaFiltro() || this.hojas()[0] || ''));
     this.aviso.set('');
     this.modo.set('nueva');
+    this.aveUi.clearEntity();
   }
 
   editar(row: SeguimientoWhatsapp): void {
@@ -263,11 +267,13 @@ export class RegistroComponent {
     this.draft.set(fromRow(row));
     this.aviso.set('');
     this.modo.set('editar');
+    this.publishAveFocus(row);
   }
 
   cancelar(): void {
     this.modo.set('lista');
     this.original.set(null);
+    this.aveUi.clearEntity();
   }
 
   guardar(): void {
@@ -352,6 +358,8 @@ export class RegistroComponent {
     this.saving.set(false);
     this.applyLocal(d, orig);
     this.modo.set('lista');
+    this.original.set(null);
+    this.aveUi.clearEntity();
     this.aviso.set(message || (orig ? 'Fila actualizada en el Excel.' : 'Fila agregada al Excel.'));
     this.dashboard.invalidateCache();
   }
@@ -411,6 +419,19 @@ export class RegistroComponent {
       (a.hojaOrigen || '') === (b.hojaOrigen || '') &&
       (a.cliente || '') === (b.cliente || '')
     );
+  }
+
+  private publishAveFocus(row: SeguimientoWhatsapp): void {
+    this.aveUi.setEntity({
+      type: 'SEGUIMIENTO',
+      allowed: {
+        cliente: row.cliente || '',
+        celular: row.celular || '',
+        fecha: (row.fecha || '').slice(0, 10),
+        hoja: row.hojaOrigen || '',
+        semaforo: row.semaforo || ''
+      }
+    });
   }
 
   private mergeOpts(base: string[], pick: (r: SeguimientoWhatsapp) => string | undefined): string[] {

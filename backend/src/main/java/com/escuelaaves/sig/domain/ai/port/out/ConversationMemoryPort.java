@@ -13,6 +13,9 @@ public interface ConversationMemoryPort {
 
     Optional<String> findSession(String sessionId);
 
+    /** Borra la sesión y sus mensajes. Idempotente. */
+    void deleteSession(String sessionId);
+
     record MemoryMessage(String role, String content) {
     }
 }

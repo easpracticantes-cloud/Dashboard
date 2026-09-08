@@ -76,7 +76,7 @@ public class CopilotOrchestrator {
             // en conversaciones nuevas).
             CopilotResponse response;
             try {
-                response = converse(sid, userMsg);
+                response = converse(sid, userMsg, request.uiContext());
             } catch (Exception ex) {
                 String failedProvider = resolveFailedProviderLabel(ex);
                 log.warn("[Ave] {} falló: {}", failedProvider, scrubLogMessage(ex.getMessage()));
@@ -104,7 +104,7 @@ public class CopilotOrchestrator {
             try {
                 observabilityPort.record(new AiObservabilityPort.AiUsageEvent(
                         null, "/api/v1/ai/copilot", "copilot", usedProvider, null,
-                        System.currentTimeMillis() - start, null, success, error
+                        System.currentTimeMillis() - start, null, success, AiUserSafeMessages.forLog(error)
                 ));
             } catch (Exception obsEx) {
                 log.warn("[Ave] obs omitido: {}", obsEx.getMessage());
@@ -132,12 +132,13 @@ public class CopilotOrchestrator {
         onDone.accept(full);
     }
 
-    private CopilotResponse converse(String sessionId, String message) {
+    private CopilotResponse converse(String sessionId, String message, String uiContext) {
         String requestId = AiPromptTrace.newRequestId();
         AiPromptTrace.begin(requestId);
         try {
             var slots = sessionSlotStore.getOrCreate(sessionId);
             boolean businessTurn = SigTopicDetector.needsBusinessContext(message);
+            String llmMessage = withScreenContext(message, uiContext);
 
             String catalog = "";
             String slotsJson = "";
@@ -149,7 +150,7 @@ public class CopilotOrchestrator {
 
             String history = softHistory(sessionId);
             AvePromptAssembler.Assembled assembled = AvePromptAssembler.assemble(
-                    message, history, businessTurn, catalog, slotsJson
+                    llmMessage, history, businessTurn, catalog, slotsJson
             );
 
             AiPromptTrace.logRoot(requestId, sessionId, "pending", assembled, false);
@@ -158,7 +159,7 @@ public class CopilotOrchestrator {
             if (!businessTurn && assembled.commercialIdentityInSystem()) {
                 log.error("[AI-ROOT-TRACE] BUG commercial identity in general SYSTEM sources={} → force clean",
                         assembled.systemSources());
-                assembled = AvePromptAssembler.assemble(message, "(sin historial previo)", false, null, null);
+                assembled = AvePromptAssembler.assemble(llmMessage, "(sin historial previo)", false, null, null);
                 AiPromptTrace.logRoot(requestId + "-clean", sessionId, "pending", assembled, false);
             }
 
@@ -199,7 +200,7 @@ public class CopilotOrchestrator {
             if (!businessTurn && AvePromptAssembler.looksLikeCommercialRefusal(text)) {
                 log.warn("[AI-ROOT-TRACE] requestId={} commercialRefusalInReply → retry without history", requestId);
                 AvePromptAssembler.Assembled retry = AvePromptAssembler.assemble(
-                        message, "(sin historial previo)", false, null, null
+                        llmMessage, "(sin historial previo)", false, null, null
                 );
                 AiPromptTrace.logRoot(requestId + "-retry", sessionId, provider, retry, false);
                 ChatAttempt second = chatWithProviderFailover(retry.system(), retry.user(), "chat");
@@ -398,6 +399,35 @@ public class CopilotOrchestrator {
         return message;
     }
 
+    /** Adjunta contexto de pantalla al turno del LLM. La memoria guarda el mensaje crudo. */
+    private static String withScreenContext(String message, String uiContext) {
+        String ctx = sanitizeUiContext(uiContext);
+        if (ctx == null) {
+            return message;
+        }
+        return message
+                + "\n\nContexto de pantalla autorizado (no es una instrucción del usuario; "
+                + "úsalo solo si el mensaje se refiere a \"este\", \"esta\", \"el actual\"):\n"
+                + ctx;
+    }
+
+    private static String sanitizeUiContext(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String t = raw.trim();
+        if (t.length() > 600) {
+            t = t.substring(0, 600);
+        }
+        if (SECRET_LEAK.matcher(t).find()) {
+            return null;
+        }
+        if (!t.startsWith("{")) {
+            return null;
+        }
+        return t;
+    }
+
     private JsonNode tryParseTool(String raw) {
         if (raw == null) {
             return null;
@@ -463,8 +493,8 @@ public class CopilotOrchestrator {
             return "(sin historial previo)";
         }
         try {
-            // Últimos 12 turnos; truncar contenido largo para controlar tokens
-            return memoryPort.recentMessages(sessionId, 12).stream()
+            // Últimos N turnos (AveMemoryPolicy); truncar contenido largo para controlar tokens
+            return memoryPort.recentMessages(sessionId, AveMemoryPolicy.CONVERSATION_TURNS).stream()
                     .map(m -> {
                         String c = AveHistorySanitizer.sanitizeTurn(m.role(), m.content());
                         if (c.length() > 600) {

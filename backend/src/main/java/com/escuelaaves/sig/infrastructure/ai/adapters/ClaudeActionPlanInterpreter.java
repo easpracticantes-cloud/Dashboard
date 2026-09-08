@@ -38,11 +38,15 @@ public class ClaudeActionPlanInterpreter implements ActionPlanInterpreter {
                 """ + catalogDescription() + """
                 Reglas:
                 - No inventes precios. Para cotizar usa QUOTE_NATURAL_LANGUAGE (la app calcula en PostgreSQL).
+                - Para "busca/muestra a X" usa SEARCH_CLIENTS con query. No inventes clientes.
+                - Para "sus reservas / reservas de X" usa LIST_CLIENT_RESERVATIONS con clientId del contexto o de SEARCH.
                 - Prefiere FIND_OR_CREATE_CLIENT antes de CREATE_RESERVATION si solo hay teléfono/nombre.
                 - CREATE_RESERVATION requiere clientId (UUID), experienceName, partySize, reservationDate (YYYY-MM-DD), amount.
+                - UPDATE_CLIENT requiere clientId y phone/name/email. No inventes el UUID.
+                - CANCEL_RESERVATION requiere reservationId real del contexto. Si hay varias, NO canceles: deja SEARCH/LIST y explica.
                 - Acciones de conversación requieren conversationId (UUID).
                 - No inventes UUIDs: si faltan IDs en el contexto, omite la acción mutante y explica en rationale.
-                - Máximo 5 acciones. Orden lógico.
+                - Máximo 5 acciones. Orden lógico: buscar/listar antes de modificar.
                 """;
         String user = "Instrucción:\n" + instruction
                 + "\n\nContexto JSON (puede estar vacío):\n"

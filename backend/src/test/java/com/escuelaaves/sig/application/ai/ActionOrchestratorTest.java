@@ -34,6 +34,8 @@ class ActionOrchestratorTest {
     @Mock
     private AiActionTool createClientTool;
     @Mock
+    private AiActionTool searchClientsTool;
+    @Mock
     private AiProviderFactory aiProviderFactory;
     @Mock
     private GenerativeAiPort generativeAiPort;
@@ -41,16 +43,20 @@ class ActionOrchestratorTest {
     private AiObservabilityPort observabilityPort;
 
     private ActionOrchestrator orchestrator;
+    private PendingActionConfirmationStore confirmationStore;
 
     @BeforeEach
     void setUp() {
         when(checklistTool.type()).thenReturn(ActionToolType.RESOLVE_CHECKLIST);
         when(createClientTool.type()).thenReturn(ActionToolType.FIND_OR_CREATE_CLIENT);
+        when(searchClientsTool.type()).thenReturn(ActionToolType.SEARCH_CLIENTS);
+        confirmationStore = new PendingActionConfirmationStore();
         orchestrator = new ActionOrchestrator(
                 interpreter,
-                List.of(checklistTool, createClientTool),
+                List.of(checklistTool, createClientTool, searchClientsTool),
                 aiProviderFactory,
-                observabilityPort
+                observabilityPort,
+                confirmationStore
         );
         when(aiProviderFactory.activeType()).thenReturn(AiProviderType.CLAUDE);
         lenient().when(aiProviderFactory.getActiveProvider()).thenReturn(generativeAiPort);
@@ -109,5 +115,75 @@ class ActionOrchestratorTest {
         assertTrue(outcome.executed());
         assertFalse(outcome.dryRun());
         verify(createClientTool).execute(any(), eq(false));
+    }
+
+    @Test
+    @DisplayName("dry-run con sesión emite confirmationId; un sí no ejecuta")
+    void dryRunIssuesTokenAndBareYesDoesNotExecute() {
+        when(interpreter.interpret(anyString(), any())).thenReturn(new ActionPlanInterpreter.InterpretedPlan(
+                "crear cliente",
+                List.of(new PlannedAction(ActionToolType.FIND_OR_CREATE_CLIENT,
+                        Map.of("phone", "3001234567"), "crm"))
+        ));
+        when(createClientTool.execute(any(), eq(true))).thenReturn(
+                ActionStepResult.ok("FIND_OR_CREATE_CLIENT", true, "sim", Map.of())
+        );
+
+        var preview = orchestrator.run("Crea cliente Ana", "{}", true, false, "sess-ave", null);
+        assertNotNull(preview.confirmationId());
+        assertTrue(preview.dryRun());
+
+        assertThrows(BadRequestException.class, () ->
+                orchestrator.run("Crea cliente Ana", "{}", false, true, "sess-ave", "si")
+        );
+        verify(createClientTool, never()).execute(any(), eq(false));
+    }
+
+    @Test
+    @DisplayName("confirm con el token de esa acción ejecuta")
+    void confirmWithIssuedTokenExecutes() {
+        when(interpreter.interpret(anyString(), any())).thenReturn(new ActionPlanInterpreter.InterpretedPlan(
+                "crear cliente",
+                List.of(new PlannedAction(ActionToolType.FIND_OR_CREATE_CLIENT,
+                        Map.of("phone", "3001234567", "name", "Ana"), "crm"))
+        ));
+        when(createClientTool.execute(any(), eq(true))).thenReturn(
+                ActionStepResult.ok("FIND_OR_CREATE_CLIENT", true, "sim", Map.of())
+        );
+        when(createClientTool.execute(any(), eq(false))).thenReturn(
+                ActionStepResult.ok("FIND_OR_CREATE_CLIENT", false, "Cliente listo", Map.of("clientId", "x"))
+        );
+
+        var preview = orchestrator.run("Crea cliente Ana", "{}", true, false, "sess-ave", null);
+        var outcome = orchestrator.run(
+                "Crea cliente Ana", "{}", false, true, "sess-ave", preview.confirmationId()
+        );
+
+        assertTrue(outcome.executed());
+        assertFalse(outcome.dryRun());
+        verify(createClientTool).execute(any(), eq(false));
+    }
+
+    @Test
+    @DisplayName("varias coincidencias no ejecutan la mutación")
+    void ambiguitySkipsMutatingFollowUp() {
+        when(interpreter.interpret(anyString(), any())).thenReturn(new ActionPlanInterpreter.InterpretedPlan(
+                "buscar y crear",
+                List.of(
+                        new PlannedAction(ActionToolType.SEARCH_CLIENTS, Map.of("query", "Carlos"), "read"),
+                        new PlannedAction(ActionToolType.FIND_OR_CREATE_CLIENT,
+                                Map.of("phone", "300"), "crm")
+                )
+        ));
+        when(searchClientsTool.execute(any(), anyBoolean())).thenReturn(
+                ActionStepResult.ok("SEARCH_CLIENTS", true, "Tengo 2 coincidencias",
+                        Map.of("ambiguous", true, "count", 2))
+        );
+
+        var outcome = orchestrator.run("Busca a Carlos y crea reserva", "{}", true, false, "sess-ave", null);
+
+        assertTrue(outcome.results().stream().anyMatch(ActionStepResult::skipped));
+        verify(createClientTool, never()).execute(any(), anyBoolean());
+        assertNull(outcome.confirmationId());
     }
 }

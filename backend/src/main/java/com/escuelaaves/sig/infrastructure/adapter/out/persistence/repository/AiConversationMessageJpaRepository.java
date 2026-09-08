@@ -9,4 +9,6 @@ import java.util.List;
 public interface AiConversationMessageJpaRepository extends JpaRepository<AiConversationMessageEntity, Long> {
 
     List<AiConversationMessageEntity> findBySession_IdOrderByCreatedAtDesc(String sessionId, Pageable pageable);
+
+    void deleteBySession_Id(String sessionId);
 }

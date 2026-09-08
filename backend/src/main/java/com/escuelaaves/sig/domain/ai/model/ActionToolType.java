@@ -4,6 +4,9 @@ package com.escuelaaves.sig.domain.ai.model;
  * Catálogo de herramientas ejecutables por el asistente operativo (function-calling interno).
  */
 public enum ActionToolType {
+    SEARCH_CLIENTS(false, ActionSafetyClass.READ_ONLY),
+    LIST_CLIENT_RESERVATIONS(false, ActionSafetyClass.READ_ONLY),
+    UPDATE_CLIENT(true, ActionSafetyClass.MUTATING),
     FIND_OR_CREATE_CLIENT(true, ActionSafetyClass.MUTATING),
     CREATE_RESERVATION(true, ActionSafetyClass.MUTATING),
     CANCEL_RESERVATION(true, ActionSafetyClass.MUTATING),

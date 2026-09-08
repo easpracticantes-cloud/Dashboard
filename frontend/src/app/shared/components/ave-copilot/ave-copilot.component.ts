@@ -7,15 +7,39 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import {
+  ActionExecuteResponse,
   CopilotResponse,
   EnterpriseAiService,
   QuoteDraft
 } from '../../../core/services/enterprise-ai.service';
 import { AveVoiceUiState, VoiceOutputState, friendlyVoiceError } from '../../../core/voice/speech-types';
 import { VoiceInputService } from '../../../core/voice/voice-input.service';
-import { VoiceOutputService } from '../../../core/voice/voice-output.service';
+import { VoiceOutputService, firstSentence, remainderAfterFirstSentence } from '../../../core/voice/voice-output.service';
+import {
+  PendingActionConfirm,
+  classifyTool,
+  confirmationPrompt,
+  isConfirmingThisAction,
+  looksLikeCrmAction,
+  requiresExplicitConfirm,
+  sanitizeUserError
+} from '../../../core/voice/ave-action-safety';
 import { AveQuoteReviewComponent } from './ave-quote-review.component';
 import { moduleLabelFromUrl } from './ave-app-context';
+import {
+  AveFocusItem,
+  isFollowUpUtterance,
+  parseFocusItems,
+  readStoredSessionId,
+  storeSessionId
+} from './ave-thread-focus';
+import { AveUiContextService } from './ave-ui-context.service';
+import { AVE_COPY, stripWakePrefix } from './ave-wake';
+
+interface AvePendingCrmAction extends PendingActionConfirm {
+  instruction: string;
+  contextJson: string;
+}
 
 interface ChatBubble {
   id: string;
@@ -41,6 +65,7 @@ export class AveCopilotComponent {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly uiCtx = inject(AveUiContextService);
   readonly voiceIn = inject(VoiceInputService);
   readonly voiceOut = inject(VoiceOutputService);
 
@@ -54,8 +79,12 @@ export class AveCopilotComponent {
   readonly stickToBottom = signal(true);
   readonly showSuggestions = signal(true);
   readonly voiceHint = signal('');
+  readonly threadFocus = signal<AveFocusItem[]>([]);
+  readonly pendingAction = signal<AvePendingCrmAction | null>(null);
+  readonly confirmationPrompt = confirmationPrompt;
   /** Sesión de voz continua (modo 2). No cambia el cerebro: solo vuelve a escuchar tras la respuesta. */
   readonly voiceSession = signal(this.readVoiceSession());
+  readonly wakeWord = signal(this.readWake());
   private readonly routeUrl = toSignal(
     this.router.events.pipe(
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
@@ -67,7 +96,9 @@ export class AveCopilotComponent {
   readonly identityCaption = computed(() => {
     const role = this.auth.currentUser()?.rol;
     const mod = this.moduleLabel();
-    return role ? `${role} · ${mod}` : mod;
+    const cliente = this.uiCtx.entity()?.allowed?.['cliente']?.trim();
+    const base = role ? `${role} · ${mod}` : mod;
+    return cliente ? `${base} · ${cliente}` : base;
   });
 
   readonly voiceUi = computed<AveVoiceUiState>(() => {
@@ -92,6 +123,9 @@ export class AveCopilotComponent {
         if (this.voiceSession()) {
           return this.voiceHint() || 'Sesión continua activa';
         }
+        if (this.wakeWord()) {
+          return this.voiceHint() || 'Di «Ave» para hablar';
+        }
         return this.voiceHint();
     }
   });
@@ -99,17 +133,14 @@ export class AveCopilotComponent {
   private readonly welcome: ChatBubble = {
     id: 'welcome',
     role: 'assistant',
-    text:
-      'Hola, soy **Ave**. Puedo conversar de cualquier tema y, si lo necesitas, ' +
-      'ayudarte con el SIG (cotizaciones, catálogo, CRM).\n\n' +
-      'Pregúntame lo que quieras.',
+    text: AVE_COPY.welcome,
     mode: 'ANSWER'
   };
 
   readonly messages = signal<ChatBubble[]>([this.welcome]);
 
   draft = '';
-  private sessionId: string | null = null;
+  private sessionId: string | null = readStoredSessionId();
   private lastQuote: QuoteDraft | null = null;
   private lastUserText = '';
   private abortStream: AbortController | null = null;
@@ -118,21 +149,35 @@ export class AveCopilotComponent {
   private awaitingSpeechEnd = false;
   private prevOutState: VoiceOutputState = 'idle';
   private speechWatch: ReturnType<typeof setTimeout> | null = null;
+  private earlySpoken = false;
+  private awaitingCommand = false;
+  /** El navegador no despierta solo: el bucle de micrófono arranca tras un gesto (botón o abrir el panel). */
+  private wakeLoopArmed = false;
+  private wakeRearm: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     effect(() => {
       const out = this.voiceOut.state();
       const prev = this.prevOutState;
       this.prevOutState = out;
-      if (!this.voiceSession() || !this.open() || this.skipAutoListen || this.listenBusy) {
+      const keepListening = this.voiceSession() || this.wakeWord() || this.awaitingCommand;
+      if (!keepListening || this.skipAutoListen || this.listenBusy) {
         return;
       }
-      if (this.awaitingSpeechEnd && prev === 'speaking' && (out === 'idle' || out === 'error')) {
+      if (!this.open() && !this.wakeWord()) {
+        return;
+      }
+      if (
+        this.awaitingSpeechEnd &&
+        prev === 'speaking' &&
+        (out === 'idle' || out === 'error')
+      ) {
         this.awaitingSpeechEnd = false;
         this.clearSpeechWatch();
         queueMicrotask(() => void this.listenForTurn());
       }
     });
+    this.restoreThread();
   }
 
   /** Solo ejemplos de arranque — no limitan lo que se puede escribir */
@@ -147,17 +192,28 @@ export class AveCopilotComponent {
     this.open.update((v) => !v);
     this.bounce.set(false);
     if (this.open()) {
+      if (this.wakeWord()) {
+        this.wakeLoopArmed = true;
+        this.skipAutoListen = false;
+        queueMicrotask(() => void this.listenForTurn());
+      }
       queueMicrotask(() => {
         this.scrollBottom(true);
         this.inputEl?.nativeElement?.focus();
       });
       return;
     }
-    this.skipAutoListen = true;
     this.awaitingSpeechEnd = false;
     this.clearSpeechWatch();
-    this.voiceIn.abort();
     this.voiceOut.stop();
+    if (this.wakeWord()) {
+      this.skipAutoListen = false;
+      this.wakeLoopArmed = true;
+      queueMicrotask(() => void this.listenForTurn());
+      return;
+    }
+    this.skipAutoListen = true;
+    this.voiceIn.abort();
   }
 
   newConversation(): void {
@@ -165,11 +221,21 @@ export class AveCopilotComponent {
     this.abortStream = null;
     this.skipAutoListen = true;
     this.awaitingSpeechEnd = false;
+    this.awaitingCommand = false;
     this.clearSpeechWatch();
+    this.clearWakeRearm();
     this.voiceIn.abort();
     this.voiceOut.stop();
     this.voiceHint.set('');
+    const previous = this.sessionId;
+    if (previous) {
+      this.ai.deleteMemory(previous).subscribe({ error: () => undefined });
+    }
     this.sessionId = null;
+    storeSessionId(null);
+    this.threadFocus.set([]);
+    this.pendingAction.set(null);
+    this.uiCtx.clearHits();
     this.lastQuote = null;
     this.lastUserText = '';
     this.quoteDraft.set(null);
@@ -181,6 +247,12 @@ export class AveCopilotComponent {
 
   useSuggestion(text: string): void {
     this.draft = text;
+    this.send();
+  }
+
+  useFocus(item: AveFocusItem): void {
+    const ordinals = ['', 'primero', 'segundo', 'tercero', 'cuarto', 'quinto'];
+    this.draft = ordinals[item.index] ? `el ${ordinals[item.index]}` : item.label;
     this.send();
   }
 
@@ -257,6 +329,32 @@ export class AveCopilotComponent {
     }
   }
 
+  toggleWake(): void {
+    const next = !this.wakeWord();
+    this.wakeWord.set(next);
+    try {
+      localStorage.setItem('eas-ave-wake', next ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+    if (next) {
+      this.wakeLoopArmed = true;
+      this.skipAutoListen = false;
+      this.voiceHint.set('Di «Ave» para hablar. El navegador no tiene wake word nativo; el micrófono queda a la espera.');
+      if (!this.open()) {
+        this.open.set(true);
+      }
+      void this.listenForTurn();
+      return;
+    }
+    this.wakeLoopArmed = false;
+    this.awaitingCommand = false;
+    this.skipAutoListen = true;
+    this.clearWakeRearm();
+    this.voiceIn.abort();
+    this.voiceHint.set('Wake word desactivado. Usa el micrófono o la sesión continua.');
+  }
+
   private async listenForTurn(): Promise<void> {
     if (this.listenBusy || this.sending() || this.voiceIn.state() === 'listening') {
       return;
@@ -272,16 +370,71 @@ export class AveCopilotComponent {
       if (!text) {
         this.voiceHint.set(this.voiceIn.lastError() || 'No capturé audio. Inténtalo de nuevo.');
         this.voiceIn.reset();
+        this.rearmWakeListen();
         return;
       }
-      this.draft = text;
+      const parsed = stripWakePrefix(text);
+      const requireWake = this.wakeWord() && !this.voiceSession() && !this.awaitingCommand;
+      if (requireWake && !parsed.hadWake) {
+        this.voiceHint.set('Di «Ave» y tu pedido.');
+        this.rearmWakeListen();
+        return;
+      }
+      if (parsed.wakeOnly) {
+        this.ackWakeThenListen();
+        return;
+      }
+      this.awaitingCommand = false;
+      if (!this.open()) {
+        this.open.set(true);
+      }
+      this.draft = parsed.hadWake ? parsed.message : text;
       this.send();
     } catch (err) {
       this.voiceHint.set((err as Error)?.message || 'No pude usar el micrófono.');
       this.voiceIn.reset();
+      this.rearmWakeListen();
     } finally {
       this.listenBusy = false;
     }
+  }
+
+  private ackWakeThenListen(): void {
+    this.open.set(true);
+    this.awaitingCommand = true;
+    this.bounce.set(false);
+    this.messages.update((m) => [
+      ...m,
+      { id: uid(), role: 'assistant', text: AVE_COPY.listening, mode: 'ANSWER' }
+    ]);
+    this.voiceHint.set(AVE_COPY.listening);
+    this.scrollBottom(true);
+    if (this.voiceOut.enabled()) {
+      this.voiceOut.speak(AVE_COPY.listening);
+      this.awaitingSpeechEnd = true;
+      this.clearSpeechWatch();
+      this.speechWatch = setTimeout(() => {
+        if (this.awaitingSpeechEnd && this.voiceOut.state() !== 'speaking') {
+          this.awaitingSpeechEnd = false;
+          void this.listenForTurn();
+        }
+      }, 900);
+      return;
+    }
+    queueMicrotask(() => void this.listenForTurn());
+  }
+
+  private rearmWakeListen(): void {
+    if (!this.wakeWord() || !this.wakeLoopArmed || this.skipAutoListen || this.sending()) {
+      return;
+    }
+    if (this.wakeRearm) {
+      clearTimeout(this.wakeRearm);
+    }
+    this.wakeRearm = setTimeout(() => {
+      this.wakeRearm = null;
+      void this.listenForTurn();
+    }, 400);
   }
 
   toggleVoiceOut(): void {
@@ -311,10 +464,19 @@ export class AveCopilotComponent {
     this.draft = '';
     this.lastUserText = text;
     this.showSuggestions.set(false);
-    const userId = uid();
-    this.messages.update((m) => [...m, { id: userId, role: 'user', text }]);
+    this.messages.update((m) => [...m, { id: uid(), role: 'user', text }]);
     this.sending.set(true);
     this.scrollBottom(true);
+
+    const pending = this.pendingAction();
+    if (isConfirmingThisAction(pending, text)) {
+      this.confirmPendingAction();
+      return;
+    }
+    if (looksLikeCrmAction(text) || (this.uiCtx.hits().length > 1 && isFollowUpUtterance(text))) {
+      this.runActionPreview(text);
+      return;
+    }
 
     const assistantId = uid();
     this.messages.update((m) => [
@@ -331,9 +493,12 @@ export class AveCopilotComponent {
 
     this.abortStream?.abort();
     this.abortStream = new AbortController();
+    const uiContext = this.uiCtx.compact();
+    this.earlySpoken = false;
 
     this.ai
       .copilotStream(text, this.sessionId ?? undefined, {
+        uiContext,
         signal: this.abortStream.signal,
         onDelta: (delta) => {
           this.messages.update((list) =>
@@ -341,6 +506,7 @@ export class AveCopilotComponent {
               b.id === assistantId ? { ...b, text: b.text + delta, streaming: true } : b
             )
           );
+          this.maybeSpeakEarly(assistantId);
           if (this.stickToBottom()) {
             this.scrollBottom(false);
           }
@@ -354,15 +520,159 @@ export class AveCopilotComponent {
           return;
         }
         // Fallback no-stream
-        this.ai.copilot(text, this.sessionId ?? undefined).subscribe({
+        this.ai.copilot(text, this.sessionId ?? undefined, uiContext).subscribe({
           next: (res) => this.applyDone(assistantId, res),
           error: (e) => this.applyError(assistantId, text, friendlyError(e))
         });
       });
   }
 
+  confirmPendingAction(): void {
+    const pending = this.pendingAction();
+    if (!pending) {
+      return;
+    }
+    this.sending.set(true);
+    this.ai
+      .executeActions({
+        instruction: pending.instruction,
+        contextJson: pending.contextJson,
+        dryRun: false,
+        confirm: true,
+        sessionId: this.ensureSessionId(),
+        confirmationId: pending.confirmationId
+      })
+      .subscribe({
+        next: (res) => {
+          this.pendingAction.set(null);
+          this.finishActionReply(res, false);
+        },
+        error: (err) => {
+          this.sending.set(false);
+          this.pushAveReply(`No pude ejecutar esa acción. ${friendlyError(err)}`, true);
+        }
+      });
+  }
+
+  dismissPendingAction(): void {
+    this.pendingAction.set(null);
+    this.pushAveReply(AVE_COPY.cancelled);
+  }
+
+  private runActionPreview(instruction: string): void {
+    const contextJson = this.uiCtx.compact();
+    this.ai
+      .executeActions({
+        instruction,
+        contextJson,
+        dryRun: true,
+        confirm: false,
+        sessionId: this.ensureSessionId()
+      })
+      .subscribe({
+        next: (res) => this.finishActionReply(res, true, instruction, contextJson),
+        error: (err) => {
+          this.sending.set(false);
+          this.pushAveReply(`No pude simular esa acción. ${friendlyError(err)}`, true);
+        }
+      });
+  }
+
+  private finishActionReply(
+    res: ActionExecuteResponse,
+    preview: boolean,
+    instruction?: string,
+    contextJson?: string
+  ): void {
+    const tools = res.plannedTools || [];
+    const mainTool = tools.find((t) => requiresExplicitConfirm(classifyTool(t))) || tools[0] || '';
+    const safety = classifyTool(mainTool);
+    const narrative = (res.narrative || res.rationale || 'Listo.').trim();
+    const token = (res.confirmationId || '').trim();
+    const needsConfirm = preview && !!token && requiresExplicitConfirm(safety);
+    this.captureHits(res);
+    if (needsConfirm && instruction) {
+      const specific =
+        (res.results || []).find((r) => r.message && classifyTool(r.tool) !== 'READ_ONLY')?.message ||
+        narrative;
+      this.pendingAction.set({
+        confirmationId: token,
+        tool: mainTool,
+        summary: specific.slice(0, 180),
+        safety,
+        instruction,
+        contextJson: contextJson || '{}'
+      });
+    } else if (!preview) {
+      this.pendingAction.set(null);
+    }
+    const pending = this.pendingAction();
+    const suffix = needsConfirm && pending
+      ? `\n\n${confirmationPrompt(pending)} Di «sí» o pulsa Confirmar.`
+      : '';
+    this.sending.set(false);
+    this.pushAveReply(narrative + suffix);
+  }
+
+  private pushAveReply(text: string, error = false): void {
+    this.messages.update((m) => [
+      ...m,
+      { id: uid(), role: error ? 'system' : 'assistant', text, error }
+    ]);
+    this.scrollBottom(true);
+    if (text) {
+      this.voiceOut.speak(text);
+      this.armFollowUpListen();
+    }
+    queueMicrotask(() => this.inputEl?.nativeElement?.focus());
+  }
+
+  private ensureSessionId(): string {
+    if (this.sessionId) {
+      return this.sessionId;
+    }
+    const id =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'ave-' + Date.now().toString(36);
+    this.sessionId = id;
+    storeSessionId(id);
+    return id;
+  }
+
+  private maybeSpeakEarly(assistantId: string): void {
+    if (this.earlySpoken || !this.voiceOut.enabled()) {
+      return;
+    }
+    const bubble = this.messages().find((m) => m.id === assistantId);
+    const sentence = firstSentence(bubble?.text || '');
+    if (sentence.length >= 12) {
+      this.earlySpoken = true;
+      this.voiceOut.speak(sentence);
+    }
+  }
+
+  private captureHits(res: ActionExecuteResponse): void {
+    const hits: Array<{ id: string; label: string }> = [];
+    for (const step of res.results || []) {
+      const raw = step.data?.['hits'];
+      if (!Array.isArray(raw)) continue;
+      for (const item of raw) {
+        const row = item as { id?: string; label?: string };
+        if (row?.id || row?.label) {
+          hits.push({ id: String(row.id || ''), label: String(row.label || '') });
+        }
+      }
+    }
+    this.uiCtx.setHits(hits);
+    if (res.narrative) {
+      this.threadFocus.set(parseFocusItems(res.narrative));
+    }
+  }
+
   private applyDone(assistantId: string, res: CopilotResponse): void {
     this.sessionId = res.sessionId;
+    storeSessionId(res.sessionId || null);
     const hasQuote = res.mode === 'QUOTE' && !!res.quoteDraft;
     this.messages.update((list) =>
       list.map((b) =>
@@ -385,8 +695,17 @@ export class AveCopilotComponent {
     this.sending.set(false);
     this.voiceIn.reset();
     this.scrollBottom(true);
-    if (res.success !== false && res.reply) {
-      this.voiceOut.speak(res.reply);
+    const reply = res.reply || '';
+    this.threadFocus.set(parseFocusItems(reply));
+    if (res.success !== false && reply) {
+      if (this.earlySpoken) {
+        const rest = remainderAfterFirstSentence(reply);
+        if (rest) {
+          this.voiceOut.enqueue(rest);
+        }
+      } else {
+        this.voiceOut.speak(reply);
+      }
       this.armFollowUpListen();
     }
     queueMicrotask(() => this.inputEl?.nativeElement?.focus());
@@ -398,7 +717,7 @@ export class AveCopilotComponent {
         b.id === assistantId
           ? {
               ...b,
-              text: `Lo siento, tuve un problema procesando tu solicitud. ${hint}`,
+              text: `${AVE_COPY.failed} ${hint}`,
               streaming: false,
               error: true,
               role: 'system',
@@ -443,8 +762,42 @@ export class AveCopilotComponent {
     }
   }
 
+  private restoreThread(): void {
+    const sid = this.sessionId;
+    if (!sid) return;
+    this.ai.memoryMessages(sid).subscribe({
+      next: (msgs) => this.hydrateFromMemory(msgs || []),
+      error: () => {
+        this.sessionId = null;
+        storeSessionId(null);
+      }
+    });
+  }
+
+  private hydrateFromMemory(msgs: Array<{ role?: string; content?: string }>): void {
+    const bubbles: ChatBubble[] = Array.isArray(msgs)
+      ? msgs
+          .filter((m) => (m.content || '').trim())
+          .map((m) => ({
+            id: uid(),
+            role: m.role === 'user' ? 'user' : m.role === 'system' ? 'system' : 'assistant',
+            text: m.content || ''
+          }))
+      : [];
+    if (!bubbles.length) return;
+    this.messages.set(bubbles);
+    this.showSuggestions.set(false);
+    const lastAve = [...bubbles].reverse().find((b) => b.role === 'assistant');
+    this.threadFocus.set(parseFocusItems(lastAve?.text || ''));
+    this.scrollBottom(true);
+  }
+
   private armFollowUpListen(): void {
-    if (!this.voiceSession() || !this.open() || this.skipAutoListen) {
+    if (this.skipAutoListen) {
+      return;
+    }
+    const keep = this.voiceSession() || this.awaitingCommand || this.wakeWord();
+    if (!keep || (!this.open() && !this.wakeWord())) {
       return;
     }
     this.awaitingSpeechEnd = true;
@@ -458,7 +811,7 @@ export class AveCopilotComponent {
         this.awaitingSpeechEnd = false;
         void this.listenForTurn();
       }
-    }, this.voiceOut.enabled() && this.voiceOut.supported() ? 1600 : 250);
+    }, this.voiceOut.enabled() && this.voiceOut.supported() ? 700 : 150);
   }
 
   private clearSpeechWatch(): void {
@@ -468,9 +821,24 @@ export class AveCopilotComponent {
     }
   }
 
+  private clearWakeRearm(): void {
+    if (this.wakeRearm) {
+      clearTimeout(this.wakeRearm);
+      this.wakeRearm = null;
+    }
+  }
+
   private readVoiceSession(): boolean {
     try {
       return localStorage.getItem('eas-ave-voice-session') === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private readWake(): boolean {
+    try {
+      return localStorage.getItem('eas-ave-wake') === '1';
     } catch {
       return false;
     }
@@ -494,16 +862,16 @@ function uid(): string {
 }
 
 function friendlyError(err: unknown): string {
-  const e = err as { error?: { message?: string; detail?: string }; status?: number };
+  const e = err as { error?: { message?: string; detail?: string }; status?: number; message?: string };
   const apiMsg = e?.error?.message || e?.error?.detail || '';
   const status = e?.status;
   if (status === 401 || status === 403) {
-    return apiMsg || 'Tu sesión expiró. Vuelve a iniciar sesión.';
+    return sanitizeUserError(apiMsg || 'Tu sesión expiró. Vuelve a iniciar sesión.');
   }
   if (status === 0) {
     return 'No hay conexión con el servidor.';
   }
-  return apiMsg || 'Inténtalo nuevamente en un momento.';
+  return sanitizeUserError(apiMsg || e?.message || 'Inténtalo nuevamente en un momento.');
 }
 
 /** Markdown ligero seguro (sin deps externas). */

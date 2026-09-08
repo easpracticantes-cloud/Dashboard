@@ -19,6 +19,16 @@
           <button
             type="button"
             class="ave-icon-btn"
+            [class.ave-icon-btn--on]="wakeWord()"
+            (click)="toggleWake()"
+            [attr.aria-label]="wakeWord() ? 'Desactivar detección de Ave' : 'Activar detección de Ave'"
+            [title]="wakeWord() ? 'Di Ave: ON (el micrófono queda a la espera)' : 'Di Ave: OFF — el navegador no tiene wake word nativo'"
+          >
+            <mat-icon>{{ wakeWord() ? 'hearing' : 'hearing_disabled' }}</mat-icon>
+          </button>
+          <button
+            type="button"
+            class="ave-icon-btn"
             [class.ave-icon-btn--on]="voiceSession()"
             (click)="toggleVoiceSession()"
             [attr.aria-label]="voiceSession() ? 'Desactivar sesión de voz continua' : 'Activar sesión de voz continua'"
@@ -118,6 +128,32 @@
           @for (s of suggestions; track s) {
             <button type="button" class="ave-chip" (click)="useSuggestion(s)">{{ s }}</button>
           }
+        </div>
+      }
+
+      @if (threadFocus().length) {
+        <div class="ave-thread">
+          <p class="ave-thread__label">En este hilo puedes decir “el segundo” o “ese”</p>
+          @for (item of threadFocus(); track item.index) {
+            <button type="button" class="ave-chip" (click)="useFocus(item)">
+              {{ item.index }}. {{ item.label }}
+            </button>
+          }
+        </div>
+      }
+
+      @if (pendingAction(); as p) {
+        <div class="ave-confirm">
+          <p class="ave-confirm__label">Acción pendiente · {{ p.tool }}</p>
+          <p class="ave-confirm__hint">{{ confirmationPrompt(p) }} Di «sí» o pulsa Confirmar.</p>
+          <div class="ave-confirm__actions">
+            <button type="button" class="ave-confirm__go" (click)="confirmPendingAction()" [disabled]="sending()">
+              Confirmar
+            </button>
+            <button type="button" class="ave-chip" (click)="dismissPendingAction()" [disabled]="sending()">
+              Cancelar
+            </button>
+          </div>
         </div>
       }
 

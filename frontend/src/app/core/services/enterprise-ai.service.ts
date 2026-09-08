@@ -160,12 +160,22 @@ export class EnterpriseAiService {
     contextJson?: string;
     dryRun?: boolean;
     confirm?: boolean;
+    sessionId?: string;
+    confirmationId?: string;
   }): Observable<ActionExecuteResponse> {
     return this.api.post('/ai/actions/execute', body);
   }
 
-  copilot(message: string, sessionId?: string): Observable<CopilotResponse> {
-    return this.api.post('/ai/copilot', { message, sessionId });
+  copilot(message: string, sessionId?: string, uiContext?: string): Observable<CopilotResponse> {
+    return this.api.post('/ai/copilot', { message, sessionId, uiContext });
+  }
+
+  memoryMessages(sessionId: string): Observable<Array<{ role: string; content: string }>> {
+    return this.api.get(`/ai/memory/${encodeURIComponent(sessionId)}/messages`);
+  }
+
+  deleteMemory(sessionId: string): Observable<void> {
+    return this.api.delete(`/ai/memory/${encodeURIComponent(sessionId)}`);
   }
 
   /**
@@ -176,6 +186,7 @@ export class EnterpriseAiService {
     sessionId: string | undefined,
     handlers: {
       signal?: AbortSignal;
+      uiContext?: string;
       onDelta: (chunk: string) => void;
       onDone: (res: CopilotResponse) => void;
       onError: (message: string) => void;
@@ -190,7 +201,7 @@ export class EnterpriseAiService {
         Accept: 'text/event-stream',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
-      body: JSON.stringify({ message, sessionId }),
+      body: JSON.stringify({ message, sessionId, uiContext: handlers.uiContext }),
       signal: handlers.signal
     });
 
@@ -285,4 +296,5 @@ export interface ActionExecuteResponse {
   executed: boolean;
   dryRun: boolean;
   plannedTools: string[];
+  confirmationId?: string | null;
 }

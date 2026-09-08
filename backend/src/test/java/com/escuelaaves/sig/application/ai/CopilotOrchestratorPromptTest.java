@@ -163,4 +163,19 @@ class CopilotOrchestratorPromptTest {
         assertFalse(res.reply().toLowerCase().contains("cancha"));
         assertEquals(AveSystemPrompt.SYSTEM, sys.getAllValues().get(1));
     }
+
+    @Test
+    void screenContextIsAttachedToTurnButNotStoredAsUserText() {
+        when(memoryPort.findSession(eq("sess-ui"))).thenReturn(Optional.of("sess-ui"));
+        stubChat(sys -> "El cliente en pantalla es Juan Pérez.");
+        orchestrator.chat(new CopilotRequest(
+                "¿qué info tenemos de este cliente?",
+                "sess-ui",
+                "{\"module\":\"Registro\",\"allowedContext\":{\"cliente\":\"Juan Pérez\"}}"
+        ));
+        assertEquals(AveSystemPrompt.SYSTEM, capturedSystem.get());
+        assertTrue(capturedUser.get().contains("Juan Pérez"));
+        assertTrue(capturedUser.get().contains("Contexto de pantalla"));
+        verify(memoryPort).appendMessage(eq("sess-ui"), eq("user"), eq("¿qué info tenemos de este cliente?"));
+    }
 }

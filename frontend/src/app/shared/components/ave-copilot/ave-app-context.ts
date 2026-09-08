@@ -1,4 +1,4 @@
-/** Etiqueta de módulo para la UI de Ave. No se envía al modelo. */
+/** Etiqueta de módulo para la UI de Ave y el JSON compacto de pantalla. */
 export function moduleLabelFromUrl(url: string): string {
   const path = (url || '').split('?')[0].toLowerCase();
   if (path.includes('/registro')) return 'Registro';
