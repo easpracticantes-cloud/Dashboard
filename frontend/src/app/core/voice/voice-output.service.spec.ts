@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { friendlyVoiceError } from './speech-types';
-import { stripForSpeech, firstSentence, remainderAfterFirstSentence, isIgnorableTtsError } from './voice-output.service';
+import {
+  firstSentence,
+  isIgnorableTtsError,
+  remainderAfterFirstSentence,
+  stripForSpeech
+} from './voice-output.service';
 
 describe('Voice helpers', () => {
   it('stripForSpeech quita markdown', () => {
@@ -20,8 +25,12 @@ describe('Voice helpers', () => {
     expect(friendlyVoiceError('tts-error')).toMatch(/voz alta/i);
   });
 
-  it('parte la primera frase para hablar antes', () => {
+  it('helpers de frase no se usan para partir el TTS premium', () => {
     expect(firstSentence('Hola Carlos. ¿Seguimos?')).toBe('Hola Carlos.');
     expect(remainderAfterFirstSentence('Hola Carlos. ¿Seguimos?')).toBe('¿Seguimos?');
+  });
+
+  it('fallback de voz premium no rompe el contrato de helpers', () => {
+    expect(stripForSpeech('**Te escucho.**')).toBe('Te escucho.');
   });
 });

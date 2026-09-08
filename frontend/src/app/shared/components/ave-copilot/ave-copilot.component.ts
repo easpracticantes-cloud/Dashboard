@@ -20,7 +20,14 @@ import {
   shouldRearmWakeAfterSttError
 } from '../../../core/voice/speech-types';
 import { VoiceInputService } from '../../../core/voice/voice-input.service';
-import { VoiceOutputService, firstSentence, remainderAfterFirstSentence } from '../../../core/voice/voice-output.service';
+import { VoiceOutputService } from '../../../core/voice/voice-output.service';
+import { planTtsForCopilotReply, shouldStopVoiceOnOutboundMessage } from '../../../core/voice/ave-voice-turn';
+import {
+  BargeInSession,
+  microphoneAlreadyGranted,
+  shouldArmSpeakingBargeIn,
+  startSpeakingBargeIn
+} from '../../../core/voice/voice-barge-in';
 import {
   PendingActionConfirm,
   classifyTool,
@@ -155,8 +162,12 @@ export class AveCopilotComponent {
   private awaitingSpeechEnd = false;
   private prevOutState: VoiceOutputState = 'idle';
   private speechWatch: ReturnType<typeof setTimeout> | null = null;
-  private earlySpoken = false;
   private awaitingCommand = false;
+  private barge: BargeInSession | null = null;
+  private bargeGen = 0;
+  private bargeHandOff = false;
+  private bargeReleaseTimer: ReturnType<typeof setTimeout> | null = null;
+  private micWasUsed = false;
   /** El navegador no despierta solo: el bucle de micrófono arranca tras un gesto (botón o abrir el panel). */
   private wakeLoopArmed = false;
   private wakeRearm: ReturnType<typeof setTimeout> | null = null;
@@ -182,6 +193,17 @@ export class AveCopilotComponent {
         this.awaitingSpeechEnd = false;
         this.clearSpeechWatch();
         queueMicrotask(() => void this.listenForTurn());
+      }
+      if (out === 'speaking') {
+        void this.armSpeakingBargeIn();
+      } else if (!this.bargeHandOff) {
+        this.releaseSpeakingBargeIn();
+      }
+    });
+    effect(() => {
+      if (this.bargeHandOff && this.voiceIn.state() === 'listening') {
+        this.releaseSpeakingBargeIn();
+        this.bargeHandOff = false;
       }
     });
     this.restoreThread();
@@ -212,6 +234,7 @@ export class AveCopilotComponent {
     }
     this.awaitingSpeechEnd = false;
     this.clearSpeechWatch();
+    this.releaseSpeakingBargeIn();
     this.voiceOut.stop();
     if (this.wakeWord()) {
       this.skipAutoListen = false;
@@ -231,6 +254,7 @@ export class AveCopilotComponent {
     this.awaitingCommand = false;
     this.clearSpeechWatch();
     this.clearWakeRearm();
+    this.releaseSpeakingBargeIn();
     this.voiceIn.abort();
     this.voiceOut.stop();
     this.voiceHint.set('');
@@ -371,6 +395,7 @@ export class AveCopilotComponent {
     }
     this.listenBusy = true;
     this.skipAutoListen = false;
+    this.micWasUsed = true;
     this.voiceOut.stop();
     try {
       const text = await this.voiceIn.listen();
@@ -491,6 +516,10 @@ export class AveCopilotComponent {
     if (!text || this.sending()) {
       return;
     }
+    if (shouldStopVoiceOnOutboundMessage()) {
+      this.releaseSpeakingBargeIn();
+      this.voiceOut.stop();
+    }
     this.draft = '';
     this.lastUserText = text;
     this.showSuggestions.set(false);
@@ -524,7 +553,6 @@ export class AveCopilotComponent {
     this.abortStream?.abort();
     this.abortStream = new AbortController();
     const uiContext = this.uiCtx.compact();
-    this.earlySpoken = false;
 
     this.ai
       .copilotStream(text, this.sessionId ?? undefined, {
@@ -536,7 +564,6 @@ export class AveCopilotComponent {
               b.id === assistantId ? { ...b, text: b.text + delta, streaming: true } : b
             )
           );
-          this.maybeSpeakEarly(assistantId);
           if (this.stickToBottom()) {
             this.scrollBottom(false);
           }
@@ -670,18 +697,6 @@ export class AveCopilotComponent {
     return id;
   }
 
-  private maybeSpeakEarly(assistantId: string): void {
-    if (this.earlySpoken || !this.voiceOut.enabled()) {
-      return;
-    }
-    const bubble = this.messages().find((m) => m.id === assistantId);
-    const sentence = firstSentence(bubble?.text || '');
-    if (sentence.length >= 12) {
-      this.earlySpoken = true;
-      this.voiceOut.speak(sentence);
-    }
-  }
-
   private captureHits(res: ActionExecuteResponse): void {
     const hits: Array<{ id: string; label: string }> = [];
     for (const step of res.results || []) {
@@ -728,13 +743,9 @@ export class AveCopilotComponent {
     const reply = res.reply || '';
     this.threadFocus.set(parseFocusItems(reply));
     if (res.success !== false && reply) {
-      if (this.earlySpoken) {
-        const rest = remainderAfterFirstSentence(reply);
-        if (rest) {
-          this.voiceOut.enqueue(rest);
-        }
-      } else {
-        this.voiceOut.speak(reply);
+      const [spoken] = planTtsForCopilotReply(reply);
+      if (spoken) {
+        this.voiceOut.speak(spoken);
       }
       this.armFollowUpListen();
     }
@@ -842,6 +853,63 @@ export class AveCopilotComponent {
         void this.listenForTurn();
       }
     }, this.voiceOut.enabled() && this.voiceOut.supported() ? 700 : 150);
+  }
+
+  private async armSpeakingBargeIn(): Promise<void> {
+    const gen = ++this.bargeGen;
+    const granted =
+      this.voiceSession() || this.wakeWord() || this.micWasUsed || (await microphoneAlreadyGranted());
+    if (gen !== this.bargeGen) {
+      return;
+    }
+    if (
+      !shouldArmSpeakingBargeIn({
+        speaking: this.voiceOut.state() === 'speaking',
+        alreadyListening: this.voiceIn.state() === 'listening',
+        micGranted: granted
+      })
+    ) {
+      return;
+    }
+    this.barge?.release();
+    this.barge = startSpeakingBargeIn(() => this.onUserBargeIn());
+  }
+
+  private onUserBargeIn(): void {
+    if (this.bargeHandOff || this.listenBusy || this.voiceIn.state() === 'listening') {
+      return;
+    }
+    this.bargeHandOff = true;
+    this.barge?.stopDetection();
+    this.awaitingSpeechEnd = false;
+    this.skipAutoListen = false;
+    this.voiceOut.stop();
+    if (this.sending()) {
+      this.abortStream?.abort();
+      this.abortStream = null;
+      this.sending.set(false);
+    }
+    void this.listenForTurn();
+    if (this.bargeReleaseTimer) {
+      clearTimeout(this.bargeReleaseTimer);
+    }
+    this.bargeReleaseTimer = setTimeout(() => {
+      this.bargeReleaseTimer = null;
+      if (this.bargeHandOff) {
+        this.releaseSpeakingBargeIn();
+        this.bargeHandOff = false;
+      }
+    }, 900);
+  }
+
+  private releaseSpeakingBargeIn(): void {
+    this.bargeGen += 1;
+    if (this.bargeReleaseTimer) {
+      clearTimeout(this.bargeReleaseTimer);
+      this.bargeReleaseTimer = null;
+    }
+    this.barge?.release();
+    this.barge = null;
   }
 
   private clearSpeechWatch(): void {

@@ -88,6 +88,19 @@ app:
       price-fast-output-per-mtok: ${AI_PRICE_HAIKU_OUTPUT:5.0}
       price-reasoning-input-per-mtok: ${AI_PRICE_SONNET_INPUT:3.0}
       price-reasoning-output-per-mtok: ${AI_PRICE_SONNET_OUTPUT:15.0}
+    voice:
+      provider: ${VOICE_PROVIDER:none}
+      api-key: ${VOICE_API_KEY:}
+      model: ${VOICE_MODEL:eleven_flash_v2_5}
+      voice-id: ${VOICE_ID:Rt1JHkPO27QCUX6Nd5bV}
+      base-url: ${VOICE_BASE_URL:https://api.elevenlabs.io}
+      output-format: ${VOICE_OUTPUT_FORMAT:pcm_24000}
+      optimize-streaming-latency: ${VOICE_OPTIMIZE_LATENCY:3}
+      stability: ${VOICE_STABILITY:0.48}
+      similarity: ${VOICE_SIMILARITY:0.78}
+      style: ${VOICE_STYLE:0.32}
+      connect-timeout-seconds: ${VOICE_CONNECT_TIMEOUT_SECONDS:10}
+      read-timeout-seconds: ${VOICE_READ_TIMEOUT_SECONDS:45}
 
 management:
   endpoints:
