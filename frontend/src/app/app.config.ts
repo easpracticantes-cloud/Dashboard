@@ -1,4 +1,10 @@
-import { ApplicationConfig, APP_INITIALIZER, LOCALE_ID, inject } from '@angular/core';
+import {
+  ApplicationConfig,
+  APP_INITIALIZER,
+  LOCALE_ID,
+  inject,
+  provideZonelessChangeDetection,
+} from '@angular/core';
 import { provideRouter, withComponentInputBinding, withPreloading, withViewTransitions } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
@@ -22,6 +28,9 @@ function initAppConfig(): () => Promise<void> {
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    // Sin zone.js: HTTP/RxJS no disparan CD solos. Los signals del template
+    // solo programan un tick si el scheduler zoneless está registrado.
+    provideZonelessChangeDetection(),
     provideRouter(
       routes,
       withComponentInputBinding(),

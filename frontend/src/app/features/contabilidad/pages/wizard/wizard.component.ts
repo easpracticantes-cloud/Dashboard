@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { Subscription, interval } from 'rxjs';
+import { Subscription, finalize, interval } from 'rxjs';
 import {
   AutobitsApiService,
   AutobitsRecord,
@@ -42,6 +43,10 @@ export class WizardComponent implements OnInit, OnDestroy {
   private readonly cruceApi = inject(CruceExcelApiService);
   private readonly docsApi = inject(DocumentsApiService);
   private readonly crossingsApi = inject(CrossingsApiService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** Invalida restauraciones HTTP que lleguen después de una acción del usuario. */
+  private restoreSeq = 0;
 
   readonly formatCop = formatCop;
   readonly packMax = PACK_MAX;
@@ -84,6 +89,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   preguntando = signal(false);
 
   private poll?: Subscription;
+  private autobitsUpload?: Subscription;
 
   ngOnInit(): void {
     sessionStorage.setItem(SESSION_KEY, '1');
@@ -92,6 +98,7 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.poll?.unsubscribe();
+    this.autobitsUpload?.unsubscribe();
   }
 
   readonly pendientesLista = computed(() => {
@@ -128,43 +135,53 @@ export class WizardComponent implements OnInit, OnDestroy {
   });
 
   vaciarImportados(): void {
-    if (
-      !confirm(
-        'Esto borra Autobits, el Excel de cruce y las facturas importadas. ¿Seguro?'
-      )
-    ) {
+    if (!this.pedirConfirmacionVaciar()) {
       return;
     }
+    this.restoreSeq += 1;
     this.limpiando.set(true);
     this.error.set('');
-    this.autobitsApi.purgeExcels(true).subscribe({
+    this.autobitsApi.purgeExcels(true).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.limpiando.set(false)),
+    ).subscribe({
       next: () => {
-        this.limpiando.set(false);
         this.resetLocal();
         this.aviso.set('Cargas anteriores vaciadas. Empieza por Autobits.');
       },
       error: (err) => {
-        this.limpiando.set(false);
         this.error.set(this.detalleError(err, 'No se pudieron vaciar las cargas.'));
       },
     });
   }
 
+  /** Separado para poder cubrir confirmar/cancelar en tests sin `window.confirm`. */
+  pedirConfirmacionVaciar(): boolean {
+    return window.confirm(
+      'Esto borra Autobits, el Excel de cruce y las facturas importadas. ¿Seguro?'
+    );
+  }
+
   onAutobits(ev: Event): void {
-    const file = (ev.target as HTMLInputElement).files?.[0];
-    (ev.target as HTMLInputElement).value = '';
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
     if (!file) return;
-    this.subiendoAutobits.set(true);
+    this.restoreSeq += 1;
     this.error.set('');
     this.aviso.set('Leyendo el Excel de Autobits…');
-    this.autobitsApi.uploadDirect(file, true).subscribe({
+    // Cancelar primero: el finalize del upload anterior no debe apagar el loading del nuevo.
+    this.autobitsUpload?.unsubscribe();
+    this.subiendoAutobits.set(true);
+    this.autobitsUpload = this.autobitsApi.uploadDirect(file, true).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.subiendoAutobits.set(false)),
+    ).subscribe({
       next: (res) => {
-        this.subiendoAutobits.set(false);
         this.aplicarAutobits(res);
         this.paso.set(2);
       },
       error: (err) => {
-        this.subiendoAutobits.set(false);
         this.error.set(this.detalleError(err, 'No se pudo leer el Excel de Autobits.'));
         this.aviso.set('');
       },
@@ -182,11 +199,13 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.subiendoCruce.set(true);
     this.error.set('');
     this.aviso.set('Conciliando con Autobits…');
-    this.cruceApi.upload(file, true).subscribe({
+    this.cruceApi.upload(file, true).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.subiendoCruce.set(false)),
+    ).subscribe({
       next: (res) => {
-        this.subiendoCruce.set(false);
         this.cruce.set(res);
-        this.comparacion.set(res.comparacion || []);
+        this.comparacion.set([...(res.comparacion || [])]);
         const n = res.comparacion?.filter((r) => r.faltas?.length).length || 0;
         this.aviso.set(
           res.reused
@@ -196,7 +215,6 @@ export class WizardComponent implements OnInit, OnDestroy {
         this.paso.set(3);
       },
       error: (err) => {
-        this.subiendoCruce.set(false);
         this.error.set(this.detalleError(err, 'No se pudo leer el Excel de cruces.'));
       },
     });
@@ -219,10 +237,12 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.subiendoFacturas.set(true);
     this.error.set('');
     this.aviso.set(`Subiendo ${files.length} factura(s) y encolando OCR/IA…`);
-    this.docsApi.uploadBatch(files, 'FACTURA', PACK_MAX, this.solicitud).subscribe({
+    this.docsApi.uploadBatch(files, 'FACTURA', PACK_MAX, this.solicitud).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.subiendoFacturas.set(false)),
+    ).subscribe({
       next: (res) => {
-        this.subiendoFacturas.set(false);
-        this.facturaItems.set(res.items);
+        this.facturaItems.set([...(res.items || [])]);
         this.packMsg.set(res.mensaje);
         if (res.total_duplicados) {
           this.aviso.set(
@@ -245,7 +265,6 @@ export class WizardComponent implements OnInit, OnDestroy {
         this.startPoll();
       },
       error: (err) => {
-        this.subiendoFacturas.set(false);
         this.error.set(this.detalleError(err, 'No se pudieron subir las facturas.'));
       },
     });
@@ -323,11 +342,10 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private aplicarAutobits(res: ImportResult): void {
-    this.autobits.set(res);
-    const fromRes = res.records || [];
-    if (fromRes.length) {
-      this.records.set(fromRes);
-    } else {
+    this.autobits.set({ ...res, records: [...(res.records || [])] });
+    const fromRes = [...(res.records || [])];
+    this.records.set(fromRes);
+    if (!fromRes.length) {
       this.cargarRecords();
     }
     const reused = res.reused ? ' (ya estaba importado; no se vació nada)' : '';
@@ -354,10 +372,17 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private cargarRecords(): void {
+    const seq = this.restoreSeq;
     const batchId = this.autobits()?.batch?.id;
-    this.autobitsApi.listRecords({ batch_id: batchId, limit: 200 }).subscribe({
-      next: (res) => this.records.set(res.items || []),
+    this.autobitsApi.listRecords({ batch_id: batchId, limit: 200 }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe({
+      next: (res) => {
+        if (seq !== this.restoreSeq) return;
+        this.records.set([...(res.items || [])]);
+      },
       error: () => {
+        if (seq !== this.restoreSeq) return;
         if (!this.records().length) this.records.set([]);
       },
     });
@@ -391,8 +416,10 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private restaurar(): void {
-    this.autobitsApi.getLatestBatch().subscribe({
+    const seq = this.restoreSeq;
+    this.autobitsApi.getLatestBatch().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (batch) => {
+        if (seq !== this.restoreSeq) return;
         this.autobits.set({
           batch,
           imported_rows: batch.imported_rows,
@@ -402,8 +429,9 @@ export class WizardComponent implements OnInit, OnDestroy {
         });
         this.cargarRecords();
         this.paso.set(2);
-        this.cruceApi.getPendientes(batch.id).subscribe({
+        this.cruceApi.getPendientes(batch.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
           next: (p) => {
+            if (seq !== this.restoreSeq) return;
             this.comparacion.set(p.comparacion || []);
             if (p.ultimo_cruce?.archivo && p.batch) {
               this.cruce.set({
@@ -441,6 +469,7 @@ export class WizardComponent implements OnInit, OnDestroy {
         this.refrescarFacturas();
       },
       error: () => {
+        if (seq !== this.restoreSeq) return;
         this.paso.set(1);
       },
     });
