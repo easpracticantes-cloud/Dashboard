@@ -22,7 +22,7 @@
   overflow: hidden;
   padding: 1.25rem 1.35rem 1.35rem !important;
   background:
-    linear-gradient(135deg, color-mix(in srgb, #1a3d2c 8%, #fff) 0%, #fff 55%, color-mix(in srgb, #1f7a4c 6%, #fff) 100%) !important;
+    linear-gradient(135deg, color-mix(in srgb, var(--eas-pine) 10%, var(--eas-surface)) 0%, var(--eas-surface) 55%, color-mix(in srgb, var(--eas-leaf) 8%, var(--eas-surface)) 100%) !important;
   border: 1px solid var(--eas-line-soft) !important;
   border-radius: 18px !important;
   box-shadow: 0 12px 28px rgba(20, 38, 28, 0.07) !important;
@@ -89,17 +89,17 @@
   padding: 0.85rem 1.1rem;
   border-radius: 14px;
   border: 1px solid var(--eas-line-soft);
-  background: color-mix(in srgb, var(--eas-surface) 96%, #fff);
+  background: var(--eas-surface);
 }
 
 .contab .period-banner.open {
   border-color: color-mix(in srgb, #1f7a4c 35%, transparent);
-  background: linear-gradient(90deg, color-mix(in srgb, #1f7a4c 10%, #fff), #fff);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--eas-leaf) 12%, var(--eas-surface)), var(--eas-surface));
 }
 
 .contab .period-banner.closed {
   border-color: color-mix(in srgb, #c0392b 30%, transparent);
-  background: linear-gradient(90deg, color-mix(in srgb, #c0392b 8%, #fff), #fff);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--eas-danger) 12%, var(--eas-surface)), var(--eas-surface));
 }
 
 .contab .period-banner .period-dot {
@@ -131,7 +131,7 @@
 .contab .start-panel,
 .contab .kpi-card,
 .contab .filters-bar {
-  background: color-mix(in srgb, var(--eas-surface) 94%, #fff) !important;
+  background: var(--eas-surface) !important;
   border: 1px solid var(--eas-line-soft) !important;
   border-radius: 16px !important;
   box-shadow: 0 10px 24px rgba(20, 38, 28, 0.055) !important;
@@ -164,7 +164,7 @@
   padding: 0.45rem 0.75rem;
   border-radius: 11px !important;
   border: 1px solid rgba(20, 38, 28, 0.14) !important;
-  background: #fbfcfb !important;
+  background: var(--eas-surface-2) !important;
   color: var(--eas-ink) !important;
   font: inherit;
 }
@@ -204,8 +204,8 @@
 
 .contab .btn-danger,
 .contab .btn-danger-outline {
-  background: color-mix(in srgb, #c0392b 10%, #fff) !important;
-  color: #8f2419 !important;
+  background: var(--eas-tint-danger) !important;
+  color: var(--eas-on-tint-danger) !important;
   border: 1px solid color-mix(in srgb, #c0392b 35%, transparent) !important;
 }
 
@@ -258,7 +258,7 @@
   border-radius: 12px;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--eas-leaf) 14%, #fff);
+  background: var(--eas-tint-leaf);
   color: var(--eas-forest);
 }
 
@@ -291,23 +291,23 @@
 }
 
 .contab .ap-kpi.warn .kpi-icon {
-  background: color-mix(in srgb, #c98a1a 16%, #fff);
-  color: #8a5a00;
+  background: var(--eas-tint-amber);
+  color: var(--eas-on-tint-amber);
 }
 
 .contab .ap-kpi.ok .kpi-icon {
-  background: color-mix(in srgb, #1f7a4c 16%, #fff);
-  color: #145a38;
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
 }
 
 .contab .ap-kpi.money .kpi-val {
   font-size: 1.25rem;
-  color: #145a38;
+  color: var(--eas-leaf);
 }
 
 .contab .ap-kpi.accent {
   border-color: color-mix(in srgb, #1f7a4c 40%, transparent) !important;
-  background: linear-gradient(160deg, color-mix(in srgb, #1f7a4c 8%, #fff), #fff) !important;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--eas-leaf) 10%, var(--eas-surface)), var(--eas-surface)) !important;
 }
 
 /* Tables: caben en el contenedor; no convierten la tarjeta en un swipe de página */
@@ -400,9 +400,9 @@
 }
 
 .contab .estado-chip.ok {
-  background: color-mix(in srgb, #1f7a4c 14%, #fff);
-  color: #145a38;
-  border-color: color-mix(in srgb, #1f7a4c 28%, transparent);
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
+  border-color: color-mix(in srgb, var(--eas-leaf) 28%, transparent);
 }
 
 .contab .estado-chip.final {
@@ -413,41 +413,41 @@
 }
 
 .contab .estado-chip.warn {
-  background: color-mix(in srgb, #c98a1a 14%, #fff);
-  color: #8a5a00;
-  border-color: color-mix(in srgb, #c98a1a 30%, transparent);
+  background: var(--eas-tint-amber);
+  color: var(--eas-on-tint-amber);
+  border-color: color-mix(in srgb, var(--eas-amber) 30%, transparent);
 }
 
 .contab .estado-chip.bad {
-  background: color-mix(in srgb, #c0392b 12%, #fff);
-  color: #8f2419;
-  border-color: color-mix(in srgb, #c0392b 28%, transparent);
+  background: var(--eas-tint-danger);
+  color: var(--eas-on-tint-danger);
+  border-color: color-mix(in srgb, var(--eas-danger) 28%, transparent);
 }
 
 .contab .estado-chip.void {
   background: repeating-linear-gradient(
     -45deg,
-    color-mix(in srgb, #6b7280 12%, #fff),
-    color-mix(in srgb, #6b7280 12%, #fff) 6px,
-    color-mix(in srgb, #6b7280 18%, #fff) 6px,
-    color-mix(in srgb, #6b7280 18%, #fff) 12px
+    color-mix(in srgb, var(--eas-muted) 12%, var(--eas-surface)),
+    color-mix(in srgb, var(--eas-muted) 12%, var(--eas-surface)) 6px,
+    color-mix(in srgb, var(--eas-muted) 18%, var(--eas-surface)) 6px,
+    color-mix(in srgb, var(--eas-muted) 18%, var(--eas-surface)) 12px
   );
-  color: #4b5563;
-  border-color: color-mix(in srgb, #6b7280 35%, transparent);
+  color: var(--eas-muted);
+  border-color: color-mix(in srgb, var(--eas-muted) 35%, transparent);
   text-decoration: line-through;
   text-decoration-thickness: 1px;
 }
 
 .contab .estado-chip.muted {
-  background: color-mix(in srgb, var(--eas-muted) 10%, #fff);
+  background: var(--eas-tint-neutral);
   color: var(--eas-muted);
   border-color: color-mix(in srgb, var(--eas-muted) 18%, transparent);
 }
 
 .contab .estado-chip.info {
-  background: color-mix(in srgb, #2f6fad 12%, #fff);
-  color: #1f4f82;
-  border-color: color-mix(in srgb, #2f6fad 26%, transparent);
+  background: var(--eas-tint-info);
+  color: var(--eas-on-tint-info);
+  border-color: color-mix(in srgb, var(--eas-on-tint-info) 26%, transparent);
 }
 
 /* Timeline / chain */
@@ -497,22 +497,22 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #fff;
+  background: var(--eas-surface);
   border: 2px solid color-mix(in srgb, var(--eas-muted) 35%, transparent);
   color: var(--eas-muted);
 }
 
 .contab .ap-timeline li.done .tl-dot {
-  background: #1f7a4c;
-  border-color: #1f7a4c;
-  color: #fff;
+  background: var(--eas-leaf);
+  border-color: var(--eas-leaf);
+  color: var(--eas-on-brand);
 }
 
 .contab .ap-timeline li.current .tl-dot {
-  background: #fff;
-  border-color: #1f7a4c;
-  color: #1f7a4c;
-  box-shadow: 0 0 0 4px color-mix(in srgb, #1f7a4c 18%, transparent);
+  background: var(--eas-surface);
+  border-color: var(--eas-leaf);
+  color: var(--eas-leaf);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--eas-leaf) 18%, transparent);
 }
 
 .contab .ap-timeline .tl-label {
@@ -559,7 +559,7 @@
   padding: 0.9rem 1rem;
   border-radius: 14px;
   border: 1px solid var(--eas-line-soft);
-  background: #fff;
+  background: var(--eas-surface);
 }
 
 .contab .ap-alert .ap-alert-icon {
@@ -571,34 +571,34 @@
 }
 
 .contab .ap-alert.bad {
-  border-color: color-mix(in srgb, #c0392b 28%, transparent);
-  background: color-mix(in srgb, #c0392b 5%, #fff);
+  border-color: color-mix(in srgb, var(--eas-danger) 28%, transparent);
+  background: var(--eas-danger-bg);
 }
 .contab .ap-alert.bad .ap-alert-icon {
-  background: color-mix(in srgb, #c0392b 14%, #fff);
-  color: #8f2419;
+  background: var(--eas-tint-danger);
+  color: var(--eas-on-tint-danger);
 }
 
 .contab .ap-alert.warn {
-  border-color: color-mix(in srgb, #c98a1a 30%, transparent);
-  background: color-mix(in srgb, #c98a1a 6%, #fff);
+  border-color: color-mix(in srgb, var(--eas-amber) 30%, transparent);
+  background: color-mix(in srgb, var(--eas-amber) 10%, var(--eas-surface));
 }
 .contab .ap-alert.warn .ap-alert-icon {
-  background: color-mix(in srgb, #c98a1a 16%, #fff);
-  color: #8a5a00;
+  background: var(--eas-tint-amber);
+  color: var(--eas-on-tint-amber);
 }
 
 .contab .ap-alert.info {
-  border-color: color-mix(in srgb, #2f6fad 26%, transparent);
-  background: color-mix(in srgb, #2f6fad 5%, #fff);
+  border-color: color-mix(in srgb, var(--eas-on-tint-info) 26%, transparent);
+  background: var(--eas-tint-info);
 }
 .contab .ap-alert.info .ap-alert-icon {
-  background: color-mix(in srgb, #2f6fad 14%, #fff);
-  color: #1f4f82;
+  background: var(--eas-tint-info);
+  color: var(--eas-on-tint-info);
 }
 
 .contab .ap-alert.muted {
-  background: color-mix(in srgb, var(--eas-muted) 5%, #fff);
+  background: var(--eas-surface-2);
 }
 
 .contab .ap-alert strong {
@@ -625,7 +625,7 @@
   border-radius: 18px;
   display: grid;
   place-items: center;
-  background: color-mix(in srgb, var(--eas-leaf) 12%, #fff);
+  background: var(--eas-tint-leaf);
   color: var(--eas-forest);
 }
 
@@ -660,9 +660,9 @@
   border-radius: 14px;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--eas-muted) 8%, #fff) 0%,
-    color-mix(in srgb, var(--eas-muted) 14%, #fff) 50%,
-    color-mix(in srgb, var(--eas-muted) 8%, #fff) 100%
+    var(--eas-skeleton-a) 0%,
+    var(--eas-skeleton-b) 50%,
+    var(--eas-skeleton-a) 100%
   );
   background-size: 200% 100%;
   animation: none;
@@ -814,12 +814,49 @@ html[data-theme='dark'] .contab .data-table,
 html[data-theme='dark'] .contab .sheet,
 html[data-theme='dark'] .contab .card,
 html[data-theme='dark'] .contab .panel,
+html[data-theme='dark'] .contab .kpi-card,
+html[data-theme='dark'] .contab .filters-bar,
+html[data-theme='dark'] .contab .ap-alert,
+html[data-theme='dark'] .wiz,
+html[data-theme='dark'] .wiz__hero,
 html[data-theme='dark'] .wiz__card,
+html[data-theme='dark'] .wiz__steps li,
+html[data-theme='dark'] .wiz__kpis li,
+html[data-theme='dark'] .wiz__ghost,
+html[data-theme='dark'] .wiz__copy,
+html[data-theme='dark'] .wiz__chip-btn,
 html[data-theme='dark'] .wiz__table-wrap,
-html[data-theme='dark'] .wiz__table {
+html[data-theme='dark'] .wiz__table,
+html[data-theme='dark'] .wiz__modal-card {
   background: var(--eas-surface) !important;
   color: var(--eas-ink) !important;
   border-color: var(--eas-line-soft) !important;
+}
+
+html[data-theme='dark'] .wiz__hero,
+html[data-theme='dark'] .wiz__modal-card {
+  background: linear-gradient(180deg, var(--eas-surface-2), var(--eas-surface)) !important;
+}
+
+html[data-theme='dark'] .wiz__steps li.is-on {
+  background: var(--eas-tint-leaf) !important;
+  border-color: var(--eas-leaf) !important;
+}
+
+html[data-theme='dark'] .wiz__drop,
+html[data-theme='dark'] .wiz__prompt,
+html[data-theme='dark'] .wiz__msg,
+html[data-theme='dark'] .wiz__files li,
+html[data-theme='dark'] .wiz__table th {
+  background: var(--eas-surface-2) !important;
+  color: var(--eas-ink) !important;
+  border-color: var(--eas-line-soft) !important;
+}
+
+html[data-theme='dark'] .wiz__copy--primary {
+  background: var(--eas-leaf) !important;
+  color: var(--eas-on-brand) !important;
+  border-color: var(--eas-leaf) !important;
 }
 
 html[data-theme='dark'] .contab .data-table thead th,
@@ -855,10 +892,14 @@ html[data-theme='dark'] .wiz__table tbody tr:hover {
 html[data-theme='dark'] .contab .estado-chip.ok,
 html[data-theme='dark'] .contab .ap-kpi .kpi-icon,
 html[data-theme='dark'] .contab .empty-state .empty-icon,
-html[data-theme='dark'] .contab .ap-alert,
 html[data-theme='dark'] .contab .ap-timeline .tl-dot {
-  background: color-mix(in srgb, var(--eas-leaf) 16%, var(--eas-surface)) !important;
-  color: var(--eas-leaf) !important;
+  background: var(--eas-tint-leaf) !important;
+  color: var(--eas-on-tint-leaf) !important;
+}
+
+html[data-theme='dark'] .contab .ap-timeline li.done .tl-dot {
+  background: var(--eas-leaf) !important;
+  color: var(--eas-on-brand) !important;
 }
 
 html[data-theme='dark'] .contab .page-hero,

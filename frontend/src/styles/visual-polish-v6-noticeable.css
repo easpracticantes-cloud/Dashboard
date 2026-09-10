@@ -56,7 +56,7 @@
   padding: 1.15rem 1.25rem 1.25rem !important;
   border-radius: 22px !important;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--eas-surface) 92%, #fff) 0%, var(--eas-surface) 100%) !important;
+    linear-gradient(135deg, var(--eas-surface-2) 0%, var(--eas-surface) 100%) !important;
   border: 1px solid color-mix(in srgb, var(--eas-line) 70%, transparent) !important;
   box-shadow: var(--eas-shadow-md) !important;
   overflow: hidden;

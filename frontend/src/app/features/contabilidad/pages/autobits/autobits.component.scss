@@ -78,6 +78,6 @@
 }
 
 .ap-kpi.bad .kpi-icon {
-  background: color-mix(in srgb, #c0392b 14%, #fff);
+  background: var(--eas-tint-danger);
   color: #c0392b;
 }

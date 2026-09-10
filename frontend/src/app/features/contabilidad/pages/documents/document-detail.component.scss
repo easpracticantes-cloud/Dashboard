@@ -361,7 +361,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: #fff;
+  background: var(--eas-surface);
   border: 2px solid color-mix(in srgb, var(--eas-muted, #888) 35%, transparent);
   color: var(--eas-muted, #888);
 }
