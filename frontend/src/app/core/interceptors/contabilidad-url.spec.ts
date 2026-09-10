@@ -24,4 +24,22 @@ describe('rewriteContabilidadUrl', () => {
     expect(rewriteContabilidadUrl('/api/v1/ai/chat', '/api/v1')).toBeNull();
     expect(rewriteContabilidadUrl('/integrations/sheets/seguimiento', '/api/v1')).toBeNull();
   });
+
+  it('conserva confirm=true al reescribir DELETE /autobits/excels', () => {
+    expect(rewriteContabilidadUrl('/contabilidad/autobits/excels?confirm=true', '/api/v1')).toBe(
+      '/api/v1/contabilidad/autobits/excels?confirm=true'
+    );
+    expect(
+      rewriteContabilidadUrl(
+        'http://127.0.0.1:8080/contabilidad/autobits/excels?confirm=true',
+        '/api/v1'
+      )
+    ).toBe('/api/v1/contabilidad/autobits/excels?confirm=true');
+  });
+
+  it('no deja un DELETE /excels sin query al reescribir', () => {
+    const out = rewriteContabilidadUrl('/contabilidad/autobits/excels?confirm=true', '/api/v1');
+    expect(out).not.toBe('/api/v1/contabilidad/autobits/excels');
+    expect(out).toContain('confirm=true');
+  });
 });

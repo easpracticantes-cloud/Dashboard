@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface AutobitsField {
@@ -141,8 +141,10 @@ export class AutobitsApiService {
 
   /** Limpia Excels Autobits/Cruce, facturas importadas y datos derivados. */
   purgeExcels(confirm = true): Observable<{ ok: boolean; deleted: Record<string, number> }> {
+    const params = new HttpParams().set('confirm', confirm ? 'true' : 'false');
     return this.http.delete<{ ok: boolean; deleted: Record<string, number> }>(
-      `${this.base}/excels?confirm=${confirm ? 'true' : 'false'}`
+      `${this.base}/excels`,
+      { params }
     );
   }
 }

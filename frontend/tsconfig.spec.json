@@ -6,7 +6,8 @@
   },
   "files": [
     "src/app/features/contabilidad/pages/wizard/wizard.component.spec.ts",
-    "src/app/core/interceptors/contabilidad-url.spec.ts"
+    "src/app/core/interceptors/contabilidad-url.spec.ts",
+    "src/app/core/interceptors/contabilidad-interceptor.spec.ts"
   ],
   "include": [
     "src/**/*.ts"

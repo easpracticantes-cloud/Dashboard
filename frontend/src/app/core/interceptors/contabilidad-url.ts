@@ -24,7 +24,7 @@ export function rewriteContabilidadUrl(rawUrl: string, apiBaseUrl: string): stri
 
   let path = pathname;
   if (path.startsWith('/api/v1/contabilidad/')) {
-    return joinBase(apiBaseUrl, path.slice('/api/v1'.length));
+    return withSearch(joinBase(apiBaseUrl, path.slice('/api/v1'.length)), rawUrl);
   }
   if (!isContablePath(path)) {
     return null;
@@ -35,7 +35,7 @@ export function rewriteContabilidadUrl(rawUrl: string, apiBaseUrl: string): stri
       break;
     }
   }
-  return joinBase(apiBaseUrl, path);
+  return withSearch(joinBase(apiBaseUrl, path), rawUrl);
 }
 
 export function isContablePath(pathname: string): boolean {
@@ -65,10 +65,36 @@ function pathnameOf(url: string): string {
     try {
       return new URL(trimmed).pathname;
     } catch {
-      return trimmed;
+      return trimmed.split('?')[0];
     }
   }
-  return trimmed.startsWith('/') ? trimmed.split('?')[0] : `/${trimmed.split('?')[0]}`;
+  const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return path.split('?')[0];
+}
+
+function searchOf(url: string): string {
+  const trimmed = (url || '').trim();
+  if (!trimmed) {
+    return '';
+  }
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      return new URL(trimmed).search;
+    } catch {
+      const q = trimmed.indexOf('?');
+      return q >= 0 ? trimmed.slice(q) : '';
+    }
+  }
+  const q = trimmed.indexOf('?');
+  return q >= 0 ? trimmed.slice(q) : '';
+}
+
+function withSearch(rewritten: string, rawUrl: string): string {
+  const search = searchOf(rawUrl);
+  if (!search) {
+    return rewritten;
+  }
+  return rewritten.includes('?') ? rewritten : `${rewritten}${search}`;
 }
 
 function joinBase(apiBaseUrl: string, path: string): string {

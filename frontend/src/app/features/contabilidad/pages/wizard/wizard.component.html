@@ -358,8 +358,13 @@
         Los registros cargados se eliminarán: Autobits, el Excel de cruce y las facturas importadas.
       </p>
       <div class="wiz__modal-actions">
-        <button type="button" class="wiz__ghost" (click)="cancelarVaciar()">Cancelar</button>
-        <button type="button" class="wiz__copy wiz__copy--primary" (click)="confirmarVaciar()" [disabled]="limpiando()">
+        <button type="button" class="wiz__ghost" (click)="cancelarVaciar(); $event.stopPropagation()">Cancelar</button>
+        <button
+          type="button"
+          class="wiz__copy wiz__copy--primary"
+          (click)="confirmarVaciar(); $event.stopPropagation()"
+          [disabled]="limpiando()"
+        >
           Vaciar
         </button>
       </div>

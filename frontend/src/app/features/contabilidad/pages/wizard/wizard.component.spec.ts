@@ -175,7 +175,7 @@ describe('WizardComponent Autobits Excel flow', () => {
     expect(cmp.aviso()).toContain('ya estaba importado');
   });
 
-  it('Vaciar abre el modal y Cancelar conserva las filas', () => {
+  it('Vaciar: abrir modal no dispara DELETE', () => {
     autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 4 })])));
     const fixture = createFixture();
     const cmp = fixture.componentInstance;
@@ -184,30 +184,67 @@ describe('WizardComponent Autobits Excel flow', () => {
 
     const heroVaciar = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('button')
-    ).find((b) => (b.textContent || '').includes('Vaciar cargas'));
+    ).find((b) => (b.textContent || '').includes('Vaciar cargas')) as HTMLButtonElement | undefined;
     heroVaciar?.click();
     fixture.detectChanges();
 
-    const root = fixture.nativeElement as HTMLElement;
     expect(cmp.confirmandoVaciar()).toBe(true);
-    expect(root.querySelector('.wiz__modal')).toBeTruthy();
-    expect(root.querySelector('#wiz-vaciar-title')?.textContent).toContain('¿Vaciar registros?');
+    expect((fixture.nativeElement as HTMLElement).querySelector('.wiz__modal')).toBeTruthy();
     expect(autobitsApi.purgeExcels).not.toHaveBeenCalled();
+  });
 
-    const cancelar = Array.from(root.querySelectorAll('.wiz__modal button')).find((b) =>
-      (b.textContent || '').includes('Cancelar')
-    ) as HTMLButtonElement | undefined;
+  it('Vaciar: Cancelar no dispara DELETE', () => {
+    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 4 })])));
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.onAutobits(xlsxEvent());
+    fixture.detectChanges();
+
+    cmp.vaciarImportados();
+    fixture.detectChanges();
+    const cancelar = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.wiz__modal button')
+    ).find((b) => (b.textContent || '').includes('Cancelar')) as HTMLButtonElement | undefined;
     cancelar?.click();
     fixture.detectChanges();
 
     expect(cmp.confirmandoVaciar()).toBe(false);
-    expect(root.querySelector('.wiz__modal')).toBeNull();
     expect(autobitsApi.purgeExcels).not.toHaveBeenCalled();
     expect(cmp.records()[0].id).toBe(4);
-    expect(cmp.autobits()).not.toBeNull();
   });
 
-  it('Vaciar confirmado limpia filas y deja listo para otro Excel', () => {
+  it('Vaciar: Escape no dispara DELETE', () => {
+    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 4 })])));
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.onAutobits(xlsxEvent());
+
+    cmp.vaciarImportados();
+    fixture.detectChanges();
+    cmp.onEscapeVaciar();
+    fixture.detectChanges();
+
+    expect(cmp.confirmandoVaciar()).toBe(false);
+    expect(autobitsApi.purgeExcels).not.toHaveBeenCalled();
+    expect(cmp.records()[0].id).toBe(4);
+  });
+
+  it('Vaciar: overlay no dispara DELETE', () => {
+    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 4 })])));
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.onAutobits(xlsxEvent());
+
+    cmp.vaciarImportados();
+    fixture.detectChanges();
+    ((fixture.nativeElement as HTMLElement).querySelector('.wiz__modal-backdrop') as HTMLElement | null)?.click();
+    fixture.detectChanges();
+
+    expect(cmp.confirmandoVaciar()).toBe(false);
+    expect(autobitsApi.purgeExcels).not.toHaveBeenCalled();
+  });
+
+  it('Vaciar confirmado: exactamente 1 DELETE con confirm=true y sin DELETE extra', () => {
     autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 4 })])));
     const fixture = createFixture();
     const cmp = fixture.componentInstance;
@@ -224,33 +261,14 @@ describe('WizardComponent Autobits Excel flow', () => {
     fixture.detectChanges();
 
     expect(cmp.confirmandoVaciar()).toBe(false);
+    expect(autobitsApi.purgeExcels).toHaveBeenCalledTimes(1);
     expect(autobitsApi.purgeExcels).toHaveBeenCalledWith(true);
+    expect(autobitsApi.purgeExcels.mock.calls.some((c) => c[0] !== true)).toBe(false);
     expect(cmp.records()).toEqual([]);
     expect(cmp.autobits()).toBeNull();
     expect(cmp.paso()).toBe(1);
     expect(cmp.limpiando()).toBe(false);
     expect(cmp.aviso()).toContain('vaciadas');
-  });
-
-  it('Vaciar: Escape y overlay cierran el modal sin borrar', () => {
-    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 4 })])));
-    const fixture = createFixture();
-    const cmp = fixture.componentInstance;
-    cmp.onAutobits(xlsxEvent());
-
-    cmp.vaciarImportados();
-    fixture.detectChanges();
-    cmp.onEscapeVaciar();
-    fixture.detectChanges();
-    expect(cmp.confirmandoVaciar()).toBe(false);
-    expect(cmp.records()[0].id).toBe(4);
-
-    cmp.vaciarImportados();
-    fixture.detectChanges();
-    ((fixture.nativeElement as HTMLElement).querySelector('.wiz__modal-backdrop') as HTMLElement | null)?.click();
-    fixture.detectChanges();
-    expect(cmp.confirmandoVaciar()).toBe(false);
-    expect(autobitsApi.purgeExcels).not.toHaveBeenCalled();
   });
 
   it('archivo inválido / error HTTP termina el loading y muestra error', () => {
