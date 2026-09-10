@@ -391,6 +391,67 @@
   border-color: #1f7a4c;
 }
 
+.wiz__modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1600;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.wiz__modal-backdrop {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: rgba(12, 24, 18, 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.wiz__modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  padding: 1.25rem 1.3rem 1.2rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f4f8f5, #fff);
+  border: 1px solid var(--eas-line-soft, #d7e2db);
+  box-shadow: 0 24px 48px rgba(12, 24, 18, 0.22);
+  animation: wiz-modal-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes wiz-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.wiz__modal-card h3 {
+  margin: 0 0 0.45rem;
+  font-family: Montserrat, Sora, sans-serif;
+  font-size: 1.18rem;
+  font-weight: 780;
+  color: #1c2b24;
+}
+
+.wiz__modal-card p {
+  margin: 0 0 1.1rem;
+  color: var(--eas-muted, #5c6b63);
+  line-height: 1.45;
+}
+
+.wiz__modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
 @media (max-width: 860px) {
   .wiz__steps,
   .wiz__kpis {
@@ -399,5 +460,11 @@
 
   .wiz__ask {
     flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wiz__modal-card {
+    animation: none;
   }
 }

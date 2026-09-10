@@ -175,14 +175,33 @@ describe('WizardComponent Autobits Excel flow', () => {
     expect(cmp.aviso()).toContain('ya estaba importado');
   });
 
-  it('Vaciar cancelado conserva las filas', () => {
+  it('Vaciar abre el modal y Cancelar conserva las filas', () => {
     autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 4 })])));
-    const cmp = create();
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
     cmp.onAutobits(xlsxEvent());
-    vi.spyOn(cmp, 'pedirConfirmacionVaciar').mockReturnValue(false);
+    fixture.detectChanges();
 
-    cmp.vaciarImportados();
+    const heroVaciar = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button')
+    ).find((b) => (b.textContent || '').includes('Vaciar cargas'));
+    heroVaciar?.click();
+    fixture.detectChanges();
 
+    const root = fixture.nativeElement as HTMLElement;
+    expect(cmp.confirmandoVaciar()).toBe(true);
+    expect(root.querySelector('.wiz__modal')).toBeTruthy();
+    expect(root.querySelector('#wiz-vaciar-title')?.textContent).toContain('¿Vaciar registros?');
+    expect(autobitsApi.purgeExcels).not.toHaveBeenCalled();
+
+    const cancelar = Array.from(root.querySelectorAll('.wiz__modal button')).find((b) =>
+      (b.textContent || '').includes('Cancelar')
+    ) as HTMLButtonElement | undefined;
+    cancelar?.click();
+    fixture.detectChanges();
+
+    expect(cmp.confirmandoVaciar()).toBe(false);
+    expect(root.querySelector('.wiz__modal')).toBeNull();
     expect(autobitsApi.purgeExcels).not.toHaveBeenCalled();
     expect(cmp.records()[0].id).toBe(4);
     expect(cmp.autobits()).not.toBeNull();
@@ -190,18 +209,48 @@ describe('WizardComponent Autobits Excel flow', () => {
 
   it('Vaciar confirmado limpia filas y deja listo para otro Excel', () => {
     autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 4 })])));
-    const cmp = create();
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
     cmp.onAutobits(xlsxEvent());
-    vi.spyOn(cmp, 'pedirConfirmacionVaciar').mockReturnValue(true);
 
     cmp.vaciarImportados();
+    fixture.detectChanges();
+    expect(autobitsApi.purgeExcels).not.toHaveBeenCalled();
 
+    const vaciar = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('.wiz__modal button')
+    ).find((b) => (b.textContent || '').trim() === 'Vaciar') as HTMLButtonElement | undefined;
+    vaciar?.click();
+    fixture.detectChanges();
+
+    expect(cmp.confirmandoVaciar()).toBe(false);
     expect(autobitsApi.purgeExcels).toHaveBeenCalledWith(true);
     expect(cmp.records()).toEqual([]);
     expect(cmp.autobits()).toBeNull();
     expect(cmp.paso()).toBe(1);
     expect(cmp.limpiando()).toBe(false);
     expect(cmp.aviso()).toContain('vaciadas');
+  });
+
+  it('Vaciar: Escape y overlay cierran el modal sin borrar', () => {
+    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 4 })])));
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.onAutobits(xlsxEvent());
+
+    cmp.vaciarImportados();
+    fixture.detectChanges();
+    cmp.onEscapeVaciar();
+    fixture.detectChanges();
+    expect(cmp.confirmandoVaciar()).toBe(false);
+    expect(cmp.records()[0].id).toBe(4);
+
+    cmp.vaciarImportados();
+    fixture.detectChanges();
+    ((fixture.nativeElement as HTMLElement).querySelector('.wiz__modal-backdrop') as HTMLElement | null)?.click();
+    fixture.detectChanges();
+    expect(cmp.confirmandoVaciar()).toBe(false);
+    expect(autobitsApi.purgeExcels).not.toHaveBeenCalled();
   });
 
   it('archivo inválido / error HTTP termina el loading y muestra error', () => {

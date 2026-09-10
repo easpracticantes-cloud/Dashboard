@@ -25,6 +25,8 @@ from infrastructure.persistence.models import (
     AccountingAdjustmentModel,
     AuditLogModel,
     AutobitsRecordModel,
+    CruceImportBatchModel,
+    CruceRecordModel,
     DigitalPackageModel,
     DocumentModel,
     ImportBatchModel,
@@ -484,6 +486,29 @@ class CrossingRepository:
             is not None
         )
 
+    def get_by_cruce_record(self, cruce_record_id: int) -> AccountCrossingModel | None:
+        if not cruce_record_id:
+            return None
+        return (
+            self.db.query(AccountCrossingModel)
+            .filter(AccountCrossingModel.cruce_record_id == cruce_record_id)
+            .order_by(
+                AccountCrossingModel.document_id.isnot(None).desc(),
+                AccountCrossingModel.id.asc(),
+            )
+            .first()
+        )
+
+    def get_for_document(self, document_id: int) -> AccountCrossingModel | None:
+        if not document_id:
+            return None
+        return (
+            self.db.query(AccountCrossingModel)
+            .filter(AccountCrossingModel.document_id == document_id)
+            .order_by(AccountCrossingModel.updated_at.desc(), AccountCrossingModel.id.desc())
+            .first()
+        )
+
     def get_by_autobits_record(self, autobits_record_id: int) -> AccountCrossingModel | None:
         """Fila del cruce de esa fila del Excel; prioriza la que ya tiene documento."""
         return (
@@ -583,10 +608,12 @@ class CrossingRepository:
         factura_cdc: str | None = None,
         fecha_pago: str | None = None,
         import_batch_id: int | None = None,
+        cruce_record_id: int | None = None,
     ) -> AccountCrossingModel:
         crossing = AccountCrossingModel(
             document_id=document_id,
             autobits_record_id=autobits_record_id,
+            cruce_record_id=cruce_record_id,
             import_batch_id=import_batch_id,
             match_type=match_type,
             match_score=match_score,
@@ -1145,6 +1172,40 @@ class PeriodClosureRepository:
             q = q.filter(PeriodClosureModel.status == status)
         total = q.count()
         return q.offset(offset).limit(limit).all(), total
+
+
+class CruceRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_latest_batch(self) -> CruceImportBatchModel | None:
+        return (
+            self.db.query(CruceImportBatchModel)
+            .order_by(CruceImportBatchModel.imported_at.desc(), CruceImportBatchModel.id.desc())
+            .first()
+        )
+
+    def get_batch_by_hash(self, file_hash: str) -> CruceImportBatchModel | None:
+        if not file_hash:
+            return None
+        return (
+            self.db.query(CruceImportBatchModel)
+            .filter(CruceImportBatchModel.file_hash == file_hash)
+            .order_by(CruceImportBatchModel.id.desc())
+            .first()
+        )
+
+    def list_records_for_batch(self, batch_id: int | None = None) -> list[CruceRecordModel]:
+        q = self.db.query(CruceRecordModel)
+        if batch_id:
+            q = q.filter(CruceRecordModel.import_batch_id == batch_id)
+        return q.order_by(CruceRecordModel.id.asc()).all()
+
+    def list_latest_records(self) -> list[CruceRecordModel]:
+        batch = self.get_latest_batch()
+        if not batch:
+            return []
+        return self.list_records_for_batch(batch.id)
 
 
 def _to_float(value) -> float | None:

@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
@@ -59,11 +59,12 @@ export class WizardComponent implements OnInit, OnDestroy {
     'Resume cada factura: proveedor, número, fecha y total.',
     '¿Cuáles necesitan revisión y por qué? Lista ambigüedades.',
     'Lista NIT, compra y reserva detectados.',
-    'Compara totales de facturas contra Autobits.',
+    'Compara totales de facturas contra el Cruce de Cuentas.',
   ];
 
   paso = signal(1);
   limpiando = signal(false);
+  confirmandoVaciar = signal(false);
   error = signal('');
   aviso = signal('');
 
@@ -135,9 +136,21 @@ export class WizardComponent implements OnInit, OnDestroy {
   });
 
   vaciarImportados(): void {
-    if (!this.pedirConfirmacionVaciar()) {
+    if (this.limpiando()) {
       return;
     }
+    this.confirmandoVaciar.set(true);
+  }
+
+  cancelarVaciar(): void {
+    this.confirmandoVaciar.set(false);
+  }
+
+  confirmarVaciar(): void {
+    if (this.limpiando()) {
+      return;
+    }
+    this.confirmandoVaciar.set(false);
     this.restoreSeq += 1;
     this.limpiando.set(true);
     this.error.set('');
@@ -155,11 +168,11 @@ export class WizardComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Separado para poder cubrir confirmar/cancelar en tests sin `window.confirm`. */
-  pedirConfirmacionVaciar(): boolean {
-    return window.confirm(
-      'Esto borra Autobits, el Excel de cruce y las facturas importadas. ¿Seguro?'
-    );
+  @HostListener('document:keydown.escape')
+  onEscapeVaciar(): void {
+    if (this.confirmandoVaciar()) {
+      this.cancelarVaciar();
+    }
   }
 
   onAutobits(ev: Event): void {
@@ -224,8 +237,8 @@ export class WizardComponent implements OnInit, OnDestroy {
     const files = Array.from((ev.target as HTMLInputElement).files || []);
     (ev.target as HTMLInputElement).value = '';
     if (!files.length) return;
-    if (!this.autobits()) {
-      this.error.set('Primero sube Autobits y el cruce.');
+    if (!this.cruce()) {
+      this.error.set('Primero sube el Excel de Cruce de Cuentas. Las facturas se vinculan a ese cruce, no a Autobits.');
       return;
     }
     if (files.length > PACK_MAX) {

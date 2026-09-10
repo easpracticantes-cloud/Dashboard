@@ -80,6 +80,10 @@ def _apply_sqlite_migrations() -> None:
             conn.execute(
                 text("ALTER TABLE account_crossings ADD COLUMN import_batch_id INTEGER")
             )
+        if "cruce_record_id" not in xmap:
+            conn.execute(
+                text("ALTER TABLE account_crossings ADD COLUMN cruce_record_id INTEGER")
+            )
 
         # Releer tras ALTER
         xcols = conn.execute(text("PRAGMA table_info(account_crossings)")).fetchall()

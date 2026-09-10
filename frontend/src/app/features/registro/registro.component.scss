@@ -217,6 +217,37 @@
   color: var(--eas-muted);
 }
 
+.reg__drop {
+  display: grid;
+  place-items: center;
+  gap: 0.25rem;
+  min-height: 7rem;
+  border: 1.5px dashed var(--eas-line);
+  border-radius: 14px;
+  background: var(--eas-surface);
+  cursor: pointer;
+  position: relative;
+  padding: 1rem;
+}
+
+.reg__drop input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.reg__drop.is-drag,
+.reg__drop:hover {
+  border-color: var(--eas-leaf);
+}
+
+.reg__preview {
+  margin-top: 0.9rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
 .reg__pager {
   display: flex;
   flex-wrap: wrap;

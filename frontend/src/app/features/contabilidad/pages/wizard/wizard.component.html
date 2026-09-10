@@ -214,7 +214,7 @@
         accept=".pdf,.jpg,.jpeg,.png"
         multiple
         (change)="onFacturas($event)"
-        [disabled]="subiendoFacturas() || !autobits()"
+        [disabled]="subiendoFacturas() || !cruce()"
       />
       <mat-icon>photo_library</mat-icon>
       <span>{{ subiendoFacturas() ? 'Subiendo y encolando OCR…' : 'Soltar hasta ' + packMax + ' facturas (PDF o foto)' }}</span>
@@ -271,7 +271,7 @@
   <section class="wiz__card wiz__chat" [class.is-dim]="paso() < 3">
     <h3>Chat con la IA sobre este paquete</h3>
     <p class="wiz__hint">
-      Pregunta sobre las facturas ya subidas (máx. {{ packMax }}). Pedidos típicos: listar totales, NIT dudosos, qué falta para Autobits, o un resumen para contramarcar.
+      Pregunta sobre las facturas ya subidas (máx. {{ packMax }}), vinculadas al Excel de Cruce de Cuentas. Pedidos típicos: listar proveedor, número, fecha y total.
     </p>
     <div class="wiz__chips">
       @for (s of chatSugerencias; track s) {
@@ -311,17 +311,17 @@
 
   @if (crossings().length) {
     <section class="wiz__card">
-      <h3>Relación factura ↔ Autobits</h3>
-      <p class="wiz__hint">Match listo para el contramarcado. Pide en el chat un resumen de lo que no cuadra.</p>
+      <h3>Relación factura ↔ Cruce de Cuentas</h3>
+      <p class="wiz__hint">Cada factura se ancla a una fila del Excel de Cruce (FACTURA/CDC, compra, fecha de pago). Autobits sigue siendo el reporte semanal operativo, no el origen de la factura.</p>
       <div class="wiz__table-wrap">
         <table class="wiz__table">
           <thead>
             <tr>
               <th>Proveedor</th>
               <th>Compra / reserva</th>
-              <th>Fecha Autobits</th>
-              <th>Valor Autobits</th>
-              <th>Factura</th>
+              <th>Fecha cruce</th>
+              <th>Valor cruce</th>
+              <th>Factura / CDC</th>
               <th>Match</th>
             </tr>
           </thead>
@@ -342,3 +342,27 @@
     </section>
   }
 </div>
+
+@if (confirmandoVaciar()) {
+  <div class="wiz__modal">
+    <div class="wiz__modal-backdrop" (click)="cancelarVaciar()"></div>
+    <div
+      class="wiz__modal-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="wiz-vaciar-title"
+      aria-describedby="wiz-vaciar-desc"
+    >
+      <h3 id="wiz-vaciar-title">¿Vaciar registros?</h3>
+      <p id="wiz-vaciar-desc">
+        Los registros cargados se eliminarán: Autobits, el Excel de cruce y las facturas importadas.
+      </p>
+      <div class="wiz__modal-actions">
+        <button type="button" class="wiz__ghost" (click)="cancelarVaciar()">Cancelar</button>
+        <button type="button" class="wiz__copy wiz__copy--primary" (click)="confirmarVaciar()" [disabled]="limpiando()">
+          Vaciar
+        </button>
+      </div>
+    </div>
+  </div>
+}

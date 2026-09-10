@@ -13,6 +13,59 @@
     </div>
   </header>
 
+  <section class="reg__card">
+    <h3>Cargar chats de WhatsApp</h3>
+    <p class="reg__lead">
+      Exporta el chat desde WhatsApp (.txt o .zip). La IA (Claude) lo convierte a las columnas del Excel de Registro.
+      Nada se guarda hasta que confirmes.
+    </p>
+    <label
+      class="reg__drop"
+      [class.is-drag]="arrastrandoWa()"
+      (dragover)="$event.preventDefault(); arrastrandoWa.set(true)"
+      (dragleave)="arrastrandoWa.set(false)"
+      (drop)="onWhatsappDrop($event)"
+    >
+      <input type="file" accept=".txt,.zip,text/plain,application/zip" (change)="onWhatsappFile($event)" [disabled]="waEstado() === 'analizando'" />
+      <strong>{{ waEstado() === 'analizando' ? 'Analizando conversación…' : 'Arrastrar archivos aquí' }}</strong>
+      <small>WhatsApp Chat — Cliente.txt</small>
+    </label>
+    @if (waFile()) {
+      <p class="reg__hint">Archivo: {{ waFile()!.name }} · {{ (waFile()!.size / 1024) | number: '1.0-0' }} KB</p>
+    }
+    @if (waError()) {
+      <p class="reg__alert">{{ waError() }}</p>
+    }
+    @if (waPreview(); as p) {
+      <div class="reg__preview">
+        <p><strong>✓ Conversación analizada</strong> · {{ p.messageCount }} mensajes</p>
+        <p>Cliente: {{ p.campos['cliente']?.valor || 'NO_IDENTIFICADO' }}</p>
+        <p>Última cotización: {{ p.ultimaCotizacion?.valor || p.ultimaCotizacion?.servicio || 'NO_IDENTIFICADO' }}
+          @if (p.ultimaCotizacion?.fecha) {
+            ({{ p.ultimaCotizacion?.fecha }})
+          }
+        </p>
+        <p>Estado: {{ p.ultimaCotizacion?.estado || p.campos['semaforo']?.valor || '—' }}</p>
+        @if (p.coincidencias; as hits) {
+          @if (hits.length) {
+            <p class="reg__alert">Posible actualización de registro existente ({{ hits[0].cliente }} · {{ hits[0].celular }}).</p>
+          }
+        }
+        <div class="reg__form-actions">
+          <button type="button" class="reg__ghost" (click)="cancelarWhatsapp()" [disabled]="waConfirmando()">Cancelar</button>
+          @if (p.coincidencias?.length) {
+            <button type="button" class="reg__btn" (click)="confirmarWhatsapp(true)" [disabled]="waConfirmando()">
+              Confirmar actualización
+            </button>
+          }
+          <button type="button" class="reg__btn" (click)="confirmarWhatsapp(false)" [disabled]="waConfirmando()">
+            Revisar antes de guardar
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+
   @if (aviso()) {
     <p class="reg__alert">{{ aviso() }}</p>
   }

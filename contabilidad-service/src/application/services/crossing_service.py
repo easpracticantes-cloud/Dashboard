@@ -16,11 +16,17 @@ from domain.autobits.observaciones import (
 from domain.enums import CrossingStatus, DocumentStatus, MatchType, RemediationType
 from domain.matching.matching_engine import MatchingEngine, extract_document_context
 from domain.rules.rule_engine import RuleEngine
-from infrastructure.persistence.models import AccountCrossingModel, AutobitsRecordModel, DocumentModel
+from infrastructure.persistence.models import (
+    AccountCrossingModel,
+    AutobitsRecordModel,
+    CruceRecordModel,
+    DocumentModel,
+)
 from infrastructure.persistence.repositories import (
     AuditRepository,
     AutobitsRepository,
     CrossingRepository,
+    CruceRepository,
     DocumentRepository,
 )
 
@@ -40,6 +46,7 @@ class CrossingService:
         self.doc_repo = DocumentRepository(db)
         self.autobits_repo = AutobitsRepository(db)
         self.crossing_repo = CrossingRepository(db)
+        self.cruce_repo = CruceRepository(db)
         self.audit = AuditRepository(db)
         self.periods = PeriodService(db)
         self.matcher = MatchingEngine()
@@ -58,6 +65,10 @@ class CrossingService:
             document_id=document_id,
             force=force,
         )
+        cruce_records = self.cruce_repo.list_latest_records()
+        if cruce_records:
+            return self._run_matching_cruce(documents, cruce_records, usuario)
+
         if batch_id:
             records = self.autobits_repo.list_records_for_batch(batch_id)
         else:
@@ -65,8 +76,9 @@ class CrossingService:
 
         if not records:
             raise CrossingServiceError(
-                "No hay registros Autobits importados. Importe un Excel primero.",
-                "NO_AUTOBITS",
+                "No hay filas del Excel de Cruce de Cuentas ni de Autobits. "
+                "Suba primero el Excel de Cruce de Cuentas.",
+                "NO_CRUCE",
             )
 
         used_record_ids: set[int] = set()
@@ -92,6 +104,147 @@ class CrossingService:
         )
         self.db.commit()
         return {"created": created, "items": results}
+
+    def _run_matching_cruce(
+        self,
+        documents: list[DocumentModel],
+        records: list[CruceRecordModel],
+        usuario: str,
+    ) -> dict:
+        used_ids: set[int] = set()
+        created = 0
+        results: list[dict] = []
+        for doc in documents:
+            available = [r for r in records if r.id not in used_ids]
+            crossing_result = self._match_document_to_cruce(doc, available)
+            if crossing_result:
+                results.append(crossing_result)
+                created += 1
+                cid = crossing_result.get("cruce_record_id")
+                if cid:
+                    used_ids.add(int(cid))
+                doc.estado = DocumentStatus.CRUZANDO
+        self.audit.log(
+            "CRUCE_FACTURA_CRUCE_CUENTAS",
+            "Crossing",
+            "cruce",
+            valor_nuevo=f"{created} facturas vinculadas al Excel de Cruce de Cuentas",
+            usuario=usuario,
+        )
+        self.db.commit()
+        return {"created": created, "items": results, "origen": "CRUCE_DE_CUENTAS"}
+
+    def _match_document_to_cruce(
+        self,
+        doc: DocumentModel,
+        records: list[CruceRecordModel],
+    ) -> dict | None:
+        ctx = extract_document_context(doc)
+        candidate = self.matcher.find_best_cruce_match(doc, records)
+        record: CruceRecordModel | None = None
+        existing: AccountCrossingModel | None = None
+        if candidate and candidate.cruce_record_id:
+            record = next((r for r in records if r.id == candidate.cruce_record_id), None)
+            if record:
+                existing = self.crossing_repo.get_by_cruce_record(record.id)
+                if existing and existing.document_id and existing.document_id != doc.id:
+                    candidate = None
+                    record = None
+                    existing = None
+        if not candidate:
+            candidate = self.matcher.build_sin_match(doc)
+            existing = None
+        estado, remediation_types, obs = self.rules.evaluate_crossing(
+            ctx,
+            candidate,
+            record_nit=record.nit if record else None,
+        )
+        if existing:
+            crossing = self._attach_document(existing, doc, candidate, estado, obs)
+        else:
+            crossing = self.crossing_repo.create_crossing(
+                document_id=doc.id,
+                autobits_record_id=None,
+                cruce_record_id=candidate.cruce_record_id,
+                match_type=candidate.match_type,
+                match_score=candidate.score if candidate.score else None,
+                estado=estado,
+                proveedor_nombre=candidate.proveedor,
+                numero_compra=candidate.numero_compra,
+                numero_reserva=candidate.numero_reserva,
+                valor_documento=candidate.valor_documento,
+                valor_autobits=candidate.valor_autobits,
+                diferencia=candidate.diferencia,
+                observaciones="; ".join(obs) if obs else None,
+                match_reasons=json.dumps(candidate.reasons, ensure_ascii=False),
+                factura_cdc=candidate.factura_cdc or (record.factura_cdc if record else None),
+                fecha_pago=record.fecha_pago if record else None,
+                fecha_ejecucion=record.fecha_ejecucion if record else None,
+                nit=record.nit if record else None,
+                concepto=record.concepto if record else None,
+            )
+        for rem_type in remediation_types:
+            self.crossing_repo.create_remediation(
+                document_id=doc.id,
+                crossing_id=crossing.id,
+                proveedor=candidate.proveedor,
+                tipo_problema=rem_type,
+                descripcion=self._remediation_description(rem_type, candidate),
+                valor_involucrado=candidate.diferencia or candidate.valor_documento,
+            )
+            if rem_type != RemediationType.SIN_MATCH:
+                doc.estado = DocumentStatus.SUBSANACION
+        if estado == CrossingStatus.APROBADO:
+            doc.estado = DocumentStatus.APROBADO
+        return self.to_dict(crossing, doc)
+
+    def seed_from_cruce(
+        self,
+        *,
+        cruce_batch_id: int,
+        rows: list[CruceRecordModel],
+        usuario: str = "SISTEMA",
+    ) -> int:
+        """Crea/actualiza account_crossings anclados a filas persistidas de Cruce."""
+        created = 0
+        for rec in rows:
+            existing = self.crossing_repo.get_by_cruce_record(rec.id)
+            if existing:
+                if rec.factura_cdc and not existing.factura_cdc:
+                    existing.factura_cdc = rec.factura_cdc
+                if rec.fecha_pago and not existing.fecha_pago:
+                    existing.fecha_pago = rec.fecha_pago
+                continue
+            self.crossing_repo.create_crossing(
+                document_id=None,
+                autobits_record_id=None,
+                cruce_record_id=rec.id,
+                match_type=MatchType.DESDE_CRUCE,
+                match_score=None,
+                estado=CrossingStatus.PENDIENTE,
+                proveedor_nombre=rec.proveedor,
+                numero_compra=rec.numero_compra,
+                numero_reserva=rec.numero_reserva,
+                valor_documento=None,
+                valor_autobits=rec.valor,
+                diferencia=None,
+                observaciones="Fila de Cruce de Cuentas. Adjunte la factura/soporte correspondiente.",
+                match_reasons=json.dumps(["desde_cruce"], ensure_ascii=False),
+                nit=rec.nit,
+                fecha_ejecucion=rec.fecha_ejecucion,
+                concepto=rec.concepto,
+                factura_cdc=rec.factura_cdc,
+                fecha_pago=rec.fecha_pago,
+            )
+            created += 1
+        self.audit.log(
+            "CRUCE_SEED_DESDE_EXCEL",
+            "CruceRecord",
+            str(cruce_batch_id),
+            valor_nuevo=f"{created} filas de Cruce de Cuentas listas para facturas",
+            usuario=usuario,
+        )
+        return created
 
     def _match_document(
         self,
@@ -168,12 +321,16 @@ class CrossingService:
         estado: str,
         obs: list[str],
     ) -> AccountCrossingModel:
-        """Vincula la factura a la fila que ya venía del Excel de Autobits.
+        """Vincula la factura a la fila del Excel de Cruce de Cuentas.
 
-        Conserva lo digitado a mano (FACTURA/CDC, FECHA DE PAGO) y no degrada
+        Conserva FACTURA/CDC y FECHA DE PAGO ya digitados y no degrada
         una fila que ya está pagada.
         """
         crossing.document_id = doc.id
+        if getattr(candidate, "cruce_record_id", None):
+            crossing.cruce_record_id = candidate.cruce_record_id
+        if getattr(candidate, "factura_cdc", None) and not crossing.factura_cdc:
+            crossing.factura_cdc = candidate.factura_cdc
         crossing.match_type = candidate.match_type
         crossing.match_score = candidate.score if candidate.score else crossing.match_score
         crossing.valor_documento = candidate.valor_documento
@@ -203,7 +360,8 @@ class CrossingService:
 
     def _remediation_description(self, rem_type: RemediationType, candidate) -> str:
         messages = {
-            RemediationType.SIN_MATCH: "No se encontró coincidencia en Autobits para este documento.",
+            RemediationType.SIN_MATCH: "No se encontró coincidencia en el Excel de Cruce de Cuentas para esta factura.",
+            RemediationType.NIT_NO_COINCIDE: "El NIT del documento no coincide con el Cruce de Cuentas.",
             RemediationType.DIFERENCIA_VALOR: f"Diferencia de valor detectada: {candidate.diferencia}.",
             RemediationType.SIN_NUMERO_DOCUMENTO: "Falta número de documento o compra en la factura.",
             RemediationType.SIN_PROVEEDOR: "No se identificó proveedor en el documento.",
@@ -757,6 +915,7 @@ class CrossingService:
             "document_numero": doc_numero,
             "document_estado": doc_estado,
             "autobits_record_id": crossing.autobits_record_id,
+            "cruce_record_id": crossing.cruce_record_id,
             "import_batch_id": crossing.import_batch_id,
             "match_type": crossing.match_type,
             "match_score": crossing.match_score,

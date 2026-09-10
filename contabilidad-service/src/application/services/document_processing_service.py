@@ -745,29 +745,61 @@ class DocumentProcessingService:
                     extracted = json.loads(doc.extracted_json)
                 except json.JSONDecodeError:
                     extracted = {}
+            cruce = None
+            try:
+                crossings = list(getattr(doc, "crossings", None) or [])
+            except Exception:
+                crossings = []
+            for crossing in crossings:
+                if crossing.cruce_record_id or crossing.factura_cdc:
+                    cruce = crossing
+                    break
+            if cruce is None and crossings:
+                cruce = crossings[0]
+            encontrado = {
+                "proveedor": doc.provider.nombre if getattr(doc, "provider", None) else extracted.get("proveedor"),
+                "numero": doc.numero_documento,
+                "fecha": doc.fecha_emision,
+                "subtotal": doc.subtotal,
+                "impuestos": doc.iva,
+                "total": doc.total,
+                "nit": extracted.get("nit_o_identificacion"),
+            }
             bloques.append(
                 {
                     "id": doc.id,
                     "archivo": doc.filename,
                     "estado": doc.estado,
-                    "numero": doc.numero_documento,
-                    "proveedor": doc.provider.nombre if getattr(doc, "provider", None) else extracted.get("proveedor"),
-                    "nit": extracted.get("nit_o_identificacion"),
-                    "total": doc.total,
-                    "fecha": doc.fecha_emision,
-                    "compra": extracted.get("compra"),
-                    "reserva": extracted.get("reserva"),
+                    "origen_vinculo": "CRUCE_DE_CUENTAS" if cruce and cruce.cruce_record_id else (
+                        "SIN_VINCULO_CRUCE"
+                    ),
+                    "encontrado": encontrado,
+                    "inferido": extracted.get("campos_asumidos") or [],
+                    "ambiguo": extracted.get("ambiguedades") or [],
+                    "faltante": extracted.get("campos_faltantes") or [],
+                    "cruce": {
+                        "cruce_record_id": getattr(cruce, "cruce_record_id", None) if cruce else None,
+                        "compra": getattr(cruce, "numero_compra", None) if cruce else None,
+                        "reserva": getattr(cruce, "numero_reserva", None) if cruce else None,
+                        "factura_cdc": getattr(cruce, "factura_cdc", None) if cruce else None,
+                        "fecha_pago": getattr(cruce, "fecha_pago", None) if cruce else None,
+                        "proveedor": getattr(cruce, "proveedor_nombre", None) if cruce else None,
+                    } if cruce else None,
                     "requiere_revision": bool(doc.requiere_revision),
-                    "campos_faltantes": extracted.get("campos_faltantes") or [],
-                    "campos_asumidos": extracted.get("campos_asumidos") or [],
-                    "ambiguedades": extracted.get("ambiguedades") or [],
                     "ocr_preview": (doc.ocr_text or "")[:1500],
                 }
             )
         payload = json.dumps(bloques, ensure_ascii=False, default=str)
         if len(payload) > 24000:
             payload = payload[:24000] + "\n…[truncated]…"
-        ai_result = self.ai.extract_custom(payload, pregunta)
+        instruccion = (
+            "Eres la IA contable de SIG-EAS. Responde SOLO con las facturas del JSON. "
+            "El origen de vinculación es el Excel de CRUCE DE CUENTAS, no Autobits. "
+            "No inventes facturas ni cifras. Si un dato es inferido, ambiguo o faltante, dilo. "
+            "Formato preferido: Factura N — Proveedor / Número / Fecha / Total.\n\n"
+            f"Pedido del usuario: {pregunta}"
+        )
+        ai_result = self.ai.extract_custom(payload, instruccion)
         if not ai_result.ok:
             return {"ok": False, "error": ai_result.error or "La IA no pudo responder."}
         return {

@@ -113,3 +113,8 @@ def test_ask_sin_facturas(client):
     body = res.json()
     assert body["ok"] is False
     assert "factura" in (body.get("error") or "").lower()
+
+
+def test_ask_es_post_no_get(client):
+    res = client.get("/api/documents/ask")
+    assert res.status_code in (405, 422)

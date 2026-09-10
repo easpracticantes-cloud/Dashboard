@@ -1,10 +1,11 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { IntegrationsService } from '../../core/services/integrations.service';
+import { WhatsappPreview, WhatsappRegistroApiService } from '../../core/services/whatsapp-registro-api.service';
 import { SeguimientoWhatsapp, SheetsDashboard } from '../../core/models/sheets-dashboard.model';
 import { AveUiContextService } from '../../shared/components/ave-copilot/ave-ui-context.service';
 
@@ -111,13 +112,14 @@ function digits(value: string | undefined): string {
 @Component({
   selector: 'eas-registro',
   standalone: true,
-  imports: [DatePipe, FormsModule],
+  imports: [DatePipe, DecimalPipe, FormsModule],
   templateUrl: './registro.component.html',
   styleUrl: './registro.component.scss',
 })
 export class RegistroComponent {
   private readonly dashboard = inject(DashboardService);
   private readonly integrations = inject(IntegrationsService);
+  private readonly whatsappApi = inject(WhatsappRegistroApiService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly route = inject(ActivatedRoute);
   private readonly aveUi = inject(AveUiContextService);
@@ -136,6 +138,12 @@ export class RegistroComponent {
   readonly numeroFiltro = signal('');
   readonly pagina = signal(1);
   readonly pageSize = PAGE_SIZE;
+  readonly waFile = signal<File | null>(null);
+  readonly waEstado = signal<'idle' | 'analizando' | 'preview' | 'error'>('idle');
+  readonly waPreview = signal<WhatsappPreview | null>(null);
+  readonly waError = signal('');
+  readonly waConfirmando = signal(false);
+  readonly arrastrandoWa = signal(false);
 
   readonly hojas = computed(() => {
     const d = this.data();
@@ -274,6 +282,137 @@ export class RegistroComponent {
     this.modo.set('lista');
     this.original.set(null);
     this.aveUi.clearEntity();
+  }
+
+  onWhatsappFile(ev: Event): void {
+    const file = (ev.target as HTMLInputElement).files?.[0];
+    (ev.target as HTMLInputElement).value = '';
+    if (file) this.analizarWhatsapp(file);
+  }
+
+  onWhatsappDrop(ev: DragEvent): void {
+    ev.preventDefault();
+    this.arrastrandoWa.set(false);
+    const file = ev.dataTransfer?.files?.[0];
+    if (file) this.analizarWhatsapp(file);
+  }
+
+  analizarWhatsapp(file: File): void {
+    const name = file.name.toLowerCase();
+    if (!name.endsWith('.txt') && !name.endsWith('.zip')) {
+      this.waEstado.set('error');
+      this.waError.set('Use un .txt o .zip exportado desde WhatsApp.');
+      return;
+    }
+    this.waFile.set(file);
+    this.waEstado.set('analizando');
+    this.waError.set('');
+    this.waPreview.set(null);
+    this.whatsappApi.analyze(file).subscribe({
+      next: (preview) => {
+        this.waPreview.set(preview);
+        this.waEstado.set('preview');
+        this.draft.set(this.draftFromWhatsapp(preview));
+        this.modo.set('nueva');
+      },
+      error: (err) => {
+        this.waEstado.set('error');
+        this.waError.set(err?.error?.message || err?.error?.detail || 'No se pudo analizar el chat.');
+      },
+    });
+  }
+
+  confirmarWhatsapp(updateExisting: boolean): void {
+    const preview = this.waPreview();
+    if (!preview || this.waConfirmando()) return;
+    this.waConfirmando.set(true);
+    const d = this.draft();
+    const row: Record<string, unknown> = {
+      ...d,
+      canal: 'WHATSAPP',
+      registrado: 'WHATSAPP',
+      cotizado: Boolean(d.fechaCotizado),
+    };
+    const hit = preview.coincidencias?.[0];
+    if (updateExisting && hit) {
+      row['matchCelular'] = hit.celular;
+      row['matchFecha'] = hit.fecha;
+      row['matchCliente'] = hit.cliente;
+      row['hojaOrigen'] = hit.hojaOrigen || d.hojaOrigen;
+    }
+    this.whatsappApi.confirm(preview.previewId, row, updateExisting && !!hit).subscribe({
+      next: (res) => {
+        this.waConfirmando.set(false);
+        this.finishSave(d, updateExisting && hit ? this.rowFromHit(hit) : null, res.message);
+        this.limpiarWhatsapp();
+      },
+      error: (err) => {
+        this.waConfirmando.set(false);
+        this.aviso.set(err?.error?.message || 'No se pudo guardar en el Registro.');
+      },
+    });
+  }
+
+  cancelarWhatsapp(): void {
+    const preview = this.waPreview();
+    if (preview?.previewId) {
+      this.whatsappApi.cancel(preview.previewId).subscribe({ error: () => undefined });
+    }
+    this.limpiarWhatsapp();
+    this.cancelar();
+  }
+
+  private limpiarWhatsapp(): void {
+    this.waFile.set(null);
+    this.waPreview.set(null);
+    this.waEstado.set('idle');
+    this.waError.set('');
+  }
+
+  private draftFromWhatsapp(preview: WhatsappPreview): Draft {
+    const v = (k: string) => preview.campos?.[k]?.valor || '';
+    return {
+      ...emptyDraft(this.hojaFiltro() || this.hojas()[0] || ''),
+      fecha: (v('fecha') || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
+      tipo: v('tipo') || 'B2C',
+      canal: 'WHATSAPP',
+      cliente: v('cliente'),
+      celular: v('celular'),
+      disc: v('disc') || 'N/A',
+      solicitud: v('solicitud'),
+      respuesta: v('respuesta'),
+      semaforo: v('semaforo') || 'TIBIO',
+      fechaCotizado: (preview.ultimaCotizacion?.fecha || v('fechaCotizado') || '').slice(0, 10),
+      notas: v('notas') || preview.resumen || '',
+      proximoSeguimiento: (v('proximoSeguimiento') || '').slice(0, 10),
+      priorizar: v('priorizar') || 'ALTA',
+      pendiente: v('pendiente') || 'SI',
+      asignado: v('asignado'),
+      fechaServicio: (v('fechaServicio') || '').slice(0, 10),
+      registrado: 'WHATSAPP',
+      objecion: v('objecion'),
+      encuesta: v('encuesta') || 'PENDIENTE',
+    };
+  }
+
+  private rowFromHit(hit: { cliente?: string; celular?: string; fecha?: string; hojaOrigen?: string }): SeguimientoWhatsapp {
+    return {
+      fecha: hit.fecha || '',
+      tipo: '',
+      canal: 'WHATSAPP',
+      cliente: hit.cliente || '',
+      celular: hit.celular || '',
+      solicitud: '',
+      respuesta: '',
+      semaforo: '',
+      cotizado: false,
+      notas: '',
+      fechaServicio: '',
+      encuesta: false,
+      asignado: '',
+      proximoSeguimiento: '',
+      hojaOrigen: hit.hojaOrigen,
+    };
   }
 
   guardar(): void {

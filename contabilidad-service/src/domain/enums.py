@@ -73,6 +73,7 @@ class MatchType(StrEnum):
     MATCH_PROBABLE = "MATCH_PROBABLE"
     SIN_MATCH = "SIN_MATCH"
     DESDE_AUTOBITS = "DESDE_AUTOBITS"
+    DESDE_CRUCE = "DESDE_CRUCE"
 
 
 class CrossingStatus(StrEnum):

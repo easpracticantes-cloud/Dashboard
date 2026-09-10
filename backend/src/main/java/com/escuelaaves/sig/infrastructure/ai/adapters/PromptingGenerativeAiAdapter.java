@@ -8,6 +8,7 @@ import com.escuelaaves.sig.domain.ai.model.NaturalLanguageQuotation;
 import com.escuelaaves.sig.domain.ai.model.PricedQuotation;
 import com.escuelaaves.sig.domain.ai.model.QuoteInterpretation;
 import com.escuelaaves.sig.domain.ai.model.ReservationExtraction;
+import com.escuelaaves.sig.domain.ai.model.SeguimientoExtraction;
 import com.escuelaaves.sig.domain.ai.model.SentimentAnalysis;
 import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
 import com.escuelaaves.sig.infrastructure.ai.support.AiStructuredJson;
@@ -17,6 +18,8 @@ import com.escuelaaves.sig.shared.exception.BadRequestException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
 
 /**
  * Prompts y parseo compartidos del proveedor Claude.
@@ -193,6 +196,118 @@ public abstract class PromptingGenerativeAiAdapter implements GenerativeAiPort {
         } catch (Exception ex) {
             throw new BadRequestException("No se pudo extraer información de reserva: " + ex.getMessage());
         }
+    }
+
+    @Override
+    public SeguimientoExtraction extractSeguimientoFromChat(String normalizedChat) {
+        String system = """
+                Eres extractor de Escuela Aves Salento. Analiza TODO el chat cronológico.
+                Devuelve SOLO JSON con esta forma:
+                {
+                  "campos": {
+                    "fecha": {"valor":"YYYY-MM-DD o null","estado":"CONFIRMADO|INFERIDO|AMBIGUO|NO_ENCONTRADO","confianza":0.0},
+                    "tipo": {"valor":"B2B|B2C|AGENCIA|PARTICULAR o null","estado":"...","confianza":0.0},
+                    "canal": {"valor":"WHATSAPP","estado":"CONFIRMADO","confianza":1},
+                    "cliente": {"valor":null,"estado":"...","confianza":0.0},
+                    "celular": {"valor":null,"estado":"...","confianza":0.0},
+                    "disc": {"valor":"N/A","estado":"...","confianza":0.0},
+                    "solicitud": {"valor":null,"estado":"...","confianza":0.0},
+                    "respuesta": {"valor":null,"estado":"...","confianza":0.0},
+                    "semaforo": {"valor":"FRIO|TIBIO|CALIENTE|VENTA o null","estado":"...","confianza":0.0},
+                    "fechaCotizado": {"valor":"YYYY-MM-DD o null","estado":"...","confianza":0.0},
+                    "notas": {"valor":null,"estado":"...","confianza":0.0},
+                    "proximoSeguimiento": {"valor":"YYYY-MM-DD o null","estado":"...","confianza":0.0},
+                    "priorizar": {"valor":"ALTA|MEDIA|BAJA o null","estado":"...","confianza":0.0},
+                    "pendiente": {"valor":null,"estado":"...","confianza":0.0},
+                    "asignado": {"valor":null,"estado":"...","confianza":0.0},
+                    "fechaServicio": {"valor":"YYYY-MM-DD o null","estado":"...","confianza":0.0},
+                    "registrado": {"valor":"WHATSAPP","estado":"CONFIRMADO","confianza":1},
+                    "objecion": {"valor":null,"estado":"...","confianza":0.0},
+                    "encuesta": {"valor":"SI|NO|PENDIENTE o null","estado":"...","confianza":0.0}
+                  },
+                  "ultimaCotizacion": {
+                    "fecha":"YYYY-MM-DD o null",
+                    "servicio":null,
+                    "valor":null,
+                    "estado":"aceptada|rechazada|pendiente|modificada|NO_IDENTIFICADO",
+                    "condiciones":null,
+                    "respuestaCliente":null
+                  },
+                  "historialCotizaciones": [],
+                  "posibleDuplicado": null,
+                  "resumen": "texto breve"
+                }
+                La última cotización NO es el último mensaje: es la última versión de precio/servicio enviada.
+                No inventes. Si no aparece, valor null y estado NO_ENCONTRADO.
+                """;
+        String user = PromptAssembly.fenceUntrusted("Chat de WhatsApp (cronológico):", normalizedChat);
+        String json = generateText(system, user, true, "extractSeguimiento");
+        try {
+            JsonNode node = objectMapper.readTree(AiStructuredJson.extractJson(json));
+            return parseSeguimiento(node);
+        } catch (Exception ex) {
+            throw new BadRequestException("No se pudo estructurar el chat de WhatsApp.");
+        }
+    }
+
+    private SeguimientoExtraction parseSeguimiento(JsonNode node) {
+        java.util.LinkedHashMap<String, SeguimientoExtraction.FieldValue> campos = new java.util.LinkedHashMap<>();
+        JsonNode rawCampos = node.path("campos");
+        String[] keys = {
+                "fecha", "tipo", "canal", "cliente", "celular", "disc", "solicitud", "respuesta",
+                "semaforo", "fechaCotizado", "notas", "proximoSeguimiento", "priorizar", "pendiente",
+                "asignado", "fechaServicio", "registrado", "objecion", "encuesta"
+        };
+        for (String key : keys) {
+            JsonNode fv = rawCampos.path(key);
+            campos.put(key, new SeguimientoExtraction.FieldValue(
+                    AiStructuredJson.textOrNull(fv, "valor"),
+                    OptionalEstado(AiStructuredJson.textOrNull(fv, "estado")),
+                    fv.path("confianza").isNumber() ? fv.path("confianza").asDouble() : 0
+            ));
+        }
+        if (campos.get("canal").valor() == null) {
+            campos.put("canal", SeguimientoExtraction.FieldValue.of("WHATSAPP", "CONFIRMADO", 1));
+        }
+        if (campos.get("registrado").valor() == null) {
+            campos.put("registrado", SeguimientoExtraction.FieldValue.of("WHATSAPP", "CONFIRMADO", 1));
+        }
+        JsonNode u = node.path("ultimaCotizacion");
+        SeguimientoExtraction.UltimaCotizacion ultima = new SeguimientoExtraction.UltimaCotizacion(
+                AiStructuredJson.textOrNull(u, "fecha"),
+                AiStructuredJson.textOrNull(u, "servicio"),
+                AiStructuredJson.textOrNull(u, "valor"),
+                AiStructuredJson.textOrNull(u, "estado"),
+                AiStructuredJson.textOrNull(u, "condiciones"),
+                AiStructuredJson.textOrNull(u, "respuestaCliente")
+        );
+        java.util.ArrayList<SeguimientoExtraction.UltimaCotizacion> hist = new java.util.ArrayList<>();
+        if (node.path("historialCotizaciones").isArray()) {
+            for (JsonNode h : node.path("historialCotizaciones")) {
+                hist.add(new SeguimientoExtraction.UltimaCotizacion(
+                        AiStructuredJson.textOrNull(h, "fecha"),
+                        AiStructuredJson.textOrNull(h, "servicio"),
+                        AiStructuredJson.textOrNull(h, "valor"),
+                        AiStructuredJson.textOrNull(h, "estado"),
+                        AiStructuredJson.textOrNull(h, "condiciones"),
+                        AiStructuredJson.textOrNull(h, "respuestaCliente")
+                ));
+            }
+        }
+        return new SeguimientoExtraction(
+                campos,
+                ultima,
+                List.copyOf(hist),
+                AiStructuredJson.textOrNull(node, "posibleDuplicado"),
+                AiStructuredJson.textOrNull(node, "resumen")
+        );
+    }
+
+    private static String OptionalEstado(String estado) {
+        if (estado == null || estado.isBlank()) {
+            return "NO_ENCONTRADO";
+        }
+        return estado.trim().toUpperCase();
     }
 
     @Override

@@ -356,7 +356,7 @@ async def upload_documents_batch(
         mensaje = (
             f"{len(queued_ids)} factura(s) en cola · {packs} paquete(s) de hasta {size} "
             f"(hasta {min(BATCH_MAX_WORKERS, size)} a la vez). "
-            "Luego se cruzan solas con Autobits (fecha, cliente, compra)."
+            "Luego se vinculan solas con el Excel de Cruce de Cuentas (compra, reserva, FACTURA/CDC)."
         )
     else:
         mensaje = f"{len(queued_ids)} archivo(s) guardados sin procesar automáticamente."

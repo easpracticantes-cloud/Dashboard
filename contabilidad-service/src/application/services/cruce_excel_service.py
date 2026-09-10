@@ -26,11 +26,17 @@ from domain.autobits.observaciones import (
 from domain.cruce.fields import ParsedCruceRow, crossing_match_keys, fold
 from domain.enums import CrossingStatus
 from infrastructure.cruce.excel_adapter import CruceExcelAdapter, CruceImportError
-from infrastructure.persistence.models import AccountCrossingModel, AutobitsRecordModel
+from infrastructure.persistence.models import (
+    AccountCrossingModel,
+    AutobitsRecordModel,
+    CruceImportBatchModel,
+    CruceRecordModel,
+)
 from infrastructure.persistence.repositories import (
     AuditRepository,
     AutobitsRepository,
     CrossingRepository,
+    CruceRepository,
 )
 
 # Estados que ya no se tocan al aplicar el Excel de cruce
@@ -100,6 +106,7 @@ class CruceExcelService:
         self.db = db
         self.autobits_repo = AutobitsRepository(db)
         self.crossing_repo = CrossingRepository(db)
+        self.cruce_repo = CruceRepository(db)
         self.audit = AuditRepository(db)
         self.adapter = CruceExcelAdapter()
         self.settings = get_settings()
@@ -125,6 +132,55 @@ class CruceExcelService:
         destino.write_bytes(content)
         return destino
 
+    def _persistir_filas(
+        self,
+        rows: list[ParsedCruceRow],
+        *,
+        file_hash: str,
+        filename: str,
+        autobits_batch_id: int | None,
+        usuario: str,
+    ) -> tuple[CruceImportBatchModel, dict[tuple[str, int], CruceRecordModel]]:
+        existing = self.cruce_repo.get_batch_by_hash(file_hash)
+        if existing:
+            modelos = self.cruce_repo.list_records_for_batch(existing.id)
+            return existing, {(m.sheet, m.row_number): m for m in modelos}
+
+        batch = CruceImportBatchModel(
+            filename=Path(filename or "cruce.xlsx").name,
+            file_hash=file_hash,
+            autobits_batch_id=autobits_batch_id,
+            total_rows=len(rows),
+            imported_by=usuario or "SISTEMA",
+        )
+        self.db.add(batch)
+        self.db.flush()
+        por_fila: dict[tuple[str, int], CruceRecordModel] = {}
+        for row in rows:
+            rec = CruceRecordModel(
+                import_batch_id=batch.id,
+                sheet=row.sheet or "",
+                row_number=row.row_number or 0,
+                proveedor=row.proveedor,
+                nit=row.nit,
+                numero_compra=row.numero_compra,
+                numero_reserva=row.numero_reserva,
+                concepto=row.concepto,
+                valor=row.valor,
+                factura_cdc=row.factura_cdc,
+                fecha_pago=row.fecha_pago,
+                fecha_ejecucion=row.fecha_ejecucion,
+                estado_compra=row.estado_compra,
+                observaciones=row.observaciones,
+                record_hash=hashlib.sha256(
+                    f"{row.sheet}|{row.row_number}|{row.numero_compra}|{row.numero_reserva}|{row.factura_cdc}".encode()
+                ).hexdigest(),
+            )
+            self.db.add(rec)
+            por_fila[(row.sheet, row.row_number)] = rec
+        self.db.flush()
+        return batch, por_fila
+
     def procesar_archivo(
         self,
         content: bytes,
@@ -149,7 +205,7 @@ class CruceExcelService:
         file_hash = hashlib.sha256(content).hexdigest()
         if not force:
             snap = self._leer_snapshot(batch.id)
-            if snap and snap.get("file_hash") == file_hash:
+            if snap and snap.get("file_hash") == file_hash and self.cruce_repo.get_batch_by_hash(file_hash):
                 data = self.pendientes(batch.id)
                 conciliacion = dict(snap.get("conciliacion") or {})
                 conciliacion.setdefault("conflictos", [])
@@ -183,6 +239,14 @@ class CruceExcelService:
         except CruceImportError as exc:
             raise CruceExcelServiceError(exc.message, exc.code) from exc
 
+        cruce_batch, por_fila = self._persistir_filas(
+            parsed.rows,
+            file_hash=file_hash,
+            filename=filename,
+            autobits_batch_id=batch.id,
+            usuario=usuario,
+        )
+
         crossings = self._crossings_del_batch(batch.id)
         indice = self._indexar(crossings)
         periodo_inicio, periodo_fin = self._periodo_efectivo(batch)
@@ -213,6 +277,23 @@ class CruceExcelService:
         conflictos: list[dict] = []
         if aplicar:
             aplicados, conflictos = self._aplicar(crossings, emparejados)
+            for crossing_id, row in emparejados.items():
+                rec = por_fila.get((row.sheet, row.row_number))
+                crossing = next((c for c in crossings if c.id == crossing_id), None)
+                if rec and crossing and not crossing.cruce_record_id:
+                    crossing.cruce_record_id = rec.id
+            from application.services.crossing_service import CrossingService
+
+            seed_rows = [
+                por_fila[(row.sheet, row.row_number)]
+                for row in sobrantes
+                if (row.sheet, row.row_number) in por_fila
+            ]
+            CrossingService(self.db).seed_from_cruce(
+                cruce_batch_id=cruce_batch.id,
+                rows=seed_rows,
+                usuario=usuario,
+            )
             self.audit.log(
                 "CRUCE_EXCEL_APLICADO",
                 "AccountCrossing",

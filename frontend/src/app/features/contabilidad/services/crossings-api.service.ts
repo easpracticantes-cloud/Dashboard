@@ -10,6 +10,7 @@ export interface CrossingSummary {
   document_numero?: string;
   document_estado?: string;
   autobits_record_id?: number;
+  cruce_record_id?: number | null;
   import_batch_id?: number | null;
   match_type: string;
   match_score?: number;

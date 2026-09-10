@@ -14,7 +14,7 @@ from domain.matching.normalize import (
     values_close,
 )
 from domain.utils.money import money_to_float
-from infrastructure.persistence.models import AutobitsRecordModel, DocumentModel
+from infrastructure.persistence.models import AutobitsRecordModel, CruceRecordModel, DocumentModel
 
 
 @dataclass
@@ -29,6 +29,8 @@ class MatchCandidate:
     numero_compra: str | None = None
     numero_reserva: str | None = None
     proveedor: str | None = None
+    cruce_record_id: int | None = None
+    factura_cdc: str | None = None
 
 
 @dataclass
@@ -173,8 +175,91 @@ class MatchingEngine:
             proveedor=record.proveedor or ctx.proveedor,
         )
 
+    def find_best_cruce_match(
+        self,
+        doc: DocumentModel,
+        records: list[CruceRecordModel],
+    ) -> MatchCandidate | None:
+        """Mejor fila del Excel de Cruce de Cuentas para esta factura."""
+        if not records:
+            return None
+        ctx = extract_document_context(doc)
+        scored: list[MatchCandidate] = []
+        for record in records:
+            candidate = self.score_cruce_pair(ctx, record)
+            if candidate.score > 0:
+                scored.append(candidate)
+        if not scored:
+            return None
+        scored.sort(key=lambda c: c.score, reverse=True)
+        best = scored[0]
+        if best.score < self.PROBABLE_THRESHOLD:
+            return None
+        return best
+
+    def score_cruce_pair(
+        self,
+        ctx: DocumentMatchContext,
+        record: CruceRecordModel,
+    ) -> MatchCandidate:
+        score = 0.0
+        reasons: list[str] = []
+        doc_compra = ctx.compra
+        doc_num = ctx.numero_documento
+
+        if doc_num and record.factura_cdc and normalize_id(doc_num) == normalize_id(record.factura_cdc):
+            score += 45
+            reasons.append("factura_cdc")
+        if doc_compra and record.numero_compra and normalize_id(doc_compra) == normalize_id(record.numero_compra):
+            score += 40
+            reasons.append("compra_exacta")
+        elif doc_num and record.numero_compra and normalize_id(doc_num) == normalize_id(record.numero_compra):
+            score += 30
+            reasons.append("doc_compra_cruzado")
+
+        if ctx.nit and record.nit and normalize_nit(ctx.nit) == normalize_nit(record.nit):
+            score += 25
+            reasons.append("nit")
+        if names_similar(ctx.proveedor, record.proveedor):
+            score += 15
+            reasons.append("proveedor")
+        if ctx.reserva and record.numero_reserva and normalize_id(ctx.reserva) == normalize_id(record.numero_reserva):
+            score += 10
+            reasons.append("reserva")
+        if values_close(ctx.valor, record.valor):
+            score += 15
+            reasons.append("valor")
+        elif ctx.valor and record.valor and values_close(ctx.valor, record.valor, tolerance_pct=5.0):
+            score += 8
+            reasons.append("valor_cercano")
+        if ctx.fecha and record.fecha_ejecucion and ctx.fecha[:10] == record.fecha_ejecucion[:10]:
+            score += 5
+            reasons.append("fecha")
+
+        if score > 100:
+            score = 100.0
+        match_type = self.classify(score, reasons)
+        diferencia = money_to_float(value_difference(ctx.valor, record.valor))
+        return MatchCandidate(
+            autobits_record_id=0,
+            cruce_record_id=record.id,
+            score=round(score, 1),
+            match_type=match_type,
+            reasons=reasons,
+            valor_documento=money_to_float(ctx.valor),
+            valor_autobits=money_to_float(record.valor),
+            diferencia=diferencia,
+            numero_compra=record.numero_compra,
+            numero_reserva=record.numero_reserva,
+            proveedor=record.proveedor or ctx.proveedor,
+            factura_cdc=record.factura_cdc,
+        )
+
     def classify(self, score: float, reasons: list[str]) -> str:
-        has_strong_id = any(r in reasons for r in ("compra_exacta", "documento_exacto", "doc_compra_cruzado"))
+        has_strong_id = any(
+            r in reasons
+            for r in ("compra_exacta", "documento_exacto", "doc_compra_cruzado", "factura_cdc")
+        )
         has_identity = "nit" in reasons or "proveedor" in reasons
 
         if score >= self.EXACT_THRESHOLD and has_strong_id and has_identity:

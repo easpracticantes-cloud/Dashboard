@@ -1,5 +1,6 @@
 package com.escuelaaves.sig.domain.ai.port;
 
+import com.escuelaaves.sig.domain.ai.model.SeguimientoExtraction;
 import com.escuelaaves.sig.domain.ai.port.out.ConversationClassifier;
 import com.escuelaaves.sig.domain.ai.port.out.EmailGenerator;
 import com.escuelaaves.sig.domain.ai.port.out.GenerativeChatProvider;
@@ -48,5 +49,12 @@ public interface GenerativeAiPort extends
 
     default String detectIntent(String text) {
         return classifyConversation(text).intent();
+    }
+
+    /**
+     * Extrae una fila de Registro (columnas del Excel existente) desde un chat normalizado.
+     */
+    default SeguimientoExtraction extractSeguimientoFromChat(String normalizedChat) {
+        throw new UnsupportedOperationException("extractSeguimientoFromChat");
     }
 }

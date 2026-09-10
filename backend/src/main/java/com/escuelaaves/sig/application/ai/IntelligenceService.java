@@ -15,6 +15,7 @@ import com.escuelaaves.sig.domain.ai.model.NaturalLanguageQuotation;
 import com.escuelaaves.sig.domain.ai.model.PricedQuotation;
 import com.escuelaaves.sig.domain.ai.model.QuoteInterpretation;
 import com.escuelaaves.sig.domain.ai.model.ReservationExtraction;
+import com.escuelaaves.sig.domain.ai.model.SeguimientoExtraction;
 import com.escuelaaves.sig.domain.ai.model.SentimentAnalysis;
 import com.escuelaaves.sig.domain.ai.port.AiProviderFactory;
 import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
@@ -111,6 +112,11 @@ public class IntelligenceService implements AIUseCase {
     public ReservationExtraction extractReservationInformation(String message) {
         return observe("extractReservation", "/api/v1/ai/extract-reservation",
                 () -> ai().extractReservationInformation(message));
+    }
+
+    public SeguimientoExtraction extractSeguimientoFromChat(String normalizedChat) {
+        return observe("extractSeguimiento", "/api/v1/ai/extract-seguimiento",
+                () -> ai().extractSeguimientoFromChat(normalizedChat));
     }
 
     @Override

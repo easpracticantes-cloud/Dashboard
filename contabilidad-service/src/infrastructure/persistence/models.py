@@ -150,6 +150,51 @@ class AutobitsRecordModel(Base):
     crossings: Mapped[list["AccountCrossingModel"]] = relationship(back_populates="autobits_record")
 
 
+class CruceImportBatchModel(Base):
+    """Carga persistida del Excel de Cruce de Cuentas (ancla de las facturas)."""
+
+    __tablename__ = "cruce_import_batches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    file_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    autobits_batch_id: Mapped[int | None] = mapped_column(
+        ForeignKey("autobits_import_batches.id"), index=True, nullable=True
+    )
+    total_rows: Mapped[int] = mapped_column(Integer, default=0)
+    imported_by: Mapped[str] = mapped_column(String(128), default="SISTEMA")
+    imported_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    records: Mapped[list["CruceRecordModel"]] = relationship(back_populates="import_batch")
+
+
+class CruceRecordModel(Base):
+    """Una fila del Excel de Cruce de Cuentas."""
+
+    __tablename__ = "cruce_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    import_batch_id: Mapped[int] = mapped_column(ForeignKey("cruce_import_batches.id"), index=True)
+    sheet: Mapped[str] = mapped_column(String(128), default="")
+    row_number: Mapped[int] = mapped_column(Integer, default=0)
+    proveedor: Mapped[str | None] = mapped_column(String(255))
+    nit: Mapped[str | None] = mapped_column(String(64), index=True)
+    numero_compra: Mapped[str | None] = mapped_column(String(128), index=True)
+    numero_reserva: Mapped[str | None] = mapped_column(String(128), index=True)
+    concepto: Mapped[str | None] = mapped_column(Text)
+    valor: Mapped[float | None] = mapped_column(Float)
+    factura_cdc: Mapped[str | None] = mapped_column(String(255), index=True)
+    fecha_pago: Mapped[str | None] = mapped_column(String(32))
+    fecha_ejecucion: Mapped[str | None] = mapped_column(String(32))
+    estado_compra: Mapped[str | None] = mapped_column(String(64))
+    observaciones: Mapped[str | None] = mapped_column(Text)
+    record_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    import_batch: Mapped[CruceImportBatchModel] = relationship(back_populates="records")
+    crossings: Mapped[list["AccountCrossingModel"]] = relationship(back_populates="cruce_record")
+
+
 class PurchaseModel(Base):
     __tablename__ = "autobits_purchases"
 
@@ -182,6 +227,9 @@ class AccountCrossingModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     document_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"), index=True, nullable=True)
     autobits_record_id: Mapped[int | None] = mapped_column(ForeignKey("autobits_records.id"), index=True)
+    cruce_record_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cruce_records.id"), index=True, nullable=True
+    )
     import_batch_id: Mapped[int | None] = mapped_column(
         ForeignKey("autobits_import_batches.id"), index=True, nullable=True
     )
@@ -210,6 +258,7 @@ class AccountCrossingModel(Base):
 
     document: Mapped[DocumentModel | None] = relationship(back_populates="crossings")
     autobits_record: Mapped[AutobitsRecordModel | None] = relationship(back_populates="crossings")
+    cruce_record: Mapped["CruceRecordModel | None"] = relationship(back_populates="crossings")
     remediations: Mapped[list["RemediationModel"]] = relationship(back_populates="crossing")
     payments: Mapped[list["PaymentModel"]] = relationship(back_populates="crossing")
 

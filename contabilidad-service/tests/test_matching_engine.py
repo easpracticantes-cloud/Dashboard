@@ -10,7 +10,7 @@ sys.path.insert(0, str(SRC))
 
 from domain.enums import MatchType
 from domain.matching.matching_engine import MatchingEngine, extract_document_context
-from infrastructure.persistence.models import AutobitsRecordModel, DocumentModel, ProviderModel
+from infrastructure.persistence.models import AutobitsRecordModel, CruceRecordModel, DocumentModel, ProviderModel
 
 
 def _doc(**kwargs) -> DocumentModel:
@@ -94,3 +94,26 @@ def test_extract_document_context():
     assert ctx.compra == "C-1001"
     assert ctx.reserva == "R-550"
     assert ctx.valor == 850000.0
+
+
+def test_match_factura_contra_cruce_no_autobits():
+    engine = MatchingEngine()
+    doc = _doc(numero_documento="CDC-99", extracted_json='{"compra": "C-1001", "reserva": "R-550"}')
+    cruce = CruceRecordModel(
+        id=7,
+        import_batch_id=1,
+        sheet="ENERO",
+        row_number=12,
+        proveedor="Hotel Andino SAS",
+        nit="900123456",
+        numero_compra="C-1001",
+        numero_reserva="R-550",
+        valor=850000.0,
+        factura_cdc="CDC-99",
+        fecha_ejecucion="2026-08-20",
+    )
+    candidate = engine.find_best_cruce_match(doc, [cruce])
+    assert candidate is not None
+    assert candidate.cruce_record_id == 7
+    assert candidate.autobits_record_id == 0
+    assert "factura_cdc" in candidate.reasons or "compra_exacta" in candidate.reasons
