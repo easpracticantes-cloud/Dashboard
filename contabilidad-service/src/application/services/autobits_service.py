@@ -126,12 +126,12 @@ class AutobitsService:
         if not force:
             existing = self.repo.find_batch_by_file_hash(file_hash)
             if existing:
-                raise AutobitsServiceError(
-                    f"Este Excel ya fue importado (lote #{existing.id}, "
-                    f"{existing.filename}). No se permiten archivos repetidos. "
-                    "Use force=true solo si necesita forzar una reimportación.",
-                    "DUPLICATE_FILE",
-                    status_code=409,
+                return self._result_from_existing_batch(
+                    existing,
+                    aviso=(
+                        f"Este Excel ya estaba importado (lote #{existing.id}, "
+                        f"{existing.filename}). Se muestran las filas existentes."
+                    ),
                 )
 
         preview_id, path = self.save_preview_file(content, filename)
@@ -168,6 +168,7 @@ class AutobitsService:
                 imported_by=imported_by,
                 skip_duplicates=skip_duplicates,
                 file_hash=file_hash,
+                force=force,
             )
             result["detected_mapping"] = {k: v for k, v in mapping.items() if v}
             result["sheet_name"] = preview.sheet_name
@@ -215,10 +216,9 @@ class AutobitsService:
         if not force:
             existing = self.repo.find_batch_by_file_hash(resolved_hash)
             if existing:
-                raise AutobitsServiceError(
-                    f"Este Excel ya fue importado (lote #{existing.id}).",
-                    "DUPLICATE_FILE",
-                    status_code=409,
+                return self._result_from_existing_batch(
+                    existing,
+                    aviso=f"Este Excel ya estaba importado (lote #{existing.id}).",
                 )
 
         try:
@@ -286,12 +286,36 @@ class AutobitsService:
 
         preview_path.unlink(missing_ok=True)
 
+        records = [self.to_record_dict(r) for r in self.repo.list_records_for_batch(batch.id)]
+        visible = max(imported, len(records))
         return {
             "batch": self.to_batch_dict(batch),
-            "imported_rows": imported,
+            "imported_rows": visible,
             "skipped_duplicates": skipped_duplicates,
             "skipped_empty": parsed.skipped_empty,
             "parse_errors": row_errors[:20],
+            "records": records[:200],
+            "reused": False,
+            "aviso": None,
+        }
+
+    def _result_from_existing_batch(self, batch: ImportBatchModel, *, aviso: str) -> dict:
+        records = [self.to_record_dict(r) for r in self.repo.list_records_for_batch(batch.id)]
+        mapping = mapping_from_json(batch.column_mapping_json)
+        return {
+            "batch": self.to_batch_dict(batch),
+            "imported_rows": batch.imported_rows or len(records),
+            "skipped_duplicates": 0,
+            "skipped_empty": 0,
+            "parse_errors": [],
+            "records": records[:200],
+            "reused": True,
+            "aviso": aviso,
+            "detected_mapping": {k: v for k, v in mapping.items() if v},
+            "sheet_name": None,
+            "analysis_mode": "reused",
+            "ai_notes": aviso,
+            "crossing": None,
         }
 
     def list_batches(self, limit: int = 50, offset: int = 0) -> tuple[list[dict], int]:

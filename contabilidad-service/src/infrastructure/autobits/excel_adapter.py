@@ -77,21 +77,77 @@ def _to_str(value) -> str | None:
     return texto or None
 
 
-def _read_sheet(path: Path):
+def _read_workbook(path: Path):
     if path.suffix.lower() not in {".xlsx", ".xlsm", ".xltx", ".xltm"}:
         raise AutobitsImportError(
             "Formato no soportado. Use un archivo Excel (.xlsx).",
             "INVALID_FORMAT",
         )
     try:
-        wb = load_workbook(path, read_only=True, data_only=True)
+        return load_workbook(path, read_only=True, data_only=True)
     except Exception as exc:
         raise AutobitsImportError(f"No se pudo leer el Excel: {exc}", "READ_ERROR") from exc
-    sheet = wb.active
-    if sheet is None:
-        wb.close()
-        raise AutobitsImportError("El archivo Excel no tiene hojas.", "EMPTY_WORKBOOK")
-    return wb, sheet
+
+
+def _sheet_usefulness(columns: list[str], n_rows: int) -> int:
+    joined = " ".join(columns).lower()
+    score = n_rows
+    for hint in (
+        "proveedor",
+        "nit",
+        "compra",
+        "reserva",
+        "total",
+        "fecha",
+        "concepto",
+        "observacion",
+        "orden",
+    ):
+        if hint in joined:
+            score += 80
+    return score
+
+
+def _pick_best_sheet(wb):
+    """Elige la hoja con más pinta de reporte Autobits (no la portada)."""
+    ranked: list[tuple[int, object, list[str], list]] = []
+    for sheet in wb.worksheets:
+        try:
+            columns, data_rows = _iter_data_rows(sheet)
+        except Exception:
+            continue
+        if not columns:
+            continue
+        ranked.append((_sheet_usefulness(columns, len(data_rows)), sheet, columns, data_rows))
+    if not ranked:
+        sheet = wb.active
+        if sheet is None:
+            raise AutobitsImportError("El archivo Excel no tiene hojas.", "EMPTY_WORKBOOK")
+        columns, data_rows = _iter_data_rows(sheet)
+        return sheet, columns, data_rows
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    _, sheet, columns, data_rows = ranked[0]
+    return sheet, columns, data_rows
+
+
+def _normalize_mapping(mapping: dict[str, str | None], columns: list[str]) -> dict[str, str | None]:
+    """Resuelve nombres de columna aunque la IA los devuelva con mayúsculas distintas."""
+    exact = {c: c for c in columns}
+    folded = {c.lower().strip(): c for c in columns}
+    out: dict[str, str | None] = {}
+    for field, col in (mapping or {}).items():
+        if not col:
+            out[field] = None
+            continue
+        if col in exact:
+            out[field] = exact[col]
+        elif col.lower().strip() in folded:
+            out[field] = folded[col.lower().strip()]
+        else:
+            needle = col.lower().strip()
+            match = next((c for c in columns if needle in c.lower() or c.lower() in needle), None)
+            out[field] = match
+    return out
 
 
 def _iter_data_rows(sheet) -> tuple[list[str], list[tuple[int, dict]]]:
@@ -177,9 +233,9 @@ class ExcelAutobitsAdapter:
     """Importador v1 de reportes semanales Autobits desde Excel."""
 
     def preview(self, path: Path, sample_limit: int = 5) -> ExcelPreviewResult:
-        wb, sheet = _read_sheet(path)
+        wb = _read_workbook(path)
         try:
-            columns, data_rows = _iter_data_rows(sheet)
+            sheet, columns, data_rows = _pick_best_sheet(wb)
             if not columns:
                 raise AutobitsImportError("El Excel está vacío o sin encabezados.", "EMPTY_SHEET")
 
@@ -204,12 +260,13 @@ class ExcelAutobitsAdapter:
         *,
         validate: bool = True,
     ) -> ExcelParseResult:
-        wb, sheet = _read_sheet(path)
+        wb = _read_workbook(path)
         try:
-            columns, data_rows = _iter_data_rows(sheet)
+            _sheet, columns, data_rows = _pick_best_sheet(wb)
             if not columns:
                 raise AutobitsImportError("El Excel está vacío o sin encabezados.", "EMPTY_SHEET")
 
+            mapping = _normalize_mapping(mapping, columns)
             active_mapping = {k: v for k, v in mapping.items() if v and v in columns}
             if validate and not active_mapping.get("valor") and not active_mapping.get("proveedor"):
                 raise AutobitsImportError(

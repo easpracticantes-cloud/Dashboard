@@ -97,3 +97,20 @@ def test_excel_adapter_preview_and_parse(sample_xlsx):
     assert row.numero_compra == "C-1001"
     assert row.valor == 850000.0
     assert parsed.skipped_empty == 0
+
+
+def test_excel_adapter_ignora_hoja_portada(tmp_path):
+    wb = Workbook()
+    cover = wb.active
+    cover.title = "Portada"
+    cover.append(["Autobits Systems"])
+    cover.append(["All rights reserved"])
+    data = wb.create_sheet("Semana")
+    data.append(["Proveedor", "NIT", "Valor", "Fecha"])
+    data.append(["Acme", "9001", 50000, "2026-08-18"])
+    path = tmp_path / "portada.xlsx"
+    wb.save(path)
+
+    preview = ExcelAutobitsAdapter().preview(path)
+    assert preview.sheet_name == "Semana"
+    assert preview.total_rows == 1

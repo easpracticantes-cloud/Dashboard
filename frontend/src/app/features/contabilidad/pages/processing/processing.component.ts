@@ -68,6 +68,7 @@ export class ProcessingComponent implements OnInit, OnDestroy {
   documentosLote: DocumentSummary[] = [];
   packActual = 0;
   packTotal = 0;
+  solicitud = '';
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -174,7 +175,12 @@ export class ProcessingComponent implements OnInit, OnDestroy {
   }
 
   agregarArchivos(files: File[]): void {
-    const validos = files.filter((f) => /\.(jpg|jpeg|png|pdf)$/i.test(f.name));
+    if (this.archivos.length >= PACK_SIZE) {
+      this.estado = `Paquete lleno: máximo ${PACK_SIZE} facturas. Procesa este lote y luego sube otro.`;
+      return;
+    }
+    const cupo = PACK_SIZE - this.archivos.length;
+    const validos = files.filter((f) => /\.(jpg|jpeg|png|pdf)$/i.test(f.name)).slice(0, cupo);
     for (const file of validos) {
       if (this.archivos.some((a) => a.file.name === file.name && a.file.size === file.size)) {
         continue;
@@ -243,7 +249,8 @@ export class ProcessingComponent implements OnInit, OnDestroy {
       .uploadBatch(
         this.archivos.map((a) => a.file),
         'FACTURA',
-        PACK_SIZE
+        PACK_SIZE,
+        this.solicitud
       )
       .subscribe({
         next: (res) => {

@@ -15,6 +15,7 @@ export interface DocumentSummary {
   total?: number;
   confidence_global?: number;
   requiere_revision: boolean;
+  observaciones?: string;
   received_at: string;
 }
 
@@ -117,8 +118,13 @@ export class DocumentsApiService {
     return this.http.post<UploadResponse>(`${this.base}/upload`, form);
   }
 
-  /** Carga masiva: guarda todos y procesa en paquetes de 25 en segundo plano. */
-  uploadBatch(files: File[], tipo = 'FACTURA', packSize = 25): Observable<BatchUploadResponse> {
+  /** Carga masiva: máximo 25 facturas por paquete. */
+  uploadBatch(
+    files: File[],
+    tipo = 'FACTURA',
+    packSize = 25,
+    solicitud?: string
+  ): Observable<BatchUploadResponse> {
     const form = new FormData();
     for (const file of files) {
       form.append('archivos', file, file.name);
@@ -127,7 +133,25 @@ export class DocumentsApiService {
     form.append('origen', 'CARGA_MANUAL');
     form.append('auto_procesar', 'true');
     form.append('pack_size', String(packSize));
+    if (solicitud?.trim()) {
+      form.append('solicitud', solicitud.trim());
+    }
     return this.http.post<BatchUploadResponse>(`${this.base}/upload-batch`, form);
+  }
+
+  ask(
+    pregunta: string,
+    documentIds?: number[]
+  ): Observable<{ ok: boolean; respuesta: string; documentos: number; error?: string | null }> {
+    return this.http.post<{
+      ok: boolean;
+      respuesta: string;
+      documentos: number;
+      error?: string | null;
+    }>(`${this.base}/ask`, {
+      pregunta,
+      document_ids: documentIds?.length ? documentIds : null,
+    });
   }
 
   processBatch(documentIds: number[], packSize = 25): Observable<{

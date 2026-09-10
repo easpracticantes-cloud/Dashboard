@@ -43,6 +43,7 @@ class DocumentSummary(BaseModel):
     total: float | None = None
     confidence_global: float | None = None
     requiere_revision: bool
+    observaciones: str | None = None
     received_at: str
 
 
@@ -202,7 +203,11 @@ BATCH_PACK_SIZE = 25
 BATCH_MAX_WORKERS = 8
 
 
-def _process_document_ids_in_packs(document_ids: list[int], pack_size: int = BATCH_PACK_SIZE) -> None:
+def _process_document_ids_in_packs(
+    document_ids: list[int],
+    pack_size: int = BATCH_PACK_SIZE,
+    solicitud: str | None = None,
+) -> None:
     """Procesa IDs en paquetes de 25; dentro del paquete hasta 8 en paralelo."""
     import logging
     from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -237,7 +242,9 @@ def _process_document_ids_in_packs(document_ids: list[int], pack_size: int = BAT
             db.close()
 
         with ThreadPoolExecutor(max_workers=min(BATCH_MAX_WORKERS, len(pack))) as pool:
-            futures = {pool.submit(processor.process_by_id, doc_id, None): doc_id for doc_id in pack}
+            futures = {
+                pool.submit(processor.process_by_id, doc_id, solicitud): doc_id for doc_id in pack
+            }
             for fut in as_completed(futures):
                 doc_id = futures[fut]
                 try:
@@ -254,11 +261,17 @@ async def upload_documents_batch(
     tipo: str = Form("FACTURA"),
     auto_procesar: bool = Form(True),
     pack_size: int = Form(BATCH_PACK_SIZE),
+    solicitud: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    """Sube muchas facturas y procesa en paquetes de `pack_size` (default 25)."""
+    """Sube hasta 25 facturas y las procesa en un paquete."""
     if not archivos:
         raise HTTPException(status_code=400, detail="No se recibieron archivos.")
+    if len(archivos) > BATCH_PACK_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Máximo {BATCH_PACK_SIZE} facturas por carga. Divide el lote en paquetes.",
+        )
 
     service = DocumentService(db)
     items: list[BatchUploadItem] = []
@@ -320,7 +333,12 @@ async def upload_documents_batch(
                     "OCR/IA no disponible aún: " + " ".join(errores)
                 ),
             )
-        background_tasks.add_task(_process_document_ids_in_packs, list(queued_ids), size)
+        background_tasks.add_task(
+            _process_document_ids_in_packs,
+            list(queued_ids),
+            size,
+            (solicitud or "").strip() or None,
+        )
 
         def _cruzar_despues() -> None:
             from application.services.crossing_service import CrossingService
@@ -352,6 +370,44 @@ async def upload_documents_batch(
         queued_ids=queued_ids,
         items=items,
         mensaje=mensaje,
+    )
+
+
+class AskRequest(BaseModel):
+    pregunta: str
+    document_ids: list[int] | None = None
+
+
+class AskResponse(BaseModel):
+    ok: bool
+    respuesta: str = ""
+    documentos: int = 0
+    error: str | None = None
+
+
+@router.post("/ask", response_model=AskResponse)
+def ask_documents(body: AskRequest, db: Session = Depends(get_db)):
+    """Chat IA sobre facturas ya extraídas (paquete de hasta 25)."""
+    pregunta = (body.pregunta or "").strip()
+    if not pregunta:
+        raise HTTPException(status_code=400, detail="Escribe qué quieres saber de las facturas.")
+    service = DocumentService(db)
+    docs = []
+    ids = [int(i) for i in (body.document_ids or []) if i][:BATCH_PACK_SIZE]
+    if ids:
+        for doc_id in ids:
+            doc = service.get_document(doc_id)
+            if doc:
+                docs.append(doc)
+    else:
+        docs, _ = service.list_documents(limit=BATCH_PACK_SIZE, tipo="FACTURA")
+    processor = get_document_processing_service()
+    result = processor.ask_about_documents(pregunta, docs)
+    return AskResponse(
+        ok=bool(result.get("ok")),
+        respuesta=result.get("respuesta") or "",
+        documentos=int(result.get("documentos") or len(docs)),
+        error=result.get("error"),
     )
 
 
@@ -528,5 +584,6 @@ def _to_summary(doc) -> DocumentSummary:
         total=doc.total,
         confidence_global=doc.confidence_global,
         requiere_revision=doc.requiere_revision,
+        observaciones=doc.observaciones,
         received_at=doc.received_at.isoformat() if doc.received_at else "",
     )

@@ -62,6 +62,9 @@ export interface ImportResult {
   crossing?: { created?: number; error?: string; items?: unknown[] };
   analysis_mode?: string;
   ai_notes?: string;
+  records?: AutobitsRecord[];
+  reused?: boolean;
+  aviso?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })

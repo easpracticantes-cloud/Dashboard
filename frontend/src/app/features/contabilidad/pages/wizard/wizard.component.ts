@@ -1,9 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { interval, Subscription } from 'rxjs';
-import { AutobitsApiService, AutobitsRecord, ImportResult } from '../../services/autobits-api.service';
+import { Subscription, interval } from 'rxjs';
+import {
+  AutobitsApiService,
+  AutobitsRecord,
+  ImportResult,
+} from '../../services/autobits-api.service';
 import { CrossingsApiService, CrossingSummary } from '../../services/crossings-api.service';
 import {
   ComparacionFila,
@@ -19,6 +23,12 @@ import {
 import { formatCop } from '../../utils/contabilidad-labels';
 
 const SESSION_KEY = 'contab-wizard-session';
+const PACK_MAX = 25;
+
+interface ChatMsg {
+  role: 'user' | 'ia';
+  text: string;
+}
 
 @Component({
   selector: 'eas-contabilidad-wizard',
@@ -34,90 +44,108 @@ export class WizardComponent implements OnInit, OnDestroy {
   private readonly crossingsApi = inject(CrossingsApiService);
 
   readonly formatCop = formatCop;
+  readonly packMax = PACK_MAX;
   readonly steps = [
     { n: 1, title: 'Excel Autobits', hint: 'De ahí salen compra, fecha, cliente y valor.' },
     { n: 2, title: 'Excel de cruces', hint: 'CRUCE DE CUENTAS: FACTURA/CDC y fecha de pago.' },
-    { n: 3, title: 'Facturas', hint: 'Hasta 25 a la vez. Se cruzan con Autobits.' },
+    { n: 3, title: 'Facturas + chat IA', hint: `Hasta ${PACK_MAX} por paquete. Pide lo que necesites.` },
+  ];
+  readonly chatSugerencias = [
+    'Resume cada factura: proveedor, número, fecha y total.',
+    '¿Cuáles necesitan revisión y por qué? Lista ambigüedades.',
+    'Lista NIT, compra y reserva detectados.',
+    'Compara totales de facturas contra Autobits.',
   ];
 
-  paso = 1;
-  limpiando = false;
-  error = '';
-  aviso = '';
+  paso = signal(1);
+  limpiando = signal(false);
+  error = signal('');
+  aviso = signal('');
 
-  subiendoAutobits = false;
-  autobits?: ImportResult | null;
-  records: AutobitsRecord[] = [];
+  subiendoAutobits = signal(false);
+  autobits = signal<ImportResult | null>(null);
+  records = signal<AutobitsRecord[]>([]);
+  verTodosRecords = signal(false);
 
-  subiendoCruce = false;
-  cruce?: CruceUploadResult | null;
-  comparacion: ComparacionFila[] = [];
+  subiendoCruce = signal(false);
+  cruce = signal<CruceUploadResult | null>(null);
+  comparacion = signal<ComparacionFila[]>([]);
 
-  subiendoFacturas = false;
-  facturaItems: BatchUploadItem[] = [];
-  documentos: DocumentSummary[] = [];
-  crossings: CrossingSummary[] = [];
-  packMsg = '';
-  soloPendientes = true;
-  copiado = '';
+  subiendoFacturas = signal(false);
+  facturaItems = signal<BatchUploadItem[]>([]);
+  documentos = signal<DocumentSummary[]>([]);
+  crossings = signal<CrossingSummary[]>([]);
+  packMsg = signal('');
+  soloPendientes = signal(true);
+  copiado = signal('');
+  solicitud = '';
+  chatInput = '';
+  chatMsgs = signal<ChatMsg[]>([]);
+  preguntando = signal(false);
+
   private poll?: Subscription;
 
   ngOnInit(): void {
-    if (!sessionStorage.getItem(SESSION_KEY)) {
-      this.vaciarImportados(true);
-    } else {
-      this.restaurar();
-    }
+    sessionStorage.setItem(SESSION_KEY, '1');
+    this.restaurar();
   }
 
   ngOnDestroy(): void {
     this.poll?.unsubscribe();
   }
 
-  get pendientesLista(): PendienteItem[] {
-    const por = this.cruce?.pendientes?.por_tipo || {};
-    return Object.values(por).flat();
-  }
+  readonly pendientesLista = computed(() => {
+    const por = this.cruce()?.pendientes?.por_tipo || {};
+    return Object.values(por).flat() as PendienteItem[];
+  });
 
-  get comparacionVista(): ComparacionFila[] {
-    if (!this.soloPendientes) return this.comparacion;
-    return this.comparacion.filter((r) => r.faltas?.length);
-  }
+  readonly comparacionVista = computed(() => {
+    const rows = this.comparacion();
+    if (!this.soloPendientes()) return rows;
+    return rows.filter((r) => r.faltas?.length);
+  });
 
-  get kpis() {
-    const total = this.comparacion.length;
-    const incompletas = this.comparacion.filter((r) => r.faltas?.length).length;
+  readonly recordsVista = computed(() => {
+    const all = this.records();
+    return this.verTodosRecords() ? all : all.slice(0, 12);
+  });
+
+  readonly facturasRevision = computed(() =>
+    this.documentos().filter((d) => d.requiere_revision)
+  );
+
+  readonly kpis = computed(() => {
+    const cmp = this.comparacion();
+    const incompletas = cmp.filter((r) => r.faltas?.length).length;
     return {
-      autobits: this.autobits?.imported_rows || this.records.length,
-      cruce: this.cruce?.lectura?.filas_leidas || 0,
+      autobits: this.autobits()?.imported_rows || this.records().length,
+      cruce: this.cruce()?.lectura?.filas_leidas || 0,
       incompletas,
-      completas: Math.max(0, total - incompletas),
-      facturas: this.documentos.length,
-      cruces: this.crossings.length,
+      completas: Math.max(0, cmp.length - incompletas),
+      facturas: this.documentos().length,
+      revision: this.facturasRevision().length,
     };
-  }
+  });
 
-  vaciarImportados(silencio = false): void {
-    this.limpiando = true;
-    this.error = '';
+  vaciarImportados(): void {
+    if (
+      !confirm(
+        'Esto borra Autobits, el Excel de cruce y las facturas importadas. ¿Seguro?'
+      )
+    ) {
+      return;
+    }
+    this.limpiando.set(true);
+    this.error.set('');
     this.autobitsApi.purgeExcels(true).subscribe({
       next: () => {
-        this.limpiando = false;
-        sessionStorage.setItem(SESSION_KEY, '1');
-        this.autobits = null;
-        this.records = [];
-        this.cruce = null;
-        this.comparacion = [];
-        this.facturaItems = [];
-        this.documentos = [];
-        this.crossings = [];
-        this.paso = 1;
-        if (!silencio) this.aviso = 'Cargas anteriores vaciadas. Empieza por Autobits.';
+        this.limpiando.set(false);
+        this.resetLocal();
+        this.aviso.set('Cargas anteriores vaciadas. Empieza por Autobits.');
       },
       error: (err) => {
-        this.limpiando = false;
-        sessionStorage.setItem(SESSION_KEY, '1');
-        if (!silencio) this.error = err?.error?.detail || 'No se pudieron vaciar las cargas.';
+        this.limpiando.set(false);
+        this.error.set(this.detalleError(err, 'No se pudieron vaciar las cargas.'));
       },
     });
   }
@@ -126,19 +154,19 @@ export class WizardComponent implements OnInit, OnDestroy {
     const file = (ev.target as HTMLInputElement).files?.[0];
     (ev.target as HTMLInputElement).value = '';
     if (!file) return;
-    this.subiendoAutobits = true;
-    this.error = '';
+    this.subiendoAutobits.set(true);
+    this.error.set('');
+    this.aviso.set('Leyendo el Excel de Autobits…');
     this.autobitsApi.uploadDirect(file, true).subscribe({
       next: (res) => {
-        this.subiendoAutobits = false;
-        this.autobits = res;
-        this.aviso = `${res.imported_rows} filas de Autobits. Fecha, cliente y compra ya están listas.`;
-        this.cargarRecords();
-        this.paso = 2;
+        this.subiendoAutobits.set(false);
+        this.aplicarAutobits(res);
+        this.paso.set(2);
       },
       error: (err) => {
-        this.subiendoAutobits = false;
-        this.error = this.detalleError(err, 'No se pudo leer el Excel de Autobits.');
+        this.subiendoAutobits.set(false);
+        this.error.set(this.detalleError(err, 'No se pudo leer el Excel de Autobits.'));
+        this.aviso.set('');
       },
     });
   }
@@ -147,23 +175,29 @@ export class WizardComponent implements OnInit, OnDestroy {
     const file = (ev.target as HTMLInputElement).files?.[0];
     (ev.target as HTMLInputElement).value = '';
     if (!file) return;
-    if (!this.autobits) {
-      this.error = 'Primero sube el Excel de Autobits.';
+    if (!this.autobits()) {
+      this.error.set('Primero sube el Excel de Autobits.');
       return;
     }
-    this.subiendoCruce = true;
-    this.error = '';
+    this.subiendoCruce.set(true);
+    this.error.set('');
+    this.aviso.set('Conciliando con Autobits…');
     this.cruceApi.upload(file, true).subscribe({
       next: (res) => {
-        this.subiendoCruce = false;
-        this.cruce = res;
-        this.comparacion = res.comparacion || [];
-        this.aviso = `Cruce leído: ${res.lectura.filas_leidas} filas en ${res.lectura.hojas.length} hojas.`;
-        this.paso = 3;
+        this.subiendoCruce.set(false);
+        this.cruce.set(res);
+        this.comparacion.set(res.comparacion || []);
+        const n = res.comparacion?.filter((r) => r.faltas?.length).length || 0;
+        this.aviso.set(
+          res.reused
+            ? `Se reutilizó el cruce ya cargado (${res.archivo}). ${n} fila(s) con datos faltantes.`
+            : `Cruce leído: ${res.lectura.filas_leidas} filas. ${n} con datos faltantes o ambiguos.`
+        );
+        this.paso.set(3);
       },
       error: (err) => {
-        this.subiendoCruce = false;
-        this.error = this.detalleError(err, 'No se pudo leer el Excel de cruces.');
+        this.subiendoCruce.set(false);
+        this.error.set(this.detalleError(err, 'No se pudo leer el Excel de cruces.'));
       },
     });
   }
@@ -172,26 +206,83 @@ export class WizardComponent implements OnInit, OnDestroy {
     const files = Array.from((ev.target as HTMLInputElement).files || []);
     (ev.target as HTMLInputElement).value = '';
     if (!files.length) return;
-    if (!this.autobits) {
-      this.error = 'Primero sube Autobits y el cruce.';
+    if (!this.autobits()) {
+      this.error.set('Primero sube Autobits y el cruce.');
       return;
     }
-    this.subiendoFacturas = true;
-    this.error = '';
-    this.docsApi.uploadBatch(files, 'FACTURA', 25).subscribe({
+    if (files.length > PACK_MAX) {
+      this.error.set(
+        `Máximo ${PACK_MAX} facturas por paquete. Seleccionaste ${files.length}. Divide la carga.`
+      );
+      return;
+    }
+    this.subiendoFacturas.set(true);
+    this.error.set('');
+    this.aviso.set(`Subiendo ${files.length} factura(s) y encolando OCR/IA…`);
+    this.docsApi.uploadBatch(files, 'FACTURA', PACK_MAX, this.solicitud).subscribe({
       next: (res) => {
-        this.subiendoFacturas = false;
-        this.facturaItems = res.items;
-        this.packMsg = res.mensaje;
+        this.subiendoFacturas.set(false);
+        this.facturaItems.set(res.items);
+        this.packMsg.set(res.mensaje);
         if (res.total_duplicados) {
-          this.aviso = `${res.total_duplicados} archivo(s) ya estaban importados y se rechazaron.`;
+          this.aviso.set(
+            `${res.total_recibidos} recibidas · ${res.total_duplicados} duplicado(s) rechazados.`
+          );
+        } else {
+          this.aviso.set(res.mensaje);
+        }
+        if (this.solicitud.trim()) {
+          this.chatMsgs.update((msgs) => [
+            ...msgs,
+            { role: 'user', text: this.solicitud.trim() },
+            {
+              role: 'ia',
+              text: 'Pedido aplicado al paquete. Cuando termine el OCR te responderé con los datos extraídos.',
+            },
+          ]);
         }
         this.refrescarFacturas();
         this.startPoll();
       },
       error: (err) => {
-        this.subiendoFacturas = false;
-        this.error = this.detalleError(err, 'No se pudieron subir las facturas.');
+        this.subiendoFacturas.set(false);
+        this.error.set(this.detalleError(err, 'No se pudieron subir las facturas.'));
+      },
+    });
+  }
+
+  usarSugerencia(texto: string): void {
+    this.chatInput = texto;
+    this.preguntar();
+  }
+
+  preguntar(): void {
+    const pregunta = this.chatInput.trim();
+    if (!pregunta || this.preguntando()) return;
+    if (!this.documentos().length) {
+      this.error.set('Sube al menos una factura del paquete para preguntar a la IA.');
+      return;
+    }
+    this.preguntando.set(true);
+    this.chatInput = '';
+    this.chatMsgs.update((msgs) => [...msgs, { role: 'user', text: pregunta }]);
+    const ids = this.documentos()
+      .map((d) => d.id)
+      .slice(0, PACK_MAX);
+    this.docsApi.ask(pregunta, ids).subscribe({
+      next: (res) => {
+        this.preguntando.set(false);
+        const texto = res.ok
+          ? res.respuesta
+          : res.error || 'La IA no pudo responder.';
+        this.chatMsgs.update((msgs) => [...msgs, { role: 'ia', text: texto }]);
+      },
+      error: (err) => {
+        this.preguntando.set(false);
+        this.chatMsgs.update((msgs) => [
+          ...msgs,
+          { role: 'ia', text: this.detalleError(err, 'No se pudo consultar la IA.') },
+        ]);
       },
     });
   }
@@ -199,12 +290,16 @@ export class WizardComponent implements OnInit, OnDestroy {
   copiar(texto: string): void {
     if (!texto) return;
     navigator.clipboard?.writeText(texto);
-    this.copiado = texto;
-    this.aviso = 'Copiado. Pégalo en el Excel: FECHA · COMPRA · REF · VALOR · FACTURA/CDC · FECHA DE PAGO.';
+    this.copiado.set(texto);
+    this.aviso.set(
+      'Copiado. Pégalo en el Excel: FECHA · COMPRA · REF · VALOR · FACTURA/CDC · FECHA DE PAGO.'
+    );
   }
 
   copiarPendientes(): void {
-    const lineas = this.comparacionVista.map((r) => r.copiar).filter(Boolean);
+    const lineas = this.comparacionVista()
+      .map((r) => r.copiar)
+      .filter(Boolean);
     if (!lineas.length) return;
     this.copiar(lineas.join('\n'));
   }
@@ -219,21 +314,62 @@ export class WizardComponent implements OnInit, OnDestroy {
     return '—';
   }
 
+  tonoEstado(estado: string): string {
+    const e = (estado || '').toUpperCase();
+    if (e === 'REQUIERE_REVISION' || e === 'DUPLICADO') return 'warn';
+    if (e === 'ERROR') return 'bad';
+    if (['EXTRAIDO', 'PROCESADO', 'APROBADO'].includes(e)) return 'ok';
+    return '';
+  }
+
+  private aplicarAutobits(res: ImportResult): void {
+    this.autobits.set(res);
+    const fromRes = res.records || [];
+    if (fromRes.length) {
+      this.records.set(fromRes);
+    } else {
+      this.cargarRecords();
+    }
+    const reused = res.reused ? ' (ya estaba importado; no se vació nada)' : '';
+    this.aviso.set(
+      res.aviso ||
+        `${res.imported_rows} filas de Autobits${reused}. Fecha, cliente y compra listas.`
+    );
+    if (res.parse_errors?.length) {
+      this.error.set(res.parse_errors.slice(0, 3).join(' · '));
+    }
+  }
+
+  private resetLocal(): void {
+    this.autobits.set(null);
+    this.records.set([]);
+    this.cruce.set(null);
+    this.comparacion.set([]);
+    this.facturaItems.set([]);
+    this.documentos.set([]);
+    this.crossings.set([]);
+    this.chatMsgs.set([]);
+    this.packMsg.set('');
+    this.paso.set(1);
+  }
+
   private cargarRecords(): void {
-    const batchId = this.autobits?.batch?.id;
-    this.autobitsApi.listRecords({ batch_id: batchId, limit: 80 }).subscribe({
-      next: (res) => (this.records = res.items || []),
-      error: () => (this.records = []),
+    const batchId = this.autobits()?.batch?.id;
+    this.autobitsApi.listRecords({ batch_id: batchId, limit: 200 }).subscribe({
+      next: (res) => this.records.set(res.items || []),
+      error: () => {
+        if (!this.records().length) this.records.set([]);
+      },
     });
   }
 
   private refrescarFacturas(): void {
-    this.docsApi.list({ limit: 80 }).subscribe({
-      next: (res) => (this.documentos = res.items || []),
+    this.docsApi.list({ limit: 200 }).subscribe({
+      next: (res) => this.documentos.set(res.items || []),
       error: () => undefined,
     });
-    this.crossingsApi.list({ limit: 200, batch_id: this.autobits?.batch?.id }).subscribe({
-      next: (res) => (this.crossings = res.items || []),
+    this.crossingsApi.list({ limit: 200, batch_id: this.autobits()?.batch?.id }).subscribe({
+      next: (res) => this.crossings.set(res.items || []),
       error: () => undefined,
     });
   }
@@ -242,12 +378,12 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.poll?.unsubscribe();
     this.poll = interval(4000).subscribe(() => {
       this.refrescarFacturas();
-      const pending = this.documentos.some((d) =>
+      const pending = this.documentos().some((d) =>
         ['RECIBIDO', 'PROCESANDO'].includes((d.estado || '').toUpperCase())
       );
-      if (!pending && this.documentos.length) {
+      if (!pending && this.documentos().length) {
         this.poll?.unsubscribe();
-        this.crossingsApi.runMatching(this.autobits?.batch?.id).subscribe({
+        this.crossingsApi.runMatching(this.autobits()?.batch?.id).subscribe({
           next: () => this.refrescarFacturas(),
         });
       }
@@ -257,56 +393,71 @@ export class WizardComponent implements OnInit, OnDestroy {
   private restaurar(): void {
     this.autobitsApi.getLatestBatch().subscribe({
       next: (batch) => {
-        this.autobits = {
+        this.autobits.set({
           batch,
           imported_rows: batch.imported_rows,
           skipped_duplicates: 0,
           skipped_empty: 0,
           parse_errors: [],
-        };
+        });
         this.cargarRecords();
-        this.paso = 2;
+        this.paso.set(2);
         this.cruceApi.getPendientes(batch.id).subscribe({
           next: (p) => {
-            this.comparacion = p.comparacion || [];
+            this.comparacion.set(p.comparacion || []);
             if (p.ultimo_cruce?.archivo && p.batch) {
-              this.cruce = {
+              this.cruce.set({
                 aplicado: !!p.ultimo_cruce.aplicado,
                 archivo: p.ultimo_cruce.archivo,
                 batch: p.batch,
                 lectura: {
-                  filas_leidas: this.comparacion.length,
+                  filas_leidas: (p.comparacion || []).length,
                   filas_duplicadas: 0,
                   hojas: [],
                   avisos: [],
                 },
                 conciliacion: {
-                  emparejadas: this.comparacion.filter((r) => !r.faltas.includes('Esta fila de Autobits no está en el Excel de cruce')).length,
+                  emparejadas: (p.comparacion || []).filter(
+                    (r) =>
+                      !r.faltas.includes(
+                        'Esta fila de Autobits no está en el Excel de cruce'
+                      )
+                  ).length,
                   sin_correspondencia: p.ultimo_cruce.sobrantes || 0,
                   fuera_de_periodo: 0,
                   sin_fecha: 0,
                   actualizadas: 0,
                   conflictos: [],
                 },
-                comparacion: this.comparacion,
+                comparacion: p.comparacion || [],
                 pendientes: p.pendientes,
-              };
-              this.paso = 3;
+              });
+              this.paso.set(3);
             } else if (p.has_autobits) {
-              this.paso = 2;
+              this.paso.set(2);
             }
           },
         });
         this.refrescarFacturas();
       },
       error: () => {
-        this.paso = 1;
+        this.paso.set(1);
       },
     });
   }
 
-  private detalleError(err: { error?: { detail?: string } }, fallback: string): string {
-    const d = err?.error?.detail;
-    return typeof d === 'string' ? d : fallback;
+  private detalleError(err: { error?: { detail?: unknown; message?: string } }, fallback: string): string {
+    const d = err?.error?.detail ?? err?.error?.message;
+    if (typeof d === 'string') return d;
+    if (Array.isArray(d)) {
+      return d
+        .map((x) => (typeof x === 'string' ? x : (x as { msg?: string })?.msg || ''))
+        .filter(Boolean)
+        .join(' ');
+    }
+    if (d && typeof d === 'object' && 'message' in d) {
+      return String((d as { message: string }).message);
+    }
+    return fallback;
   }
 }

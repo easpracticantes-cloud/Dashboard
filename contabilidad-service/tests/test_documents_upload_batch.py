@@ -33,7 +33,7 @@ def client(monkeypatch):
     _vaciar()
 
     # Evita OCR/IA reales en el background task
-    def _noop(ids, pack_size=25):
+    def _noop(*args, **kwargs):
         return None
 
     class _FakeProc:
@@ -42,6 +42,11 @@ def client(monkeypatch):
 
         def process_by_id(self, *args, **kwargs):
             return {"ok": True}
+
+        def ask_about_documents(self, pregunta, documents):
+            if not documents:
+                return {"ok": False, "error": "No hay facturas para consultar. Súbelas primero."}
+            return {"ok": True, "respuesta": "ok", "documentos": len(documents)}
 
     monkeypatch.setattr(
         "api.routers.documents._process_document_ids_in_packs",
@@ -81,3 +86,30 @@ def test_upload_batch_queues_packs(client):
     assert body["packs"] == 1
     assert len(body["queued_ids"]) == 3
     assert "paquete" in body["mensaje"].lower() or "cola" in body["mensaje"].lower()
+
+
+def test_upload_batch_rechaza_mas_de_25(client):
+    files = [
+        ("archivos", (f"f{i}.png", _png_bytes(i), "image/png"))
+        for i in range(26)
+    ]
+    res = client.post(
+        "/api/documents/upload-batch",
+        files=files,
+        data={"auto_procesar": "false", "tipo": "FACTURA"},
+    )
+    assert res.status_code == 400
+    assert "25" in (res.json().get("detail") or "")
+
+
+def test_ask_sin_pregunta(client):
+    res = client.post("/api/documents/ask", json={"pregunta": "   "})
+    assert res.status_code == 400
+
+
+def test_ask_sin_facturas(client):
+    res = client.post("/api/documents/ask", json={"pregunta": "Resume los totales"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["ok"] is False
+    assert "factura" in (body.get("error") or "").lower()

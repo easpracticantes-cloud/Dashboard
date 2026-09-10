@@ -30,6 +30,9 @@ class ImportResponse(BaseModel):
     crossing: dict | None = None
     analysis_mode: str | None = None
     ai_notes: str | None = None
+    records: list[dict] = []
+    reused: bool = False
+    aviso: str | None = None
 
 
 class PreviewResponse(BaseModel):
@@ -211,7 +214,7 @@ def purge_excels(
     confirm: bool = False,
     db: Session = Depends(get_db),
 ):
-    """Limpia Excels Autobits/Cruce ya subidos y datos derivados (no borra facturas)."""
+    """Limpia Excels Autobits/Cruce, facturas importadas y datos derivados."""
     from application.services.excel_purge_service import ExcelPurgeService
 
     if not confirm:

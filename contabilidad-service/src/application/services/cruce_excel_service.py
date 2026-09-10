@@ -150,12 +150,32 @@ class CruceExcelService:
         if not force:
             snap = self._leer_snapshot(batch.id)
             if snap and snap.get("file_hash") == file_hash:
-                raise CruceExcelServiceError(
-                    f"Este Excel de cruce ya fue cargado ({snap.get('archivo') or filename}). "
-                    "No se permiten archivos repetidos.",
-                    "DUPLICATE_FILE",
-                    status_code=409,
-                )
+                data = self.pendientes(batch.id)
+                conciliacion = dict(snap.get("conciliacion") or {})
+                conciliacion.setdefault("conflictos", [])
+                conciliacion.setdefault("emparejadas", 0)
+                conciliacion.setdefault("sin_correspondencia", 0)
+                conciliacion.setdefault("fuera_de_periodo", 0)
+                conciliacion.setdefault("sin_fecha", 0)
+                conciliacion.setdefault("actualizadas", 0)
+                return {
+                    "aplicado": bool(snap.get("aplicado")),
+                    "archivo": snap.get("archivo") or Path(filename).name,
+                    "reused": True,
+                    "batch": data.get("batch") or self._batch_dict(batch),
+                    "lectura": {
+                        "filas_leidas": len(data.get("comparacion") or []),
+                        "filas_duplicadas": 0,
+                        "hojas": [],
+                        "avisos": [
+                            "Se reutilizó el Excel de cruce ya cargado (mismo archivo)."
+                        ],
+                    },
+                    "conciliacion": conciliacion,
+                    "comparacion": data.get("comparacion") or [],
+                    "pendientes": data.get("pendientes") or self._vacio(),
+                    "file_hash": file_hash,
+                }
 
         ruta = self._guardar(content, filename)
         try:

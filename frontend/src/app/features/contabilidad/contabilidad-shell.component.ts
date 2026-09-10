@@ -11,7 +11,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       <eas-page-header
         eyebrow="Contabilidad"
         title="Cruce semanal"
-        subtitle="Autobits → Excel de cruces → facturas. Sin módulos sueltos."
+        subtitle="Autobits → Excel de cruces → facturas (paquetes de 25) y chat con la IA."
       />
       <div class="contab__body">
         <router-outlet />

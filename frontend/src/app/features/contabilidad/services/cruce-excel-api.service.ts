@@ -99,6 +99,7 @@ export interface CruceUploadResult {
   };
   comparacion?: ComparacionFila[];
   pendientes: PendientesData;
+  reused?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })

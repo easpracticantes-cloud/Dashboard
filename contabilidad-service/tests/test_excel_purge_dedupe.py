@@ -103,8 +103,11 @@ def test_bloquea_excel_autobits_repetido(client):
             files={"archivo": ("semana.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
             data={"auto_cruzar": "false"},
         )
-        assert r2.status_code == 409
-        assert "ya fue importado" in (r2.json().get("detail") or "").lower()
+        assert r2.status_code == 200, r2.text
+        body = r2.json()
+        assert body.get("reused") is True
+        assert body.get("imported_rows", 0) >= 1
+        assert body.get("records")
 
 
 def test_purge_excels(client):

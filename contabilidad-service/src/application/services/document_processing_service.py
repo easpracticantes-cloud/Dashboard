@@ -18,7 +18,12 @@ from infrastructure.ai.ai_factory import (
     resolve_ai_provider_name,
 )
 from infrastructure.ai.ollama_provider import AIExtractionResult, AIProvider
-from infrastructure.ocr.pdf_rasterize import ensure_raster_image, is_pdf
+from infrastructure.ocr.pdf_rasterize import (
+    ensure_raster_image,
+    extract_pdf_native_text,
+    is_pdf,
+    rasterize_pdf_pages,
+)
 from infrastructure.ocr.tesseract_provider import TesseractOCRProvider
 from infrastructure.persistence.database import SessionLocal, init_db
 from infrastructure.persistence.repositories import (
@@ -271,6 +276,10 @@ class DocumentProcessingService:
         hints = extract_invoice_hints(ocr_text)
         extracted = merge_hints_into_extraction(dict(ai_data), hints)
         extracted["_metodo_ocr"] = metodo_ocr
+        if extracted.get("campos_asumidos"):
+            extracted["requiere_revision"] = True
+        if extracted.get("ambiguedades"):
+            extracted["requiere_revision"] = True
         rule = self.rules.evaluate_invoice(extracted)
         # Vision: no penalizar por OCR corto
         ocr_chars = len((ocr_text or "").strip())
@@ -359,20 +368,41 @@ class DocumentProcessingService:
 
             self._ensure_output_dirs()
             stem = path.stem
+            native_text = extract_pdf_native_text(path) if is_pdf(path) else ""
             image_path = self._prepare_image_for_ocr(path)
+            extra_pages = []
+            if is_pdf(path):
+                extra_pages = rasterize_pdf_pages(path, self.carpeta_preprocesadas, max_pages=3)
+                if extra_pages:
+                    image_path = extra_pages[0]
             ruta_pre = self.carpeta_preprocesadas / f"{stem}.png"
             if not self.ocr.preprocess(image_path, ruta_pre):
                 ruta_pre = None
 
+            ocr_chunks = []
             ocr_result = self.ocr.extract_with_fallback(
                 image_path,
                 ruta_pre if ruta_pre and ruta_pre.exists() else None,
             )
-            guardar_texto(self.carpeta_textos / f"{stem}.txt", ocr_result.text)
+            if ocr_result.text:
+                ocr_chunks.append(ocr_result.text)
+            for extra in extra_pages[1:]:
+                extra_ocr = self.ocr.extract_with_fallback(extra, None)
+                if extra_ocr.text:
+                    ocr_chunks.append(extra_ocr.text)
+            ocr_combined = "\n\n".join(ocr_chunks).strip()
+            if native_text and len(native_text) >= 80:
+                ocr_text = native_text
+                if ocr_combined and ocr_combined not in native_text:
+                    ocr_text = native_text + "\n\n--- OCR ---\n" + ocr_combined
+                metodo = f"{ocr_result.method}+PDF_TEXT"
+            else:
+                ocr_text = ocr_combined or ocr_result.text
+                metodo = ocr_result.method
+            guardar_texto(self.carpeta_textos / f"{stem}.txt", ocr_text)
 
             ai_result = None
-            metodo = ocr_result.method
-            ocr_debil = self._ocr_parece_basura(ocr_result.text)
+            ocr_debil = self._ocr_parece_basura(ocr_text) and len(native_text) < 80
             vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
 
             if ocr_debil and self._vision_enabled():
@@ -390,20 +420,25 @@ class DocumentProcessingService:
                     # reintento sobre PNG si el path original falló
                     ai_result = vision_fn(image_path)
                 if not ai_result.ok:
-                    error = f"Vision IA fallo: {ai_result.error}"
-                    document.estado = DocumentStatus.REQUIERE_REVISION
-                    job_repo.mark_requires_review(job)
-                    audit.log("OCR_VISION_FAIL", "Document", str(document.id), valor_nuevo=error)
-                    db.commit()
-                    return {
-                        "ok": False,
-                        "error": error,
-                        "document_id": document.id,
-                        "estado": DocumentStatus.REQUIERE_REVISION,
-                    }
+                    hints = extract_invoice_hints(ocr_text)
+                    if any(hints.get(k) for k in ("total", "numero_factura", "nit_o_identificacion", "proveedor")):
+                        ai_result = AIExtractionResult(ok=True, data=hints, raw_text=ocr_text)
+                        metodo = f"{metodo}+OCR_JSON"
+                    else:
+                        error = f"Vision IA fallo: {ai_result.error}"
+                        document.estado = DocumentStatus.REQUIERE_REVISION
+                        job_repo.mark_requires_review(job)
+                        audit.log("OCR_VISION_FAIL", "Document", str(document.id), valor_nuevo=error)
+                        db.commit()
+                        return {
+                            "ok": False,
+                            "error": error,
+                            "document_id": document.id,
+                            "estado": DocumentStatus.REQUIERE_REVISION,
+                        }
             elif ocr_debil:
                 error = (
-                    f"OCR debil ({len(ocr_result.text.strip())} caracteres) y "
+                    f"OCR debil ({len((ocr_text or '').strip())} caracteres) y "
                     "no hay proveedor de vision disponible. "
                     "Sube JPG/PNG nitido o configura ANTHROPIC_API_KEY."
                 )
@@ -418,37 +453,34 @@ class DocumentProcessingService:
                     "estado": DocumentStatus.REQUIERE_REVISION,
                 }
             else:
-                # Texto OCR + visión de refuerzo si faltan campos clave tras OCR largo
-                ai_result = self.ai.extract_invoice(ocr_result.text)
-                if ai_result.ok and self._vision_enabled():
-                    datos = ai_result.data or {}
-                    faltan = not datos.get("total") or not (
-                        datos.get("nit_o_identificacion")
-                        or (isinstance(datos.get("proveedor"), dict) and datos["proveedor"].get("nit"))
-                        or datos.get("numero_factura")
-                    )
-                    if faltan:
-                        logger.info("Extracción incompleta — refuerzo vision doc #%s", document.id)
-                        vision_result = vision_fn(image_path if image_path.exists() else path)
-                        if vision_result.ok:
-                            merged = merge_hints_into_extraction(
-                                dict(vision_result.data or {}),
-                                extract_invoice_hints(ocr_result.text),
-                            )
-                            # Completar huecos con lo que sí sacó el OCR+texto
-                            merged = merge_hints_into_extraction(
-                                merged,
-                                {k: v for k, v in datos.items() if v not in (None, "", [], {})},
-                            )
-                            ai_result = AIExtractionResult(
-                                ok=True,
-                                data=merged,
-                                raw_text=vision_result.raw_text,
-                            )
-                            metodo = f"{resolve_ai_provider_name().upper()}_VISION+OCR"
+                # Texto OCR + visión de refuerzo si faltan campos clave o hay poca señal
+                ai_result = self.ai.extract_invoice(ocr_text)
+                faltan_clave = self._faltan_campos_clave(ai_result.data if ai_result and ai_result.ok else {})
+                if (faltan_clave or ocr_debil) and self._vision_enabled():
+                    logger.info("Extracción incompleta — refuerzo vision doc #%s", document.id)
+                    vision_result = vision_fn(image_path if image_path.exists() else path)
+                    if vision_result.ok:
+                        merged = merge_hints_into_extraction(
+                            dict(vision_result.data or {}),
+                            extract_invoice_hints(ocr_text),
+                        )
+                        merged = merge_hints_into_extraction(
+                            merged,
+                            {
+                                k: v
+                                for k, v in (ai_result.data or {}).items()
+                                if v not in (None, "", [], {})
+                            },
+                        )
+                        ai_result = AIExtractionResult(
+                            ok=True,
+                            data=merged,
+                            raw_text=vision_result.raw_text,
+                        )
+                        metodo = f"{resolve_ai_provider_name().upper()}_VISION+OCR"
 
             if not ai_result or not ai_result.ok:
-                hints = extract_invoice_hints(ocr_result.text)
+                hints = extract_invoice_hints(ocr_text)
                 utiles = [
                     hints.get("total"),
                     hints.get("numero_factura"),
@@ -459,7 +491,7 @@ class DocumentProcessingService:
                     ai_result = AIExtractionResult(
                         ok=True,
                         data=hints,
-                        raw_text=ocr_result.text,
+                        raw_text=ocr_text,
                     )
                     metodo = f"{metodo}+OCR_JSON"
                 else:
@@ -479,7 +511,7 @@ class DocumentProcessingService:
                         "estado": DocumentStatus.ERROR,
                     }
 
-            return self._finalize_structured_extraction(
+            finalized = self._finalize_structured_extraction(
                 db=db,
                 doc_repo=doc_repo,
                 job_repo=job_repo,
@@ -487,9 +519,10 @@ class DocumentProcessingService:
                 document=document,
                 job=job,
                 ai_data=ai_result.data,
-                ocr_text=ocr_result.text,
+                ocr_text=ocr_text,
                 metodo_ocr=metodo,
             )
+            return finalized
         except Exception as error:
             db.rollback()
             logger.exception("Error en process_structured_by_id")
@@ -635,12 +668,113 @@ class DocumentProcessingService:
         finally:
             db.close()
 
+    def _faltan_campos_clave(self, datos: dict) -> bool:
+        if not datos:
+            return True
+        proveedor = datos.get("proveedor")
+        if isinstance(proveedor, dict):
+            proveedor = proveedor.get("nombre")
+        nit = datos.get("nit_o_identificacion")
+        if isinstance(datos.get("proveedor"), dict):
+            nit = nit or datos["proveedor"].get("nit")
+        return not (
+            datos.get("total")
+            and (nit or datos.get("numero_factura") or proveedor)
+        )
+
     def process_by_id(self, document_id: int, solicitud_usuario: str | None = None) -> dict:
-        """Procesa un documento ya registrado — siempre extracción estructurada de factura."""
-        # solicitud_usuario se conserva por compatibilidad de firma; el path de producto
-        # ya no usa extract_custom (texto libre).
-        _ = solicitud_usuario
-        return self.process_structured_by_id(document_id)
+        """Procesa un documento: extracción estructurada + solicitud libre opcional."""
+        result = self.process_structured_by_id(document_id)
+        pregunta = (solicitud_usuario or "").strip()
+        if not pregunta or not result.get("ok"):
+            return result
+        try:
+            extra = self.ai.extract_custom(
+                (result.get("datos") and json.dumps(result["datos"], ensure_ascii=False) or "")
+                + "\n\nOCR:\n"
+                + (result.get("respuesta_ia") or ""),
+                pregunta,
+            )
+            if extra.ok:
+                result["respuesta_solicitud"] = extra.raw_text or extra.data.get("respuesta_ia")
+                datos = dict(result.get("datos") or {})
+                datos["_respuesta_solicitud"] = result["respuesta_solicitud"]
+                datos["_solicitud"] = pregunta
+                result["datos"] = datos
+                init_db()
+                db = SessionLocal()
+                try:
+                    repo = DocumentRepository(db)
+                    doc = repo.get_by_id(document_id)
+                    if doc and doc.extracted_json:
+                        try:
+                            stored = json.loads(doc.extracted_json)
+                        except json.JSONDecodeError:
+                            stored = {}
+                        stored["_respuesta_solicitud"] = result["respuesta_solicitud"]
+                        stored["_solicitud"] = pregunta
+                        doc.extracted_json = json.dumps(stored, ensure_ascii=False)
+                        nota = (doc.observaciones or "").strip()
+                        snippet = str(result["respuesta_solicitud"] or "")[:400]
+                        doc.observaciones = (nota + " | " if nota else "") + f"IA: {snippet}"
+                        db.commit()
+                    else:
+                        db.rollback()
+                except Exception:
+                    db.rollback()
+                    logger.exception("No se pudo persistir respuesta de solicitud")
+                finally:
+                    db.close()
+        except Exception:
+            logger.exception("Solicitud IA falló para documento #%s", document_id)
+        return result
+
+    def ask_about_documents(self, pregunta: str, documents: list) -> dict:
+        """Chat sobre un paquete de facturas ya extraídas (máx. 25)."""
+        pregunta = (pregunta or "").strip()
+        if not pregunta:
+            return {"ok": False, "error": "Escribe qué necesitas de las facturas."}
+        lote = documents[:25]
+        if not lote:
+            return {"ok": False, "error": "No hay facturas para consultar. Súbelas primero."}
+        bloques = []
+        for doc in lote:
+            extracted = {}
+            if getattr(doc, "extracted_json", None):
+                try:
+                    extracted = json.loads(doc.extracted_json)
+                except json.JSONDecodeError:
+                    extracted = {}
+            bloques.append(
+                {
+                    "id": doc.id,
+                    "archivo": doc.filename,
+                    "estado": doc.estado,
+                    "numero": doc.numero_documento,
+                    "proveedor": doc.provider.nombre if getattr(doc, "provider", None) else extracted.get("proveedor"),
+                    "nit": extracted.get("nit_o_identificacion"),
+                    "total": doc.total,
+                    "fecha": doc.fecha_emision,
+                    "compra": extracted.get("compra"),
+                    "reserva": extracted.get("reserva"),
+                    "requiere_revision": bool(doc.requiere_revision),
+                    "campos_faltantes": extracted.get("campos_faltantes") or [],
+                    "campos_asumidos": extracted.get("campos_asumidos") or [],
+                    "ambiguedades": extracted.get("ambiguedades") or [],
+                    "ocr_preview": (doc.ocr_text or "")[:1500],
+                }
+            )
+        payload = json.dumps(bloques, ensure_ascii=False, default=str)
+        if len(payload) > 24000:
+            payload = payload[:24000] + "\n…[truncated]…"
+        ai_result = self.ai.extract_custom(payload, pregunta)
+        if not ai_result.ok:
+            return {"ok": False, "error": ai_result.error or "La IA no pudo responder."}
+        return {
+            "ok": True,
+            "respuesta": ai_result.raw_text or ai_result.data.get("respuesta_ia") or "",
+            "documentos": len(lote),
+        }
 
 
 _service: DocumentProcessingService | None = None

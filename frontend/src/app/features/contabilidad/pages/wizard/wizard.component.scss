@@ -163,7 +163,7 @@
 
 .wiz__kpis {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0.6rem;
   margin: 0;
   padding: 0;
@@ -282,9 +282,122 @@
   background: #fdecec;
 }
 
+.wiz__table tr.is-miss td {
+  background: #fff8f4;
+}
+
+.wiz__label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 650;
+  margin: 0.4rem 0 0.35rem;
+}
+
+.wiz__prompt {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #c5d3cb;
+  border-radius: 12px;
+  padding: 0.7rem 0.85rem;
+  font: inherit;
+  margin-bottom: 0.8rem;
+}
+
+.wiz__chip {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: #eef4f0;
+  font-size: 0.75rem;
+}
+
+.wiz__chip.is-ok {
+  background: #e5f5ea;
+  color: #1f7a4c;
+}
+
+.wiz__chip.is-warn {
+  background: #fff3d6;
+  color: #8a5a00;
+}
+
+.wiz__chip.is-bad {
+  background: #fdecec;
+  color: #8a3b2a;
+}
+
+.wiz__chat .wiz__msgs {
+  display: grid;
+  gap: 0.55rem;
+  max-height: 280px;
+  overflow: auto;
+  margin-bottom: 0.8rem;
+}
+
+.wiz__msg {
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  background: #f6f9f7;
+  border: 1px solid #e2ebe5;
+}
+
+.wiz__msg.is-user {
+  background: #eef6f1;
+}
+
+.wiz__msg strong {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5c6b63;
+}
+
+.wiz__msg p {
+  margin: 0.25rem 0 0;
+  white-space: pre-wrap;
+}
+
+.wiz__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.7rem;
+}
+
+.wiz__chip-btn {
+  border: 1px solid #c5d3cb;
+  background: #fff;
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.wiz__ask {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.wiz__ask .wiz__prompt {
+  margin: 0;
+  flex: 1;
+}
+
+.wiz__copy--primary {
+  background: #1f7a4c;
+  color: #fff;
+  border-color: #1f7a4c;
+}
+
 @media (max-width: 860px) {
   .wiz__steps,
   .wiz__kpis {
     grid-template-columns: 1fr;
+  }
+
+  .wiz__ask {
+    flex-direction: column;
   }
 }

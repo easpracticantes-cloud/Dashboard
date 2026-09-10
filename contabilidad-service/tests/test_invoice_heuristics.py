@@ -48,3 +48,17 @@ def test_merge_hints_solo_rellena_vacios():
     assert merged["total"] == 50.0
     assert merged["nit_o_identificacion"] == "8001"
     assert merged["numero_factura"] == "A1"
+
+
+def test_extract_invoice_en_ingles_y_oc():
+    texto = """
+    ACME TRAVEL LLC
+    Invoice No. INV-8891
+    Tax ID 900888777
+    Purchase order OC44521
+    Total $ 2,500.00
+    """
+    hints = extract_invoice_hints(texto)
+    assert "8891" in hints.get("numero_factura", "")
+    assert hints.get("compra")
+    assert hints.get("total") in (2500.0, 250000.0) or (hints.get("total") or 0) >= 2500

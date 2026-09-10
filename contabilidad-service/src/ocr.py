@@ -15,15 +15,19 @@ PALABRAS_CLAVE_FACTURA = [
     "Seller",
     "Client",
     "Tax Id",
+    "Tax ID",
     "ITEMS",
     "SUMMARY",
     "Total",
     "Gross worth",
+    "Amount due",
+    "Bill to",
     # Español / DIAN / cuentas de cobro físicas
     "Factura",
     "NIT",
     "IVA",
     "CUFE",
+    "RUT",
     "Razón social",
     "Razon social",
     "Fecha",
@@ -39,6 +43,10 @@ PALABRAS_CLAVE_FACTURA = [
     "Cuenta de Cobro",
     "Régimen",
     "Regimen",
+    "Autoriza",
+    "DIAN",
+    "CUNE",
+    "Valor total",
 ]
 
 

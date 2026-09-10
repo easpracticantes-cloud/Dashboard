@@ -51,8 +51,18 @@ _SUBTOTAL_RE = re.compile(
     r"([\d]{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:[.,]\d{2})?)",
     re.IGNORECASE,
 )
+_CUFE_RE = re.compile(r"\b([a-fA-F0-9]{40,96})\b")
+_RUT_RE = re.compile(r"(?:RUT)\s*[:#]?\s*([\d]{6,12}[\s\-]?[\d]?)", re.IGNORECASE)
+_INVOICE_EN_RE = re.compile(
+    r"(?:invoice\s*(?:no\.?|number|#)|bill\s*#)\s*[:.]?\s*([A-Z0-9][\w\-/]{2,20})",
+    re.IGNORECASE,
+)
+_OC_RE = re.compile(
+    r"(?:orden\s+de\s+compra|o\.?\s*c\.?|oc|purchase\s+order)\s*[:#]?\s*([A-Z]{0,6}\d{3,10})",
+    re.IGNORECASE,
+)
 _PROVEEDOR_RE = re.compile(
-    r"(?:raz[oó]n\s*social|proveedor|emisor|vendedor)\s*[:#]?\s*([^\n\r]{3,80})",
+    r"(?:raz[oó]n\s*social|proveedor|emisor|vendedor|seller)\s*[:#]?\s*([^\n\r]{3,80})",
     re.IGNORECASE,
 )
 
@@ -110,7 +120,7 @@ def extract_invoice_hints(ocr_text: str) -> dict[str, Any]:
     text = ocr_text or ""
     hints: dict[str, Any] = {}
 
-    m = _NIT_RE.search(text)
+    m = _NIT_RE.search(text) or _RUT_RE.search(text)
     if m:
         hints["nit_o_identificacion"] = re.sub(r"\s+", "", m.group(1))
     else:
@@ -118,13 +128,18 @@ def extract_invoice_hints(ocr_text: str) -> dict[str, Any]:
         if m2:
             hints["nit_o_identificacion"] = m2.group(1)
 
-    m = _FACTURA_POS_RE.search(text) or _FACTURA_RE.search(text) or _FACTURA_NO_RE.search(text)
+    m = (
+        _FACTURA_POS_RE.search(text)
+        or _FACTURA_RE.search(text)
+        or _INVOICE_EN_RE.search(text)
+        or _FACTURA_NO_RE.search(text)
+    )
     if m:
         num = re.sub(r"\s+", " ", m.group(1)).strip()
         if len(num) >= 3 and not num.lower().startswith("de"):
             hints["numero_factura"] = num
 
-    m = _COMPRA_RE.search(text)
+    m = _COMPRA_RE.search(text) or _OC_RE.search(text)
     if m:
         hints["compra"] = re.sub(r"\s+", "", m.group(1)).upper()
     m = _RESERVA_RE.search(text)
@@ -153,6 +168,10 @@ def extract_invoice_hints(ocr_text: str) -> dict[str, Any]:
         nombre = re.sub(r"\s+", " ", m.group(1)).strip(" -:|")
         if len(nombre) >= 3:
             hints["proveedor"] = nombre[:120]
+
+    cufe = _CUFE_RE.search(text)
+    if cufe:
+        hints["_cufe"] = cufe.group(1)
 
     return {k: v for k, v in hints.items() if v is not None and v != ""}
 

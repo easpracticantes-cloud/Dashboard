@@ -147,6 +147,14 @@
       }
 
       <div class="prompt">
+        <label class="muted" for="proc-solicitud">Pedido a la IA (opcional, se aplica al paquete de hasta {{ packSize }})</label>
+        <textarea
+          id="proc-solicitud"
+          rows="3"
+          [(ngModel)]="solicitud"
+          placeholder="Ej. Extrae NIT, total y número. Si algo está borroso, asume y marca revisión."
+          style="width:100%;margin:0.4rem 0 0.8rem;padding:0.65rem;border-radius:10px;"
+        ></textarea>
         <div class="prompt-actions">
           <button type="button" class="btn btn-primary btn-lg" [disabled]="procesando" (click)="procesar()">
             @if (procesando) {

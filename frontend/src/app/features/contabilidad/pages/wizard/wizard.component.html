@@ -5,23 +5,23 @@
     <p class="wiz__lead">
       1) Autobits trae compra, fecha, cliente y valor.
       2) El Excel de cruces dice qué FACTURA/CDC y fecha de pago ya están.
-      3) Las facturas se cruzan contra Autobits — hasta 25 a la vez.
+      3) Sube hasta {{ packMax }} facturas y habla con la IA para pedir totales, NIT, lo dudoso o el contramarcado.
     </p>
-    <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando">
-      {{ limpiando ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
+    <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando()">
+      {{ limpiando() ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
     </button>
   </header>
 
-  @if (error) {
-    <p class="wiz__alert wiz__alert--bad">{{ error }}</p>
+  @if (error()) {
+    <p class="wiz__alert wiz__alert--bad">{{ error() }}</p>
   }
-  @if (aviso) {
-    <p class="wiz__alert">{{ aviso }}</p>
+  @if (aviso()) {
+    <p class="wiz__alert">{{ aviso() }}</p>
   }
 
   <ol class="wiz__steps">
     @for (s of steps; track s.n) {
-      <li [class.is-on]="paso === s.n" [class.is-done]="paso > s.n">
+      <li [class.is-on]="paso() === s.n" [class.is-done]="paso() > s.n">
         <span class="wiz__num">{{ s.n }}</span>
         <div>
           <strong>{{ s.title }}</strong>
@@ -31,35 +31,42 @@
     }
   </ol>
 
-  @if (autobits || comparacion.length || documentos.length) {
+  @if (autobits() || comparacion().length || documentos().length) {
     <ul class="wiz__kpis">
-      <li><strong>{{ kpis.autobits }}</strong><span>Autobits</span></li>
-      <li><strong>{{ kpis.cruce }}</strong><span>Filas cruce</span></li>
-      <li><strong>{{ kpis.incompletas }}</strong><span>Faltan datos</span></li>
-      <li><strong>{{ kpis.completas }}</strong><span>Completas</span></li>
-      <li><strong>{{ kpis.facturas }}</strong><span>Facturas</span></li>
+      <li><strong>{{ kpis().autobits }}</strong><span>Autobits</span></li>
+      <li><strong>{{ kpis().cruce }}</strong><span>Filas cruce</span></li>
+      <li><strong>{{ kpis().incompletas }}</strong><span>Faltan datos</span></li>
+      <li><strong>{{ kpis().completas }}</strong><span>Completas</span></li>
+      <li><strong>{{ kpis().facturas }}</strong><span>Facturas</span></li>
+      <li><strong>{{ kpis().revision }}</strong><span>A revisar</span></li>
     </ul>
   }
 
-  <section class="wiz__card" [class.is-dim]="paso < 1">
+  <section class="wiz__card" [class.is-dim]="paso() < 1">
     <h3>1. Excel de Autobits</h3>
-    <p>Reporte de la semana. De aquí salen orden de compra, reserva, fecha, cliente y valor.</p>
+    <p>Reporte de la semana. De aquí salen orden de compra, reserva, fecha, cliente y valor. La tabla se actualiza al terminar la lectura — no hace falta vaciar.</p>
     <label class="wiz__drop">
-      <input type="file" accept=".xlsx,.xls,.xlsm,.csv" (change)="onAutobits($event)" [disabled]="subiendoAutobits" />
+      <input type="file" accept=".xlsx,.xls,.xlsm,.csv" (change)="onAutobits($event)" [disabled]="subiendoAutobits() || limpiando()" />
       <mat-icon>upload_file</mat-icon>
-      <span>{{ subiendoAutobits ? 'Leyendo Autobits…' : 'Soltar o elegir Excel de Autobits' }}</span>
+      <span>{{ subiendoAutobits() ? 'Leyendo Autobits…' : 'Soltar o elegir Excel de Autobits' }}</span>
     </label>
-    @if (autobits) {
+    @if (autobits(); as ab) {
       <div class="wiz__meta">
-        <span>{{ autobits.batch.filename }}</span>
-        <span>{{ autobits.imported_rows }} filas</span>
-        <span>{{ autobits.batch.period_start }} → {{ autobits.batch.period_end }}</span>
-        @if (autobits.skipped_duplicates) {
-          <span>Duplicados rechazados: {{ autobits.skipped_duplicates }}</span>
+        <span>{{ ab.batch.filename }}</span>
+        <span>{{ ab.imported_rows }} filas</span>
+        <span>{{ ab.batch.period_start }} → {{ ab.batch.period_end }}</span>
+        @if (ab.reused) {
+          <span>Reutilizado (mismo archivo)</span>
+        }
+        @if (ab.skipped_duplicates) {
+          <span>Duplicados actualizados: {{ ab.skipped_duplicates }}</span>
+        }
+        @if (ab.sheet_name) {
+          <span>Hoja {{ ab.sheet_name }}</span>
         }
       </div>
     }
-    @if (records.length) {
+    @if (records().length) {
       <div class="wiz__table-wrap">
         <table class="wiz__table">
           <thead>
@@ -72,7 +79,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (r of records.slice(0, 8); track r.id) {
+            @for (r of recordsVista(); track r.id) {
               <tr>
                 <td>{{ r.proveedor || '—' }}</td>
                 <td>{{ r.numero_compra || '—' }}</td>
@@ -84,38 +91,43 @@
           </tbody>
         </table>
       </div>
-      @if (records.length > 8) {
-        <p class="wiz__hint">Mostrando 8 de {{ records.length }} filas importadas.</p>
+      @if (records().length > 12) {
+        <button type="button" class="wiz__copy" (click)="verTodosRecords.set(!verTodosRecords())">
+          {{ verTodosRecords() ? 'Ver menos' : 'Mostrar las ' + records().length + ' filas' }}
+        </button>
       }
     }
   </section>
 
-  <section class="wiz__card" [class.is-dim]="paso < 2">
+  <section class="wiz__card" [class.is-dim]="paso() < 2">
     <h3>2. Excel de cruces (CRUCE DE CUENTAS)</h3>
     <p>
       Hojas por mes, bloques por proveedor:
       FECHA · COMPRA · REF · VALOR · FACTURA/CDC · FECHA DE PAGO.
-      También lee VENTAS_DUSTER, CDC BOSQUE DE PALMAS y PRECOMPRA LUGER.
+      El sistema marca lo ambiguo: falta en un lado, valor distinto, o fila de más.
     </p>
     <label class="wiz__drop">
-      <input type="file" accept=".xlsx,.xlsm" (change)="onCruce($event)" [disabled]="subiendoCruce || !autobits" />
+      <input type="file" accept=".xlsx,.xlsm" (change)="onCruce($event)" [disabled]="subiendoCruce() || !autobits()" />
       <mat-icon>compare_arrows</mat-icon>
-      <span>{{ subiendoCruce ? 'Conciliando…' : 'Soltar o elegir CRUCE DE CUENTAS' }}</span>
+      <span>{{ subiendoCruce() ? 'Conciliando…' : 'Soltar o elegir CRUCE DE CUENTAS' }}</span>
     </label>
-    @if (cruce) {
+    @if (cruce(); as cr) {
       <div class="wiz__meta">
-        <span>{{ cruce.archivo }}</span>
-        <span>{{ cruce.lectura.filas_leidas }} filas leídas</span>
-        <span>{{ cruce.conciliacion.emparejadas }} emparejadas</span>
-        <span>{{ cruce.pendientes.total }} pendientes</span>
-        @for (h of cruce.lectura.hojas; track h.nombre) {
+        <span>{{ cr.archivo }}</span>
+        <span>{{ cr.lectura.filas_leidas }} filas leídas</span>
+        <span>{{ cr.conciliacion.emparejadas }} emparejadas</span>
+        <span>{{ cr.pendientes.total }} pendientes</span>
+        @if (cr.reused) {
+          <span>Reutilizado</span>
+        }
+        @for (h of cr.lectura.hojas; track h.nombre) {
           <span>{{ h.nombre }} · {{ h.filas }}</span>
         }
       </div>
     }
   </section>
 
-  @if (comparacion.length) {
+  @if (comparacion().length) {
     <section class="wiz__card">
       <div class="wiz__row">
         <div>
@@ -127,7 +139,7 @@
         </div>
         <div class="wiz__row-actions">
           <label class="wiz__check">
-            <input type="checkbox" [(ngModel)]="soloPendientes" />
+            <input type="checkbox" [ngModel]="soloPendientes()" (ngModelChange)="soloPendientes.set($event)" />
             Solo lo que falta
           </label>
           <button type="button" class="wiz__copy" (click)="copiarPendientes()">Copiar pendientes</button>
@@ -145,8 +157,8 @@
             </tr>
           </thead>
           <tbody>
-            @for (row of comparacionVista; track $index) {
-              <tr>
+            @for (row of comparacionVista(); track $index) {
+              <tr [class.is-miss]="row.faltas.length">
                 <td>{{ row.proveedor || '—' }}</td>
                 <td>
                   <div>{{ texto(row.lado_autobits['compra']) }} · {{ texto(row.lado_autobits['reserva']) }}</div>
@@ -182,29 +194,37 @@
     </section>
   }
 
-  <section class="wiz__card" [class.is-dim]="paso < 3">
+  <section class="wiz__card" [class.is-dim]="paso() < 3">
     <h3>3. Facturas de la semana</h3>
     <p>
-      Puedes soltar las 70. Se analizan en bloques de 25, varias al mismo tiempo.
-      Duplicados se rechazan. Se cruzan con Autobits (compra, fecha, cliente).
+      Paquetes de máximo {{ packMax }} archivos (PDF, foto o escaneo).
+      El OCR + visión lee facturas físicas, electrónicas o borrosas; si algo es dudoso lo marca para revisión.
     </p>
+    <label class="wiz__label" for="solicitud-ia">Qué quieres que saque o revise (opcional)</label>
+    <textarea
+      id="solicitud-ia"
+      class="wiz__prompt"
+      rows="3"
+      [(ngModel)]="solicitud"
+      placeholder="Ej. Extrae NIT, número, total y compra. Si el total no cuadra o el sello tapó un dígito, asume y marca revisión."
+    ></textarea>
     <label class="wiz__drop">
       <input
         type="file"
         accept=".pdf,.jpg,.jpeg,.png"
         multiple
         (change)="onFacturas($event)"
-        [disabled]="subiendoFacturas || !autobits"
+        [disabled]="subiendoFacturas() || !autobits()"
       />
       <mat-icon>photo_library</mat-icon>
-      <span>{{ subiendoFacturas ? 'Subiendo y encolando OCR…' : 'Soltar facturas (PDF o foto), hasta 25 por bloque' }}</span>
+      <span>{{ subiendoFacturas() ? 'Subiendo y encolando OCR…' : 'Soltar hasta ' + packMax + ' facturas (PDF o foto)' }}</span>
     </label>
-    @if (packMsg) {
-      <p class="wiz__hint">{{ packMsg }}</p>
+    @if (packMsg()) {
+      <p class="wiz__hint">{{ packMsg() }}</p>
     }
-    @if (facturaItems.length) {
+    @if (facturaItems().length) {
       <ul class="wiz__files">
-        @for (it of facturaItems; track it.filename) {
+        @for (it of facturaItems(); track it.filename) {
           <li [class.is-bad]="!it.ok">
             <strong>{{ it.filename }}</strong>
             <small>{{ it.ok ? (it.document?.estado || 'en cola') : it.error }}</small>
@@ -212,7 +232,7 @@
         }
       </ul>
     }
-    @if (documentos.length) {
+    @if (documentos().length) {
       <h4 class="wiz__sub">Ya importadas</h4>
       <div class="wiz__table-wrap">
         <table class="wiz__table">
@@ -226,13 +246,20 @@
             </tr>
           </thead>
           <tbody>
-            @for (d of documentos; track d.id) {
-              <tr>
+            @for (d of documentos(); track d.id) {
+              <tr [class.is-miss]="d.requiere_revision">
                 <td>{{ d.filename }}</td>
                 <td>{{ d.numero_documento || '—' }}</td>
                 <td>{{ d.proveedor_nombre || '—' }}</td>
                 <td>{{ formatCop(d.total) }}</td>
-                <td>{{ d.estado }}</td>
+                <td>
+                  <span class="wiz__chip" [class]="'is-' + tonoEstado(d.estado)">
+                    {{ d.estado }}
+                    @if (d.requiere_revision) {
+                      · revisar
+                    }
+                  </span>
+                </td>
               </tr>
             }
           </tbody>
@@ -241,10 +268,51 @@
     }
   </section>
 
-  @if (crossings.length) {
+  <section class="wiz__card wiz__chat" [class.is-dim]="paso() < 3">
+    <h3>Chat con la IA sobre este paquete</h3>
+    <p class="wiz__hint">
+      Pregunta sobre las facturas ya subidas (máx. {{ packMax }}). Pedidos típicos: listar totales, NIT dudosos, qué falta para Autobits, o un resumen para contramarcar.
+    </p>
+    <div class="wiz__chips">
+      @for (s of chatSugerencias; track s) {
+        <button type="button" class="wiz__chip-btn" (click)="usarSugerencia(s)" [disabled]="preguntando() || !documentos().length">
+          {{ s }}
+        </button>
+      }
+    </div>
+    <div class="wiz__msgs" aria-live="polite">
+      @if (!chatMsgs().length) {
+        <p class="wiz__hint">Aún no hay mensajes. Sube el paquete y pregunta.</p>
+      }
+      @for (m of chatMsgs(); track $index) {
+        <article class="wiz__msg" [class.is-user]="m.role === 'user'">
+          <strong>{{ m.role === 'user' ? 'Tú' : 'IA contable' }}</strong>
+          <p>{{ m.text }}</p>
+        </article>
+      }
+      @if (preguntando()) {
+        <article class="wiz__msg"><strong>IA contable</strong><p>Pensando…</p></article>
+      }
+    </div>
+    <div class="wiz__ask">
+      <input
+        type="text"
+        class="wiz__prompt"
+        [(ngModel)]="chatInput"
+        (keydown.enter)="preguntar()"
+        placeholder="Escribe el pedido y pulsa Preguntar"
+        [disabled]="preguntando()"
+      />
+      <button type="button" class="wiz__copy wiz__copy--primary" (click)="preguntar()" [disabled]="preguntando() || !chatInput.trim()">
+        Preguntar
+      </button>
+    </div>
+  </section>
+
+  @if (crossings().length) {
     <section class="wiz__card">
       <h3>Relación factura ↔ Autobits</h3>
-      <p class="wiz__hint">Queda lista para el contramarcado que pediremos a la IA después.</p>
+      <p class="wiz__hint">Match listo para el contramarcado. Pide en el chat un resumen de lo que no cuadra.</p>
       <div class="wiz__table-wrap">
         <table class="wiz__table">
           <thead>
@@ -258,7 +326,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (c of crossings; track c.id) {
+            @for (c of crossings(); track c.id) {
               <tr>
                 <td>{{ c.proveedor || '—' }}</td>
                 <td>{{ c.numero_compra || '—' }} · {{ c.numero_reserva || '—' }}</td>
