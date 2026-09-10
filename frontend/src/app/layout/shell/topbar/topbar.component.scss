@@ -3,12 +3,14 @@
   top: 0;
   z-index: 30;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   min-width: 0;
   max-width: 100%;
-  height: var(--eas-topbar-h);
-  padding: 0 1.25rem;
+  height: auto;
+  min-height: var(--eas-topbar-h);
+  padding: 0.35rem 1.25rem;
   background: var(--eas-topbar-bg);
   border-bottom: 1px solid var(--eas-line-soft);
   backdrop-filter: blur(18px) saturate(160%);
@@ -122,7 +124,8 @@ html[data-theme='dark'] .tb {
 
 .tb__search {
   display: none;
-  flex: 1;
+  flex: 1 1 12rem;
+  min-width: 0;
   max-width: 460px;
   align-items: center;
   gap: 0.55rem;
@@ -174,8 +177,10 @@ html[data-theme='dark'] .tb {
 .tb__actions {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
+  min-width: 0;
 }
 
 .tb__user {
@@ -244,8 +249,8 @@ html[data-theme='dark'] .tb {
 }
 
 .tb-notif {
-  width: min(320px, calc(100dvw - 1.5rem));
-  max-width: calc(100dvw - 1.5rem);
+  width: min(320px, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
   padding: 0.35rem 0;
 }
 

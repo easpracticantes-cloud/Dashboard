@@ -74,8 +74,8 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
         max-height: 100vh;
         max-height: 100dvh;
         min-width: 0 !important;
-        max-width: 100%;
-        overflow-x: auto;
+        width: auto;
+        overflow-x: hidden;
         overflow-y: auto;
         background: transparent;
         box-sizing: border-box;

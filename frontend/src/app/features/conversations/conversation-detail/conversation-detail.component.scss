@@ -9,7 +9,7 @@
 
 @media (min-width: 1100px) {
   .cd {
-    grid-template-columns: minmax(0, 1.4fr) 320px;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 320px);
     align-items: start;
   }
 }

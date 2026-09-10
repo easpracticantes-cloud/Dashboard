@@ -71,6 +71,7 @@
   display: flex;
   gap: 0.7rem;
   align-items: flex-start;
+  min-width: 0;
   padding: 0.85rem;
   border-radius: 14px;
   border: 1px solid #d7e2db;
@@ -132,8 +133,11 @@
 
 .wiz__drop {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.7rem;
+  min-width: 0;
+  max-width: 100%;
   min-height: 72px;
   padding: 0.9rem 1rem;
   border: 1px dashed #9bb5a6;
@@ -171,6 +175,8 @@
 }
 
 .wiz__kpis li {
+  min-width: 0;
+  max-width: 100%;
   padding: 0.75rem 0.85rem;
   border: 1px solid #d7e2db;
   border-radius: 14px;
@@ -180,6 +186,7 @@
 .wiz__kpis strong {
   display: block;
   font-size: 1.25rem;
+  overflow-wrap: anywhere;
 }
 
 .wiz__kpis span {
@@ -197,8 +204,10 @@
 
 .wiz__row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.6rem;
   align-items: center;
+  min-width: 0;
 }
 
 .wiz__check {
@@ -214,16 +223,12 @@
   font-size: 0.92rem;
 }
 
-.wiz__table--cmp td:nth-child(2),
-.wiz__table--cmp td:nth-child(3) {
-  min-width: 160px;
-}
-
 .wiz__table-wrap {
-  overflow-x: auto;
-  overflow-y: auto;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
+  overflow-x: auto;
+  overflow-y: auto;
   border: 1px solid #e2ebe5;
   border-radius: 12px;
   -webkit-overflow-scrolling: touch;
@@ -241,6 +246,7 @@
   border-bottom: 1px solid #edf3ef;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 
 .wiz__table th {
@@ -380,8 +386,10 @@
 
 .wiz__ask {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: stretch;
+  min-width: 0;
 }
 
 .wiz__ask .wiz__prompt {
@@ -415,8 +423,9 @@
 .wiz__modal-card {
   position: relative;
   z-index: 1;
-  width: min(420px, 100%);
-  max-height: min(90dvh, 640px);
+  width: min(420px, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100dvh - 2rem);
   overflow: auto;
   padding: 1.25rem 1.3rem 1.2rem;
   border-radius: 18px;
@@ -477,11 +486,6 @@
 
   .wiz__ask {
     flex-direction: column;
-  }
-
-  .wiz__table--cmp td:nth-child(2),
-  .wiz__table--cmp td:nth-child(3) {
-    min-width: 140px;
   }
 }
 

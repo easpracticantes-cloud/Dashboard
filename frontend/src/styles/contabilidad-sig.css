@@ -236,7 +236,7 @@
 .contab .stats-grid,
 .contab .ap-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.85rem;
 }
 
@@ -308,7 +308,10 @@
 
 /* Tables */
 .contab .table-wrap {
-  overflow: auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
   padding: 0 !important;
 }
 
@@ -543,7 +546,7 @@
 /* Alerts */
 .contab .ap-alert {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 0.75rem;
   align-items: start;
   padding: 0.9rem 1rem;
@@ -711,7 +714,7 @@
 
 .contab .detail-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
 }
 

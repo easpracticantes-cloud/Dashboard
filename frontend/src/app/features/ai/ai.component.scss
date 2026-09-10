@@ -134,7 +134,10 @@
 }
 
 .ai-table-wrap {
-  overflow: auto;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .ai-table {
@@ -174,7 +177,7 @@
 .ai-cards {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .ai-mini-card {

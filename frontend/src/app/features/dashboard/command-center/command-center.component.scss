@@ -7,9 +7,11 @@ eas-command-center,
 }
 .cc__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
+  min-width: 0;
 }
 
 .cc__eyebrow {
@@ -61,7 +63,7 @@ eas-command-center,
 
 .cc-kpi {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
   padding: 1rem 1.05rem;
@@ -148,7 +150,7 @@ eas-command-center,
 
 .cc-grid {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
   gap: 0.9rem;
 }
 
@@ -178,10 +180,12 @@ eas-command-center,
 
 .cc-panel__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.85rem;
+  min-width: 0;
 }
 
 .cc-panel__head h3 {
@@ -284,7 +288,7 @@ eas-command-center,
 
 .cc-agenda {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75rem;
 }
 

@@ -106,8 +106,8 @@
 }
 
 .upload-copy {
-  flex: 1;
-  min-width: 180px;
+  flex: 1 1 12rem;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -145,7 +145,7 @@
 
 .conc-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
@@ -216,7 +216,7 @@
 
 .tipos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
   margin-bottom: 1rem;
 }
@@ -363,8 +363,8 @@
 }
 
 .excel-info {
-  flex: 1;
-  min-width: 200px;
+  flex: 1 1 12rem;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -427,7 +427,7 @@
 
 .workflow-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.5rem;
   margin-bottom: 1.25rem;
 }
@@ -528,6 +528,9 @@
 }
 
 .table-scroll {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
 }
 

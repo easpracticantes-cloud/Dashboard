@@ -171,6 +171,9 @@ html,
 body {
   height: 100%;
   margin: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -248,7 +251,7 @@ button {
   box-sizing: border-box;
 }
 
-/* El área del sidenav debe poder encogerse; el clip evita que tablas ensanchen la página */
+/* El sidenav no debe crear scroll horizontal de página (Material usa overflow: auto). */
 .mat-sidenav-container.shell,
 .mat-drawer-container.shell {
   width: 100% !important;
@@ -259,8 +262,9 @@ button {
 .mat-sidenav-content.shell__content,
 .mat-drawer-content.shell__content {
   min-width: 0 !important;
-  max-width: 100% !important;
-  overflow-x: auto !important;
+  width: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
   box-sizing: border-box !important;
 }
 
