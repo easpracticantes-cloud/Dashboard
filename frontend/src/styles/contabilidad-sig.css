@@ -306,18 +306,20 @@
   background: linear-gradient(160deg, color-mix(in srgb, #1f7a4c 8%, #fff), #fff) !important;
 }
 
-/* Tables */
+/* Tables: caben en el contenedor; no convierten la tarjeta en un swipe de página */
 .contab .table-wrap {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: auto;
+  overflow-x: visible;
   padding: 0 !important;
 }
 
 .contab table,
 .contab .data-table {
   width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -333,7 +335,8 @@
   text-transform: uppercase;
   color: var(--eas-muted);
   border-bottom: 1px solid var(--eas-line-soft);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .contab .data-table tbody td {
@@ -766,7 +769,8 @@ html[data-theme='dark'] .contab textarea {
 .contab .table-wrap.sticky-head,
 .contab .sticky-head {
   max-height: min(70vh, 720px);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .contab .sticky-head thead th,

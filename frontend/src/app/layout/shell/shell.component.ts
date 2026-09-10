@@ -77,6 +77,7 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
         width: auto;
         overflow-x: hidden;
         overflow-y: auto;
+        touch-action: pan-y;
         background: transparent;
         box-sizing: border-box;
         scroll-behavior: smooth;
@@ -112,11 +113,9 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
       @keyframes eas-page-enter {
         from {
           opacity: 0;
-          transform: translateY(10px);
         }
         to {
           opacity: 1;
-          transform: translateY(0);
         }
       }
 

@@ -82,14 +82,25 @@ eas-shell,
   min-width: 0;
 }
 
-/* Material sidenav: overflow:auto en ambos ejes = swipe de toda la página */
+html,
+body,
+.shell__content,
+.mat-drawer-content,
+.mat-sidenav-content {
+  touch-action: pan-y;
+}
+
+/* Material sidenav: overflow:auto en AMBOS ejes convierte el pane en un swipe de página */
 .mat-sidenav-container.shell,
-.mat-drawer-container.shell {
+.mat-drawer-container.shell,
+.mat-drawer-container {
   width: 100% !important;
   max-width: 100% !important;
   overflow: hidden !important;
 }
 
+.mat-sidenav-content,
+.mat-drawer-content,
 .mat-sidenav-content.shell__content,
 .mat-drawer-content.shell__content {
   min-width: 0 !important;
@@ -108,37 +119,87 @@ eas-shell,
   min-width: 0;
 }
 
-/* Tablas: ÚNICO lugar con overflow-x: auto */
+/*
+ * .table-wrap es una TARJETA alrededor de <table>, no un scroller de página.
+ * overflow-x: auto aquí era lo que permitía deslizar Wizard/Autobits/Cola.
+ * Las tablas de Contabilidad/Wizard se ADAPTAN (table-layout: fixed).
+ * Scroll X solo en datasets con demasiadas columnas (Registro, Sheets, CRM).
+ */
 .table-wrap,
 .table-scroll,
 .wiz__table-wrap,
-.reg__table-wrap,
-.sheets-table-wrap,
-.crm-table-wrap,
-.crm-table__scroll,
 .ai-table-wrap,
 .settings-table-wrap,
-.commercial-table,
-.eas-scroll-x,
 .dense.table-wrap,
-.contab .table-wrap {
+.contab .table-wrap,
+.sheet.table-wrap {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: visible;
+}
+
+.contab .data-table,
+.wiz__table,
+.ai-table,
+.settings-table,
+.users-table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
+}
+
+.contab .data-table th,
+.contab .data-table td,
+.wiz__table th,
+.wiz__table td,
+.ai-table th,
+.ai-table td,
+.settings-table th,
+.settings-table td,
+.users-table th,
+.users-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.contab .data-table .num,
+.contab .data-table .mono,
+.wiz__table .num {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contab .data-table .col-actions,
+.contab .data-table td.actions,
+.contab .data-table td.row-actions {
+  width: 8.5rem;
+}
+
+.contab .table-wrap.sticky-head,
+.contab .sticky-head {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* ÚNICOS scrollers horizontales: tablas que no pueden caber por número de columnas */
+.reg__table-wrap,
+.sheets-table-wrap,
+.crm-table__scroll,
+.commercial-table,
+.eas-scroll-x {
   display: block;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
-}
-
-.table-wrap table,
-.wiz__table,
-.reg__table,
-.ai-table,
-.settings-table,
-.contab table,
-.contab .data-table {
-  max-width: none;
+  touch-action: pan-x pan-y;
 }
 
 /* Cards / KPIs / grid children deben poder encoger */

@@ -229,13 +229,15 @@ html[data-theme='dark'] .settings-nav__item:hover {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: auto;
+  overflow-x: visible;
   border-radius: 12px;
   border: 1px solid var(--eas-line-soft);
 }
 
 .settings-table {
   width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.82rem;
 }

@@ -48,13 +48,14 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: auto;
+  overflow-x: visible;
   padding: 0;
 }
 
 .table-wrap.dense {
   max-height: min(70vh, 820px);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .dense-table {
