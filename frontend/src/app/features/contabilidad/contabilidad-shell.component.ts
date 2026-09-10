@@ -22,7 +22,17 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
     `
       .contab {
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
         gap: 1rem;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      .contab > *,
+      .contab__body {
+        min-width: 0;
+        max-width: 100%;
       }
 
       .contab__body {

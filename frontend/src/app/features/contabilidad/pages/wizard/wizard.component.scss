@@ -1,7 +1,23 @@
+:host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .wiz {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.1rem;
   color: var(--eas-ink, #1c2b24);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.wiz > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .wiz__hero {
@@ -136,8 +152,10 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.7rem;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
+  box-sizing: border-box;
   min-height: 72px;
   padding: 0.9rem 1rem;
   border: 1px dashed #9bb5a6;
@@ -476,7 +494,7 @@
 
 @media (max-width: 1024px) {
   .wiz__steps {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -493,7 +511,7 @@
 @media (max-width: 480px) {
   .wiz__steps,
   .wiz__kpis {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

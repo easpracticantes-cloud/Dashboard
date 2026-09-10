@@ -48,13 +48,46 @@ button {
 }
 
 eas-shell,
+eas-registro,
+eas-contabilidad-shell,
+eas-contabilidad-wizard,
+eas-contabilidad-documents-list,
+eas-contabilidad-autobits,
+eas-contabilidad-pending,
+eas-contabilidad-crossings,
+eas-contabilidad-processing,
+eas-contabilidad-payments,
+eas-contabilidad-dashboard,
+eas-contabilidad-cola,
+eas-contabilidad-packages,
+eas-contabilidad-remediations,
+eas-dashboard,
+eas-dashboard-sheets,
+eas-command-center,
+eas-quotes,
+eas-conversations-list,
+eas-clients,
+eas-analytics,
+eas-ai,
+eas-settings,
+eas-help,
+eas-profile,
+eas-reports,
+eas-history,
+eas-notifications,
+eas-users {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .shell,
-.shell__content,
 .shell__main,
 .shell__canvas,
 .ph,
 .ph__copy,
-.ph__actions,
 .page-header,
 .contab,
 .reg,
@@ -64,10 +97,87 @@ eas-shell,
 .dash,
 .pagos,
 .autobits,
-.pend {
+.pend,
+.cosmos-page,
+.cruce {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Páginas apiladas: una columna que SÍ encoge. Sin esto, un hijo max-content
+   (tabla de Registro) ensancha toda la página y centra el drop a la derecha. */
+.reg,
+.wiz,
+.contab,
+.cosmos-page,
+.dash,
+.cc,
+.sheets-dash,
+.pagos,
+.autobits,
+.pend,
+.cruce {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.reg > *,
+.wiz > *,
+.contab > *,
+.contab__body,
+.cosmos-page > *,
+.dash > *,
+.cc > *,
+.sheets-dash > *,
+.pagos > *,
+.autobits > *,
+.pend > *,
+.cruce > *,
+.reg__card,
+.wiz__card,
+.reg__hero,
+.wiz__hero,
+.page-hero {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.reg__card,
+.wiz__card {
+  width: 100%;
+  contain: inline-size;
+}
+
+.reg__card {
+  overflow-x: visible;
+}
+
+.reg__drop,
+.upload-hero,
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  justify-self: stretch;
+  text-align: center;
+}
+
+.wiz__drop,
+.cruce-upload,
+.excel-step,
+.upload-alt,
+.sheet {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .shell__canvas {
@@ -104,8 +214,7 @@ body,
 .mat-sidenav-content.shell__content,
 .mat-drawer-content.shell__content {
   min-width: 0 !important;
-  max-width: none !important;
-  width: auto !important;
+  max-width: 100% !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
   box-sizing: border-box !important;
@@ -340,7 +449,7 @@ body,
   .upload-row,
   .dash-charts,
   .settings-layout {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 }
 
@@ -404,7 +513,7 @@ body,
   .contab .detail-grid,
   .sheets-dash__charts,
   .detail-cards {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   .reg__wide,
@@ -433,7 +542,7 @@ body,
   .detail-cards,
   .contab .detail-grid,
   .sheets-dash__charts {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   .reg__grid,
@@ -487,7 +596,7 @@ body,
   }
 
   .reg__grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   .reg__wide {
@@ -548,12 +657,12 @@ body,
   .pay-stats,
   .contab .kpi-grid,
   .contab .ap-kpi-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   .contab .ap-timeline,
   .ap-timeline {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .contab .ap-timeline li::before,

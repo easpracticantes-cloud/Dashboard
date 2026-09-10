@@ -5,6 +5,12 @@
   </button>
 </eas-page-header>
 
+<ul class="users-legend" aria-label="Resumen de usuarios">
+  <li>Total {{ counts().total }}</li>
+  <li>Activos {{ counts().active }}</li>
+  <li>Inactivos {{ counts().inactive }}</li>
+</ul>
+
 <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
   <div class="eas-card px-4 py-3">
     <p class="text-xs font-semibold uppercase tracking-wide text-eas-muted">Total</p>

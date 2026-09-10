@@ -41,7 +41,8 @@ export const routes: Routes = [
       },
       {
         path: 'ai',
-        loadChildren: () => import('./features/ai/ai.routes').then((m) => m.AI_ROUTES)
+        redirectTo: 'dashboard',
+        pathMatch: 'full'
       },
       {
         path: 'help',

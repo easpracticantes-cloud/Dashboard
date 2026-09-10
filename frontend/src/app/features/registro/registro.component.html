@@ -19,6 +19,12 @@
       Exporta el chat desde WhatsApp (.txt o .zip). La IA (Claude) lo convierte a las columnas del Excel de Registro.
       Nada se guarda hasta que confirmes.
     </p>
+    <ol class="reg__wa-flow" aria-label="Flujo de carga WhatsApp">
+      <li [class.is-on]="waEstado() === 'idle' || waEstado() === 'error'">WhatsApp</li>
+      <li [class.is-on]="waEstado() === 'analizando'">Análisis IA</li>
+      <li [class.is-on]="waEstado() === 'preview' && !waConfirmando()">Revisión</li>
+      <li [class.is-on]="waConfirmando()">Confirmación</li>
+    </ol>
     <label
       class="reg__drop"
       [class.is-drag]="arrastrandoWa()"

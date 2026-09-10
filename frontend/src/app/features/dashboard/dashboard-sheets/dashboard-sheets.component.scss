@@ -8,6 +8,7 @@
 
 .sheets-dash {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   width: 100%;
   max-width: 100%;
@@ -441,7 +442,7 @@
   .sheets-dash__kpis,
   .sheets-filters,
   .sheets-dash__charts {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .sheets-filters__search {
@@ -449,7 +450,7 @@
   }
 
   .sheets-editor__body {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

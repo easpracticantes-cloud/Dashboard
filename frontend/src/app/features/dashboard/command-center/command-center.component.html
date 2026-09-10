@@ -48,6 +48,51 @@
     </article>
   </div>
 
+  <article class="cc-claude" aria-label="Control de costos de Claude">
+    <div class="cc-claude__brand">
+      <span class="cc-claude__mark"><mat-icon>psychology</mat-icon></span>
+      <div class="cc-claude__titles">
+        <p class="cc-claude__eyebrow">Motor de IA</p>
+        <h3>Claude</h3>
+        <p class="cc-claude__provider">{{ claudeProvider() }} · Anthropic</p>
+      </div>
+      <span class="cc-claude__status" [class.is-ready]="claudeReady()" [class.is-off]="claudeUnavailable()">
+        {{ claudeStatusLabel() }}
+      </span>
+    </div>
+
+    <div class="cc-claude__grid">
+      <div class="cc-claude__cell">
+        <p class="cc-claude__label">Saldo disponible</p>
+        <p class="cc-claude__value cc-claude__value--muted">No disponible</p>
+        <p class="cc-claude__hint">No hay presupuesto ni crédito de Claude configurado en SIG.</p>
+      </div>
+      <div class="cc-claude__cell">
+        <p class="cc-claude__label">Gastado (registros observados)</p>
+        @if (claudeLoading()) {
+          <p class="cc-claude__value">…</p>
+        } @else if (claudeUnavailable() || claudeSpentUsd() === null) {
+          <p class="cc-claude__value cc-claude__value--muted">Datos de consumo no disponibles</p>
+        } @else {
+          <p class="cc-claude__value">{{ claudeSpentUsd()! | currency: 'USD' : 'symbol' : '1.2-4' }}</p>
+          <p class="cc-claude__hint">
+            {{ claudeCalls() }} llamada{{ claudeCalls() === 1 ? '' : 's' }} Claude en los últimos registros.
+            Estimación a partir de costos guardados — no se inventa un % de presupuesto.
+          </p>
+        }
+      </div>
+    </div>
+
+    <footer class="cc-claude__foot">
+      @if (claudeUpdated()) {
+        <span>Actualizado {{ claudeUpdated() | date: 'dd/MM/yyyy HH:mm' }}</span>
+      } @else {
+        <span>Sin fecha de uso reciente</span>
+      }
+      <span title="Solo se suman eventos cuyo proveedor es Claude o Anthropic">Solo Claude</span>
+    </footer>
+  </article>
+
   <div class="cc-grid">
     <section class="cc-panel">
       <div class="cc-panel__head">

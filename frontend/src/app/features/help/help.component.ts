@@ -64,11 +64,12 @@ export class HelpComponent {
       routeLabel: 'Ver Registro'
     },
     {
-      icon: 'auto_awesome',
-      title: 'Asistente de IA',
-      body: 'En cada chat puedes sugerir respuesta, resumir y generar cotización en PDF.',
-      route: '/app/registro',
-      routeLabel: 'Abrir registro'
+      icon: 'smart_toy',
+      title: 'Ave, el copilot',
+      body: 'El muñeco flotante es el chat de IA del día a día: contexto de pantalla, voz y acciones. No hay una consola técnica aparte en el menú.',
+      route: '/app/dashboard',
+      routeLabel: 'Ir al centro de mando',
+      steps: ['Abre Ave abajo a la derecha.', 'Pregunta sobre la pantalla actual.', 'Confirma antes de ejecutar cambios.']
     },
     {
       icon: 'person',

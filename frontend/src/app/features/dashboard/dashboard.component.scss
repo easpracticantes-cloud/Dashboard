@@ -1,6 +1,7 @@
 eas-dashboard,
 .dash {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.45rem;
   width: 100%;
   max-width: 100%;
@@ -82,6 +83,27 @@ eas-dashboard,
   color: rgba(255, 255, 255, 0.86);
   font-size: 0.95rem;
   line-height: 1.58;
+}
+
+.dash-hero__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash-hero__chips li {
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .dash-hero__actions {

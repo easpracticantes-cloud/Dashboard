@@ -1,5 +1,13 @@
+:host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
 .reg {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.1rem;
   color: var(--eas-ink);
   width: 100%;
@@ -7,7 +15,15 @@
   min-width: 0;
 }
 
+.reg > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .reg__hero {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 1.2rem 1.3rem;
   border: 1px solid var(--eas-line-soft);
   border-radius: 18px;
@@ -36,6 +52,41 @@
   max-width: 68ch;
   color: var(--eas-muted);
   line-height: 1.45;
+}
+
+.reg__wa-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0 0 0.95rem;
+  padding: 0;
+  list-style: none;
+}
+
+.reg__wa-flow li {
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--eas-muted);
+  background: var(--eas-mist);
+  border: 1px solid var(--eas-line-soft);
+}
+
+.reg__wa-flow li.is-on {
+  color: var(--eas-on-tint-leaf);
+  background: var(--eas-tint-leaf);
+  border-color: color-mix(in srgb, var(--eas-leaf) 35%, transparent);
+}
+
+@media (max-width: 720px) {
+  .reg__wa-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .reg__hero-actions,
@@ -103,10 +154,14 @@
 }
 
 .reg__card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 1.1rem 1.2rem 1.25rem;
   border: 1px solid var(--eas-line-soft);
   border-radius: 16px;
   background: var(--eas-surface);
+  box-sizing: border-box;
 }
 
 .reg__card h3 {
@@ -228,8 +283,15 @@
 }
 
 .reg__drop {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  justify-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   gap: 0.25rem;
   min-height: 7rem;
   border: 1.5px dashed var(--eas-line);
@@ -238,6 +300,7 @@
   cursor: pointer;
   position: relative;
   padding: 1rem;
+  text-align: center;
 }
 
 .reg__drop input {
@@ -270,7 +333,7 @@
 
 @media (max-width: 1100px) {
   .reg__grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .reg__wide {
@@ -280,7 +343,7 @@
 
 @media (max-width: 768px) {
   .reg__grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .reg__wide {

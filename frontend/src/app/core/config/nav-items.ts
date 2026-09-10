@@ -29,7 +29,6 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['ADMINISTRADOR', 'GERENCIA', 'CONTABILIDAD', 'SUPERVISOR']
   },
   { label: 'Analítica', icon: 'monitoring', route: '/app/analytics', roles: ALL_ROLES },
-  { label: 'Consola IA', icon: 'tune', route: '/app/ai', roles: ['ADMINISTRADOR', 'GERENCIA', 'SUPERVISOR'] },
   { label: 'Reportes', icon: 'summarize', route: '/app/reports', roles: ALL_ROLES },
   { label: 'Usuarios', icon: 'group', route: '/app/users', roles: ['ADMINISTRADOR', 'GERENCIA', 'SUPERVISOR'] },
   { label: 'Configuración', icon: 'settings', route: '/app/settings', roles: ALL_ROLES },

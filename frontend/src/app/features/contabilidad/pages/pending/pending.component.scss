@@ -1,5 +1,7 @@
 .pend {
+  width: 100%;
   max-width: 1280px;
+  min-width: 0;
 }
 
 .upload-row {
@@ -70,6 +72,6 @@ button.ap-kpi.activo {
 
 @media (max-width: 900px) {
   .upload-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

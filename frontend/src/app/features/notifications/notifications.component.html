@@ -9,6 +9,12 @@
   </button>
 </eas-page-header>
 
+<ul class="notif-legend" aria-label="Lectura de avisos">
+  <li>Sin leer</li>
+  <li>Por tipo</li>
+  <li>Acción en un clic</li>
+</ul>
+
 <div class="notif-toolbar">
   <div class="eas-chip-group">
     <button type="button" class="eas-chip" [class.is-active]="filter() === 'ALL'" (click)="setFilter('ALL')">

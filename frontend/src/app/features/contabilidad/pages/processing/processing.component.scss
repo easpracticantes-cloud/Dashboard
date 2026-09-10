@@ -64,6 +64,10 @@
 .drop-zone {
   text-align: center;
   padding: 2.75rem 2rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 2px dashed rgba(212, 175, 120, 0.3);
   border-radius: var(--radius-xl);
   margin-bottom: 1.25rem;
@@ -297,6 +301,6 @@
 
 @media (max-width: 900px) {
   .proc-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

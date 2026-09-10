@@ -1,0 +1,193 @@
+/**
+ * Acabado visual SIG-EAS — identidad única, sin inventar métricas.
+ * Se carga antes de no-motion.css: color/borde/sombra sí; transform de hover no.
+ */
+
+.login-trust {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 1.1rem 0 0;
+}
+
+.login-trust span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 0;
+  padding: 0.45rem 0.4rem;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+  color: var(--eas-muted);
+  background: var(--eas-mist);
+  border: 1px solid var(--eas-line-soft);
+}
+
+@media (max-width: 640px) {
+  .login-trust {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.login-google-btn {
+  border-radius: 12px !important;
+  border-width: 1.5px !important;
+}
+
+.login-panel {
+  box-shadow:
+    0 24px 48px rgba(10, 18, 14, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.4) inset !important;
+}
+
+.fp__card {
+  border: 1px solid var(--eas-line-soft);
+  box-shadow: var(--eas-shadow-md);
+}
+
+.fp__hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.8rem;
+  color: var(--eas-muted);
+  line-height: 1.4;
+}
+
+.help-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.help-card__icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
+}
+
+.history-item {
+  min-width: 0;
+}
+
+.history-item__when strong {
+  display: block;
+  font-size: 0.78rem;
+}
+
+.notif-legend,
+.reports-legend,
+.analytics-legend,
+.settings-legend,
+.profile-legend,
+.users-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+  padding: 0;
+  list-style: none;
+}
+
+.notif-legend li,
+.reports-legend li,
+.analytics-legend li,
+.settings-legend li,
+.profile-legend li,
+.users-legend li {
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--eas-muted);
+  background: var(--eas-surface);
+  border: 1px solid var(--eas-line-soft);
+}
+
+.reports-stats {
+  min-width: 0;
+}
+
+.users-legend {
+  margin-bottom: 1rem;
+}
+
+html[data-theme='dark'] table,
+html[data-theme='dark'] .data-table,
+html[data-theme='dark'] .reg__table,
+html[data-theme='dark'] .commercial-table,
+html[data-theme='dark'] .sheets-table-wrap,
+html[data-theme='dark'] .ai-table-wrap,
+html[data-theme='dark'] .settings-table-wrap {
+  background: var(--eas-surface);
+  color: var(--eas-ink);
+}
+
+html[data-theme='dark'] table thead th,
+html[data-theme='dark'] .reg__table th,
+html[data-theme='dark'] .commercial-table th {
+  background: var(--eas-surface-2) !important;
+  color: var(--eas-muted) !important;
+}
+
+html[data-theme='dark'] table tbody td,
+html[data-theme='dark'] .reg__table td,
+html[data-theme='dark'] .commercial-table td {
+  color: var(--eas-ink) !important;
+  border-bottom-color: var(--eas-line-soft) !important;
+}
+
+html[data-theme='dark'] .reg__table tbody tr:nth-child(even),
+html[data-theme='dark'] .commercial-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--eas-mist) 70%, transparent);
+}
+
+.contab [data-estado='PENDIENTE'],
+.contab .estado-chip.pendiente,
+.contab .badge.pendiente {
+  background: color-mix(in srgb, var(--eas-amber) 16%, transparent);
+  color: var(--eas-on-tint-amber);
+}
+
+.contab [data-estado='PROCESANDO'],
+.contab .estado-chip.procesando {
+  background: color-mix(in srgb, var(--eas-tint-info) 80%, transparent);
+  color: var(--eas-on-tint-info);
+}
+
+.contab [data-estado='OK'],
+.contab [data-estado='PAGADO'],
+.contab .estado-chip.pagado {
+  background: var(--eas-tint-leaf);
+  color: var(--eas-on-tint-leaf);
+}
+
+.contab [data-estado='ERROR'],
+.contab [data-estado='ANULADO'] {
+  background: var(--eas-tint-danger);
+  color: var(--eas-on-tint-danger);
+}
+
+.contab [data-estado='DUPLICADO'] {
+  background: var(--eas-tint-neutral);
+  color: var(--eas-on-tint-neutral);
+}
+
+.eas-btn-primary,
+.eas-btn-secondary,
+.eas-chip,
+.eas-card {
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+}
+
+.ph,
+.page-header,
+eas-page-header {
+  min-width: 0;
+  max-width: 100%;
+}

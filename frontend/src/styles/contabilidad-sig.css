@@ -8,7 +8,11 @@
   color: var(--eas-ink);
   font-family: inherit;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .contab .page-hero,
@@ -328,7 +332,7 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: color-mix(in srgb, var(--eas-forest) 5%, #fff);
+  background: var(--eas-surface-2);
   padding: 0.85rem 0.9rem;
   font-size: 0.7rem;
   letter-spacing: 0.07em;
@@ -778,7 +782,7 @@ html[data-theme='dark'] .contab textarea {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: color-mix(in srgb, var(--eas-surface, #fff) 96%, #e8f0eb);
+  background: var(--eas-surface);
   box-shadow: 0 1px 0 var(--eas-line-soft, #e2e8e4);
 }
 
@@ -801,4 +805,68 @@ html[data-theme='dark'] .contab textarea {
 .contab .alert.error p,
 .contab .alert.alert-error p {
   margin: 0.15rem 0 0;
+}
+
+/* Dark mode: tablas y superficies de Contabilidad usan tokens, no blanco fijo */
+html[data-theme='dark'] .contab .table-wrap,
+html[data-theme='dark'] .contab table,
+html[data-theme='dark'] .contab .data-table,
+html[data-theme='dark'] .contab .sheet,
+html[data-theme='dark'] .contab .card,
+html[data-theme='dark'] .contab .panel,
+html[data-theme='dark'] .wiz__card,
+html[data-theme='dark'] .wiz__table-wrap,
+html[data-theme='dark'] .wiz__table {
+  background: var(--eas-surface) !important;
+  color: var(--eas-ink) !important;
+  border-color: var(--eas-line-soft) !important;
+}
+
+html[data-theme='dark'] .contab .data-table thead th,
+html[data-theme='dark'] .contab .sticky-head thead th,
+html[data-theme='dark'] .contab .table-wrap.sticky-head thead th,
+html[data-theme='dark'] .wiz__table thead th,
+html[data-theme='dark'] .contab table thead th {
+  background: var(--eas-surface-2) !important;
+  color: var(--eas-muted) !important;
+  border-bottom-color: var(--eas-line) !important;
+}
+
+html[data-theme='dark'] .contab .data-table tbody td,
+html[data-theme='dark'] .contab table tbody td,
+html[data-theme='dark'] .wiz__table tbody td {
+  color: var(--eas-ink) !important;
+  border-bottom-color: var(--eas-line-soft) !important;
+  background: transparent;
+}
+
+html[data-theme='dark'] .contab .data-table tbody tr:nth-child(even),
+html[data-theme='dark'] .contab table tbody tr:nth-child(even),
+html[data-theme='dark'] .wiz__table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--eas-mist) 55%, transparent) !important;
+}
+
+html[data-theme='dark'] .contab .data-table tbody tr:hover,
+html[data-theme='dark'] .contab table tbody tr:hover,
+html[data-theme='dark'] .wiz__table tbody tr:hover {
+  background: color-mix(in srgb, var(--eas-leaf) 12%, transparent) !important;
+}
+
+html[data-theme='dark'] .contab .estado-chip.ok,
+html[data-theme='dark'] .contab .ap-kpi .kpi-icon,
+html[data-theme='dark'] .contab .empty-state .empty-icon,
+html[data-theme='dark'] .contab .ap-alert,
+html[data-theme='dark'] .contab .ap-timeline .tl-dot {
+  background: color-mix(in srgb, var(--eas-leaf) 16%, var(--eas-surface)) !important;
+  color: var(--eas-leaf) !important;
+}
+
+html[data-theme='dark'] .contab .page-hero,
+html[data-theme='dark'] .contab .viewer-hero {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--eas-leaf) 12%, var(--eas-surface)) 0%,
+    var(--eas-surface) 55%,
+    var(--eas-surface-2) 100%
+  ) !important;
 }

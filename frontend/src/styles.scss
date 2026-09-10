@@ -263,7 +263,7 @@ button {
 .mat-sidenav-content.shell__content,
 .mat-drawer-content.shell__content {
   min-width: 0 !important;
-  width: auto !important;
+  max-width: 100% !important;
   overflow-x: hidden !important;
   overflow-y: auto !important;
   box-sizing: border-box !important;

@@ -5,7 +5,7 @@ export function moduleLabelFromUrl(url: string): string {
   if (path.includes('/contabilidad')) return 'Contabilidad';
   if (path.includes('/dashboard')) return 'Dashboard';
   if (path.includes('/analytics')) return 'Analítica';
-  if (path.includes('/ai')) return 'Consola IA';
+  if (path.includes('/ai')) return 'Dashboard';
   if (path.includes('/users')) return 'Usuarios';
   if (path.includes('/settings')) return 'Ajustes';
   if (path.includes('/profile')) return 'Perfil';

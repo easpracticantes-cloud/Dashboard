@@ -8,7 +8,7 @@
 }
 
 /* ===== Núcleo útil v5 ===== */
-eas-dashboard, eas-dashboard-sheets, eas-quotes, eas-conversations-list, eas-clients, eas-analytics { display: block; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+eas-dashboard, eas-dashboard-sheets, eas-quotes, eas-conversations-list, eas-clients, eas-analytics, eas-registro, eas-contabilidad-shell, eas-command-center { display: block; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
 .sheets-table-wrap, .crm-table__scroll, .commercial-table, .sheets-raw-wrap { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--eas-leaf) 45%, transparent) transparent; }
 .sheets-table-wrap::-webkit-scrollbar, .crm-table__scroll::-webkit-scrollbar { height: 8px; width: 8px; }
 .sheets-table-wrap::-webkit-scrollbar-thumb, .crm-table__scroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--eas-leaf) 40%, transparent); border-radius: 999px; }
