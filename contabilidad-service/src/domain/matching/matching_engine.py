@@ -109,6 +109,7 @@ class MatchingEngine:
         best = scored[0]
         if best.score < self.PROBABLE_THRESHOLD:
             return None
+        self._flag_ambiguity(best, scored)
         return best
 
     def score_pair(
@@ -195,6 +196,7 @@ class MatchingEngine:
         best = scored[0]
         if best.score < self.PROBABLE_THRESHOLD:
             return None
+        self._flag_ambiguity(best, scored)
         return best
 
     def score_cruce_pair(
@@ -254,6 +256,21 @@ class MatchingEngine:
             proveedor=record.proveedor or ctx.proveedor,
             factura_cdc=record.factura_cdc,
         )
+
+    AMBIGUITY_GAP = 8.0
+
+    def _flag_ambiguity(self, best: MatchCandidate, scored: list[MatchCandidate]) -> None:
+        """Si hay dos candidatos probables casi empatados, no se trata como exacto."""
+        if len(scored) < 2:
+            return
+        second = scored[1]
+        if second.score < self.PROBABLE_THRESHOLD:
+            return
+        if best.score - second.score >= self.AMBIGUITY_GAP:
+            return
+        if "ambiguo" not in best.reasons:
+            best.reasons.append("ambiguo")
+        best.match_type = MatchType.MATCH_PROBABLE
 
     def classify(self, score: float, reasons: list[str]) -> str:
         has_strong_id = any(

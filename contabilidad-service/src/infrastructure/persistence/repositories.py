@@ -530,7 +530,6 @@ class CrossingRepository:
         rows = (
             self.db.query(AccountCrossingModel)
             .filter(AccountCrossingModel.match_type == MatchType.DESDE_AUTOBITS)
-            .filter(AccountCrossingModel.estado != CrossingStatus.ARCHIVADO)
             .all()
         )
         from domain.autobits.business_key import autobits_business_key
@@ -538,7 +537,14 @@ class CrossingRepository:
         out: dict[str, AccountCrossingModel] = {}
         for row in rows:
             key = autobits_business_key(row.nit, row.numero_compra, row.numero_reserva)
-            if key and key in keys and key not in out:
+            if not key or key not in keys:
+                continue
+            actual = out.get(key)
+            if actual is None:
+                out[key] = row
+                continue
+            # Preferir la fila viva: el seed puede desarchivar la misma OC.
+            if actual.estado == CrossingStatus.ARCHIVADO and row.estado != CrossingStatus.ARCHIVADO:
                 out[key] = row
         return out
 

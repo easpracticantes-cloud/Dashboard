@@ -6,6 +6,7 @@ import { AutobitsApiService, AutobitsRecord, ImportResult } from '../../services
 import { CrossingsApiService } from '../../services/crossings-api.service';
 import { CruceExcelApiService } from '../../services/cruce-excel-api.service';
 import { DocumentsApiService } from '../../services/documents-api.service';
+import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
 import { WizardComponent } from './wizard.component';
 
 function xlsxEvent(name = 'semana.xlsx'): Event {
@@ -82,7 +83,17 @@ describe('WizardComponent Autobits Excel flow', () => {
           provide: CruceExcelApiService,
           useValue: {
             upload: vi.fn(),
+            analizar: vi.fn(() => of({
+              aplicado: true,
+              archivo: 'sistema',
+              batch: { id: 11, filename: 'semana.xlsx', imported_rows: 1, imported_at: '' },
+              lectura: { filas_leidas: 1, filas_duplicadas: 0, hojas: [], avisos: [] },
+              conciliacion: { emparejadas: 0, sin_correspondencia: 0, fuera_de_periodo: 0, sin_fecha: 0, actualizadas: 0, conflictos: [] },
+              comparacion: [],
+              pendientes: { total: 0, por_tipo: {}, resumen: [] },
+            })),
             getPendientes: vi.fn(() => of({ has_autobits: false, batch: null, pendientes: { total: 0, por_tipo: {}, resumen: [] }, comparacion: [] })),
+            exportExcelUrl: vi.fn(() => '/contabilidad/cruce-excel/export.xlsx'),
           },
         },
         {
@@ -99,6 +110,10 @@ describe('WizardComponent Autobits Excel flow', () => {
             list: vi.fn(() => of({ items: [], total: 0 })),
             runMatching: vi.fn(() => of({})),
           },
+        },
+        {
+          provide: ContabilidadDownloadService,
+          useValue: { download: vi.fn(async () => undefined) },
         },
       ],
     }).compileComponents();
@@ -337,5 +352,67 @@ describe('WizardComponent Autobits Excel flow', () => {
     const cmp = create();
     expect(TestBed.inject(DestroyRef)).toBeTruthy();
     cmp.ngOnDestroy();
+  });
+
+  it('Cruce de Cuentas no pide adjuntar Excel y ofrece Procesar / Generar Excel', () => {
+    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 1 })])));
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.onAutobits(xlsxEvent());
+    fixture.detectChanges();
+
+    const html = (fixture.nativeElement as HTMLElement).textContent || '';
+    expect(html).toContain('Procesar');
+    expect(html).toContain('Generar Excel');
+    expect(html).not.toContain('Soltar o elegir CRUCE DE CUENTAS');
+    const fileLabels = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('input[type="file"]')
+    ).map((el) => el.closest('label')?.textContent || '');
+    expect(fileLabels.some((t) => /CRUCE DE CUENTAS|hoja de cruce/i.test(t))).toBe(false);
+  });
+
+  it('facturas se habilitan con Autobits, sin haber pulsado Procesar', () => {
+    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 1 })])));
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.onAutobits(xlsxEvent());
+    fixture.detectChanges();
+
+    const input = (fixture.nativeElement as HTMLElement).querySelector(
+      'input[accept*=".pdf"]',
+    ) as HTMLInputElement;
+    expect(input).toBeTruthy();
+    expect(input.disabled).toBe(false);
+    const card = input.closest('.wiz__card');
+    expect(card?.classList.contains('is-dim')).toBe(false);
+  });
+
+  it('Generar Excel se habilita con Autobits, sin haber pulsado Procesar', () => {
+    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 1 })])));
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.onAutobits(xlsxEvent());
+    fixture.detectChanges();
+
+    const btn = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('button')
+    ).find((b) => (b.textContent || '').includes('Generar Excel')) as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    expect(btn.disabled).toBe(false);
+    expect(cmp.cruce()).toBeNull();
+  });
+
+  it('Procesar analiza SIG sin upload y habilita Generar Excel', () => {
+    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 1 })])));
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.onAutobits(xlsxEvent());
+    cmp.analizarCruce();
+    fixture.detectChanges();
+
+    expect(cmp.subiendoCruce()).toBe(false);
+    expect(cmp.cruce()?.archivo).toBe('sistema');
+    expect(cmp.paso()).toBe(3);
+    expect(cmp.aviso()).toContain('SIG');
   });
 });

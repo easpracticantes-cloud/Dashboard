@@ -108,6 +108,11 @@ export class CruceExcelApiService {
 
   constructor(private readonly http: HttpClient) {}
 
+  analizar(batchId?: number): Observable<CruceUploadResult> {
+    const q = batchId ? `?batch_id=${batchId}` : '';
+    return this.http.post<CruceUploadResult>(`${this.base}/analizar${q}`, {});
+  }
+
   upload(file: File, aplicar = true): Observable<CruceUploadResult> {
     const form = new FormData();
     form.append('archivo', file, file.name);
@@ -123,5 +128,10 @@ export class CruceExcelApiService {
   exportUrl(batchId?: number): string {
     const q = batchId ? `?batch_id=${batchId}` : '';
     return `${this.base}/pendientes/export${q}`;
+  }
+
+  exportExcelUrl(batchId?: number): string {
+    const q = batchId ? `?batch_id=${batchId}` : '';
+    return `${this.base}/export.xlsx${q}`;
   }
 }

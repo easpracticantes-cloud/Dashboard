@@ -82,6 +82,20 @@ def money_to_float(value: object) -> float | None:
     return float(to_money(value))
 
 
+def to_money_or_none(value: object) -> Decimal | None:
+    """Como ``to_money`` pero conserva nulos: no convierte vacío ni texto ilegible en 0."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        if not value.strip():
+            return None
+        if _parse_texto(value) is None:
+            return None
+    return to_money(value)
+
+
 def format_cop(value: object) -> str:
     """Formato de presentación: ``$1.234.567``."""
     entero = to_money(value).to_integral_value(rounding=ROUND_HALF_UP)

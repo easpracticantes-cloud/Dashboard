@@ -25,6 +25,8 @@ const ICONOS_PENDIENTE: Record<string, string> = {
   DIFERENCIA_VALOR: 'balance',
   FALTA_EN_CRUCE: 'playlist_add',
   SOBRA_EN_CRUCE: 'help_outline',
+  AMBIGUO: 'priority_high',
+  DUPLICADO: 'content_copy',
 };
 
 @Component({
@@ -45,6 +47,7 @@ export class CrossingsComponent implements OnInit {
   cargando = true;
   ejecutando = false;
   subiendoCruce = false;
+  generandoExcel = false;
   error = '';
   mensajeOk = '';
 
@@ -186,51 +189,48 @@ export class CrossingsComponent implements OnInit {
       });
   }
 
-  onCruceExcelSelected(event: Event, aplicar = true): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-
+  analizarCruce(): void {
     this.subiendoCruce = true;
     this.error = '';
     this.mensajeOk = '';
-    this.ultimaCargaCruce = null;
-
-    this.cruceExcel.upload(file, aplicar).subscribe({
+    this.cruceExcel.analizar(this.batchId).subscribe({
       next: (res) => {
         this.subiendoCruce = false;
-        input.value = '';
         this.ultimaCargaCruce = res;
         this.pendientes = res.pendientes;
         this.tipoPendienteActivo = '';
-        const c = res.conciliacion;
-        const faltan = res.pendientes?.por_tipo?.['FALTA_EN_CRUCE']?.length || 0;
-        const base = res.aplicado
-          ? `Cruce aplicado: ${c.emparejadas} coinciden con Autobits · ${c.actualizadas} actualizada(s)`
-          : `Revisión: ${c.emparejadas} coinciden con Autobits (sin modificar)`;
-        this.mensajeOk =
-          faltan > 0
-            ? `${base}. ${faltan} fila(s) de Autobits faltan en su Excel — diligéncielas abajo.`
-            : `${base}. Pendientes por campos: ${res.pendientes.total}.`;
-        if (faltan > 0) {
-          this.tipoPendienteActivo = 'FALTA_EN_CRUCE';
-          this.verSoloPendientes = true;
-        }
-        // Recarga contexto/filas; GET /pendientes ya trae FALTA_EN_CRUCE del snapshot.
+        const n = res.pendientes?.total || 0;
+        this.mensajeOk = `Cruce analizado desde SIG: ${res.lectura.filas_leidas} filas · ${n} pendiente(s).`;
         this.cargarContexto();
       },
       error: (err) => {
         this.subiendoCruce = false;
-        input.value = '';
         this.error =
           err?.error?.detail ||
-          'No se pudo leer el Excel de cruce de cuentas. Guárdelo como .xlsx e intente de nuevo.';
+          'No se pudo analizar el cruce con los datos de SIG.';
       },
     });
   }
 
+  async generarExcel(): Promise<void> {
+    this.generandoExcel = true;
+    this.error = '';
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await this.download.download(
+        this.cruceExcel.exportExcelUrl(this.batchId),
+        `Cruce_Cuentas_${today}.xlsx`,
+      );
+      this.mensajeOk = 'Excel de Cruce de Cuentas descargado.';
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'No se pudo generar el Excel.';
+    } finally {
+      this.generandoExcel = false;
+    }
+  }
+
   accionPendienteLabel(tipo: string): string {
-    if (tipo === 'FALTA_EN_CRUCE') return 'Agregar al Excel de cruce';
+    if (tipo === 'FALTA_EN_CRUCE') return 'Revisar en SIG';
     if (tipo === 'SOBRA_EN_CRUCE') return 'Revisar en Autobits';
     if (tipo === 'SIN_FACTURA' || tipo === 'SIN_FECHA_PAGO') return 'Completar';
     return 'Ver';

@@ -21,6 +21,7 @@ import {
   DocumentSummary,
   DocumentsApiService,
 } from '../../services/documents-api.service';
+import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
 import { formatCop } from '../../utils/contabilidad-labels';
 
 const SESSION_KEY = 'contab-wizard-session';
@@ -43,6 +44,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   private readonly cruceApi = inject(CruceExcelApiService);
   private readonly docsApi = inject(DocumentsApiService);
   private readonly crossingsApi = inject(CrossingsApiService);
+  private readonly download = inject(ContabilidadDownloadService);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Invalida restauraciones HTTP que lleguen después de una acción del usuario. */
@@ -51,15 +53,15 @@ export class WizardComponent implements OnInit, OnDestroy {
   readonly formatCop = formatCop;
   readonly packMax = PACK_MAX;
   readonly steps = [
-    { n: 1, title: 'Excel Autobits', hint: 'De ahí salen compra, fecha, cliente y valor.' },
-    { n: 2, title: 'Excel de cruces', hint: 'CRUCE DE CUENTAS: FACTURA/CDC y fecha de pago.' },
+    { n: 1, title: 'Excel Autobits', hint: 'De ahí salen compra, fecha, proveedor y valor.' },
+    { n: 2, title: 'Cruce de Cuentas', hint: 'Analiza SIG y genera el Excel estándar.' },
     { n: 3, title: 'Facturas + chat IA', hint: `Hasta ${PACK_MAX} por paquete. Pide lo que necesites.` },
   ];
   readonly chatSugerencias = [
     'Resume cada factura: proveedor, número, fecha y total.',
     '¿Cuáles necesitan revisión y por qué? Lista ambigüedades.',
     'Lista NIT, compra y reserva detectados.',
-    'Compara totales de facturas contra el Cruce de Cuentas.',
+    'Compara totales de facturas contra Autobits.',
   ];
 
   paso = signal(1);
@@ -74,6 +76,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   verTodosRecords = signal(false);
 
   subiendoCruce = signal(false);
+  generandoExcel = signal(false);
   cruce = signal<CruceUploadResult | null>(null);
   comparacion = signal<ComparacionFila[]>([]);
 
@@ -201,44 +204,56 @@ export class WizardComponent implements OnInit, OnDestroy {
     });
   }
 
-  onCruce(ev: Event): void {
-    const file = (ev.target as HTMLInputElement).files?.[0];
-    (ev.target as HTMLInputElement).value = '';
-    if (!file) return;
-    if (!this.autobits()) {
-      this.error.set('Primero sube el Excel de Autobits.');
+  analizarCruce(): void {
+    if (!this.autobits() && !this.documentos().length) {
+      this.error.set('Carga Autobits o facturas en SIG antes de analizar el cruce.');
       return;
     }
     this.subiendoCruce.set(true);
     this.error.set('');
-    this.aviso.set('Conciliando con Autobits…');
-    this.cruceApi.upload(file, true).pipe(
+    this.aviso.set('Analizando Autobits, facturas y proveedores ya cargados…');
+    this.cruceApi.analizar(this.autobits()?.batch?.id).pipe(
       takeUntilDestroyed(this.destroyRef),
       finalize(() => this.subiendoCruce.set(false)),
     ).subscribe({
       next: (res) => {
-        this.cruce.set(res);
-        this.comparacion.set([...(res.comparacion || [])]);
-        const n = res.comparacion?.filter((r) => r.faltas?.length).length || 0;
-        this.aviso.set(
-          res.reused
-            ? `Se reutilizó el cruce ya cargado (${res.archivo}). ${n} fila(s) con datos faltantes.`
-            : `Cruce leído: ${res.lectura.filas_leidas} filas. ${n} con datos faltantes o ambiguos.`
-        );
+        this.aplicarAnalisis(res);
         this.paso.set(3);
       },
       error: (err) => {
-        this.error.set(this.detalleError(err, 'No se pudo leer el Excel de cruces.'));
+        this.error.set(this.detalleError(err, 'No se pudo analizar el cruce con los datos de SIG.'));
       },
     });
+  }
+
+  async generarExcel(): Promise<void> {
+    if (this.generandoExcel()) return;
+    this.generandoExcel.set(true);
+    this.error.set('');
+    this.aviso.set('Generando Excel estándar de Cruce de Cuentas…');
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await this.download.download(
+        this.cruceApi.exportExcelUrl(this.autobits()?.batch?.id),
+        `Cruce_Cuentas_${today}.xlsx`,
+      );
+      this.aviso.set('Excel de Cruce de Cuentas descargado.');
+      this.cruceApi.analizar(this.autobits()?.batch?.id).subscribe({
+        next: (res) => this.aplicarAnalisis(res),
+      });
+    } catch (err) {
+      this.error.set(err instanceof Error ? err.message : 'No se pudo generar el Excel.');
+    } finally {
+      this.generandoExcel.set(false);
+    }
   }
 
   onFacturas(ev: Event): void {
     const files = Array.from((ev.target as HTMLInputElement).files || []);
     (ev.target as HTMLInputElement).value = '';
     if (!files.length) return;
-    if (!this.cruce()) {
-      this.error.set('Primero sube el Excel de Cruce de Cuentas. Las facturas se vinculan a ese cruce, no a Autobits.');
+    if (!this.autobits() && !this.cruce()) {
+      this.error.set('Carga Autobits o procesa el cruce antes de subir facturas.');
       return;
     }
     if (files.length > PACK_MAX) {
@@ -323,8 +338,15 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (!texto) return;
     navigator.clipboard?.writeText(texto);
     this.copiado.set(texto);
+    this.aviso.set('Copiado: FECHA · COMPRA · REF · VALOR · FACTURA/CDC · FECHA DE PAGO.');
+  }
+
+  private aplicarAnalisis(res: CruceUploadResult): void {
+    this.cruce.set(res);
+    this.comparacion.set([...(res.comparacion || [])]);
+    const n = res.comparacion?.filter((r) => r.faltas?.length).length || 0;
     this.aviso.set(
-      'Copiado. Pégalo en el Excel: FECHA · COMPRA · REF · VALOR · FACTURA/CDC · FECHA DE PAGO.'
+      `Cruce analizado desde SIG: ${res.lectura.filas_leidas} filas. ${n} con datos faltantes o ambiguos.`
     );
   }
 
@@ -446,10 +468,10 @@ export class WizardComponent implements OnInit, OnDestroy {
           next: (p) => {
             if (seq !== this.restoreSeq) return;
             this.comparacion.set(p.comparacion || []);
-            if (p.ultimo_cruce?.archivo && p.batch) {
+            if (p.has_autobits && p.batch && (p.comparacion || []).length) {
               this.cruce.set({
-                aplicado: !!p.ultimo_cruce.aplicado,
-                archivo: p.ultimo_cruce.archivo,
+                aplicado: true,
+                archivo: 'sistema',
                 batch: p.batch,
                 lectura: {
                   filas_leidas: (p.comparacion || []).length,
@@ -458,13 +480,8 @@ export class WizardComponent implements OnInit, OnDestroy {
                   avisos: [],
                 },
                 conciliacion: {
-                  emparejadas: (p.comparacion || []).filter(
-                    (r) =>
-                      !r.faltas.includes(
-                        'Esta fila de Autobits no está en el Excel de cruce'
-                      )
-                  ).length,
-                  sin_correspondencia: p.ultimo_cruce.sobrantes || 0,
+                  emparejadas: (p.comparacion || []).filter((r) => !r.faltas?.length).length,
+                  sin_correspondencia: (p.comparacion || []).filter((r) => r.faltas?.length).length,
                   fuera_de_periodo: 0,
                   sin_fecha: 0,
                   actualizadas: 0,
@@ -473,7 +490,7 @@ export class WizardComponent implements OnInit, OnDestroy {
                 comparacion: p.comparacion || [],
                 pendientes: p.pendientes,
               });
-              this.paso.set(3);
+              this.paso.set(2);
             } else if (p.has_autobits) {
               this.paso.set(2);
             }

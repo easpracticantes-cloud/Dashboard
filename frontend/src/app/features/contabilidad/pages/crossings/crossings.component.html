@@ -5,8 +5,8 @@
         <span class="label-caps">Cruce de cuentas</span>
         <h1 class="page-title">Reporte de pagos</h1>
         <p class="page-lead">
-          Suba el Excel de Autobits y luego adjunte su CRUCE DE CUENTAS: el sistema compara ambos
-          y le dice qué falta por llenar (factura/CDC, fecha de pago, filas sin digitar).
+          Autobits y las facturas ya cargadas en SIG alimentan el cruce.
+          Procese la información y genere el Excel estándar; no hay que adjuntar un libro de cruce.
         </p>
       </div>
       <div class="hero-actions">
@@ -59,47 +59,24 @@
         <a routerLink="/app/contabilidad/autobits" class="btn btn-ghost btn-sm">Cambiar</a>
       </article>
 
-      <article class="sheet excel-step upload-step" [class.busy]="subiendoCruce">
+      <article class="sheet excel-step" [class.busy]="subiendoCruce || generandoExcel">
         <span class="step-badge">2</span>
-        <label class="cruce-upload">
-          <div class="upload-icon">
-            @if (subiendoCruce) {
-              <mat-spinner diameter="28"></mat-spinner>
-            } @else {
-              <mat-icon>fact_check</mat-icon>
-            }
-          </div>
-          <div class="upload-copy">
-            <span class="excel-label">Excel CRUCE DE CUENTAS</span>
-            <strong>{{ subiendoCruce ? 'Comparando con Autobits…' : 'Adjuntar su hoja de cruce' }}</strong>
-            <span class="upload-hint">
-              Copia FACTURA/CDC y FECHA DE PAGO a las filas que coincidan. Lo que ya digitó no se borra.
-            </span>
-          </div>
-          <span class="btn btn-primary">Seleccionar .xlsx</span>
-          <input
-            type="file"
-            accept=".xlsx,.xlsm"
-            (change)="onCruceExcelSelected($event, true)"
-            [disabled]="subiendoCruce"
-          />
-        </label>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm solo-revisar"
-          (click)="cruceSoloRevisar.click()"
-          [disabled]="subiendoCruce"
-        >
-          Solo revisar
-        </button>
-        <input
-          #cruceSoloRevisar
-          type="file"
-          accept=".xlsx,.xlsm"
-          class="hidden-input"
-          (change)="onCruceExcelSelected($event, false)"
-          [disabled]="subiendoCruce"
-        />
+        <div class="excel-icon"><mat-icon>fact_check</mat-icon></div>
+        <div class="excel-info">
+          <span class="excel-label">Cruce de Cuentas</span>
+          <strong>{{ subiendoCruce ? 'Analizando SIG…' : 'Analizar y generar Excel' }}</strong>
+          <span class="excel-meta">
+            Usa Autobits, facturas y proveedores ya persistidos. No se adjunta Excel de entrada.
+          </span>
+        </div>
+        <div class="hero-actions">
+          <button type="button" class="btn btn-primary" (click)="analizarCruce()" [disabled]="subiendoCruce || generandoExcel">
+            {{ subiendoCruce ? 'Analizando…' : 'Procesar' }}
+          </button>
+          <button type="button" class="btn btn-success" (click)="generarExcel()" [disabled]="generandoExcel || subiendoCruce">
+            {{ generandoExcel ? 'Generando…' : 'Generar Excel' }}
+          </button>
+        </div>
       </article>
     </section>
 
@@ -120,7 +97,7 @@
         <div class="conc-stats">
           <div class="cstat">
             <span class="cstat-num">{{ ultimaCargaCruce.lectura.filas_leidas }}</span>
-            <span class="cstat-lbl">Filas leídas del cruce</span>
+            <span class="cstat-lbl">Filas analizadas en SIG</span>
           </div>
           <div class="cstat ok">
             <span class="cstat-num">{{ ultimaCargaCruce.conciliacion.emparejadas }}</span>
@@ -150,8 +127,7 @@
           <div>
             <h2 class="section-head">Qué falta por diligenciar</h2>
             <p class="pendientes-lead">
-              Comparación de su Excel de cruce contra Autobits.
-              Priorice las filas «Falta en cruce» para agregarlas a su hoja.
+              Pendientes según Autobits, facturas y cruces ya guardados en SIG.
             </p>
           </div>
           <div class="pendientes-actions">
@@ -298,7 +274,7 @@
     <div class="sheet empty-state">
       <div class="empty-icon"><mat-icon>compare_arrows</mat-icon></div>
       <h2>Sin filas de cruce</h2>
-      <p>Suba el Excel de Autobits y pulse «Sincronizar Excel», luego adjunte su CRUCE DE CUENTAS.</p>
+      <p>Suba el Excel de Autobits y pulse «Procesar» para analizar SIG, o «Generar Excel» para descargar el libro estándar.</p>
     </div>
   } @else {
     <p class="count">{{ total }} fila(s) del Excel vigente</p>

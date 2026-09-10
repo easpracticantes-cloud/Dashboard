@@ -1,9 +1,8 @@
-"""Conciliación del Excel «CRUCE DE CUENTAS» contra el Excel de Autobits.
+"""Cruce de Cuentas: analiza datos ya persistidos en SIG y genera el Excel de salida.
 
-Flujo contable que resuelve:
-  1. Se sube el reporte semanal de Autobits (filas que hay que pagar).
-  2. Se sube el Excel de cruce de cuentas (lo que ya se digitó a mano).
-  3. El sistema compara ambos y dice exactamente qué falta por llenar.
+El flujo de producto ya no pide un Excel de cruce como entrada.
+Autobits, facturas y proveedores se leen de la base. El endpoint de upload
+histórico se conserva por compatibilidad.
 """
 
 from __future__ import annotations
@@ -23,14 +22,21 @@ from domain.autobits.observaciones import (
     observaciones_from_record,
     resolve_crossing_estado,
 )
+from domain.autobits.business_key import autobits_business_key
+from domain.cruce.export_row import CruceExportRow
 from domain.cruce.fields import ParsedCruceRow, crossing_match_keys, fold
+from domain.cruce.raw_fields import extras_from_record
+from domain.enums import DocumentStatus, DocumentType
 from domain.enums import CrossingStatus
+from domain.utils.money import to_money_or_none
 from infrastructure.cruce.excel_adapter import CruceExcelAdapter, CruceImportError
+from infrastructure.cruce.workbook_builder import CruceWorkbookBuilder
 from infrastructure.persistence.models import (
     AccountCrossingModel,
     AutobitsRecordModel,
     CruceImportBatchModel,
     CruceRecordModel,
+    DocumentModel,
 )
 from infrastructure.persistence.repositories import (
     AuditRepository,
@@ -109,6 +115,7 @@ class CruceExcelService:
         self.cruce_repo = CruceRepository(db)
         self.audit = AuditRepository(db)
         self.adapter = CruceExcelAdapter()
+        self.workbook_builder = CruceWorkbookBuilder()
         self.settings = get_settings()
 
     # -- carga del archivo -------------------------------------------------
@@ -354,10 +361,443 @@ class CruceExcelService:
             "file_hash": file_hash,
         }
 
+    # -- análisis desde SIG (sin Excel de entrada) ------------------------
+
+    def analizar_desde_sistema(
+        self,
+        *,
+        batch_id: int | None = None,
+        usuario: str = "SISTEMA",
+        cruzar_facturas: bool = True,
+    ) -> dict:
+        """Concilia Autobits + facturas + cruces ya persistidos. No pide Excel."""
+        from application.services.crossing_service import CrossingService, CrossingServiceError
+
+        crossing_svc = CrossingService(self.db)
+        batch = self.autobits_repo.get_batch(batch_id) if batch_id else None
+        if not batch:
+            batch = self.autobits_repo.get_latest_batch()
+
+        seeded = None
+        if batch:
+            try:
+                seeded = crossing_svc.seed_from_autobits(
+                    batch_id=batch.id, use_latest=False, usuario=usuario
+                )
+            except CrossingServiceError as exc:
+                if exc.code != "NO_AUTOBITS":
+                    raise CruceExcelServiceError(exc.message, exc.code) from exc
+
+        matched = None
+        if cruzar_facturas:
+            try:
+                matched = crossing_svc.run_matching(
+                    batch_id=batch.id if batch else None,
+                    usuario=usuario,
+                    usar_excel_cruce=False,
+                )
+            except CrossingServiceError as exc:
+                if exc.code not in {"NO_DATOS", "NO_CRUCE", "NO_AUTOBITS"}:
+                    raise CruceExcelServiceError(exc.message, exc.code) from exc
+
+        crossings = self._crossings_del_contexto(batch.id if batch else None)
+        export_rows = self._export_rows(crossings)
+        export_rows.extend(self._filas_documentos_sin_cruce(export_rows, batch))
+        self._marcar_duplicados(export_rows)
+        comparacion = self._comparacion_sistema(crossings, export_rows)
+        pendientes = self._detectar_pendientes(crossings)
+        pendientes = self._anexar_ambiguos_y_duplicados(pendientes, export_rows)
+
+        self.audit.log(
+            "CRUCE_ANALISIS_SISTEMA",
+            "AccountCrossing",
+            str(batch.id if batch else "sin-autobits"),
+            valor_nuevo=f"{len(crossings)} filas · {pendientes.get('total', 0)} pendientes",
+            usuario=usuario,
+        )
+        self.db.commit()
+
+        return {
+            "aplicado": True,
+            "archivo": "sistema",
+            "origen": "SIG",
+            "batch": self._batch_dict(batch) if batch else None,
+            "lectura": {
+                "filas_leidas": len(export_rows),
+                "filas_duplicadas": sum(1 for r in export_rows if r.duplicado),
+                "hojas": [],
+                "avisos": [
+                    "Cruce generado desde Autobits, facturas y proveedores ya cargados en SIG."
+                ],
+            },
+            "conciliacion": {
+                "emparejadas": sum(1 for r in export_rows if r.document_id and r.autobits_record_id),
+                "sin_correspondencia": sum(
+                    1 for r in export_rows if r.document_id and not r.autobits_record_id
+                ),
+                "fuera_de_periodo": 0,
+                "sin_fecha": sum(1 for r in export_rows if not r.fecha_ejecucion),
+                "actualizadas": (seeded or {}).get("updated", 0),
+                "ambiguos": sum(1 for r in export_rows if r.ambiguo),
+                "duplicados": sum(1 for r in export_rows if r.duplicado),
+                "facturas_vinculadas": (matched or {}).get("created", 0),
+                "conflictos": [],
+            },
+            "comparacion": comparacion,
+            "pendientes": pendientes,
+        }
+
+    def generar_excel(
+        self,
+        *,
+        batch_id: int | None = None,
+        usuario: str = "SISTEMA",
+    ) -> tuple[bytes, str, dict]:
+        """Analiza SIG y produce el Excel estándar de salida."""
+        analisis = self.analizar_desde_sistema(
+            batch_id=batch_id, usuario=usuario, cruzar_facturas=True
+        )
+        batch = self.autobits_repo.get_batch(batch_id) if batch_id else None
+        if not batch:
+            batch = self.autobits_repo.get_latest_batch()
+        crossings = self._crossings_del_contexto(batch.id if batch else None)
+        rows = self._export_rows(crossings)
+        rows.extend(self._filas_documentos_sin_cruce(rows, batch))
+        self._marcar_duplicados(rows)
+        year = None
+        if batch and batch.period_start:
+            try:
+                year = int(str(batch.period_start)[:4])
+            except ValueError:
+                year = None
+        content = self.workbook_builder.build(rows, year=year)
+        today = datetime.now(timezone.utc).date().isoformat()
+        filename = f"Cruce_Cuentas_{today}.xlsx"
+        self.audit.log(
+            "CRUCE_EXCEL_GENERADO",
+            "CruceExcel",
+            str(batch.id if batch else "sin-autobits"),
+            valor_nuevo=f"{filename} · {len(rows)} filas",
+            usuario=usuario,
+        )
+        self.db.commit()
+        return content, filename, analisis
+
+    def _crossings_del_contexto(self, batch_id: int | None) -> list[AccountCrossingModel]:
+        from sqlalchemy.orm import joinedload
+
+        q = (
+            self.db.query(AccountCrossingModel)
+            .options(
+                joinedload(AccountCrossingModel.document).joinedload(DocumentModel.provider),
+                joinedload(AccountCrossingModel.autobits_record),
+            )
+            .filter(AccountCrossingModel.estado.notin_(_ESTADOS_CERRADOS))
+        )
+        if batch_id:
+            from sqlalchemy import or_
+
+            q = q.filter(
+                or_(
+                    AccountCrossingModel.import_batch_id == batch_id,
+                    AccountCrossingModel.autobits_record.has(
+                        AutobitsRecordModel.import_batch_id == batch_id
+                    ),
+                )
+            )
+        return q.order_by(
+            AccountCrossingModel.proveedor_nombre.asc(),
+            AccountCrossingModel.fecha_ejecucion.asc(),
+        ).all()
+
+    def _export_rows(self, crossings: list[AccountCrossingModel]) -> list[CruceExportRow]:
+        rows: list[CruceExportRow] = []
+        for crossing in crossings:
+            record = crossing.autobits_record
+            doc = crossing.document
+            proveedor = (
+                crossing.proveedor_nombre
+                or (record.proveedor if record else None)
+                or (doc.provider.nombre if doc and doc.provider else None)
+            )
+            nit = crossing.nit or (record.nit if record else None) or (
+                doc.provider.nit if doc and doc.provider else None
+            )
+            factura = (crossing.factura_cdc or "").strip() or (
+                doc.numero_documento if doc else None
+            )
+            reasons: list[str] = []
+            if crossing.match_reasons:
+                try:
+                    parsed = json.loads(crossing.match_reasons)
+                    if isinstance(parsed, list):
+                        reasons = [str(x) for x in parsed]
+                except json.JSONDecodeError:
+                    reasons = [crossing.match_reasons]
+            extras = extras_from_record(record)
+            rows.append(
+                CruceExportRow(
+                    proveedor=proveedor,
+                    nit=nit,
+                    numero_compra=crossing.numero_compra
+                    or (record.numero_compra if record else None),
+                    numero_reserva=crossing.numero_reserva
+                    or (record.numero_reserva if record else None),
+                    fecha_ejecucion=crossing.fecha_ejecucion
+                    or (record.fecha if record else None),
+                    valor=to_money_or_none(
+                        crossing.valor_autobits
+                        if crossing.valor_autobits is not None
+                        else (record.valor if record else None)
+                    ),
+                    factura_cdc=factura or None,
+                    fecha_pago=(crossing.fecha_pago or "").strip() or None,
+                    concepto=crossing.concepto
+                    or (record.concepto if record else None)
+                    or (doc.concepto if doc else None),
+                    estado_compra=record.estado_compra if record else crossing.estado,
+                    observaciones=crossing.observaciones
+                    or (record.observaciones if record else None),
+                    match_type=crossing.match_type,
+                    match_reasons=reasons,
+                    ambiguo="ambiguo" in reasons,
+                    document_id=crossing.document_id,
+                    crossing_id=crossing.id,
+                    autobits_record_id=crossing.autobits_record_id,
+                    origen="AMBOS"
+                    if crossing.document_id and crossing.autobits_record_id
+                    else ("DOCUMENTO" if crossing.document_id else "AUTOBITS"),
+                    referencia_oc=extras.get("referencia_oc"),
+                    precio_terceros=extras.get("precio_terceros"),
+                    comprador=extras.get("comprador"),
+                    vendedor=extras.get("vendedor"),
+                    cantidad=extras.get("cantidad"),
+                )
+            )
+        return rows
+
+    def _filas_documentos_sin_cruce(
+        self,
+        ya: list[CruceExportRow],
+        batch,
+    ) -> list[CruceExportRow]:
+        """Facturas persistidas sin crossing: salen en el Excel, no se inventa Autobits."""
+        from sqlalchemy.orm import joinedload
+
+        usados = {r.document_id for r in ya if r.document_id}
+        q = (
+            self.db.query(DocumentModel)
+            .options(joinedload(DocumentModel.provider))
+            .filter(
+                DocumentModel.tipo.in_([DocumentType.FACTURA, DocumentType.CUENTA_DE_COBRO]),
+                DocumentModel.estado.notin_(
+                    [DocumentStatus.ANULADO, DocumentStatus.DUPLICADO]
+                ),
+            )
+        )
+        if usados:
+            q = q.filter(~DocumentModel.id.in_(usados))
+        inicio, fin = self._periodo_efectivo(batch) if batch else (None, None)
+        if inicio and fin:
+            candidatos = q.all()
+            extra: list[CruceExportRow] = []
+            for doc in candidatos:
+                if not self._fecha_en_periodo(doc.fecha_emision, inicio, fin):
+                    continue
+                extra.append(self._fila_documento_suelto(doc))
+            return extra
+        extra: list[CruceExportRow] = []
+        for doc in q.all():
+            extra.append(self._fila_documento_suelto(doc))
+        return extra
+
+    def _fila_documento_suelto(self, doc: DocumentModel) -> CruceExportRow:
+        return CruceExportRow(
+            proveedor=doc.provider.nombre if doc.provider else None,
+            nit=doc.provider.nit if doc.provider else None,
+            numero_compra=None,
+            numero_reserva=None,
+            fecha_ejecucion=doc.fecha_emision,
+            valor=to_money_or_none(doc.total),
+            factura_cdc=doc.numero_documento,
+            fecha_pago=None,
+            concepto=doc.concepto,
+            match_type="SIN_MATCH",
+            match_reasons=["sin_candidato"],
+            document_id=doc.id,
+            origen="DOCUMENTO",
+        )
+
+    @staticmethod
+    def _fecha_en_periodo(fecha: str | None, inicio: str | None, fin: str | None) -> bool:
+        """Compara YYYY-MM-DD. Sin fecha no se mete en un export semanal."""
+        if not inicio or not fin:
+            return True
+        if not fecha:
+            return False
+        dia = str(fecha).strip()[:10]
+        if len(dia) < 10:
+            return False
+        return str(inicio)[:10] <= dia <= str(fin)[:10]
+
+    def _marcar_duplicados(self, rows: list[CruceExportRow]) -> None:
+        grupos: dict[str, list[CruceExportRow]] = {}
+        for row in rows:
+            key = autobits_business_key(row.nit, row.numero_compra, row.numero_reserva)
+            if not key:
+                continue
+            grupos.setdefault(key, []).append(row)
+        for grupo in grupos.values():
+            if len(grupo) > 1:
+                for row in grupo:
+                    row.duplicado = True
+
+    def _anexar_ambiguos_y_duplicados(
+        self, pendientes: dict, rows: list[CruceExportRow]
+    ) -> dict:
+        por_tipo = dict(pendientes.get("por_tipo") or {tipo: [] for tipo in TIPOS_PENDIENTE})
+        for row in rows:
+            if row.ambiguo:
+                por_tipo.setdefault("AMBIGUO", []).append(
+                    {
+                        "tipo": "AMBIGUO",
+                        "titulo": "Coincidencia ambigua",
+                        "detalle": "Hay más de un candidato probable; no se confirma en silencio.",
+                        "crossing_id": row.crossing_id,
+                        "proveedor": row.proveedor,
+                        "numero_compra": row.numero_compra,
+                        "numero_reserva": row.numero_reserva,
+                        "valor": float(row.valor) if row.valor is not None else None,
+                        "origen": "sistema",
+                    }
+                )
+            if row.duplicado:
+                por_tipo.setdefault("DUPLICADO", []).append(
+                    {
+                        "tipo": "DUPLICADO",
+                        "titulo": "Posible duplicado",
+                        "detalle": "Misma clave NIT + compra + reserva en más de una fila.",
+                        "crossing_id": row.crossing_id,
+                        "proveedor": row.proveedor,
+                        "numero_compra": row.numero_compra,
+                        "numero_reserva": row.numero_reserva,
+                        "valor": float(row.valor) if row.valor is not None else None,
+                        "origen": "sistema",
+                    }
+                )
+        total = sum(len(v) for v in por_tipo.values())
+        resumen = list(pendientes.get("resumen") or [])
+        for tipo, etiqueta in (
+            ("AMBIGUO", "Coincidencia ambigua"),
+            ("DUPLICADO", "Posible duplicado"),
+        ):
+            if por_tipo.get(tipo):
+                resumen.append(
+                    {"tipo": tipo, "etiqueta": etiqueta, "cantidad": len(por_tipo[tipo])}
+                )
+        return {
+            **pendientes,
+            "total": total,
+            "por_tipo": por_tipo,
+            "resumen": resumen,
+        }
+
+    def _comparacion_sistema(
+        self,
+        crossings: list[AccountCrossingModel],
+        export_rows: list[CruceExportRow],
+    ) -> list[dict]:
+        por_id = {r.crossing_id: r for r in export_rows if r.crossing_id}
+        filas: list[dict] = []
+        for crossing in crossings:
+            row = por_id.get(crossing.id)
+            doc = crossing.document
+            faltas: list[str] = []
+            if not (crossing.factura_cdc or (doc.numero_documento if doc else None)):
+                faltas.append("FACTURA/CDC")
+            if not (crossing.fecha_pago or "").strip():
+                faltas.append("FECHA DE PAGO")
+            if crossing.document_id is None:
+                faltas.append("Soporte de factura")
+            if row and row.ambiguo:
+                faltas.append("Coincidencia ambigua")
+            if row and row.duplicado:
+                faltas.append("Posible duplicado")
+            filas.append(
+                {
+                    "crossing_id": crossing.id,
+                    "proveedor": crossing.proveedor_nombre,
+                    "lado_autobits": {
+                        "compra": crossing.numero_compra,
+                        "reserva": crossing.numero_reserva,
+                        "fecha": crossing.fecha_ejecucion,
+                        "concepto": crossing.concepto,
+                        "valor": crossing.valor_autobits,
+                    },
+                    "lado_excel": {
+                        "factura": crossing.factura_cdc
+                        or (doc.numero_documento if doc else None),
+                        "fecha_pago": crossing.fecha_pago,
+                        "valor": crossing.valor_documento,
+                        "documento_id": crossing.document_id,
+                    },
+                    "lado_documento": {
+                        "factura": doc.numero_documento if doc else None,
+                        "fecha": doc.fecha_emision if doc else None,
+                        "total": doc.total if doc else None,
+                        "nit": doc.provider.nit if doc and doc.provider else None,
+                    },
+                    "faltas": faltas,
+                    "accion": "Revisar en SIG" if faltas else "Completo",
+                    "copiar": self._copiar_excel(
+                        fecha=crossing.fecha_ejecucion,
+                        compra=crossing.numero_compra,
+                        reserva=crossing.numero_reserva,
+                        valor=crossing.valor_autobits,
+                        factura=crossing.factura_cdc
+                        or (doc.numero_documento if doc else None),
+                        pago=crossing.fecha_pago,
+                    ),
+                }
+            )
+        for row in export_rows:
+            if row.crossing_id or row.origen != "DOCUMENTO":
+                continue
+            filas.append(
+                {
+                    "crossing_id": None,
+                    "proveedor": row.proveedor,
+                    "lado_autobits": {},
+                    "lado_excel": {
+                        "factura": row.factura_cdc,
+                        "fecha_pago": row.fecha_pago,
+                        "valor": float(row.valor) if row.valor is not None else None,
+                        "documento_id": row.document_id,
+                    },
+                    "lado_documento": {
+                        "factura": row.factura_cdc,
+                        "fecha": row.fecha_ejecucion,
+                        "total": float(row.valor) if row.valor is not None else None,
+                        "nit": row.nit,
+                    },
+                    "faltas": ["Factura sin coincidencia en Autobits"],
+                    "accion": "Revisar en SIG",
+                    "copiar": self._copiar_excel(
+                        fecha=row.fecha_ejecucion,
+                        compra=row.numero_compra,
+                        reserva=row.numero_reserva,
+                        valor=float(row.valor) if row.valor is not None else None,
+                        factura=row.factura_cdc,
+                        pago=row.fecha_pago,
+                    ),
+                }
+            )
+        return filas
+
     # -- pendientes sin archivo -------------------------------------------
 
     def pendientes(self, batch_id: int | None = None) -> dict:
-        """Qué falta por llenar según el estado actual + último Excel de cruce."""
+        """Qué falta por llenar según Autobits, facturas y cruces ya persistidos."""
         batch = None
         if batch_id:
             batch = self.autobits_repo.get_batch(batch_id)
@@ -370,32 +810,22 @@ class CruceExcelService:
                 "batch": None,
                 "pendientes": self._vacio(),
                 "comparacion": [],
+                "ultimo_cruce": None,
             }
 
-        crossings = self._crossings_del_batch(batch.id)
+        crossings = self._crossings_del_contexto(batch.id)
         pendientes = self._detectar_pendientes(crossings)
-        pendientes = self._fusionar_snapshot(batch.id, crossings, pendientes)
-        snap = self._leer_snapshot(batch.id)
-        sobrantes_info = list((pendientes.get("por_tipo") or {}).get("SOBRA_EN_CRUCE") or [])
-        falta_ids: set[int] = set()
-        for raw in (snap or {}).get("falta_crossing_ids") or []:
-            try:
-                falta_ids.add(int(raw))
-            except (TypeError, ValueError):
-                continue
+        export_rows = self._export_rows(crossings)
+        export_rows.extend(self._filas_documentos_sin_cruce(export_rows, batch))
+        self._marcar_duplicados(export_rows)
+        pendientes = self._anexar_ambiguos_y_duplicados(pendientes, export_rows)
+        comparacion = self._comparacion_sistema(crossings, export_rows)
         return {
             "has_autobits": True,
             "batch": self._batch_dict(batch),
             "pendientes": pendientes,
-            "comparacion": self._comparacion(crossings, {}, [], falta_ids=falta_ids),
-            "ultimo_cruce": {
-                "archivo": (snap or {}).get("archivo"),
-                "aplicado": (snap or {}).get("aplicado"),
-                "timestamp": (snap or {}).get("timestamp"),
-                "sobrantes": len(sobrantes_info),
-            }
-            if snap
-            else None,
+            "comparacion": comparacion,
+            "ultimo_cruce": None,
         }
 
     # -- interno -----------------------------------------------------------

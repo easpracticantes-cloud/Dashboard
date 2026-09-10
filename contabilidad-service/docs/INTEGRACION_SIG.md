@@ -123,7 +123,9 @@ Consuma los endpoints REST documentados en `/docs`. Los más usados:
 | Método | Ruta | Uso |
 |--------|------|-----|
 | POST | `/api/autobits/upload` | Subir Excel Autobits |
-| POST | `/api/cruce-excel/upload` | Subir CRUCE DE CUENTAS |
+| POST | `/api/cruce-excel/analizar` | Analizar cruce desde SIG (sin Excel) |
+| GET | `/api/cruce-excel/export.xlsx` | Generar Excel estándar de salida |
+| POST | `/api/cruce-excel/upload` | Compatibilidad: subir CRUCE DE CUENTAS histórico |
 | GET | `/api/cruce-excel/pendientes` | Qué falta por llenar |
 | GET | `/api/crossings` | Listado de cruces |
 | PATCH | `/api/crossings/{id}/complete` | Factura/CDC + fecha pago |

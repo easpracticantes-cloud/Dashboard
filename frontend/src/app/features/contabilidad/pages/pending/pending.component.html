@@ -5,8 +5,8 @@
         <span class="label-caps">Bandeja de trabajo · Cruce</span>
         <h1 class="page-title">Pendientes por diligenciar</h1>
         <p class="page-lead">
-          Lo que Autobits tiene y su Excel de cruce aún no, más campos sin FACTURA/CDC o FECHA DE PAGO.
-          Suba el Excel de CRUCE DE CUENTAS para actualizar la comparación.
+          Lo que falta en SIG: FACTURA/CDC, fecha de pago, soporte, coincidencias ambiguas o duplicadas.
+          Procese el cruce con los datos ya cargados y genere el Excel estándar.
         </p>
       </div>
       <div class="hero-actions">
@@ -87,39 +87,27 @@
   }
 
   <div class="upload-row">
-    <label class="sheet upload-hero" [class.busy]="subiendo">
+    <article class="sheet upload-hero" [class.busy]="subiendo || generando">
       <div class="upload-icon">
-        @if (subiendo) {
+        @if (subiendo || generando) {
           <mat-spinner diameter="28"></mat-spinner>
         } @else {
           <mat-icon>fact_check</mat-icon>
         }
       </div>
-      <h2>{{ subiendo ? 'Comparando con Autobits…' : 'Adjuntar CRUCE DE CUENTAS' }}</h2>
+      <h2>{{ subiendo ? 'Analizando SIG…' : 'Cruce de Cuentas' }}</h2>
       <p>
-        Se copian FACTURA/CDC y FECHA DE PAGO a las filas que coincidan.
-        Lo que usted ya digitó aquí no se sobreescribe.
+        Analiza Autobits, facturas y proveedores ya persistidos. No se adjunta Excel de entrada.
       </p>
-      <span class="btn btn-primary btn-lg">Aplicar al cruce</span>
-      <input
-        type="file"
-        accept=".xlsx,.xlsm"
-        (change)="onFileSelected($event, true)"
-        [disabled]="subiendo || !hasAutobits"
-      />
-    </label>
-
-    <label class="sheet upload-alt" [class.busy]="subiendo">
-      <mat-icon>visibility</mat-icon>
-      <strong>Solo revisar</strong>
-      <span>Compara y muestra el reporte sin modificar nada.</span>
-      <input
-        type="file"
-        accept=".xlsx,.xlsm"
-        (change)="onFileSelected($event, false)"
-        [disabled]="subiendo || !hasAutobits"
-      />
-    </label>
+      <div class="hero-actions">
+        <button type="button" class="btn btn-primary btn-lg" (click)="analizar()" [disabled]="subiendo || generando">
+          {{ subiendo ? 'Analizando…' : 'Procesar' }}
+        </button>
+        <button type="button" class="btn btn-success btn-lg" (click)="generarExcel()" [disabled]="generando || subiendo">
+          {{ generando ? 'Generando…' : 'Generar Excel' }}
+        </button>
+      </div>
+    </article>
   </div>
 
   @if (mensajeOk) {
@@ -140,7 +128,7 @@
 
   @if (ultimaCarga) {
     <section class="sheet sheet-pad read-result">
-      <h2 class="section-head">Lectura del archivo</h2>
+      <h2 class="section-head">Resultado del análisis</h2>
       <div class="ap-kpi-grid">
         <article class="ap-kpi sheet">
           <span class="kpi-val">{{ ultimaCarga.lectura.filas_leidas }}</span>
@@ -233,24 +221,17 @@
       <div class="empty-icon"><mat-icon>verified</mat-icon></div>
       <h2>Bandeja limpia</h2>
       <p>
-        No hay filas de Autobits faltantes en el cruce ni campos pendientes por diligenciar
-        @if (pendientes!.ultimo_cruce?.archivo) {
-          (último Excel: {{ pendientes!.ultimo_cruce!.archivo }}).
-        } @else {
-          .
-        }
+        No hay filas de Autobits faltantes ni campos pendientes por diligenciar.
       </p>
       <a routerLink="/app/contabilidad/pagos" class="btn btn-primary">Ir a pagos</a>
     </div>
   } @else if (pendientes?.total) {
-    @if (pendientes!.ultimo_cruce?.archivo) {
-      <div class="filters-bar sheet">
-        <span class="estado-chip info">
-          <mat-icon>fact_check</mat-icon>
-          Último cruce: {{ pendientes!.ultimo_cruce!.archivo }}
-        </span>
-      </div>
-    }
+    <div class="filters-bar sheet">
+      <span class="estado-chip info">
+        <mat-icon>fact_check</mat-icon>
+        Pendientes desde SIG (Autobits, facturas y cruces persistidos)
+      </span>
+    </div>
     @if (tipoActivo) {
       <div class="filters-bar sheet">
         <span class="estado-chip warn">Filtro: {{ tipoActivo }}</span>
@@ -316,7 +297,7 @@
     <div class="sheet empty-state">
       <div class="empty-icon"><mat-icon>inbox</mat-icon></div>
       <h2>Sin pendientes cargados</h2>
-      <p>Adjunte el Excel de cruce o actualice la bandeja.</p>
+      <p>Pulse «Procesar» para analizar SIG o actualice la bandeja.</p>
     </div>
   }
 </div>

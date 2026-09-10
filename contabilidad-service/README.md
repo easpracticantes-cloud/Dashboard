@@ -100,7 +100,7 @@ frontend/ (Angular 19)  →  api_server.py (FastAPI v1.8)
 | `/api/documents` | Upload y CRUD documentos |
 | `/api/autobits` | Preview/import Excel |
 | `/api/crossings` | Cruce y aprobación |
-| `/api/cruce-excel` | Excel CRUCE DE CUENTAS y pendientes por llenar |
+| `/api/cruce-excel` | Análisis SIG + Excel de salida CRUCE DE CUENTAS |
 | `/api/remediations` | Subsanaciones |
 | `/api/payments` | Pagos y comprobantes |
 | `/api/packages` | Paquetes digitales |

@@ -59,13 +59,14 @@ class CrossingService:
         document_id: int | None = None,
         force: bool = False,
         usuario: str = "SISTEMA",
+        usar_excel_cruce: bool = False,
     ) -> dict:
         documents = self.doc_repo.list_for_crossing(
             batch_id=batch_id,
             document_id=document_id,
             force=force,
         )
-        cruce_records = self.cruce_repo.list_latest_records()
+        cruce_records = self.cruce_repo.list_latest_records() if usar_excel_cruce else []
         if cruce_records:
             return self._run_matching_cruce(documents, cruce_records, usuario)
 
@@ -74,11 +75,11 @@ class CrossingService:
         else:
             records = self.autobits_repo.list_all_records()
 
-        if not records:
+        if not records and not documents:
             raise CrossingServiceError(
-                "No hay filas del Excel de Cruce de Cuentas ni de Autobits. "
-                "Suba primero el Excel de Cruce de Cuentas.",
-                "NO_CRUCE",
+                "No hay filas de Autobits ni facturas para cruzar. "
+                "Cargue Autobits o facturas en SIG e intente de nuevo.",
+                "NO_DATOS",
             )
 
         used_record_ids: set[int] = set()
@@ -141,6 +142,11 @@ class CrossingService:
     ) -> dict | None:
         ctx = extract_document_context(doc)
         candidate = self.matcher.find_best_cruce_match(doc, records)
+        if candidate and "ambiguo" in candidate.reasons:
+            ambiguo = candidate
+            candidate = self.matcher.build_sin_match(doc)
+            candidate.reasons = ["ambiguo"] + [r for r in ambiguo.reasons if r != "ambiguo"]
+            candidate.match_type = MatchType.SIN_MATCH
         record: CruceRecordModel | None = None
         existing: AccountCrossingModel | None = None
         if candidate and candidate.cruce_record_id:
@@ -253,6 +259,12 @@ class CrossingService:
     ) -> dict | None:
         ctx = extract_document_context(doc)
         candidate = self.matcher.find_best_match(doc, records)
+        if candidate and "ambiguo" in candidate.reasons:
+            # No se ancla en silencio: se deja identificado como sin match.
+            ambiguo = candidate
+            candidate = self.matcher.build_sin_match(doc)
+            candidate.reasons = ["ambiguo"] + [r for r in ambiguo.reasons if r != "ambiguo"]
+            candidate.match_type = MatchType.SIN_MATCH
 
         record: AutobitsRecordModel | None = None
         existing: AccountCrossingModel | None = None
@@ -581,7 +593,7 @@ class CrossingService:
         return [
             {"step": 1, "title": "Excel Autobits", "hint": "Semana sábado–viernes"},
             {"step": 2, "title": "Facturas proveedores", "hint": "WhatsApp, correo o DIAN"},
-            {"step": 3, "title": "Cruce de cuentas", "hint": "Adjunte su Excel de cruce"},
+            {"step": 3, "title": "Cruce de cuentas", "hint": "Procesar SIG y generar Excel"},
             {"step": 4, "title": "Reporte de pagos", "hint": "Filas aprobadas → Bancolombia"},
             {"step": 5, "title": "Comprobantes", "hint": "Contramarcar y subir al Drive"},
             {"step": 6, "title": "Autobits + paquete", "hint": "Actualizar plataforma y digitalizar"},

@@ -20,6 +20,8 @@ const ICONOS: Record<string, string> = {
   DIFERENCIA_VALOR: 'balance',
   FALTA_EN_CRUCE: 'playlist_add',
   SOBRA_EN_CRUCE: 'help_outline',
+  AMBIGUO: 'priority_high',
+  DUPLICADO: 'content_copy',
 };
 
 @Component({
@@ -35,6 +37,7 @@ export class PendingComponent implements OnInit {
 
   cargando = true;
   subiendo = false;
+  generando = false;
   error = '';
   mensajeOk = '';
 
@@ -68,37 +71,44 @@ export class PendingComponent implements OnInit {
     });
   }
 
-  onFileSelected(event: Event, aplicar: boolean): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-
+  analizar(): void {
     this.subiendo = true;
     this.error = '';
     this.mensajeOk = '';
-    this.ultimaCarga = null;
-
-    this.api.upload(file, aplicar).subscribe({
+    this.api.analizar(this.batch?.id).subscribe({
       next: (res) => {
         this.subiendo = false;
-        input.value = '';
         this.ultimaCarga = res;
         this.pendientes = res.pendientes;
         this.batch = res.batch;
-        this.hasAutobits = true;
+        this.hasAutobits = !!res.batch;
         this.tipoActivo = '';
-        this.mensajeOk = res.aplicado
-          ? `Cruce aplicado: ${res.conciliacion.actualizadas} fila(s) actualizadas de ${res.lectura.filas_leidas} leídas.`
-          : `Revisión sin cambios: ${res.conciliacion.emparejadas} fila(s) coinciden de ${res.lectura.filas_leidas} leídas.`;
+        this.mensajeOk = `Cruce analizado desde SIG: ${res.lectura.filas_leidas} filas · ${res.pendientes.total} pendiente(s).`;
       },
       error: (err) => {
         this.subiendo = false;
-        input.value = '';
         this.error =
           err?.error?.detail ||
-          'No se pudo leer el Excel de cruce de cuentas. Guárdelo como .xlsx e intente de nuevo.';
+          'No se pudo analizar el cruce con los datos de SIG.';
       },
     });
+  }
+
+  async generarExcel(): Promise<void> {
+    this.generando = true;
+    this.error = '';
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await this.download.download(
+        this.api.exportExcelUrl(this.batch?.id),
+        `Cruce_Cuentas_${today}.xlsx`,
+      );
+      this.mensajeOk = 'Excel de Cruce de Cuentas descargado.';
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : 'No se pudo generar el Excel.';
+    } finally {
+      this.generando = false;
+    }
   }
 
   get tipos(): { tipo: string; etiqueta: string; cantidad: number; icono: string }[] {
@@ -135,7 +145,9 @@ export class PendingComponent implements OnInit {
 
   tipoPriorityLabel(tipo: string): string {
     const t = (tipo || '').toUpperCase();
-    if (t === 'FALTA_EN_CRUCE') return 'Falta en Excel';
+    if (t === 'AMBIGUO') return 'Ambiguo';
+    if (t === 'DUPLICADO') return 'Duplicado';
+    if (t === 'FALTA_EN_CRUCE') return 'Sin soporte Autobits';
     const tone = this.tipoTone(tipo);
     if (tone === 'bad') return 'Urgente';
     if (tone === 'warn') return 'Pendiente';
@@ -144,7 +156,7 @@ export class PendingComponent implements OnInit {
   }
 
   accionPendienteLabel(tipo: string): string {
-    if (tipo === 'FALTA_EN_CRUCE') return 'Agregar al Excel de cruce';
+    if (tipo === 'FALTA_EN_CRUCE') return 'Revisar en SIG';
     if (tipo === 'SOBRA_EN_CRUCE') return 'Revisar en Autobits';
     return 'Completar en cruce';
   }

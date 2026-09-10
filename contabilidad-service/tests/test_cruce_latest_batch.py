@@ -17,6 +17,21 @@ from infrastructure.ai.excel_ai_analyzer import ExcelAIAnalysis
 from infrastructure.persistence.database import init_db
 
 
+def _vaciar_tablas():
+    from infrastructure.persistence.database import engine
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        conn.execute(text("PRAGMA foreign_keys = OFF"))
+        tablas = [
+            row[0]
+            for row in conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+            if not row[0].startswith("sqlite_")
+        ]
+        for tabla in tablas:
+            conn.execute(text(f'DELETE FROM "{tabla}"'))
+
+
 def _xlsx(rows: list[list]) -> bytes:
     wb = Workbook()
     ws = wb.active
@@ -62,9 +77,11 @@ def _fake_analysis():
 def client():
     get_settings.cache_clear()
     init_db()
+    _vaciar_tablas()
     from api_server import app
 
-    return TestClient(app)
+    yield TestClient(app)
+    _vaciar_tablas()
 
 
 def _upload(client, rows):
@@ -138,3 +155,28 @@ def test_reimport_updates_crossing_preserving_factura(client):
     data = refreshed.json()
     assert data["factura_cdc"] == "FV POS 999"
     assert data["valor_autobits"] == 155000
+
+
+def test_reimport_revives_archived_same_business_key(client):
+    first = _upload(client, [["900111", "Hotel A", "COM001", "EAS001", "2026-08-20", 100000, ""]])
+    assert first.status_code == 200
+    second = _upload(
+        client,
+        [["900222", "Hotel B", "COM002", "EAS002", "2026-08-21", 200000, ""]],
+    )
+    assert second.status_code == 200
+
+    revived = _upload(
+        client,
+        [["900111", "Hotel A", "COM001", "EAS001", "2026-08-20", 155000, ""]],
+    )
+    assert revived.status_code == 200
+
+    listing = client.get("/api/crossings").json()["items"]
+    vivos = [
+        i
+        for i in listing
+        if i["numero_compra"] == "COM001" and i["estado"] != "ARCHIVADO"
+    ]
+    assert vivos
+    assert vivos[0]["valor_autobits"] == 155000

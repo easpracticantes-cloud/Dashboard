@@ -1,0 +1,333 @@
+"""Genera el Excel de salida con la estructura del estándar CRUCE DE CUENTAS."""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from datetime import date, datetime
+from decimal import Decimal
+from io import BytesIO
+
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.worksheet import Worksheet
+
+from domain.cruce.export_row import CruceExportRow
+from domain.cruce.workbook_spec import (
+    BLOCK_GAP,
+    BLOCK_WIDTH,
+    BOSQUE_HEADERS,
+    DUSTER_HEADERS,
+    FONT_NAME,
+    FONT_NAME_TABLE,
+    HEADER_FILL_BLUE,
+    HEADER_FILL_PEACH,
+    HEADER_FILL_TEAL,
+    LUGER_HEADERS,
+    PERIOD_BLOCK_HEADERS,
+    PRECIO_EAS_FILL,
+    PRECIO_TERC_FILL,
+    PROVIDERS_PER_BAND,
+    luger_sheet_name,
+    period_sheets,
+    standard_sheet_names,
+)
+
+_THIN = Border(
+    left=Side(style="thin", color="B0B0B0"),
+    right=Side(style="thin", color="B0B0B0"),
+    top=Side(style="thin", color="B0B0B0"),
+    bottom=Side(style="thin", color="B0B0B0"),
+)
+_HEADER_FONT = Font(name=FONT_NAME, size=11, bold=True, color="FFFFFF")
+_TITLE_FONT = Font(name=FONT_NAME, size=12, bold=True)
+_TABLE_HEADER_FONT = Font(name=FONT_NAME_TABLE, size=12, bold=True)
+_MONEY_FMT = '#,##0'
+_DATE_FMT = "YYYY-MM-DD"
+
+
+def _fill(rgb: str) -> PatternFill:
+    return PatternFill("solid", fgColor=rgb)
+
+
+def _as_date(value: str | None):
+    if not value:
+        return None
+    text = str(value)[:10]
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError:
+        return value
+
+
+def _as_number(value: Decimal | None):
+    if value is None:
+        return None
+    return float(value)
+
+
+class CruceWorkbookBuilder:
+    def build(self, rows: list[CruceExportRow], *, year: int | None = None) -> bytes:
+        year = year or self._infer_year(rows)
+        wb = Workbook()
+        default = wb.active
+        names = standard_sheet_names(year)
+        default.title = names[0]
+
+        for name in names[1:]:
+            wb.create_sheet(name)
+
+        specials, period_rows = self._split(rows)
+        self._write_period_sheets(wb, period_rows, year)
+        self._write_duster(wb["VENTAS_DUSTER"], specials.get("duster", []))
+        self._write_bosque(wb["CDC BOSQUE DE PALMAS"], specials.get("bosque", []))
+        self._write_luger(wb[luger_sheet_name(year)], specials.get("luger", []))
+
+        buf = BytesIO()
+        wb.save(buf)
+        return buf.getvalue()
+
+    def _infer_year(self, rows: list[CruceExportRow]) -> int:
+        years = [r.year() for r in rows if r.year()]
+        if years:
+            return max(years)
+        return date.today().year
+
+    def _split(
+        self, rows: list[CruceExportRow]
+    ) -> tuple[dict[str, list[CruceExportRow]], list[CruceExportRow]]:
+        specials: dict[str, list[CruceExportRow]] = defaultdict(list)
+        period: list[CruceExportRow] = []
+        for row in rows:
+            token = row.special_sheet_token()
+            if token:
+                specials[token].append(row)
+            else:
+                period.append(row)
+        return specials, period
+
+    def _write_period_sheets(
+        self, wb: Workbook, rows: list[CruceExportRow], year: int
+    ) -> None:
+        buckets: dict[str, list[CruceExportRow]] = {p.name: [] for p in period_sheets(year)}
+        month_to_sheet = {}
+        for sheet in period_sheets(year):
+            for month in sheet.months:
+                month_to_sheet[month] = sheet.name
+        fallback = period_sheets(year)[0].name
+        for row in rows:
+            month = row.month()
+            name = month_to_sheet.get(month, fallback)
+            buckets[name].append(row)
+
+        for sheet in period_sheets(year):
+            ws = wb[sheet.name]
+            grouped = self._group_by_provider(buckets[sheet.name])
+            self._write_provider_bands(ws, grouped)
+
+    def _group_by_provider(
+        self, rows: list[CruceExportRow]
+    ) -> list[tuple[str, list[CruceExportRow]]]:
+        groups: dict[str, list[CruceExportRow]] = defaultdict(list)
+        order: list[str] = []
+        for row in rows:
+            key = (row.proveedor or "").strip()
+            if key not in groups:
+                order.append(key)
+            groups[key].append(row)
+        for key in order:
+            groups[key].sort(key=lambda r: (r.fecha_ejecucion or "", r.numero_compra or ""))
+        return [(k, groups[k]) for k in order]
+
+    def _write_provider_bands(
+        self, ws: Worksheet, groups: list[tuple[str, list[CruceExportRow]]]
+    ) -> None:
+        if not groups:
+            self._style_header_row(ws, 2, 1, PERIOD_BLOCK_HEADERS, HEADER_FILL_BLUE)
+            self._autosize(ws, BLOCK_WIDTH)
+            return
+
+        start_row = 1
+        for band_start in range(0, len(groups), PROVIDERS_PER_BAND):
+            band = groups[band_start : band_start + PROVIDERS_PER_BAND]
+            max_data = max(len(items) for _name, items in band)
+            for idx, (proveedor, items) in enumerate(band):
+                col0 = 1 + idx * (BLOCK_WIDTH + BLOCK_GAP)
+                fill = HEADER_FILL_BLUE if idx % 2 == 0 else HEADER_FILL_PEACH
+                title = proveedor if proveedor and proveedor != "(Sin proveedor)" else None
+                title_cell = ws.cell(start_row, col0, title)
+                title_cell.font = _TITLE_FONT
+                if BLOCK_WIDTH > 1:
+                    ws.merge_cells(
+                        start_row=start_row,
+                        start_column=col0,
+                        end_row=start_row,
+                        end_column=col0 + BLOCK_WIDTH - 1,
+                    )
+                self._style_header_row(
+                    ws, start_row + 1, col0, PERIOD_BLOCK_HEADERS, fill
+                )
+                for offset, row in enumerate(items):
+                    r = start_row + 2 + offset
+                    values = [
+                        _as_date(row.fecha_ejecucion),
+                        row.numero_compra,
+                        row.numero_reserva,
+                        _as_number(row.valor),
+                        row.factura_cdc,
+                        _as_date(row.fecha_pago),
+                    ]
+                    for c, value in enumerate(values):
+                        cell = ws.cell(r, col0 + c, value)
+                        cell.border = _THIN
+                        if c == 3 and value is not None:
+                            cell.number_format = _MONEY_FMT
+                        if c in (0, 5) and isinstance(value, date):
+                            cell.number_format = _DATE_FMT
+                # TOTAL PAGADOS del estándar: solo filas con FECHA DE PAGO.
+                total_row = start_row + 2 + max_data
+                valor_col = get_column_letter(col0 + 3)
+                pago_col = get_column_letter(col0 + 5)
+                first = start_row + 2
+                last = start_row + 1 + max_data
+                label = ws.cell(total_row, col0 + 2, "TOTAL PAGADOS")
+                label.font = Font(name=FONT_NAME, bold=True)
+                total_cell = ws.cell(
+                    total_row,
+                    col0 + 3,
+                    f'=SUMIF({pago_col}{first}:{pago_col}{last},"<>",{valor_col}{first}:{valor_col}{last})',
+                )
+                total_cell.number_format = _MONEY_FMT
+                total_cell.font = Font(name=FONT_NAME, bold=True)
+            start_row += max_data + 5
+
+        last_col = PROVIDERS_PER_BAND * (BLOCK_WIDTH + BLOCK_GAP)
+        self._autosize(ws, last_col)
+        ws.freeze_panes = "A3"
+
+    def _style_header_row(
+        self, ws: Worksheet, row: int, col0: int, headers: tuple[str, ...], rgb: str
+    ) -> None:
+        fill = _fill(rgb)
+        align = Alignment(horizontal="center", wrap_text=True, vertical="center")
+        font = _HEADER_FONT if rgb != HEADER_FILL_PEACH else Font(
+            name=FONT_NAME, size=11, bold=True
+        )
+        for i, header in enumerate(headers):
+            cell = ws.cell(row, col0 + i, header)
+            cell.fill = fill
+            cell.font = font
+            cell.alignment = align
+            cell.border = _THIN
+
+    def _write_duster(self, ws: Worksheet, rows: list[CruceExportRow]) -> None:
+        ws.merge_cells("B1:J1")
+        ws["B1"] = "VENTAS_DUSTER"
+        ws["B1"].font = _TITLE_FONT
+        self._write_table_headers(ws, 2, DUSTER_HEADERS, eas_col=9, terc_col=10)
+        for i, row in enumerate(rows, start=3):
+            values = [
+                row.mes_nombre(),
+                row.nit,
+                row.numero_compra,
+                row.referencia_oc,
+                row.numero_reserva,
+                _as_date(row.fecha_ejecucion),
+                row.estado_compra,
+                row.concepto,
+                _as_number(row.valor),
+                _as_number(row.precio_terceros),
+            ]
+            for c, value in enumerate(values, start=1):
+                cell = ws.cell(i, c, value)
+                cell.border = _THIN
+                if c == 6 and isinstance(value, date):
+                    cell.number_format = _DATE_FMT
+                if c in (9, 10) and value is not None:
+                    cell.number_format = _MONEY_FMT
+        if rows:
+            last = 2 + len(rows)
+            total = ws.cell(last + 1, 9, f"=SUM(I3:I{last})")
+            total.number_format = _MONEY_FMT
+            total.font = Font(name=FONT_NAME_TABLE, bold=True)
+            ws.cell(last + 1, 8, "TOTAL")
+        ws.auto_filter.ref = f"A2:J{max(2, 2 + len(rows))}"
+        ws.freeze_panes = "A3"
+        self._autosize(ws, 10)
+
+    def _write_bosque(self, ws: Worksheet, rows: list[CruceExportRow]) -> None:
+        ws.cell(1, 2, "CDC BOSQUE DE PALMAS")
+        ws["B1"].font = _TITLE_FONT
+        self._write_table_headers(ws, 9, BOSQUE_HEADERS)
+        for i, row in enumerate(rows, start=10):
+            values = [
+                row.nit,
+                row.proveedor,
+                row.numero_compra,
+                row.comprador,
+                row.numero_reserva,
+                row.vendedor,
+                _as_date(row.fecha_ejecucion),
+                row.estado_compra,
+                _as_number(row.cantidad),
+                _as_number(row.valor),
+            ]
+            for c, value in enumerate(values, start=1):
+                cell = ws.cell(i, c, value)
+                cell.border = _THIN
+                if c == 7 and isinstance(value, date):
+                    cell.number_format = _DATE_FMT
+                if c in (9, 10) and value is not None:
+                    cell.number_format = _MONEY_FMT
+        if rows:
+            last = 9 + len(rows)
+            total = ws.cell(last + 1, 10, f"=SUM(J10:J{last})")
+            total.number_format = _MONEY_FMT
+            total.font = Font(name=FONT_NAME_TABLE, bold=True)
+        ws.freeze_panes = "A10"
+        self._autosize(ws, 10)
+
+    def _write_luger(self, ws: Worksheet, rows: list[CruceExportRow]) -> None:
+        ws.cell(2, 2, "UNIDADES DISPONIBLES AÑO")
+        ws["B2"].font = _TITLE_FONT
+        self._style_header_row(ws, 5, 2, LUGER_HEADERS, HEADER_FILL_TEAL)
+        # INGRESO no existe en SIG: no se escribe la cadena EGRESO (depende de ese saldo).
+        for i, row in enumerate(rows, start=6):
+            ws.cell(i, 2, _as_date(row.fecha_ejecucion)).number_format = _DATE_FMT
+            ws.cell(i, 3, row.numero_compra)
+            valor = ws.cell(i, 4, _as_number(row.valor))
+            if row.valor is not None:
+                valor.number_format = _MONEY_FMT
+            # E4 INGRESO y F EGRESO se dejan vacíos: sin saldo de apertura en SIG.
+        ws.freeze_panes = "B6"
+        self._autosize(ws, 6)
+
+    def _write_table_headers(
+        self,
+        ws: Worksheet,
+        row: int,
+        headers: tuple[str, ...],
+        *,
+        eas_col: int | None = None,
+        terc_col: int | None = None,
+    ) -> None:
+        align = Alignment(horizontal="center", wrap_text=True)
+        for i, header in enumerate(headers, start=1):
+            cell = ws.cell(row, i, header)
+            if eas_col and i == eas_col:
+                cell.fill = _fill(PRECIO_EAS_FILL)
+            elif terc_col and i == terc_col:
+                cell.fill = _fill(PRECIO_TERC_FILL)
+            else:
+                cell.fill = _fill(HEADER_FILL_TEAL)
+            cell.font = _TABLE_HEADER_FONT
+            cell.alignment = align
+            cell.border = _THIN
+
+    def _autosize(self, ws: Worksheet, max_col: int) -> None:
+        for col in range(1, max_col + 1):
+            letter = get_column_letter(col)
+            current = ws.column_dimensions[letter].width or 13
+            ws.column_dimensions[letter].width = max(13, min(current, 36))
+            if col == 8 and ws.title == "VENTAS_DUSTER":
+                ws.column_dimensions[letter].width = 40

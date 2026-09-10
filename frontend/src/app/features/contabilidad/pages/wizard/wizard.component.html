@@ -3,9 +3,9 @@
     <p class="wiz__eyebrow">Contabilidad · semana operativa</p>
     <h2>Paso a paso</h2>
     <p class="wiz__lead">
-      1) Autobits trae compra, fecha, cliente y valor.
-      2) El Excel de cruces dice qué FACTURA/CDC y fecha de pago ya están.
-      3) Sube hasta {{ packMax }} facturas y habla con la IA para pedir totales, NIT, lo dudoso o el contramarcado.
+      1) Autobits trae compra, fecha, proveedor y valor.
+      2) Cruce de Cuentas analiza SIG y genera el Excel estándar (sin adjuntar un libro de cruce).
+      3) Las facturas se pueden subir en cuanto haya Autobits; no esperan un Excel de entrada.
     </p>
     <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando()">
       {{ limpiando() ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
@@ -100,29 +100,35 @@
   </section>
 
   <section class="wiz__card" [class.is-dim]="paso() < 2">
-    <h3>2. Excel de cruces (CRUCE DE CUENTAS)</h3>
+    <h3>2. Cruce de Cuentas</h3>
     <p>
-      Hojas por mes, bloques por proveedor:
-      FECHA · COMPRA · REF · VALOR · FACTURA/CDC · FECHA DE PAGO.
-      El sistema marca lo ambiguo: falta en un lado, valor distinto, o fila de más.
+      Toma Autobits, facturas, proveedores y pagos ya persistidos.
+      No hay que adjuntar un Excel de cruce: el sistema analiza y luego genera el libro estándar.
     </p>
-    <label class="wiz__drop">
-      <input type="file" accept=".xlsx,.xlsm" (change)="onCruce($event)" [disabled]="subiendoCruce() || !autobits()" />
-      <mat-icon>compare_arrows</mat-icon>
-      <span>{{ subiendoCruce() ? 'Conciliando…' : 'Soltar o elegir CRUCE DE CUENTAS' }}</span>
-    </label>
+    <div class="wiz__row-actions">
+      <button
+        type="button"
+        class="wiz__copy wiz__copy--primary"
+        (click)="analizarCruce()"
+        [disabled]="subiendoCruce() || generandoExcel() || (!autobits() && !documentos().length)"
+      >
+        {{ subiendoCruce() ? 'Analizando…' : 'Procesar' }}
+      </button>
+      <button
+        type="button"
+        class="wiz__copy"
+        (click)="generarExcel()"
+        [disabled]="generandoExcel() || subiendoCruce() || (!autobits() && !documentos().length)"
+      >
+        {{ generandoExcel() ? 'Generando Excel…' : 'Generar Excel' }}
+      </button>
+    </div>
     @if (cruce(); as cr) {
       <div class="wiz__meta">
-        <span>{{ cr.archivo }}</span>
-        <span>{{ cr.lectura.filas_leidas }} filas leídas</span>
+        <span>Origen SIG</span>
+        <span>{{ cr.lectura.filas_leidas }} filas</span>
         <span>{{ cr.conciliacion.emparejadas }} emparejadas</span>
         <span>{{ cr.pendientes.total }} pendientes</span>
-        @if (cr.reused) {
-          <span>Reutilizado</span>
-        }
-        @for (h of cr.lectura.hojas; track h.nombre) {
-          <span>{{ h.nombre }} · {{ h.filas }}</span>
-        }
       </div>
     }
   </section>
@@ -133,8 +139,8 @@
         <div>
           <h3>Qué falta y en qué lado</h3>
           <p class="wiz__hint">
-            Autobits a la izquierda, Excel a la derecha. Copiar pega una fila lista para el bloque:
-            FECHA · COMPRA · REF · VALOR · FACTURA/CDC · FECHA DE PAGO.
+            Autobits a la izquierda, factura/CDC de SIG a la derecha.
+            Lo ambiguo o sin coincidencia queda marcado; no se rellena en silencio.
           </p>
         </div>
         <div class="wiz__row-actions">
@@ -151,7 +157,7 @@
             <tr>
               <th>Proveedor</th>
               <th>Autobits</th>
-              <th>Excel de cruce</th>
+              <th>Factura / SIG</th>
               <th>Falta / lado</th>
               <th></th>
             </tr>
@@ -194,7 +200,7 @@
     </section>
   }
 
-  <section class="wiz__card" [class.is-dim]="paso() < 3">
+  <section class="wiz__card" [class.is-dim]="paso() < 2">
     <h3>3. Facturas de la semana</h3>
     <p>
       Paquetes de máximo {{ packMax }} archivos (PDF, foto o escaneo).
@@ -214,7 +220,7 @@
         accept=".pdf,.jpg,.jpeg,.png"
         multiple
         (change)="onFacturas($event)"
-        [disabled]="subiendoFacturas() || !cruce()"
+        [disabled]="subiendoFacturas() || (!autobits() && !cruce())"
       />
       <mat-icon>photo_library</mat-icon>
       <span>{{ subiendoFacturas() ? 'Subiendo y encolando OCR…' : 'Soltar hasta ' + packMax + ' facturas (PDF o foto)' }}</span>
@@ -271,7 +277,7 @@
   <section class="wiz__card wiz__chat" [class.is-dim]="paso() < 3">
     <h3>Chat con la IA sobre este paquete</h3>
     <p class="wiz__hint">
-      Pregunta sobre las facturas ya subidas (máx. {{ packMax }}), vinculadas al Excel de Cruce de Cuentas. Pedidos típicos: listar proveedor, número, fecha y total.
+      Pregunta sobre las facturas ya subidas (máx. {{ packMax }}), vinculadas al cruce de Autobits y documentos de SIG.
     </p>
     <div class="wiz__chips">
       @for (s of chatSugerencias; track s) {
@@ -311,8 +317,8 @@
 
   @if (crossings().length) {
     <section class="wiz__card">
-      <h3>Relación factura ↔ Cruce de Cuentas</h3>
-      <p class="wiz__hint">Cada factura se ancla a una fila del Excel de Cruce (FACTURA/CDC, compra, fecha de pago). Autobits sigue siendo el reporte semanal operativo, no el origen de la factura.</p>
+      <h3>Relación factura ↔ Autobits / Cruce</h3>
+      <p class="wiz__hint">Cada factura se ancla a la fila de Autobits o cruce persistido (FACTURA/CDC, compra, fecha de pago). Autobits no se elimina: deja de ser un Excel obligatorio para este paso.</p>
       <div class="wiz__table-wrap">
         <table class="wiz__table">
           <thead>
@@ -355,7 +361,7 @@
     >
       <h3 id="wiz-vaciar-title">¿Vaciar registros?</h3>
       <p id="wiz-vaciar-desc">
-        Los registros cargados se eliminarán: Autobits, el Excel de cruce y las facturas importadas.
+        Los registros cargados se eliminarán: Autobits y las facturas importadas. El módulo Autobits no se desactiva.
       </p>
       <div class="wiz__modal-actions">
         <button type="button" class="wiz__ghost" (click)="cancelarVaciar(); $event.stopPropagation()">Cancelar</button>

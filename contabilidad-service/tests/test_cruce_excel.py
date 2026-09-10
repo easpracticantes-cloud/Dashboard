@@ -376,7 +376,7 @@ def test_pendientes_endpoint_sin_archivo(client):
 
 
 def test_pendientes_persiste_falta_en_cruce_tras_upload(client):
-    """GET /pendientes debe conservar FALTA_EN_CRUCE del último Excel de cruce."""
+    """El upload histórico sigue reportando FALTA_EN_CRUCE; GET /pendientes ya no."""
     assert _subir_autobits(
         client,
         [
@@ -403,16 +403,19 @@ def test_pendientes_persiste_falta_en_cruce_tras_upload(client):
 
     get_res = client.get("/api/cruce-excel/pendientes")
     assert get_res.status_code == 200
-    pendientes = get_res.json()["pendientes"]
-    faltan = {i["numero_compra"] for i in pendientes["por_tipo"]["FALTA_EN_CRUCE"]}
-    assert "COM003" in faltan
-    assert "COM001" not in faltan
-    assert pendientes.get("ultimo_cruce", {}).get("archivo")
+    body = get_res.json()
+    pendientes = body["pendientes"]
+    faltan = {i["numero_compra"] for i in (pendientes["por_tipo"].get("FALTA_EN_CRUCE") or [])}
+    assert "COM003" not in faltan
+    compras = {r["lado_autobits"].get("compra") for r in body["comparacion"]}
+    assert "COM001" in compras
+    assert "COM003" in compras
+    assert body.get("ultimo_cruce") in (None, {})
 
     csv_res = client.get("/api/cruce-excel/pendientes/export")
     assert csv_res.status_code == 200
-    assert "FALTA_EN_CRUCE" in csv_res.text
     assert "COM003" in csv_res.text
+    assert "FALTA_EN_CRUCE" not in csv_res.text
 
 
 def _cruce_tabular_xlsx() -> bytes:

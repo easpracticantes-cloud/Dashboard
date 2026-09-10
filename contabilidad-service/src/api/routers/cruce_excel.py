@@ -1,10 +1,10 @@
-"""Router API — Excel de trabajo «CRUCE DE CUENTAS»."""
+"""Router API — Cruce de Cuentas (análisis SIG + Excel de salida)."""
 
 import csv
 import io
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
 
 from api.deps import resolve_usuario
@@ -18,6 +18,52 @@ from infrastructure.persistence.database import get_db
 router = APIRouter(prefix="/api/cruce-excel", tags=["cruce-excel"])
 
 _EXTENSIONES = (".xlsx", ".xlsm")
+_XLSX_MEDIA = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+@router.post("/analizar")
+def analizar_cruce(
+    request: Request,
+    batch_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Analiza Autobits, facturas y proveedores ya persistidos. No requiere Excel."""
+    service = CruceExcelService(db)
+    try:
+        return service.analizar_desde_sistema(
+            batch_id=batch_id,
+            usuario=resolve_usuario(request),
+        )
+    except CruceExcelServiceError as exc:
+        raise HTTPException(
+            status_code=getattr(exc, "status_code", 400) or 400,
+            detail=exc.message,
+        ) from exc
+
+
+@router.get("/export.xlsx")
+def exportar_excel(
+    request: Request,
+    batch_id: int | None = None,
+    db: Session = Depends(get_db),
+):
+    """Genera el Excel estándar de Cruce de Cuentas a partir de SIG."""
+    service = CruceExcelService(db)
+    try:
+        content, filename, _analisis = service.generar_excel(
+            batch_id=batch_id,
+            usuario=resolve_usuario(request),
+        )
+    except CruceExcelServiceError as exc:
+        raise HTTPException(
+            status_code=getattr(exc, "status_code", 400) or 400,
+            detail=exc.message,
+        ) from exc
+    return Response(
+        content=content,
+        media_type=_XLSX_MEDIA,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/upload")
