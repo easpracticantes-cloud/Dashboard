@@ -4,7 +4,6 @@
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  overflow-x: clip;
 }
 
 .crm-toolbar {
@@ -116,13 +115,13 @@
 
 .crm-mat-table {
   width: max-content !important;
-  min-width: 1100px;
+  min-width: 100%;
   max-width: none;
 }
 
 :host ::ng-deep .crm-mat-table.mat-mdc-table {
   width: max-content !important;
-  min-width: 1100px;
+  min-width: 100%;
 }
 
 :host ::ng-deep .crm-mat-table .mat-mdc-header-cell,

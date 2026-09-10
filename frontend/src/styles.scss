@@ -260,7 +260,7 @@ button {
 .mat-drawer-content.shell__content {
   min-width: 0 !important;
   max-width: 100% !important;
-  overflow-x: clip !important;
+  overflow-x: auto !important;
   box-sizing: border-box !important;
 }
 
@@ -679,6 +679,8 @@ html {
   border: 1px solid var(--eas-line-soft) !important;
   box-shadow: var(--eas-shadow-lg) !important;
   overflow: hidden;
+  max-width: min(96vw, 920px);
+  max-height: 92dvh;
 }
 
 .eas-dialog-panel .mat-mdc-dialog-surface {

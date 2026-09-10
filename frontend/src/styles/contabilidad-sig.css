@@ -236,7 +236,7 @@
 .contab .stats-grid,
 .contab .ap-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
   gap: 0.85rem;
 }
 
@@ -522,11 +522,20 @@
   height: 16px !important;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .contab .ap-timeline {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .contab .ap-timeline li:nth-child(4)::before {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .contab .ap-timeline {
+    grid-template-columns: 1fr;
+  }
+  .contab .ap-timeline li::before {
     display: none;
   }
 }
@@ -702,7 +711,7 @@
 
 .contab .detail-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 0.85rem;
 }
 

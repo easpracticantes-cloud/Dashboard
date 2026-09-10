@@ -4,7 +4,6 @@
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  overflow-x: clip;
 }
 
 .sheets-dash {
@@ -25,7 +24,7 @@
 }
 
 .sheets-table-card {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .sheets-dash__head {
@@ -303,7 +302,7 @@
   z-index: 90;
   display: flex;
   flex-direction: column;
-  width: min(560px, 100vw);
+  width: min(560px, 100%);
   height: 100dvh;
   background: var(--eas-surface);
   border-left: 1px solid var(--eas-line-soft);

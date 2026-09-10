@@ -171,7 +171,7 @@ html[data-theme='dark'] .settings-nav__item:hover {
 
 .settings-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
   gap: 0.65rem;
   margin: 1rem 0;
 }
@@ -206,7 +206,7 @@ html[data-theme='dark'] .settings-nav__item:hover {
 
 .health-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 0.65rem;
 }
 

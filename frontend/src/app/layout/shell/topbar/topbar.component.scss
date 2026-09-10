@@ -5,6 +5,8 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
+  max-width: 100%;
   height: var(--eas-topbar-h);
   padding: 0 1.25rem;
   background: var(--eas-topbar-bg);
@@ -242,7 +244,8 @@ html[data-theme='dark'] .tb {
 }
 
 .tb-notif {
-  width: 320px;
+  width: min(320px, calc(100dvw - 1.5rem));
+  max-width: calc(100dvw - 1.5rem);
   padding: 0.35rem 0;
 }
 

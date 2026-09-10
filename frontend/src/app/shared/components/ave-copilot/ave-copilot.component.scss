@@ -222,8 +222,8 @@
 }
 
 .ave-panel {
-  width: min(420px, calc(100vw - 1.25rem));
-  max-height: min(680px, calc(100vh - 5.5rem));
+  width: min(420px, calc(100dvw - 1.25rem));
+  max-height: min(680px, calc(100dvh - 5.5rem));
   display: flex;
   flex-direction: column;
   border-radius: 22px;
@@ -758,7 +758,8 @@
   }
 
   .ave-panel {
-    width: min(100vw - 1rem, 420px);
-    height: min(78vh, 640px);
+    width: min(calc(100dvw - 1rem), 420px);
+    height: min(78dvh, 640px);
+    max-height: min(78dvh, 640px);
   }
 }

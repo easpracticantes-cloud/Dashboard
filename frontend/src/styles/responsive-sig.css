@@ -1,0 +1,336 @@
+/**
+ * SIG layout fluido — zoom 100%.
+ * No oculta información: el scroll horizontal queda DENTRO de tablas/paneles.
+ * Breakpoints: 1280 (laptop), 1024 (sidenav overlay), 768 (tablet), 640/480 (móvil).
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+video,
+canvas,
+iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+input,
+select,
+textarea {
+  max-width: 100%;
+  min-width: 0;
+}
+
+eas-shell,
+.shell,
+.shell__content,
+.shell__main,
+.shell__canvas,
+.ph,
+.ph__copy,
+.ph__actions,
+.page-header,
+.contab,
+.reg,
+.wiz,
+.sheets-dash,
+.cc {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.shell__canvas > *:not(router-outlet) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Tablas: el viewport no se ensancha; se recorre el contenedor */
+.table-wrap,
+.wiz__table-wrap,
+.reg__table-wrap,
+.sheets-table-wrap,
+.crm-table-wrap,
+.eas-scroll-x,
+.dense.table-wrap {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* KPI / grids auto-fit: minmax fijo > contenedor estrecho desborda */
+.contab .kpi-grid,
+.contab .kpis,
+.contab .stats-grid,
+.contab .ap-kpi-grid,
+.contab .detail-grid,
+.money-grid,
+.link-grid,
+.pay-stats,
+.batch-grid,
+.settings-kpis,
+.ai-cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)) !important;
+}
+
+.contab .detail-grid,
+.batch-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)) !important;
+}
+
+/* Wizard: 6 KPIs y 3 pasos no caben en 1280 con sidebar (~950px útiles) */
+@media (max-width: 1280px) {
+  .wiz__kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1024px) {
+  .wiz__steps {
+    grid-template-columns: 1fr;
+  }
+
+  .wiz__kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .reg__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .batch-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cc-pulse {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .contab .ap-timeline,
+  .ap-timeline {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .contab .ap-alert {
+    grid-template-columns: auto 1fr;
+  }
+
+  .contab .ap-alert > :last-child {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 768px) {
+  .shell__main {
+    padding: 0.9rem 0.75rem 5.75rem !important;
+  }
+
+  .ph {
+    padding: 1rem 1rem 1.15rem !important;
+    margin-bottom: 1.1rem !important;
+    border-radius: 16px !important;
+  }
+
+  .ph h1 {
+    font-size: clamp(1.35rem, 6.2vw, 1.85rem) !important;
+  }
+
+  .page-header {
+    padding: 1.1rem 1.15rem !important;
+  }
+
+  .wiz__kpis,
+  .batch-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wiz__ask {
+    flex-direction: column;
+  }
+
+  .reg__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reg__wide {
+    grid-column: span 1;
+  }
+
+  .tb {
+    padding-inline: 0.65rem !important;
+    gap: 0.35rem !important;
+  }
+
+  .tb__search {
+    display: none !important;
+  }
+
+  .tb-notif {
+    width: min(320px, calc(100dvw - 1.5rem));
+    max-width: calc(100dvw - 1.5rem);
+  }
+
+  .tb-notif__title,
+  .tb-notif__body {
+    max-width: none;
+  }
+
+  .contab .ap-timeline,
+  .ap-timeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .contab .ap-timeline li:nth-child(odd)::before {
+    display: none;
+  }
+
+  .detail-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-row .input,
+  .toolbar select,
+  .toolbar input,
+  .filters select,
+  .filters input,
+  .search {
+    min-width: 0 !important;
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .sheets-filters__search {
+    grid-column: 1 / -1;
+  }
+
+  .login-hero__brand {
+    font-size: clamp(2.4rem, 14vw, 3.6rem) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .wiz__kpis,
+  .cc-pulse,
+  .cc-pulse--two,
+  .batch-kpis,
+  .money-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contab .ap-timeline,
+  .ap-timeline {
+    grid-template-columns: 1fr;
+  }
+
+  .contab .ap-timeline li::before,
+  .ap-timeline li::before {
+    display: none;
+  }
+
+  .tb__user-text,
+  .tb__theme-label {
+    display: none !important;
+  }
+
+  .eas-btn-primary,
+  .eas-btn-secondary,
+  .eas-btn-accent,
+  .wiz__ghost,
+  .wiz__copy,
+  .reg__btn,
+  .reg__ghost {
+    width: auto;
+    max-width: 100%;
+  }
+}
+
+/* Modal wizard Vaciar + Ave + diálogos Material */
+.wiz__modal {
+  padding: 0.75rem;
+  align-items: center;
+  justify-items: center;
+}
+
+.wiz__modal-card {
+  width: min(420px, 100%);
+  max-height: min(90dvh, 640px);
+  overflow: auto;
+}
+
+.ave-panel {
+  width: min(420px, calc(100dvw - 1.25rem)) !important;
+  max-height: min(680px, calc(100dvh - 5.5rem));
+}
+
+@media (max-width: 480px) {
+  .ave-panel {
+    width: min(420px, calc(100dvw - 1rem)) !important;
+    height: min(78dvh, 640px);
+    max-height: min(78dvh, 640px);
+  }
+}
+
+.sheets-editor {
+  width: min(560px, 100%) !important;
+  max-width: 100%;
+}
+
+.cdk-overlay-pane.mat-mdc-dialog-panel:not(.eas-command-palette-panel),
+.cdk-overlay-pane.eas-dialog-panel,
+.cdk-overlay-pane.eas-ai-quote-panel {
+  max-width: min(96vw, 920px) !important;
+  max-height: 92dvh !important;
+}
+
+.mat-mdc-dialog-container,
+.mdc-dialog__surface {
+  max-height: 92dvh !important;
+}
+
+.mat-mdc-dialog-content,
+.mdc-dialog__content {
+  max-height: min(70dvh, calc(92dvh - 8rem));
+  overflow: auto !important;
+}
+
+.login-page {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr);
+}
+
+@media (max-width: 1024px) {
+  .login-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.login-main,
+.login-card,
+.login-form {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.crm-mat-table,
+.crm-mat-table.mat-mdc-table {
+  min-width: 0;
+}
+
+/* Acciones de fila siempre accesibles al hacer scroll de la tabla */
+.reg__row-actions,
+.wiz__row-actions,
+.actions,
+.contab .actions,
+.contab .row-actions {
+  flex-wrap: wrap;
+}

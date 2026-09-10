@@ -4,7 +4,7 @@
 
 .pay-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr));
   gap: 0.75rem;
   margin-bottom: 1.25rem;
 }
@@ -48,8 +48,8 @@
 }
 
 .search {
-  flex: 1;
-  min-width: 220px;
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .manual-panel {
@@ -100,7 +100,8 @@
 
   .input {
     width: auto;
-    min-width: 200px;
+    min-width: 0;
+    flex: 1 1 160px;
   }
 }
 

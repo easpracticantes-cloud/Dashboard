@@ -80,7 +80,7 @@ import { Component, input } from '@angular/core';
       .ph h1 {
         margin: 0;
         font-family: 'Montserrat', 'Sora', sans-serif;
-        font-size: clamp(1.85rem, 3.2vw, 2.55rem);
+        font-size: clamp(1.45rem, 3.2vw, 2.55rem);
         font-weight: 900;
         letter-spacing: -0.05em;
         line-height: 1.05;
@@ -103,6 +103,11 @@ import { Component, input } from '@angular/core';
         line-height: 1.55;
         color: var(--eas-ink);
         opacity: 0.72;
+      }
+
+      .ph__copy {
+        min-width: 0;
+        flex: 1 1 16rem;
       }
 
       .ph__actions {

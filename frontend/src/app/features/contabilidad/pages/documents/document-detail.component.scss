@@ -418,13 +418,23 @@
   padding: 0 1.15rem 1.15rem;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .ap-timeline {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .detail-cards {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .ap-timeline {
+    grid-template-columns: 1fr;
+  }
+
+  .ap-timeline li::before {
+    display: none;
   }
 }
 

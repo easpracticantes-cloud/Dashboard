@@ -39,6 +39,7 @@
               "src/styles/sig-ui-real.css",
               "src/styles/theme-transitions.css",
               "src/styles/contabilidad-sig.css",
+              "src/styles/responsive-sig.css",
               "src/styles/no-motion.css"
             ],
             "stylePreprocessorOptions": {

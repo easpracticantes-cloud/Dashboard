@@ -40,8 +40,8 @@
 }
 
 .search {
-  flex: 1;
-  min-width: 220px;
+  flex: 1 1 140px;
+  min-width: 0;
 }
 
 .table-wrap {
@@ -232,7 +232,7 @@
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .batch-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -242,5 +242,11 @@
     .meta {
       grid-column: 2;
     }
+  }
+}
+
+@media (max-width: 480px) {
+  .batch-kpis {
+    grid-template-columns: 1fr;
   }
 }

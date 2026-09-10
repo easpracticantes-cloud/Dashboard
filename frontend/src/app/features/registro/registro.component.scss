@@ -175,9 +175,13 @@
 }
 
 .reg__table-wrap {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--eas-line-soft);
   border-radius: 12px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .reg__table {
@@ -256,7 +260,7 @@
   margin-top: 0.9rem;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .reg__grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -266,7 +270,7 @@
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .reg__grid {
     grid-template-columns: 1fr;
   }
