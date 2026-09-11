@@ -586,7 +586,7 @@ export class RegistroComponent {
     const row: Record<string, unknown> = {
       ...d,
       canal: 'WHATSAPP',
-      registrado: 'WHATSAPP',
+      registrado: (d.registrado || '').trim() || 'WHATSAPP',
       cotizado: Boolean(d.fechaCotizado),
     };
     const hit = preview.coincidencias?.[0];

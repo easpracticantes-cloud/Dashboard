@@ -148,6 +148,7 @@
 .ave-doll__face img {
   width: 34px;
   height: 34px;
+  object-fit: contain;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
 }
 
@@ -562,6 +563,7 @@
 .ave-avatar--xs img {
   width: 12px;
   height: 12px;
+  object-fit: contain;
 }
 
 .ave-msg__toolbar {

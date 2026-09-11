@@ -17,7 +17,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
-@Tag(name = "Usuarios", description = "Administracion de usuarios del sistema (solo ADMINISTRADOR)")
+@Tag(name = "Usuarios", description = "Administracion de usuarios (Administrador, Gerencia y Supervisor)")
 public class UserController {
 
     private final UserUseCase userUseCase;

@@ -1,0 +1,123 @@
+.uf {
+  width: min(92vw, 560px);
+  padding: 0.25rem 0.15rem;
+}
+
+.uf__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.uf__eyebrow {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--eas-muted);
+}
+
+.uf h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.25rem;
+}
+
+.uf__close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--eas-muted);
+  cursor: pointer;
+}
+
+.uf form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.uf__grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .uf__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.uf label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--eas-ink);
+}
+
+.uf input,
+.uf select {
+  width: 100%;
+  border: 1px solid var(--eas-line-soft);
+  background: var(--eas-snow, var(--eas-surface));
+  color: var(--eas-ink);
+  border-radius: 12px;
+  padding: 0.6rem 0.8rem;
+  font: inherit;
+}
+
+.uf input[readonly] {
+  opacity: 0.7;
+}
+
+.uf small {
+  color: #9b1c1c;
+  font-weight: 500;
+}
+
+.uf__hint {
+  color: var(--eas-muted) !important;
+}
+
+.uf__pass {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.uf__pass input {
+  flex: 1;
+}
+
+.uf__pass button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  border: 1px solid var(--eas-line-soft);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--eas-muted);
+  cursor: pointer;
+}
+
+.uf__check {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 550;
+}
+
+.uf__check input {
+  width: auto;
+}
+
+.uf__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.35rem;
+}

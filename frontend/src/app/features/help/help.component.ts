@@ -26,99 +26,121 @@ export class HelpComponent {
 
   readonly topics: HelpTopic[] = [
     {
+      icon: 'space_dashboard',
+      title: 'Dashboard Sheets',
+      body: 'Centro de mando: pulso del workbook, Claude y atajos a Registro y Contabilidad.',
+      route: '/app/dashboard',
+      routeLabel: 'Ir al dashboard',
+      steps: ['Revisa indicadores del día.', 'Usa Ctrl/⌘ K para saltar a un módulo.', 'Abre Ave si necesitas contexto de la pantalla.']
+    },
+    {
       icon: 'table_chart',
-      title: 'Registro del Excel',
-      body: 'Agrega o edita filas del workbook (fecha, cliente, semáforo, prioridad) y se guarda en la hoja.',
+      title: 'Registro',
+      body: 'Alta y edición de filas del Excel: cliente, DISC por color, semáforo y canal. Puedes importar chats de WhatsApp (txt o zip) y confirmar antes de escribir.',
       route: '/app/registro',
       routeLabel: 'Ir a Registro',
       steps: [
-        'Abre Registro y elige la hoja.',
-        'Pulsa Nueva fila o Editar.',
-        'Guarda para escribir en Google Sheets.'
+        'Elige la hoja del workbook.',
+        'Nueva fila o Editar; DISC se ve como Rojo, Amarillo, Verde o Azul.',
+        'Registrada (Autobits / físico / WhatsApp) se diligencia a mano.',
+        'Si subes chats, revisa el preview y confirma para guardar.'
       ]
     },
     {
-      icon: 'grid_on',
-      title: 'Google Sheets',
-      body: 'Configura el Web App URL y sincroniza para proyectar clientes, chats y comercial.',
-      route: '/app/settings',
-      routeLabel: 'Abrir Configuración',
-      steps: [
-        'Ve a Configuración → Google Sheets.',
-        'Pega la URL del Apps Script.',
-        'Pulsa Sincronizar ahora (o usa el botón del topbar).'
-      ]
+      icon: 'account_balance',
+      title: 'Contabilidad',
+      body: 'Cruce de Cuentas desde SIG: Autobits, facturas y pagos. No hace falta subir un Excel de cruce.',
+      route: '/app/contabilidad',
+      routeLabel: 'Abrir Contabilidad',
+      steps: ['Carga o usa Autobits.', 'Sube facturas si hace falta.', 'Genera el cruce y descárgalo.']
     },
     {
       icon: 'monitoring',
       title: 'Analítica',
-      body: 'Combina año, mes, estado e importancia para leer el negocio en tiempo real.',
+      body: 'KPIs y gráficos del workbook: año, mes, estado, importancia, asesor y tendencias. No inventa métricas.',
       route: '/app/analytics',
-      routeLabel: 'Ver Analítica'
+      routeLabel: 'Ver Analítica',
+      steps: ['Combina filtros.', 'Revisa insights comerciales.', 'Exporta desempeño de asesores si lo necesitas.']
     },
     {
-      icon: 'request_quote',
-      title: 'Pipeline comercial',
-      body: 'Clona cotizaciones, extiende validez, convierte a reserva y luego a venta.',
-      route: '/app/registro',
-      routeLabel: 'Ver Registro'
+      icon: 'summarize',
+      title: 'Reportes',
+      body: 'Resumen operativo, digest comercial y descargas CSV/PDF (conversaciones, cotizaciones, ventas, reservas, clientes y asesores).',
+      route: '/app/reports',
+      routeLabel: 'Abrir Reportes'
+    },
+    {
+      icon: 'group',
+      title: 'Usuarios',
+      body: 'Altas, roles, activar/desactivar y contraseñas. Lo ven Administrador, Gerencia y Supervisor.',
+      route: '/app/users',
+      routeLabel: 'Gestionar usuarios',
+      steps: [
+        'Crea el usuario con correo, rol y clave de 8+ caracteres.',
+        'Elige el rol según los módulos que debe ver.',
+        'No puedes desactivar ni borrar tu propia cuenta.'
+      ]
+    },
+    {
+      icon: 'settings',
+      title: 'Configuración',
+      body: 'Google Sheets, WhatsApp, apariencia, salud del sistema, usuarios y seguridad.',
+      route: '/app/settings',
+      routeLabel: 'Abrir Configuración',
+      steps: ['Pega la URL del Apps Script en Google Sheets.', 'Sincroniza desde aquí o con Sync del topbar.', 'Revisa salud e integraciones.']
     },
     {
       icon: 'smart_toy',
       title: 'Ave, el copilot',
-      body: 'El muñeco flotante es el chat de IA del día a día: contexto de pantalla, voz y acciones. No hay una consola técnica aparte en el menú.',
+      body: 'Chat flotante con contexto de la pantalla. En turnos de negocio adapta el tono al DISC del prospecto. No hay consola técnica en el menú.',
       route: '/app/dashboard',
       routeLabel: 'Ir al centro de mando',
-      steps: ['Abre Ave abajo a la derecha.', 'Pregunta sobre la pantalla actual.', 'Confirma antes de ejecutar cambios.']
+      steps: ['Ábrelo abajo a la derecha.', 'Pregunta sobre lo que estás viendo.', 'Confirma antes de ejecutar cambios.']
     },
     {
       icon: 'person',
       title: 'Mi perfil',
-      body: 'Actualiza nombre, correo, avatar, tema y preferencias de densidad.',
+      body: 'Nombre, correo, avatar y preferencias de tema.',
       route: '/app/profile',
       routeLabel: 'Abrir perfil'
     },
     {
-      icon: 'security',
-      title: 'Roles y permisos',
-      body: 'ADMINISTRADOR, GERENCIA, COMERCIAL, CONTABILIDAD y OPERACIONES controlan el acceso.',
-      route: '/app/users',
-      routeLabel: 'Gestionar usuarios'
-    },
-    {
       icon: 'support_agent',
-      title: 'Soporte Escuela Aves',
-      body: 'Escríbenos a escuelaavescomercial@gmail.com, easpracticantes@gmail.com o escuelaavesdesalento@gmail.com.',
-      steps: ['Describe el módulo afectado.', 'Incluye captura y hora del incidente.', 'Indica el usuario con el que ingresaste.']
+      title: 'Soporte EAS',
+      body: 'Escríbenos a easpracticantes@gmail.com o al correo corporativo de tu equipo.',
+      steps: ['Indica el módulo (Registro, Contabilidad, Usuarios…).', 'Adjunta captura y hora.', 'Di con qué usuario entraste.']
     }
   ];
 
   readonly faqs = [
     {
       q: '¿Cómo inicio sesión?',
-      a: 'Solo con Google. Usa escuelaavescomercial@gmail.com, easpracticantes@gmail.com o escuelaavesdesalento@gmail.com.'
+      a: 'Con usuario del equipo o Google autorizado. Si no entra, pide a un administrador que revise tu cuenta en Usuarios.'
     },
     {
       q: '¿Por qué no veo datos nuevos?',
-      a: 'Pulsa el botón Sync del topbar o sincroniza en Configuración → Google Sheets.'
+      a: 'Pulsa Sync en el topbar o ve a Configuración → Google Sheets y sincroniza el workbook.'
     },
     {
-      q: '¿Cómo exporto un listado?',
-      a: 'En Clientes, Cotizaciones, Reservas y Ventas hay un botón Exportar CSV.'
+      q: '¿Dónde exporto un listado?',
+      a: 'En Reportes: CSV/PDF de conversaciones, cotizaciones, ventas, reservas, clientes y desempeño de asesores. Analítica también exporta asesores.'
     },
     {
-      q: '¿Cómo genero una cotización desde un chat?',
-      a: 'Abre la conversación, acepta el banner de IA o usa Cotizar con IA, edita el borrador y descarga el PDF.'
+      q: '¿Cómo entra un chat de WhatsApp al Excel?',
+      a: 'En Registro sube uno o varios .txt o un zip (hasta 50). Revisa el preview, ajusta DISC y Registrada si hace falta, y confirma. Nada se escribe hasta que confirmas.'
+    },
+    {
+      q: '¿Qué significan los colores DISC?',
+      a: 'Rojo es dominante, Amarillo influencia, Verde estabilidad y Azul cumplimiento. La IA los sugiere desde el chat del prospecto; no pisa un DISC que ya esté en Excel.'
     },
     {
       q: '¿Dónde cambio el tema oscuro?',
-      a: 'Desde el topbar, en Mi perfil → Preferencias, o en Configuración → Apariencia.'
+      a: 'Desde el topbar, en Mi perfil o en Configuración → Apariencia.'
     }
   ];
 
   readonly shortcuts = [
-    { keys: 'Ctrl / ⌘ K', action: 'Command palette (buscar módulos, clientes y chats)' },
-    { keys: 'Enter', action: 'Enviar mensaje en el hilo de conversación' },
+    { keys: 'Ctrl / ⌘ K', action: 'Buscar módulos, clientes y chats' },
     { keys: 'Esc', action: 'Cerrar diálogos abiertos' }
   ];
 

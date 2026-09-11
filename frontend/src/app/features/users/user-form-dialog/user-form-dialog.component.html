@@ -1,72 +1,68 @@
-<div class="w-[min(92vw,460px)] p-1">
-  <div class="mb-5 flex items-center justify-between">
-    <h2 class="font-display text-xl text-eas-ink">{{ isEdit ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
-    <button type="button" (click)="cancel()" class="grid h-8 w-8 place-items-center rounded-full text-eas-muted hover:bg-eas-mist">
-      <mat-icon [style.font-size.px]="18" [style.width.px]="18" [style.height.px]="18">close</mat-icon>
+<div class="uf">
+  <div class="uf__head">
+    <div>
+      <p class="uf__eyebrow">{{ isEdit ? 'Editar' : 'Alta' }}</p>
+      <h2>{{ isEdit ? 'Editar usuario' : 'Nuevo usuario' }}</h2>
+    </div>
+    <button type="button" (click)="cancel()" class="uf__close" aria-label="Cerrar">
+      <mat-icon>close</mat-icon>
     </button>
   </div>
 
-  <form [formGroup]="form" (ngSubmit)="save()" class="space-y-4">
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Usuario</label>
-        <input
-          type="text"
-          formControlName="username"
-          [readonly]="isEdit"
-          class="w-full rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:bg-white focus:outline-none focus:ring-2 focus:ring-eas-leaf/20 disabled:opacity-60"
-        />
-      </div>
-      <div>
-        <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Correo</label>
-        <input
-          type="email"
-          formControlName="email"
-          class="w-full rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:bg-white focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
-        />
-      </div>
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <div class="uf__grid">
+      <label>
+        Usuario
+        <input type="text" formControlName="username" [readonly]="isEdit" autocomplete="off" placeholder="nombre.apellido" />
+        @if (form.controls.username.touched && form.controls.username.invalid) {
+          <small>Mínimo 3 caracteres.</small>
+        }
+      </label>
+      <label>
+        Correo
+        <input type="email" formControlName="email" autocomplete="email" placeholder="nombre@eas.com" />
+        @if (form.controls.email.touched && form.controls.email.invalid) {
+          <small>Correo válido.</small>
+        }
+      </label>
     </div>
-    <div>
-      <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Nombre completo</label>
-      <input
-        type="text"
-        formControlName="fullName"
-        class="w-full rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:bg-white focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
-      />
-    </div>
-    <div class="grid grid-cols-2 gap-3">
-      <div>
-        <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Rol</label>
-        <select
-          formControlName="role"
-          class="w-full rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
-        >
-          @for (role of roles; track role) {
-            <option [value]="role">{{ roleLabels[role] }}</option>
-          }
-        </select>
-      </div>
-      <div>
-        <label class="mb-1.5 block text-sm font-semibold text-eas-ink">Contraseña {{ isEdit ? '(opcional)' : '' }}</label>
-        <input
-          type="password"
-          formControlName="password"
-          class="w-full rounded-xl border border-eas-forest/12 bg-eas-snow px-3.5 py-2.5 text-sm text-eas-ink focus:border-eas-leaf focus:bg-white focus:outline-none focus:ring-2 focus:ring-eas-leaf/20"
-        />
-      </div>
-    </div>
-    <label class="flex items-center gap-2.5 text-sm font-medium text-eas-ink">
-      <input type="checkbox" formControlName="active" class="h-4 w-4 rounded border-eas-forest/30 text-eas-forest focus:ring-eas-leaf/30" />
-      Usuario activo
+
+    <label>
+      Nombre completo
+      <input type="text" formControlName="fullName" autocomplete="name" />
     </label>
 
-    <div class="flex justify-end gap-2 pt-2">
-      <button type="button" (click)="cancel()" class="rounded-full px-4 py-2.5 text-sm font-semibold text-eas-muted hover:bg-eas-mist">
-        Cancelar
-      </button>
-      <button type="submit" class="rounded-full bg-eas-brand px-5 py-2.5 text-sm font-semibold text-eas-on-brand hover:bg-eas-brand-hover">
-        Guardar
-      </button>
+    <label>
+      Rol
+      <select formControlName="role">
+        @for (role of roles; track role) {
+          <option [value]="role">{{ roleLabels[role] }}</option>
+        }
+      </select>
+      <small class="uf__hint">{{ roleHint }}</small>
+    </label>
+
+    <label>
+      Contraseña {{ isEdit ? '(déjala vacía para no cambiarla)' : '' }}
+      <span class="uf__pass">
+        <input [type]="showPassword() ? 'text' : 'password'" formControlName="password" autocomplete="new-password" />
+        <button type="button" (click)="showPassword.set(!showPassword())">
+          <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+        </button>
+      </span>
+      @if (form.controls.password.touched && form.controls.password.invalid) {
+        <small>Mínimo 8 caracteres.</small>
+      }
+    </label>
+
+    <label class="uf__check">
+      <input type="checkbox" formControlName="active" />
+      Usuario activo (puede iniciar sesión)
+    </label>
+
+    <div class="uf__actions">
+      <button type="button" class="eas-btn-secondary" (click)="cancel()">Cancelar</button>
+      <button type="submit" class="eas-btn-primary">{{ isEdit ? 'Guardar cambios' : 'Crear usuario' }}</button>
     </div>
   </form>
 </div>

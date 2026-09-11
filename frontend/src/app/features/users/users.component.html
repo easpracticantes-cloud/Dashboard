@@ -1,5 +1,9 @@
-<eas-page-header eyebrow="Administración" title="Usuarios" subtitle="Gestiona el equipo que tiene acceso al sistema.">
-  <button type="button" class="eas-btn-primary" (click)="openCreate()">
+<eas-page-header
+  eyebrow="Equipo"
+  title="Usuarios"
+  subtitle="Cuentas, roles y acceso a Dashboard, Registro, Contabilidad, Analítica, Reportes y Configuración."
+>
+  <button type="button" class="eas-btn-primary" (click)="openCreate()" [disabled]="saving() || !canManage()">
     <mat-icon>person_add</mat-icon>
     Nuevo usuario
   </button>
@@ -11,130 +15,224 @@
   <li>Inactivos {{ counts().inactive }}</li>
 </ul>
 
-<div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-  <div class="eas-card px-4 py-3">
-    <p class="text-xs font-semibold uppercase tracking-wide text-eas-muted">Total</p>
-    <p class="mt-1 text-2xl font-bold text-eas-ink">{{ counts().total }}</p>
-  </div>
-  <div class="eas-card px-4 py-3">
-    <p class="text-xs font-semibold uppercase tracking-wide text-eas-muted">Activos</p>
-    <p class="mt-1 text-2xl font-bold text-eas-pine">{{ counts().active }}</p>
-  </div>
-  <div class="eas-card px-4 py-3">
-    <p class="text-xs font-semibold uppercase tracking-wide text-eas-muted">Inactivos</p>
-    <p class="mt-1 text-2xl font-bold text-eas-muted">{{ counts().inactive }}</p>
-  </div>
-</div>
+@if (aviso()) {
+  <p class="users-aviso" [class.is-err]="avisoKind() === 'err'" role="status">{{ aviso() }}</p>
+}
 
-<div class="eas-card mb-4 grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
-  <mat-form-field appearance="outline" class="w-full">
-    <mat-label>Buscar</mat-label>
-    <mat-icon matPrefix>search</mat-icon>
-    <input matInput [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Nombre, correo o usuario" />
-  </mat-form-field>
-  <mat-form-field appearance="outline" class="w-full">
-    <mat-label>Rol</mat-label>
-    <mat-select [ngModel]="roleFilter()" (ngModelChange)="roleFilter.set($event)">
-      <mat-option value="ALL">Todos</mat-option>
-      @for (role of roleOptions; track role) {
-        <mat-option [value]="role">{{ roleLabels[role] }}</mat-option>
-      }
-    </mat-select>
-  </mat-form-field>
-  <mat-form-field appearance="outline" class="w-full">
-    <mat-label>Estado</mat-label>
-    <mat-select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)">
-      <mat-option value="ALL">Todos</mat-option>
-      <mat-option value="ACTIVE">Activos</mat-option>
-      <mat-option value="INACTIVE">Inactivos</mat-option>
-    </mat-select>
-  </mat-form-field>
-</div>
-
-<div class="eas-card overflow-hidden">
-  @if (loading()) {
-    <div class="space-y-3 p-5">
-      @for (s of [1, 2, 3, 4]; track s) {
-        <div class="eas-skeleton h-12 w-full"></div>
-      }
+@if (confirmUser(); as doomed) {
+  <div class="users-confirm" role="alertdialog" aria-label="Confirmar eliminación">
+    <div>
+      <strong>¿Eliminar a {{ doomed.fullName }}?</strong>
+      <p>Se pierde el acceso de &#64;{{ doomed.username }}. Esta acción no se deshace.</p>
     </div>
-  } @else if (filtered().length === 0) {
-    <eas-empty-state
-      icon="admin_panel_settings"
-      title="Sin coincidencias"
-      description="Prueba otra búsqueda o limpia los filtros de rol y estado."
-    ></eas-empty-state>
-  } @else {
-    <div class="users-table-wrap">
-      <table class="users-table w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-eas-forest/8 text-xs uppercase tracking-wide text-eas-muted">
-            <th class="px-5 py-3 font-semibold">Usuario</th>
-            <th class="px-5 py-3 font-semibold">Correo</th>
-            <th class="px-5 py-3 font-semibold">Rol</th>
-            <th class="px-5 py-3 font-semibold">Estado</th>
-            <th class="px-5 py-3 font-semibold">Últ. acceso</th>
-            <th class="px-5 py-3 font-semibold"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-eas-forest/6">
-          @for (user of filtered(); track user.id) {
-            <tr class="transition hover:bg-eas-mist/40">
-              <td class="px-5 py-3.5">
-                <div class="flex items-center gap-3">
-                  <eas-avatar [name]="user.fullName" [imageUrl]="user.avatarUrl" [size]="36"></eas-avatar>
-                  <div class="min-w-0">
-                    <p class="truncate font-medium text-eas-ink">{{ user.fullName }}</p>
-                    <p class="truncate text-xs text-eas-muted">&#64;{{ user.username }}</p>
+    <div class="users-confirm__actions">
+      <button type="button" class="eas-btn-secondary" (click)="confirmUser.set(null)" [disabled]="saving()">Cancelar</button>
+      <button type="button" class="eas-btn-primary users-confirm__danger" (click)="confirmRemove()" [disabled]="saving()">
+        Eliminar
+      </button>
+    </div>
+  </div>
+}
+
+<div class="users-kpis">
+  <article class="eas-card">
+    <p>Total</p>
+    <strong>{{ counts().total }}</strong>
+  </article>
+  <article class="eas-card">
+    <p>Activos</p>
+    <strong class="is-ok">{{ counts().active }}</strong>
+  </article>
+  <article class="eas-card">
+    <p>Inactivos</p>
+    <strong>{{ counts().inactive }}</strong>
+  </article>
+  <article class="eas-card users-kpis__roles">
+    <p>Por rol</p>
+    <ul>
+      @for (r of counts().byRole; track r.role) {
+        @if (r.count) {
+          <li>
+            <button type="button" [class.is-on]="roleFilter() === r.role" (click)="roleFilter.set(roleFilter() === r.role ? 'ALL' : r.role)">
+              {{ r.label }} <span>{{ r.count }}</span>
+            </button>
+          </li>
+        }
+      }
+    </ul>
+  </article>
+</div>
+
+<div class="eas-card users-filters">
+  <label>
+    Buscar
+    <input
+      type="search"
+      [ngModel]="search()"
+      (ngModelChange)="search.set($event)"
+      placeholder="Nombre, correo, usuario o rol"
+    />
+  </label>
+  <label>
+    Rol
+    <select [ngModel]="roleFilter()" (ngModelChange)="roleFilter.set($event)">
+      <option value="ALL">Todos</option>
+      @for (role of roleOptions; track role) {
+        <option [value]="role">{{ roleLabels[role] }}</option>
+      }
+    </select>
+  </label>
+  <label>
+    Estado
+    <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)">
+      <option value="ALL">Todos</option>
+      <option value="ACTIVE">Activos</option>
+      <option value="INACTIVE">Inactivos</option>
+    </select>
+  </label>
+  <button type="button" class="eas-btn-secondary" (click)="clearFilters()">Limpiar</button>
+</div>
+
+<div class="users-layout">
+  <div class="eas-card users-table-card">
+    @if (loading()) {
+      <div class="users-skel">
+        @for (s of [1, 2, 3, 4]; track s) {
+          <div class="eas-skeleton" style="height: 52px"></div>
+        }
+      </div>
+    } @else if (filtered().length === 0) {
+      <eas-empty-state
+        icon="admin_panel_settings"
+        title="Sin coincidencias"
+        description="Prueba otra búsqueda o limpia rol y estado. Si la lista está vacía, puede que no tengas permiso."
+      ></eas-empty-state>
+    } @else {
+      <div class="users-table-wrap">
+        <table class="users-table">
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Correo</th>
+              <th>Rol</th>
+              <th>Estado</th>
+              <th>Últ. acceso</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of filtered(); track user.id) {
+              <tr
+                [class.is-selected]="selected()?.id === user.id"
+                [class.is-off]="!user.active"
+                (click)="select(user)"
+              >
+                <td>
+                  <div class="users-id">
+                    <eas-avatar [name]="user.fullName" [imageUrl]="user.avatarUrl" [size]="36"></eas-avatar>
+                    <div>
+                      <p>
+                        {{ user.fullName }}
+                        @if (isSelf(user)) {
+                          <span class="users-you">Tú</span>
+                        }
+                      </p>
+                      <small>&#64;{{ user.username }}</small>
+                    </div>
                   </div>
-                </div>
-              </td>
-              <td class="px-5 py-3.5 text-eas-muted">{{ user.email }}</td>
-              <td class="px-5 py-3.5">
-                <span class="rounded-full bg-eas-mist px-2.5 py-1 text-xs font-semibold text-eas-pine">{{
-                  roleLabels[user.role]
-                }}</span>
-              </td>
-              <td class="px-5 py-3.5">
-                <span
-                  class="rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset"
-                  [class]="user.active ? 'bg-eas-mist text-eas-pine ring-eas-leaf/30' : 'bg-slate-100 text-slate-500 ring-slate-200'"
-                >
-                  {{ user.active ? 'Activo' : 'Inactivo' }}
-                </span>
-              </td>
-              <td class="px-5 py-3.5 text-eas-muted">{{ user.lastLoginAt ? (user.lastLoginAt | timeAgo) : '—' }}</td>
-              <td class="px-5 py-3.5 text-right">
-                <button
-                  type="button"
-                  class="grid h-8 w-8 place-items-center rounded-lg text-eas-muted hover:bg-eas-mist"
-                  [matMenuTriggerFor]="rowMenu"
-                >
-                  <mat-icon [style.font-size.px]="18" [style.width.px]="18" [style.height.px]="18">more_vert</mat-icon>
-                </button>
-                <mat-menu #rowMenu="matMenu">
-                  <button mat-menu-item (click)="openEdit(user)">
+                </td>
+                <td class="users-muted">{{ user.email }}</td>
+                <td>
+                  <span class="users-role" [attr.data-role]="user.role">{{ roleLabels[user.role] }}</span>
+                </td>
+                <td>
+                  <span class="users-status" [class.is-on]="user.active">{{ user.active ? 'Activo' : 'Inactivo' }}</span>
+                </td>
+                <td class="users-muted">
+                  @if (user.lastLoginAt) {
+                    <span [title]="user.lastLoginAt | date: 'dd/MM/yyyy HH:mm'">{{ user.lastLoginAt | timeAgo }}</span>
+                  } @else {
+                    —
+                  }
+                </td>
+                <td class="users-actions" (click)="$event.stopPropagation()">
+                  <button type="button" (click)="openEdit(user)" title="Editar">
                     <mat-icon>edit</mat-icon>
-                    <span>Editar</span>
                   </button>
                   <button
-                    mat-menu-item
+                    type="button"
                     [disabled]="isSelf(user) || togglingId() === user.id"
                     (click)="toggleActive(user)"
+                    [title]="user.active ? 'Desactivar' : 'Activar'"
                   >
                     <mat-icon>{{ user.active ? 'person_off' : 'person' }}</mat-icon>
-                    <span>{{ user.active ? 'Desactivar' : 'Activar' }}</span>
                   </button>
-                  <button mat-menu-item [disabled]="isSelf(user)" (click)="remove(user)">
-                    <mat-icon>delete</mat-icon>
-                    <span>Eliminar</span>
-                  </button>
-                </mat-menu>
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
-  }
+                  @if (canDelete()) {
+                    <button type="button" [disabled]="isSelf(user)" (click)="askRemove(user)" title="Eliminar">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <aside class="eas-card users-detail">
+    @if (selected(); as user) {
+      <header>
+        <eas-avatar [name]="user.fullName" [imageUrl]="user.avatarUrl" [size]="52"></eas-avatar>
+        <div>
+          <h3>{{ user.fullName }}</h3>
+          <p>{{ user.email }}</p>
+        </div>
+      </header>
+      <dl>
+        <div>
+          <dt>Usuario</dt>
+          <dd>&#64;{{ user.username }}</dd>
+        </div>
+        <div>
+          <dt>Rol</dt>
+          <dd>{{ roleLabels[user.role] }}</dd>
+        </div>
+        <div>
+          <dt>Estado</dt>
+          <dd>{{ user.active ? 'Activo' : 'Inactivo' }}</dd>
+        </div>
+        <div>
+          <dt>Último acceso</dt>
+          <dd>{{ user.lastLoginAt ? (user.lastLoginAt | date: 'dd/MM/yyyy HH:mm') : 'Aún no ingresa' }}</dd>
+        </div>
+        @if (user.createdAt) {
+          <div>
+            <dt>Creado</dt>
+            <dd>{{ user.createdAt | date: 'dd/MM/yyyy' }}</dd>
+          </div>
+        }
+      </dl>
+      <p class="users-detail__desc">{{ roleDescriptions[user.role] }}</p>
+      <h4>Módulos de este rol</h4>
+      <ul class="users-mods">
+        @for (mod of roleAccess[user.role]; track mod) {
+          <li>{{ mod }}</li>
+        }
+      </ul>
+      <div class="users-detail__btns">
+        <button type="button" class="eas-btn-primary" (click)="openEdit(user)">Editar</button>
+        <button type="button" class="eas-btn-secondary" [disabled]="isSelf(user)" (click)="toggleActive(user)">
+          {{ user.active ? 'Desactivar' : 'Activar' }}
+        </button>
+      </div>
+    } @else {
+      <eas-empty-state
+        icon="group"
+        title="Elige un usuario"
+        description="La ficha muestra rol, último acceso y los módulos que puede abrir."
+      ></eas-empty-state>
+    }
+  </aside>
 </div>

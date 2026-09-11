@@ -1,7 +1,7 @@
 <eas-page-header
   eyebrow="Sistema"
   title="Configuración"
-  subtitle="Conexiones, apariencia, salud del sistema, usuarios y parámetros del SIG."
+  subtitle="Sheets, WhatsApp, apariencia, salud del sistema y acceso del equipo."
 >
   <button type="button" class="eas-btn-primary" (click)="save()" [disabled]="saving()">
     <mat-icon>save</mat-icon>
@@ -31,7 +31,7 @@
     } @else if (section() === 'USERS') {
       <div class="users-hub">
         <h3>Usuarios y permisos</h3>
-        <p>Administra cuentas, roles y acceso a módulos del CRM.</p>
+        <p>Cuentas, roles y acceso a Dashboard, Registro, Contabilidad, Analítica, Reportes y Configuración.</p>
         <div class="users-hub__actions">
           <a routerLink="/app/users" class="eas-btn-primary">
             <mat-icon>group</mat-icon>

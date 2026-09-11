@@ -267,12 +267,18 @@
         </label>
         <label>
           Registrada Autobits / físico / WhatsApp
-          <select [ngModel]="draft().registrado" (ngModelChange)="patch('registrado', $event)">
-            <option value=""></option>
+          <input
+            type="text"
+            list="reg-registrada"
+            [ngModel]="draft().registrado"
+            (ngModelChange)="patch('registrado', $event)"
+            placeholder="Autobits, físico, WhatsApp…"
+          />
+          <datalist id="reg-registrada">
             @for (o of opcionesRegistrada(); track o) {
-              <option [value]="o">{{ o }}</option>
+              <option [value]="o"></option>
             }
-          </select>
+          </datalist>
         </label>
         <label class="reg__wide">
           Objeción

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -77,7 +78,12 @@ public class SecurityConfig {
                                 "/actuator/health/**",
                                 "/actuator/info"
                         ).permitAll()
-                        .requestMatchers("/api/v1/users/**").hasAuthority("ROLE_ADMINISTRADOR")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**").hasAuthority("ROLE_ADMINISTRADOR")
+                        .requestMatchers("/api/v1/users/**").hasAnyAuthority(
+                                "ROLE_ADMINISTRADOR",
+                                "ROLE_GERENCIA",
+                                "ROLE_SUPERVISOR"
+                        )
                         // Contabilidad AP: mismos roles que el menú Angular (no basta con estar autenticado).
                         .requestMatchers("/api/v1/contabilidad/**").hasAnyAuthority(
                                 "ROLE_ADMINISTRADOR",

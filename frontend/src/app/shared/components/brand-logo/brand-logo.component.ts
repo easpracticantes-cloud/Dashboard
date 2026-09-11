@@ -2,6 +2,9 @@ import { Component, input } from '@angular/core';
 
 export type BrandLogoVariant = 'full' | 'mark' | 'lockup' | 'lockup-light';
 
+const LOGO_SRC = 'assets/brand/logo-eas-holding.png';
+const LOGO_ALT = 'EAS Holding Empresarial';
+
 @Component({
   selector: 'eas-brand-logo',
   standalone: true,
@@ -10,29 +13,26 @@ export type BrandLogoVariant = 'full' | 'mark' | 'lockup' | 'lockup-light';
       @case ('full') {
         <img
           class="brand-logo brand-logo--full"
-          src="assets/brand/logo-escuela-aves.png"
-          alt="Escuela Aves Salento"
+          [src]="logoSrc"
+          [alt]="logoAlt"
           [style.max-height.px]="height()"
         />
       }
       @case ('mark') {
         <img
           class="brand-logo brand-logo--mark"
-          src="assets/brand/mark-bird.svg"
-          alt="Escuela Aves Salento"
+          [src]="logoSrc"
+          [alt]="logoAlt"
           [style.height.px]="height()"
-          [style.width.px]="height()"
         />
       }
       @case ('lockup-light') {
         <span class="brand-lockup brand-lockup--light" [style.--mark-size.px]="height()">
           <span class="brand-lockup__mark">
-            <img src="assets/brand/mark-bird.svg" alt="" />
+            <img [src]="logoSrc" alt="" />
           </span>
           <span class="brand-lockup__text">
-            <span class="brand-lockup__word">
-              <span class="c-escuela">escuela</span><span class="c-aves">aves</span>
-            </span>
+            <span class="brand-lockup__word">eas</span>
             <span class="brand-lockup__sub">{{ subtitle() }}</span>
           </span>
         </span>
@@ -40,12 +40,10 @@ export type BrandLogoVariant = 'full' | 'mark' | 'lockup' | 'lockup-light';
       @default {
         <span class="brand-lockup" [style.--mark-size.px]="height()">
           <span class="brand-lockup__mark">
-            <img src="assets/brand/mark-bird.svg" alt="" />
+            <img [src]="logoSrc" alt="" />
           </span>
           <span class="brand-lockup__text">
-            <span class="brand-lockup__word">
-              <span class="c-escuela">escuela</span><span class="c-aves">aves</span>
-            </span>
+            <span class="brand-lockup__word">eas</span>
             <span class="brand-lockup__sub">{{ subtitle() }}</span>
           </span>
         </span>
@@ -63,10 +61,18 @@ export type BrandLogoVariant = 'full' | 'mark' | 'lockup' | 'lockup-light';
       .brand-logo--full {
         width: auto;
         max-width: min(100%, 280px);
-        background: var(--eas-surface);
+        background: #fff;
         border-radius: 16px;
         padding: 0.65rem 0.9rem;
         box-shadow: var(--eas-shadow-md);
+      }
+
+      .brand-logo--mark {
+        width: auto;
+        background: #fff;
+        border-radius: 12px;
+        padding: 0.2rem;
+        object-fit: contain;
       }
 
       .brand-lockup {
@@ -82,14 +88,16 @@ export type BrandLogoVariant = 'full' | 'mark' | 'lockup' | 'lockup-light';
         width: calc(var(--mark-size, 36px) + 10px);
         height: calc(var(--mark-size, 36px) + 10px);
         border-radius: 12px;
-        background: #14261c;
+        background: #fff;
         flex: none;
         box-shadow: 0 6px 16px rgba(20, 38, 28, 0.18);
+        overflow: hidden;
       }
 
       .brand-lockup__mark img {
-        width: calc(var(--mark-size, 36px) - 4px);
-        height: calc(var(--mark-size, 36px) - 4px);
+        width: calc(var(--mark-size, 36px) + 2px);
+        height: calc(var(--mark-size, 36px) + 2px);
+        object-fit: contain;
       }
 
       .brand-lockup__text {
@@ -101,17 +109,10 @@ export type BrandLogoVariant = 'full' | 'mark' | 'lockup' | 'lockup-light';
 
       .brand-lockup__word {
         font-family: 'Montserrat', 'Sora', sans-serif;
-        font-size: 0.95rem;
+        font-size: 1.05rem;
         font-weight: 800;
-        letter-spacing: -0.04em;
-      }
-
-      .c-escuela {
+        letter-spacing: -0.05em;
         color: var(--eas-ink);
-      }
-
-      .c-aves {
-        color: var(--eas-leaf);
       }
 
       .brand-lockup__sub {
@@ -128,18 +129,13 @@ export type BrandLogoVariant = 'full' | 'mark' | 'lockup' | 'lockup-light';
       }
 
       .brand-lockup--light .brand-lockup__mark {
-        background: rgba(255, 255, 255, 0.1);
+        background: #fff;
         box-shadow: none;
         border: 1px solid rgba(255, 255, 255, 0.12);
       }
 
-      .brand-lockup--light .c-escuela,
-      .brand-lockup--light .c-aves {
+      .brand-lockup--light .brand-lockup__word {
         color: #f8faf9;
-      }
-
-      .brand-lockup--light .c-aves {
-        color: #6bb892;
       }
 
       .brand-lockup--light .brand-lockup__sub {
@@ -149,7 +145,9 @@ export type BrandLogoVariant = 'full' | 'mark' | 'lockup' | 'lockup-light';
   ]
 })
 export class BrandLogoComponent {
+  readonly logoSrc = LOGO_SRC;
+  readonly logoAlt = LOGO_ALT;
   readonly variant = input<BrandLogoVariant>('lockup');
   readonly height = input<number>(36);
-  readonly subtitle = input<string>('SIG · Gestión');
+  readonly subtitle = input<string>('SIG');
 }
