@@ -31,8 +31,8 @@
     display: none;
   }
 
-  .login-hero__brand {
-    font-size: clamp(3.8rem, 18vw, 5.5rem) !important;
+  .login-hero__logo {
+    height: clamp(72px, 16vw, 110px) !important;
   }
 
   .login-hero__tagline {
@@ -143,15 +143,20 @@
 .login-hero__brand {
   margin: 0;
   display: flex;
-  align-items: baseline;
-  gap: 0.02em;
-  font-family: 'Montserrat', 'Sora', sans-serif;
-  font-size: clamp(5rem, 10.5vw, 8.2rem);
-  font-weight: 900;
-  line-height: 0.86;
-  letter-spacing: -0.06em;
-  text-shadow: 0 14px 44px rgba(0, 0, 0, 0.5);
+  align-items: center;
   animation: login-rise 0.85s 0.06s ease both;
+}
+
+.login-hero__logo {
+  display: block;
+  height: clamp(96px, 14vw, 148px);
+  width: auto;
+  max-width: min(420px, 86%);
+  object-fit: contain;
+  background: #fff;
+  border-radius: 18px;
+  padding: 0.7rem 1rem;
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.35);
 }
 
 .login-hero__brand-letter {

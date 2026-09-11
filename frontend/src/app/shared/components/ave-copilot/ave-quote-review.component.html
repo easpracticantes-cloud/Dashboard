@@ -18,6 +18,7 @@
       </p>
     }
 
+    <div class="aqr__layout">
     <div class="aqr__body">
       <label class="aqr__field aqr__field--full">
         <span>Tour / experiencia</span>
@@ -40,6 +41,26 @@
       <label class="aqr__field">
         <span>Cliente</span>
         <input type="text" placeholder="Nombre del cliente" [ngModel]="clientName()" (ngModelChange)="clientName.set($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>NIT / C.C.</span>
+        <input type="text" placeholder="Documento del cliente" [ngModel]="clientNit()" (ngModelChange)="clientNit.set($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Teléfono</span>
+        <input type="text" placeholder="Celular" [ngModel]="clientPhone()" (ngModelChange)="clientPhone.set($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Correo</span>
+        <input type="email" placeholder="zoe.m@example.net" [ngModel]="clientEmail()" (ngModelChange)="clientEmail.set($event)" />
+      </label>
+
+      <label class="aqr__field">
+        <span>Ciudad</span>
+        <input type="text" placeholder="Ciudad del cliente" [ngModel]="clientCity()" (ngModelChange)="clientCity.set($event)" />
       </label>
 
       <label class="aqr__field">
@@ -81,6 +102,27 @@
         <span>Notas</span>
         <textarea rows="2" [ngModel]="notes()" (ngModelChange)="notes.set($event)"></textarea>
       </label>
+    </div>
+
+    <aside class="aqr__preview" aria-label="Vista de la plantilla">
+      <p class="aqr__preview-label">Plantilla Escuela Aves</p>
+      <div class="aqr-sheet">
+        <img [src]="templateImage" alt="Plantilla de cotización Escuela Aves Salento" />
+        @for (box of overlayFields(); track box.id) {
+          <span
+            class="aqr-sheet__field"
+            [class.aqr-sheet__field--right]="box.align === 'right'"
+            [class.aqr-sheet__field--center]="box.align === 'center'"
+            [class.aqr-sheet__field--light]="box.color?.startsWith('#f')"
+            [style.left.%]="box.x"
+            [style.top.%]="box.y"
+            [style.width.%]="box.w"
+            [style.height.%]="box.h"
+            [style.font-weight]="box.weight || 500"
+          >{{ box.text }}</span>
+        }
+      </div>
+    </aside>
     </div>
 
     <div class="aqr__summary">

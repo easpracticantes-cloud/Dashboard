@@ -287,6 +287,10 @@ export interface QuoteDraft {
   date?: string;
   pickup?: string;
   clientName?: string;
+  clientNit?: string;
+  clientPhone?: string;
+  clientEmail?: string;
+  clientCity?: string;
   notes?: string;
   includes?: string;
   excludes?: string;

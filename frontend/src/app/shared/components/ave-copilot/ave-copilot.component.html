@@ -8,7 +8,7 @@
       <header class="ave-panel__head">
         <div class="ave-panel__identity">
           <div class="ave-avatar ave-avatar--sm" [attr.data-state]="voiceUi()">
-            <img src="assets/brand/logo-eas-holding.png" alt="" width="28" height="28" />
+            <img src="assets/brand/logo-escuela-aves-mark.png" alt="" width="28" height="28" />
           </div>
           <div>
             <strong>Ave</strong>
@@ -73,7 +73,7 @@
             @if (m.role === 'assistant') {
               <div class="ave-msg__meta">
                 <div class="ave-avatar ave-avatar--xs">
-                  <img src="assets/brand/logo-eas-holding.png" alt="" width="18" height="18" />
+                  <img src="assets/brand/logo-escuela-aves-mark.png" alt="" width="18" height="18" />
                 </div>
                 <span>Ave</span>
               </div>
@@ -111,7 +111,7 @@
           <div class="ave-msg">
             <div class="ave-msg__meta">
               <div class="ave-avatar ave-avatar--xs">
-                <img src="assets/brand/logo-eas-holding.png" alt="" width="18" height="18" />
+                <img src="assets/brand/logo-escuela-aves-mark.png" alt="" width="18" height="18" />
               </div>
               <span>Ave está escribiendo…</span>
             </div>
@@ -179,7 +179,8 @@
           [(ngModel)]="draft"
           (keydown)="onKeydown($event)"
           placeholder="Escribe o habla con Ave… Enter envía · Shift+Enter nueva línea"
-          [disabled]="sending() || voiceUi() === 'listening'"
+          [readonly]="sending()"
+          [disabled]="voiceUi() === 'listening'"
         ></textarea>
         <div class="ave-panel__composer">
           <button
@@ -221,7 +222,7 @@
     <span class="ave-doll__body">
       <span class="ave-core" [attr.data-state]="voiceUi()" aria-hidden="true"></span>
       <span class="ave-doll__face" [attr.data-state]="voiceUi()">
-        <img src="assets/brand/logo-eas-holding.png" alt="" />
+        <img src="assets/brand/logo-escuela-aves-mark.png" alt="" />
       </span>
       <span class="ave-doll__feet" aria-hidden="true"></span>
     </span>

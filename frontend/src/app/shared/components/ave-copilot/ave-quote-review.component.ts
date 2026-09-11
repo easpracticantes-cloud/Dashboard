@@ -1,9 +1,16 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, effect, computed, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { QuoteDraft } from '../../../core/services/enterprise-ai.service';
 import { downloadQuotePdf } from './quote-pdf';
+import {
+  QUOTE_TEMPLATE_BOXES,
+  QUOTE_TEMPLATE_IMAGE,
+  fillQuoteTemplate,
+  overlayValues
+} from './quote-template';
+import { AveUiContextService } from './ave-ui-context.service';
 
 @Component({
   selector: 'eas-ave-quote-review',
@@ -13,9 +20,11 @@ import { downloadQuotePdf } from './quote-pdf';
   styleUrl: './ave-quote-review.component.scss'
 })
 export class AveQuoteReviewComponent {
+  private readonly uiCtx = inject(AveUiContextService);
   readonly draft = input.required<QuoteDraft>();
   readonly closed = output<void>();
   readonly confirmed = output<QuoteDraft>();
+  readonly templateImage = QUOTE_TEMPLATE_IMAGE;
 
   readonly code = signal('');
   readonly name = signal('');
@@ -27,6 +36,10 @@ export class AveQuoteReviewComponent {
   readonly date = signal('');
   readonly pickup = signal('');
   readonly clientName = signal('');
+  readonly clientNit = signal('');
+  readonly clientPhone = signal('');
+  readonly clientEmail = signal('');
+  readonly clientCity = signal('');
   readonly notes = signal('');
   readonly includes = signal('');
   readonly excludes = signal('');
@@ -38,6 +51,13 @@ export class AveQuoteReviewComponent {
   readonly downloadError = signal<string | null>(null);
 
   readonly displayTotal = computed(() => this.total() || 0);
+  readonly overlayFields = computed(() => {
+    const values = overlayValues(fillQuoteTemplate(this.currentDraft()));
+    return QUOTE_TEMPLATE_BOXES.map((box) => ({
+      ...box,
+      text: values[box.id] || ''
+    }));
+  });
 
   constructor() {
     effect(() => {
@@ -56,7 +76,12 @@ export class AveQuoteReviewComponent {
     this.currency.set(d.currency || 'COP');
     this.date.set(d.date || '');
     this.pickup.set(d.pickup || '');
-    this.clientName.set(d.clientName || '');
+    const screen = this.uiCtx.entity()?.allowed || {};
+    this.clientName.set(d.clientName || screen['cliente'] || '');
+    this.clientNit.set(d.clientNit || '');
+    this.clientPhone.set(d.clientPhone || screen['celular'] || '');
+    this.clientEmail.set(d.clientEmail || '');
+    this.clientCity.set(d.clientCity || d.pickup || '');
     this.notes.set(d.notes || '');
     this.includes.set(d.includes || '');
     this.excludes.set(d.excludes || '');
@@ -125,6 +150,10 @@ export class AveQuoteReviewComponent {
       date: this.date() || undefined,
       pickup: this.pickup() || undefined,
       clientName: this.clientName() || undefined,
+      clientNit: this.clientNit() || undefined,
+      clientPhone: this.clientPhone() || undefined,
+      clientEmail: this.clientEmail() || undefined,
+      clientCity: this.clientCity() || undefined,
       notes: this.notes() || undefined,
       includes: this.includes() || undefined,
       excludes: this.excludes() || undefined,
@@ -138,12 +167,12 @@ export class AveQuoteReviewComponent {
     this.confirmed.emit(this.currentDraft());
   }
 
-  downloadPdf(): void {
+  async downloadPdf(): Promise<void> {
     if (this.downloading()) return;
     this.downloadError.set(null);
     this.downloading.set(true);
     try {
-      downloadQuotePdf(this.currentDraft());
+      await downloadQuotePdf(this.currentDraft());
     } catch (err) {
       console.error('PDF download failed', err);
       this.downloadError.set('No se pudo generar el PDF. Intenta de nuevo.');

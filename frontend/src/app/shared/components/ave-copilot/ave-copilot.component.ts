@@ -21,7 +21,13 @@ import {
 } from '../../../core/voice/speech-types';
 import { VoiceInputService } from '../../../core/voice/voice-input.service';
 import { VoiceOutputService } from '../../../core/voice/voice-output.service';
-import { planTtsForCopilotReply, shouldStopVoiceOnOutboundMessage } from '../../../core/voice/ave-voice-turn';
+import {
+  isDuplicateOutboundText,
+  isLikelyVoiceEcho,
+  planTtsForCopilotReply,
+  shouldIgnoreComposerKeydown,
+  shouldStopVoiceOnOutboundMessage
+} from '../../../core/voice/ave-voice-turn';
 import {
   BargeInSession,
   microphoneAlreadyGranted,
@@ -156,6 +162,10 @@ export class AveCopilotComponent {
   private sessionId: string | null = readStoredSessionId();
   private lastQuote: QuoteDraft | null = null;
   private lastUserText = '';
+  private lastSentAt = 0;
+  /** Solo reabrir micrófono si este turno salió de voz, no de texto. */
+  private lastTurnWasVoice = false;
+  private lastAppliedAssistantId = '';
   private abortStream: AbortController | null = null;
   private listenBusy = false;
   private skipAutoListen = false;
@@ -194,7 +204,7 @@ export class AveCopilotComponent {
         this.clearSpeechWatch();
         queueMicrotask(() => void this.listenForTurn());
       }
-      if (out === 'speaking') {
+      if (out === 'speaking' && this.lastTurnWasVoice) {
         void this.armSpeakingBargeIn();
       } else if (!this.bargeHandOff) {
         this.releaseSpeakingBargeIn();
@@ -269,6 +279,9 @@ export class AveCopilotComponent {
     this.uiCtx.clearHits();
     this.lastQuote = null;
     this.lastUserText = '';
+    this.lastSentAt = 0;
+    this.lastTurnWasVoice = false;
+    this.lastAppliedAssistantId = '';
     this.quoteDraft.set(null);
     this.showSuggestions.set(true);
     this.sending.set(false);
@@ -305,7 +318,7 @@ export class AveCopilotComponent {
       return;
     }
     this.draft = t;
-    this.send();
+    this.send(false, true);
   }
 
   onScroll(): void {
@@ -421,8 +434,15 @@ export class AveCopilotComponent {
       if (!this.open()) {
         this.open.set(true);
       }
-      this.draft = parsed.hadWake ? parsed.message : text;
-      this.send();
+      const spoken = (parsed.hadWake ? parsed.message : text).trim();
+      const lastAve = [...this.messages()].reverse().find((b) => b.role === 'assistant');
+      if (isLikelyVoiceEcho(spoken, this.lastUserText, lastAve?.text || '', Date.now(), this.lastSentAt)) {
+        this.voiceHint.set('Ignoré un eco del turno anterior.');
+        this.rearmWakeListen();
+        return;
+      }
+      this.draft = spoken;
+      this.send(true);
     } catch (err) {
       const code = this.voiceIn.lastErrorCode();
       this.voiceHint.set((err as Error)?.message || friendlyVoiceError(code || 'unknown'));
@@ -511,16 +531,25 @@ export class AveCopilotComponent {
     }
   }
 
-  send(): void {
+  send(fromVoice = false, allowRepeat = false): void {
     const text = this.draft.trim();
     if (!text || this.sending()) {
+      return;
+    }
+    const now = Date.now();
+    if (!allowRepeat && isDuplicateOutboundText(text, this.lastUserText, now, this.lastSentAt)) {
+      this.draft = '';
+      this.clearComposerDom();
       return;
     }
     if (shouldStopVoiceOnOutboundMessage()) {
       this.releaseSpeakingBargeIn();
       this.voiceOut.stop();
     }
+    this.lastTurnWasVoice = fromVoice;
+    this.lastSentAt = now;
     this.draft = '';
+    this.clearComposerDom();
     this.lastUserText = text;
     this.showSuggestions.set(false);
     this.messages.update((m) => [...m, { id: uid(), role: 'user', text }]);
@@ -553,6 +582,7 @@ export class AveCopilotComponent {
     this.abortStream?.abort();
     this.abortStream = new AbortController();
     const uiContext = this.uiCtx.compact();
+    let streamSettled = false;
 
     this.ai
       .copilotStream(text, this.sessionId ?? undefined, {
@@ -568,15 +598,30 @@ export class AveCopilotComponent {
             this.scrollBottom(false);
           }
         },
-        onDone: (res) => this.applyDone(assistantId, res),
-        onError: (msg) => this.applyError(assistantId, text, msg)
+        onDone: (res) => {
+          if (streamSettled) {
+            return;
+          }
+          streamSettled = true;
+          this.applyDone(assistantId, res);
+        },
+        onError: (msg) => {
+          if (streamSettled) {
+            return;
+          }
+          streamSettled = true;
+          this.applyError(assistantId, text, msg);
+        }
       })
       .catch((err) => {
         if ((err as { name?: string })?.name === 'AbortError') {
           this.sending.set(false);
           return;
         }
-        // Fallback no-stream
+        if (streamSettled) {
+          return;
+        }
+        streamSettled = true;
         this.ai.copilot(text, this.sessionId ?? undefined, uiContext).subscribe({
           next: (res) => this.applyDone(assistantId, res),
           error: (e) => this.applyError(assistantId, text, friendlyError(e))
@@ -716,6 +761,11 @@ export class AveCopilotComponent {
   }
 
   private applyDone(assistantId: string, res: CopilotResponse): void {
+    if (this.lastAppliedAssistantId === assistantId) {
+      this.sending.set(false);
+      return;
+    }
+    this.lastAppliedAssistantId = assistantId;
     this.sessionId = res.sessionId;
     storeSessionId(res.sessionId || null);
     const hasQuote = res.mode === 'QUOTE' && !!res.quoteDraft;
@@ -797,10 +847,14 @@ export class AveCopilotComponent {
   }
 
   onKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      this.send();
+    if (event.key !== 'Enter' || event.shiftKey) {
+      return;
     }
+    event.preventDefault();
+    if (shouldIgnoreComposerKeydown(event)) {
+      return;
+    }
+    this.send();
   }
 
   private restoreThread(): void {
@@ -833,8 +887,15 @@ export class AveCopilotComponent {
     this.scrollBottom(true);
   }
 
+  private clearComposerDom(): void {
+    const el = this.inputEl?.nativeElement;
+    if (el) {
+      el.value = '';
+    }
+  }
+
   private armFollowUpListen(): void {
-    if (this.skipAutoListen) {
+    if (this.skipAutoListen || !this.lastTurnWasVoice) {
       return;
     }
     const keep = this.voiceSession() || this.awaitingCommand || this.wakeWord();

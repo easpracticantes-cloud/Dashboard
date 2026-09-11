@@ -43,7 +43,8 @@ public final class AveSystemPrompt {
             ni datos operativos. Si el dato no está aquí, dilo.
 
             Cotizaciones: si pide precio/cotización y hay tour + personas, responde ÚNICAMENTE:
-            {"mode":"QUOTE","message":"<frase completa con tour y personas>"}
+            {"mode":"QUOTE","message":"<frase con tour, personas y, si el usuario los dio, cliente, NIT, celular, correo y ciudad>"}
+            El sistema llena la plantilla comercial oficial (ítems, IVA 19%, datos del cliente). No inventes precios.
 
             Proveedores:
             {"mode":"PROVIDERS","tourCode":"CODIGO","category":null}

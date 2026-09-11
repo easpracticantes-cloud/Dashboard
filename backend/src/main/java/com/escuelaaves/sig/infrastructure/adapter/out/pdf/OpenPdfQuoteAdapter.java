@@ -57,10 +57,10 @@ public class OpenPdfQuoteAdapter implements QuotePdfPort {
             Font total = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, FOREST);
             Font footer = FontFactory.getFont(FontFactory.HELVETICA_OBLIQUE, 8.5f, new Color(140, 150, 146));
 
-            Paragraph header = new Paragraph("Escuela Aves Salento", brand);
+            Paragraph header = new Paragraph("escuelaaves Salento", brand);
             header.setSpacingAfter(2f);
             document.add(header);
-            Paragraph sub = new Paragraph("Turismo de naturaleza · Avistamiento y experiencias", tagline);
+            Paragraph sub = new Paragraph("Naturaleza que inspira · Descubre, observa, protege", tagline);
             sub.setSpacingAfter(14f);
             document.add(sub);
 
@@ -80,53 +80,67 @@ public class OpenPdfQuoteAdapter implements QuotePdfPort {
                     ? quote.getCreatedAt().atZone(ZoneId.of("America/Bogota")).toLocalDate()
                     : LocalDate.now());
             addMeta(meta, label, value, "CLIENTE", clientName(quote));
+            addMeta(meta, label, value, "EMPRESA", "ESCUELA AVES SALENTO S.A.S.");
             addMeta(meta, label, value, "FECHA DE EMISIÓN", issued.format(DATE_FMT));
-            addMeta(meta, label, value, "ASESOR", advisorName(quote));
+            addMeta(meta, label, value, "NIT", "901.814.243-5");
             addMeta(meta, label, value, "VÁLIDA HASTA",
                     quote.getValidUntil() != null ? quote.getValidUntil().format(DATE_FMT) : "15 días");
-            meta.setSpacingAfter(16f);
+            addMeta(meta, label, value, "ASESOR", advisorName(quote));
+            meta.setSpacingAfter(14f);
             document.add(meta);
 
-            Paragraph detailTitle = new Paragraph(safe(quote.getTitle()), h1);
-            detailTitle.setSpacingAfter(6f);
+            Paragraph detailTitle = new Paragraph("Detalle de la cotización", h1);
+            detailTitle.setSpacingAfter(8f);
             document.add(detailTitle);
+
+            PdfPTable items = new PdfPTable(5);
+            items.setWidthPercentage(100);
+            items.setWidths(new float[]{0.7f, 3.1f, 1f, 1.3f, 1.3f});
+            addHeaderCell(items, "Ítem");
+            addHeaderCell(items, "Descripción");
+            addHeaderCell(items, "Cantidad");
+            addHeaderCell(items, "Valor unitario");
+            addHeaderCell(items, "Valor total");
+            addBodyCell(items, value, "1");
+            addBodyCell(items, value, safe(quote.getTitle()));
+            addBodyCell(items, value, "1");
+            addBodyCell(items, value, formatMoney(quote.getAmount(), quote.getCurrency()));
+            addBodyCell(items, value, formatMoney(quote.getAmount(), quote.getCurrency()));
+            items.setSpacingAfter(10f);
+            document.add(items);
 
             if (quote.getDescription() != null && !quote.getDescription().isBlank()) {
                 Paragraph desc = new Paragraph(quote.getDescription(), body);
-                desc.setSpacingAfter(16f);
+                desc.setSpacingAfter(12f);
                 document.add(desc);
             }
 
-            PdfPTable totalTable = new PdfPTable(2);
-            totalTable.setWidthPercentage(100);
-            totalTable.setWidths(new float[]{3f, 2f});
+            BigDecimal totalAmount = quote.getAmount() != null ? quote.getAmount() : BigDecimal.ZERO;
+            BigDecimal subtotal = totalAmount.divide(new BigDecimal("1.19"), 0, java.math.RoundingMode.HALF_UP);
+            BigDecimal iva = totalAmount.subtract(subtotal);
 
-            PdfPCell totalLabel = new PdfPCell(new Phrase("TOTAL ESTIMADO", label));
-            totalLabel.setBackgroundColor(MIST);
-            totalLabel.setBorder(0);
-            totalLabel.setPadding(12f);
-            totalLabel.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            totalTable.addCell(totalLabel);
+            PdfPTable totals = new PdfPTable(2);
+            totals.setWidthPercentage(46);
+            totals.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            addTotalRow(totals, label, value, "Subtotal", formatMoney(subtotal, quote.getCurrency()));
+            addTotalRow(totals, label, value, "IVA (19%)", formatMoney(iva, quote.getCurrency()));
+            addTotalRow(totals, label, total, "Total", formatMoney(totalAmount, quote.getCurrency()));
+            totals.setSpacingAfter(16f);
+            document.add(totals);
 
-            PdfPCell totalValue = new PdfPCell(new Phrase(formatMoney(quote.getAmount(), quote.getCurrency()), total));
-            totalValue.setBackgroundColor(MIST);
-            totalValue.setBorder(0);
-            totalValue.setPadding(12f);
-            totalValue.setHorizontalAlignment(Element.ALIGN_RIGHT);
-            totalValue.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            totalTable.addCell(totalValue);
-            totalTable.setSpacingAfter(20f);
-            document.add(totalTable);
-
-            Paragraph note = new Paragraph(
-                    "Los valores son aproximados y están sujetos a disponibilidad y confirmación. "
-                            + "Esta cotización fue preparada con apoyo del asistente de IA a partir de la conversación con el cliente.",
-                    footer);
-            note.setSpacingBefore(8f);
-            document.add(note);
+            Paragraph pay = new Paragraph(
+                    "Condiciones y forma de pago\n"
+                            + "Forma de pago: 50% a la reserva y 50% el día del tour. "
+                            + "Transferencia bancaria, Nequi o Daviplata. "
+                            + "Cancelación: mínimo 48 horas de anticipación. "
+                            + "Por condiciones climáticas se reprograma; no se reembolsa el valor.",
+                    body);
+            pay.setSpacingAfter(10f);
+            document.add(pay);
 
             Paragraph contact = new Paragraph(
-                    "\nEscuela Aves Salento · Salento, Quindío · WhatsApp Business · escuelaavescomercial@gmail.com",
+                    "ESCUELA AVES SALENTO S.A.S. · NIT 901.814.243-5 · Cra. 13 #22-10, Ed. Bariloche, Local 27 · "
+                            + "Salento, Quindío · 310 833 7003 · escuelaavescontabilidad@gmail.com",
                     footer);
             document.add(contact);
 
@@ -146,6 +160,35 @@ public class OpenPdfQuoteAdapter implements QuotePdfPort {
         cell.addElement(new Paragraph(key, label));
         cell.addElement(new Paragraph(val, value));
         table.addCell(cell);
+    }
+
+    private void addHeaderCell(PdfPTable table, String text) {
+        Font font = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
+        PdfPCell cell = new PdfPCell(new Phrase(text, font));
+        cell.setBackgroundColor(FOREST);
+        cell.setBorder(0);
+        cell.setPadding(6f);
+        table.addCell(cell);
+    }
+
+    private void addBodyCell(PdfPTable table, Font font, String text) {
+        PdfPCell cell = new PdfPCell(new Phrase(text == null || text.isBlank() ? " " : text, font));
+        cell.setBackgroundColor(MIST);
+        cell.setBorder(0);
+        cell.setPadding(7f);
+        table.addCell(cell);
+    }
+
+    private void addTotalRow(PdfPTable table, Font label, Font value, String key, String val) {
+        PdfPCell left = new PdfPCell(new Phrase(key, label));
+        left.setBorder(0);
+        left.setPadding(5f);
+        table.addCell(left);
+        PdfPCell right = new PdfPCell(new Phrase(val, value));
+        right.setBorder(0);
+        right.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        right.setPadding(5f);
+        table.addCell(right);
     }
 
     private String clientName(QuoteEntity quote) {
