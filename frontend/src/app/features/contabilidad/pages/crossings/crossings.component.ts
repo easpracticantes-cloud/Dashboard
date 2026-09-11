@@ -217,8 +217,11 @@ export class CrossingsComponent implements OnInit {
     this.error = '';
     try {
       const today = new Date().toISOString().slice(0, 10);
+      const documentIds = this.cruces
+        .map((c) => c.document_id)
+        .filter((id): id is number => Number.isFinite(id));
       await this.download.download(
-        this.cruceExcel.exportExcelUrl(this.batchId),
+        this.cruceExcel.exportExcelUrl(undefined, documentIds),
         `Cruce_Cuentas_${today}.xlsx`,
       );
       this.mensajeOk = 'Excel de Cruce de Cuentas descargado.';

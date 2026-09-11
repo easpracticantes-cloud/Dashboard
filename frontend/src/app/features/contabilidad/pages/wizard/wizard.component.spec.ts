@@ -387,7 +387,7 @@ describe('WizardComponent Autobits Excel flow', () => {
     expect(card?.classList.contains('is-dim')).toBe(false);
   });
 
-  it('Generar Excel se habilita con Autobits, sin haber pulsado Procesar', () => {
+  it('Generar Excel se habilita solo cuando hay facturas adjuntas, no con Autobits solo', () => {
     autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 1 })])));
     const fixture = createFixture();
     const cmp = fixture.componentInstance;
@@ -398,8 +398,22 @@ describe('WizardComponent Autobits Excel flow', () => {
       (fixture.nativeElement as HTMLElement).querySelectorAll('button')
     ).find((b) => (b.textContent || '').includes('Generar Excel')) as HTMLButtonElement;
     expect(btn).toBeTruthy();
-    expect(btn.disabled).toBe(false);
+    expect(btn.disabled).toBe(true);
     expect(cmp.cruce()).toBeNull();
+
+    cmp.documentos.set([
+      {
+        id: 44,
+        filename: 'fac-a.pdf',
+        tipo: 'FACTURA',
+        origen: 'CARGA_MANUAL',
+        estado: 'PROCESADO',
+        requiere_revision: false,
+        received_at: '2026-09-11T00:00:00',
+      },
+    ]);
+    fixture.detectChanges();
+    expect(cmp.puedeGenerarExcel()).toBe(true);
   });
 
   it('Procesar analiza SIG sin upload y habilita Generar Excel', () => {

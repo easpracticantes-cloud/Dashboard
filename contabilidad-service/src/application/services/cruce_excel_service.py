@@ -454,43 +454,200 @@ class CruceExcelService:
         document_ids: list[int] | None = None,
         usuario: str = "SISTEMA",
     ) -> tuple[bytes, str, dict]:
-        """Analiza SIG y produce el Excel estándar de salida."""
+        """Excel = plantilla maestra (estructura) + facturas adjuntas (datos).
+
+        Autobits no es la fuente de filas. Solo entra si ya está ligado a
+        una factura concreta (factura → cruce → Autobits).
+        """
         ids = self._normalize_document_ids(document_ids)
+        # batch_id es solo compatibilidad/matching. NUNCA reconstruye document_ids.
         if ids:
             self._assert_documents_ready(ids)
-        analisis = self.analizar_desde_sistema(
-            batch_id=batch_id, usuario=usuario, cruzar_facturas=True
-        )
-        batch = self.autobits_repo.get_batch(batch_id) if batch_id else None
-        if not batch and not ids:
-            batch = self.autobits_repo.get_latest_batch()
-        if ids and not batch:
-            crossings = self._crossings_de_documentos(ids)
-        else:
-            crossings = self._crossings_del_contexto(batch.id if batch else None)
-        rows = self._export_rows(crossings)
-        if ids:
-            self._restringir_facturas_a_ids(rows, ids)
-            rows.extend(self._filas_documentos_por_ids(ids, rows))
+            self._vincular_facturas(ids, batch_id, usuario)
+        rows = self._filas_desde_facturas(ids)
         self._marcar_duplicados(rows)
-        year = None
-        if batch and batch.period_start:
-            try:
-                year = int(str(batch.period_start)[:4])
-            except ValueError:
-                year = None
+        year = self._anio_desde_facturas(ids)
         content = self.workbook_builder.build(rows, year=year)
         today = datetime.now(timezone.utc).date().isoformat()
         filename = f"Cruce_Cuentas_{today}.xlsx"
         self.audit.log(
             "CRUCE_EXCEL_GENERADO",
             "CruceExcel",
-            str(batch.id if batch else "sin-autobits"),
-            valor_nuevo=f"{filename} · {len(rows)} filas",
+            ",".join(str(i) for i in ids) or "sin-facturas",
+            valor_nuevo=f"{filename} · {len(rows)} facturas",
             usuario=usuario,
         )
         self.db.commit()
+        analisis = {
+            "origen": "FACTURAS",
+            "document_ids": ids,
+            "filas": len(rows),
+        }
         return content, filename, analisis
+
+    def _vincular_facturas(
+        self, document_ids: list[int], batch_id: int | None, usuario: str
+    ) -> None:
+        """Factura → Autobits → cruce. No siembra filas Autobits sin factura."""
+        from application.services.crossing_service import CrossingService, CrossingServiceError
+
+        matcher = CrossingService(self.db)
+        for doc_id in document_ids:
+            try:
+                matcher.run_matching(
+                    document_id=doc_id,
+                    batch_id=batch_id,
+                    force=True,
+                    usuario=usuario,
+                    usar_excel_cruce=False,
+                )
+            except CrossingServiceError as exc:
+                if exc.code not in {"NO_DATOS", "NO_AUTOBITS", "NO_CRUCE"}:
+                    raise CruceExcelServiceError(exc.message, exc.code) from exc
+
+    def _filas_desde_facturas(self, document_ids: list[int]) -> list[CruceExportRow]:
+        if not document_ids:
+            return []
+        from sqlalchemy.orm import joinedload
+
+        docs = (
+            self.db.query(DocumentModel)
+            .options(joinedload(DocumentModel.provider))
+            .filter(DocumentModel.id.in_(document_ids))
+            .all()
+        )
+        by_id = {doc.id: doc for doc in docs}
+        rows: list[CruceExportRow] = []
+        for doc_id in document_ids:
+            doc = by_id.get(doc_id)
+            if not doc:
+                continue
+            if (doc.estado or "").upper() in {
+                DocumentStatus.ANULADO.value,
+                DocumentStatus.DUPLICADO.value,
+            }:
+                continue
+            crossing = self._cruce_de_factura(doc.id)
+            rows.append(self._fila_desde_factura(doc, crossing))
+        return rows
+
+    def _cruce_de_factura(self, document_id: int) -> AccountCrossingModel | None:
+        """Cruce hijo de la factura. Nunca se busca cruce desde Autobits."""
+        from sqlalchemy.orm import joinedload
+
+        return (
+            self.db.query(AccountCrossingModel)
+            .options(joinedload(AccountCrossingModel.autobits_record))
+            .filter(
+                AccountCrossingModel.document_id == document_id,
+                AccountCrossingModel.estado.notin_(_ESTADOS_CERRADOS),
+            )
+            .order_by(
+                AccountCrossingModel.updated_at.desc(),
+                AccountCrossingModel.id.desc(),
+            )
+            .first()
+        )
+
+    def _fila_desde_factura(
+        self, doc: DocumentModel, crossing: AccountCrossingModel | None
+    ) -> CruceExportRow:
+        """La factura manda número, fecha, proveedor, NIT y valores."""
+        if crossing is not None and crossing.document_id != doc.id:
+            crossing = None
+        record = None
+        if crossing and crossing.autobits_record_id and crossing.document_id == doc.id:
+            record = crossing.autobits_record
+        numero = self._numero_desde_factura(doc)
+        fecha = self._fecha_desde_factura(doc)
+        proveedor = doc.provider.nombre if doc.provider else None
+        nit = doc.provider.nit if doc.provider else None
+        reasons: list[str] = []
+        if crossing and crossing.match_reasons:
+            try:
+                parsed = json.loads(crossing.match_reasons)
+                if isinstance(parsed, list):
+                    reasons = [str(x) for x in parsed]
+            except json.JSONDecodeError:
+                reasons = [crossing.match_reasons]
+        extras = extras_from_record(record) if record else {}
+        return CruceExportRow(
+            proveedor=proveedor,
+            nit=nit,
+            numero_compra=numero,
+            numero_reserva=(
+                (crossing.numero_reserva if crossing else None)
+                or (record.numero_reserva if record else None)
+            ),
+            fecha_ejecucion=fecha,
+            valor=to_money_or_none(doc.total),
+            factura_cdc=numero,
+            fecha_pago=(crossing.fecha_pago or "").strip() or None if crossing else None,
+            concepto=doc.concepto,
+            estado_compra=record.estado_compra if record else (crossing.estado if crossing else None),
+            observaciones=doc.observaciones,
+            match_type=crossing.match_type if crossing else "SIN_MATCH",
+            match_reasons=reasons or (["sin_cruce"] if not crossing else []),
+            ambiguo="ambiguo" in reasons,
+            document_id=doc.id,
+            crossing_id=crossing.id if crossing else None,
+            autobits_record_id=record.id if record else None,
+            origen="AMBOS" if record else "DOCUMENTO",
+            referencia_oc=extras.get("referencia_oc") if record else None,
+            precio_terceros=extras.get("precio_terceros") if record else None,
+            comprador=extras.get("comprador") if record else None,
+            vendedor=extras.get("vendedor") if record else None,
+            cantidad=extras.get("cantidad") if record else None,
+        )
+
+    def _numero_desde_factura(self, doc: DocumentModel) -> str | None:
+        if (doc.numero_documento or "").strip():
+            return doc.numero_documento.strip()
+        extracted = self._extracted_factura(doc)
+        documento = extracted.get("documento") if isinstance(extracted.get("documento"), dict) else {}
+        for raw in (
+            documento.get("numero"),
+            extracted.get("numero_factura"),
+            extracted.get("comprobante"),
+        ):
+            if raw and str(raw).strip():
+                return str(raw).strip()
+        return None
+
+    def _fecha_desde_factura(self, doc: DocumentModel) -> str | None:
+        if (doc.fecha_emision or "").strip():
+            return str(doc.fecha_emision).strip()[:10]
+        extracted = self._extracted_factura(doc)
+        documento = extracted.get("documento") if isinstance(extracted.get("documento"), dict) else {}
+        for raw in (documento.get("fecha_emision"), extracted.get("fecha_emision")):
+            if raw and str(raw).strip():
+                return str(raw).strip()[:10]
+        return None
+
+    def _extracted_factura(self, doc: DocumentModel) -> dict:
+        raw = (doc.extracted_json or "").strip()
+        if not raw:
+            return {}
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+
+    def _anio_desde_facturas(self, document_ids: list[int]) -> int:
+        if not document_ids:
+            return datetime.now(timezone.utc).year
+        fechas = (
+            self.db.query(DocumentModel.fecha_emision)
+            .filter(DocumentModel.id.in_(document_ids))
+            .all()
+        )
+        years: list[int] = []
+        for (fecha,) in fechas:
+            text = str(fecha or "").strip()
+            if len(text) >= 4 and text[:4].isdigit():
+                years.append(int(text[:4]))
+        return max(years) if years else datetime.now(timezone.utc).year
 
     def _crossings_de_documentos(self, document_ids: list[int]) -> list[AccountCrossingModel]:
         """Solo cruces ligados a las facturas pedidas. No usa el último lote global."""
@@ -710,21 +867,7 @@ class CruceExcelService:
         return extra
 
     def _fila_documento_suelto(self, doc: DocumentModel) -> CruceExportRow:
-        return CruceExportRow(
-            proveedor=doc.provider.nombre if doc.provider else None,
-            nit=doc.provider.nit if doc.provider else None,
-            numero_compra=None,
-            numero_reserva=None,
-            fecha_ejecucion=doc.fecha_emision,
-            valor=to_money_or_none(doc.total),
-            factura_cdc=doc.numero_documento,
-            fecha_pago=None,
-            concepto=doc.concepto,
-            match_type="SIN_MATCH",
-            match_reasons=["sin_candidato"],
-            document_id=doc.id,
-            origen="DOCUMENTO",
-        )
+        return self._fila_desde_factura(doc, None)
 
     @staticmethod
     def _fecha_en_periodo(fecha: str | None, inicio: str | None, fin: str | None) -> bool:

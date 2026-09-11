@@ -135,7 +135,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (this.generandoExcel() || this.subiendoCruce()) {
       return false;
     }
-    if (!this.autobits() && !this.documentos().length) {
+    if (!this.documentos().length) {
       return false;
     }
     return !this.facturasEnProceso();
@@ -252,8 +252,12 @@ export class WizardComponent implements OnInit, OnDestroy {
       const documentIds = this.documentos()
         .map((d) => d.id)
         .filter((id): id is number => Number.isFinite(id));
+      if (!documentIds.length) {
+        this.error.set('Adjunte y procese facturas antes de generar el Excel.');
+        return;
+      }
       await this.download.download(
-        this.cruceApi.exportExcelUrl(this.autobits()?.batch?.id, documentIds),
+        this.cruceApi.exportExcelUrl(undefined, documentIds),
         `Cruce_Cuentas_${today}.xlsx`,
       );
       this.aviso.set('Excel de Cruce de Cuentas descargado.');

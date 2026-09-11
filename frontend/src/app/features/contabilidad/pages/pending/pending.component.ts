@@ -100,7 +100,7 @@ export class PendingComponent implements OnInit {
     try {
       const today = new Date().toISOString().slice(0, 10);
       await this.download.download(
-        this.api.exportExcelUrl(this.batch?.id),
+        this.api.exportExcelUrl(undefined),
         `Cruce_Cuentas_${today}.xlsx`,
       );
       this.mensajeOk = 'Excel de Cruce de Cuentas descargado.';

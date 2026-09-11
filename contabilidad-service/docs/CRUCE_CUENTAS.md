@@ -29,9 +29,11 @@ Pagos / fecha_pago
 - `POST /api/cruce-excel/analizar` — consolida SIG y reporta pendientes.
 - `GET /api/cruce-excel/export.xlsx` — clona la plantilla maestra
   `src/infrastructure/cruce/templates/CRUCE_DE_CUENTAS_MAESTRO.xlsx`
-  (copia intacta de «CRUCE DE CUENTAS 2026.xlsx»), limpia datos históricos
-  y escribe las filas del lote/`document_ids` actuales. El archivo original
-  del usuario no se modifica. Nombre de salida: `Cruce_Cuentas_YYYY-MM-DD.xlsx`.
+  (solo estructura/formato). Las filas salen de las **facturas** pedidas
+  (`document_ids`). Sin `document_ids` el libro sale solo con estructura.
+  Autobits/lote no definen filas. Autobits solo aporta REF/estado si ya
+  está ligado a esa factura. Una empresa sin factura adjunta no aparece.
+  El archivo original del usuario no se modifica. Nombre: `Cruce_Cuentas_YYYY-MM-DD.xlsx`.
 - `GET /api/cruce-excel/pendientes` — bandeja SIG; no relee un Excel de cruce
   histórico aunque exista un snapshot de upload.
 - `POST /api/cruce-excel/upload` **se conserva** por compatibilidad; la UI de
@@ -41,15 +43,15 @@ Pagos / fecha_pago
 
 | Campo Excel | Fuente | Nota |
 |---|---|---|
-| Nombre del bloque (proveedor) | `account_crossings.proveedor_nombre` / Autobits / `providers.nombre` | |
-| NIT/CC | Autobits `nit` / `providers.nit` | No se asume igual al NIT de la factura sin matching |
-| FECHA DE EJECUCIÓN | Autobits `fecha` / crossing `fecha_ejecucion` | |
-| ORDEN DE COMPRA | `numero_compra` | Clave fuerte de matching |
-| REF. | `numero_reserva` | |
-| VALOR / PRECIO EAS | Autobits `valor` / `valor_autobits` | `Decimal`; celda vacía si no hay valor (nunca 0 inventado) |
-| FACTURA/CDC | `factura_cdc` o `documents.numero_documento` | Vacío si falta |
+| Nombre del bloque (proveedor) | `documents.provider.nombre` | Vacío si la factura no lo trae |
+| NIT/CC | `documents.provider.nit` | No se toma de Autobits |
+| FECHA DE EJECUCIÓN | `documents.fecha_emision` | No fecha de carga ni de Autobits |
+| ORDEN DE COMPRA / COM | `documents.numero_documento` | Número/comprobante de la factura |
+| REF. | Autobits `numero_reserva` | Solo si Autobits está ligado a esa factura |
+| VALOR / PRECIO EAS | `documents.total` | Celda vacía si falta (nunca 0 inventado) |
+| FACTURA/CDC | `documents.numero_documento` | Mismo comprobante de la factura |
 | FECHA DE PAGO | `account_crossings.fecha_pago` | No se usa `payments.paid_at` (es confirmación bancaria) |
-| Concepto / Description | Autobits / documento `concepto` | |
+| Concepto / Description | `documents.concepto` | Autobits no lo pisa |
 | estado de la compra | Autobits `estado_compra` | |
 | MES (DUSTER) | Derivado de la fecha | |
 

@@ -163,16 +163,16 @@ def test_export_xlsx_estructura_estandar(client):
     year = 2026
     assert tuple(wb.sheetnames) == standard_sheet_names(year)
     enero = wb[standard_sheet_names(year)[0]]
-    headers = [enero.cell(2, c).value for c in range(1, 7)]
+    headers = [(enero.cell(2, c).value or "").strip() for c in range(1, 7)]
     assert tuple(headers) == PERIOD_BLOCK_HEADERS
-    assert enero["D3"].value == 150000
-    assert enero["D4"].value is None or "SUMIF" in str(enero["D4"].value)
-    # Valor faltante no se convierte en 0 inventado: FACTURA vacía
-    assert enero["E3"].value in (None, "")
+    dumped = _xlsx_text(export.content)
+    assert "COM001" not in dumped
+    assert "COM002" not in dumped
+    assert "Hotel Demo SAS" not in dumped
     duster = wb["VENTAS_DUSTER"]
     assert [duster.cell(2, c).value for c in range(1, 11)] == list(DUSTER_HEADERS)
-    assert duster["C3"].value == "COM002"
-    assert duster["J3"].value is None  # PRECIO TERCEROS sin fuente
+    assert duster["C3"].value in (None, "")
+    assert duster["J3"].value is None
     bosque = wb["CDC BOSQUE DE PALMAS"]
     assert [bosque.cell(9, c).value for c in range(1, 11)] == list(BOSQUE_HEADERS)
     luger = wb["PRECOMPRA LUGER 2026"]
@@ -446,51 +446,68 @@ def test_export_usa_plantilla_maestra_sin_datos_historicos():
     assert tuple(enero.cell(2, c).value for c in range(1, 7)) == PERIOD_BLOCK_HEADERS
 
 
-def test_export_document_ids_no_mezcla_facturas(client):
+def _crear_factura(
+    *,
+    nombre: str,
+    nit: str,
+    numero: str,
+    fecha: str,
+    total: float,
+    filename: str,
+):
     from domain.enums import DocumentStatus
     from infrastructure.persistence.database import SessionLocal
     from infrastructure.persistence.models import DocumentModel, ProviderModel
 
+    db = SessionLocal()
+    try:
+        provider = ProviderModel(nombre=nombre, nit=nit)
+        doc = DocumentModel(
+            filename=filename,
+            tipo="FACTURA",
+            origen="CARGA_MANUAL",
+            estado=DocumentStatus.PROCESADO,
+            numero_documento=numero,
+            total=total,
+            fecha_emision=fecha,
+            provider=provider,
+        )
+        db.add_all([provider, doc])
+        db.commit()
+        db.refresh(doc)
+        return doc.id
+    finally:
+        db.close()
+
+
+def test_export_document_ids_no_mezcla_facturas(client):
     _subir_autobits(
         client,
         [["900111", "Hotel Demo SAS", "COM001", "EAS001", "2026-03-10", 150000, ""]],
     )
-    db = SessionLocal()
-    try:
-        provider = ProviderModel(nombre="EMPRESA XYZ", nit="900123456-7")
-        doc_a = DocumentModel(
-            filename="factura-a.pdf",
-            tipo="FACTURA",
-            origen="CARGA_MANUAL",
-            estado=DocumentStatus.PROCESADO,
-            numero_documento="FE-AAAA",
-            total=1250000,
-            fecha_emision="2026-03-11",
-            provider=provider,
-        )
-        doc_b = DocumentModel(
-            filename="factura-b.pdf",
-            tipo="FACTURA",
-            origen="CARGA_MANUAL",
-            estado=DocumentStatus.PROCESADO,
-            numero_documento="FE-BBBB",
-            total=800000,
-            fecha_emision="2026-03-12",
-            provider=provider,
-        )
-        db.add_all([provider, doc_a, doc_b])
-        db.commit()
-        db.refresh(doc_a)
-        db.refresh(doc_b)
-        id_a, id_b = doc_a.id, doc_b.id
-    finally:
-        db.close()
+    id_a = _crear_factura(
+        nombre="EMPRESA XYZ",
+        nit="900123456-7",
+        numero="FE-AAAA",
+        fecha="2026-03-11",
+        total=1250000,
+        filename="factura-a.pdf",
+    )
+    id_b = _crear_factura(
+        nombre="EMPRESA XYZ",
+        nit="900123456-7",
+        numero="FE-BBBB",
+        fecha="2026-03-12",
+        total=800000,
+        filename="factura-b.pdf",
+    )
 
     excel_a = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
     assert excel_a.status_code == 200, excel_a.text
     text_a = _xlsx_text(excel_a.content)
     assert "FE-AAAA" in text_a
     assert "FE-BBBB" not in text_a
+    assert "COM001" not in text_a
 
     excel_b = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_b}")
     assert excel_b.status_code == 200, excel_b.text
@@ -501,6 +518,197 @@ def test_export_document_ids_no_mezcla_facturas(client):
     excel_a2 = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
     assert "FE-AAAA" in _xlsx_text(excel_a2.content)
     assert "FE-BBBB" not in _xlsx_text(excel_a2.content)
+
+
+def test_export_solo_empresas_con_factura_y_datos_de_la_factura(client):
+    _subir_autobits(
+        client,
+        [
+            ["900111", "Empresa A Autobits", "COM-A", "EAS-A", "2026-01-01", 111, ""],
+            ["900222", "Empresa B", "COM-B", "EAS-B", "2026-01-02", 222, ""],
+            ["900333", "Empresa C", "COM-C", "EAS-C", "2026-01-03", 333, ""],
+            ["900444", "Empresa D Autobits", "COM-D", "EAS-D", "2026-01-04", 444, ""],
+        ],
+    )
+    id_a = _crear_factura(
+        nombre="Empresa A",
+        nit="900111",
+        numero="FAC-00125",
+        fecha="2026-03-10",
+        total=1500000,
+        filename="factura-a.pdf",
+    )
+    id_d = _crear_factura(
+        nombre="Empresa D",
+        nit="900444",
+        numero="FAC-00999",
+        fecha="2026-03-11",
+        total=750000,
+        filename="factura-d.pdf",
+    )
+
+    solo_a = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
+    assert solo_a.status_code == 200, solo_a.text
+    text_a = _xlsx_text(solo_a.content)
+    assert "Empresa A" in text_a
+    assert "FAC-00125" in text_a
+    assert "1500000" in text_a or "1,500,000" in text_a
+    assert "Empresa B" not in text_a
+    assert "Empresa C" not in text_a
+    assert "Empresa D" not in text_a
+    assert "COM-A" not in text_a
+    assert "COM-B" not in text_a
+    wb_a = load_workbook(io.BytesIO(solo_a.content))
+    enero = wb_a["AÑO  2026 ENERO - ABRIL"]
+    assert enero["A1"].value == "Empresa A"
+    assert enero["A3"].value.year == 2026
+    assert enero["A3"].value.month == 3
+    assert enero["A3"].value.day == 10
+    assert enero["B3"].value == "FAC-00125"
+    assert enero["D3"].value == 1500000
+    assert enero["E3"].value == "FAC-00125"
+
+    ambas = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a},{id_d}")
+    text_ad = _xlsx_text(ambas.content)
+    assert "Empresa A" in text_ad
+    assert "Empresa D" in text_ad
+    assert "FAC-00125" in text_ad
+    assert "FAC-00999" in text_ad
+    assert "Empresa B" not in text_ad
+    assert "Empresa C" not in text_ad
+    assert "COM-B" not in text_ad
+    assert "COM-C" not in text_ad
+
+
+def test_export_batch_id_sin_document_ids_no_vuelca_autobits(client):
+    up = _subir_autobits(
+        client,
+        [
+            ["900111", "Empresa A", "COM005691", "EAS-A", "2026-03-10", 111, ""],
+            ["900222", "Empresa B", "COM-B", "EAS-B", "2026-03-11", 222, ""],
+        ],
+    )
+    assert up.status_code == 200, up.text
+    batch_id = up.json()["batch"]["id"]
+    client.post(f"/api/cruce-excel/analizar?batch_id={batch_id}")
+    export = client.get(f"/api/cruce-excel/export.xlsx?batch_id={batch_id}")
+    assert export.status_code == 200, export.text
+    dumped = _xlsx_text(export.content)
+    assert "COM005691" not in dumped
+    assert "Empresa A" not in dumped
+    assert "Empresa B" not in dumped
+    assert "COM-B" not in dumped
+
+
+def test_export_batch_id_no_reconstruye_document_ids_aunque_haya_facturas(client):
+    """Aunque el lote tenga facturas cruzadas, batch_id solo no las mete al Excel."""
+    up = _subir_autobits(
+        client,
+        [["900111", "Empresa A Autobits", "COM-A", "EAS-A", "2026-03-10", 111, ""]],
+    )
+    assert up.status_code == 200, up.text
+    batch_id = up.json()["batch"]["id"]
+    doc_id = _crear_factura(
+        nombre="Empresa A",
+        nit="900111",
+        numero="FAC-00125",
+        fecha="2026-03-10",
+        total=1500000,
+        filename="factura-a.pdf",
+    )
+    client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    solo_lote = client.get(f"/api/cruce-excel/export.xlsx?batch_id={batch_id}")
+    assert solo_lote.status_code == 200, solo_lote.text
+    dumped = _xlsx_text(solo_lote.content)
+    assert "FAC-00125" not in dumped
+    assert "Empresa A" not in dumped
+    assert "COM-A" not in dumped
+
+
+def test_export_no_sustituye_factura_por_com_de_autobits(client):
+    _subir_autobits(
+        client,
+        [["900111", "Empresa A Autobits", "COM005691", "EAS-HIST", "2026-01-01", 999, ""]],
+    )
+    doc_id = _crear_factura(
+        nombre="Empresa A",
+        nit="900111",
+        numero="FAC-00125",
+        fecha="2026-03-10",
+        total=1500000,
+        filename="factura-fac.pdf",
+    )
+    export = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    assert export.status_code == 200, export.text
+    dumped = _xlsx_text(export.content)
+    assert "FAC-00125" in dumped
+    assert "COM005691" not in dumped
+    assert "2026-01-01" not in dumped
+    wb = load_workbook(io.BytesIO(export.content))
+    enero = wb["AÑO  2026 ENERO - ABRIL"]
+    assert enero["B3"].value == "FAC-00125"
+    assert enero["D3"].value == 1500000
+    assert enero["E3"].value == "FAC-00125"
+
+
+def test_export_cruce_de_otra_factura_no_se_mezcla(client):
+    from domain.enums import CrossingStatus
+    from infrastructure.persistence.database import SessionLocal
+    from infrastructure.persistence.models import AccountCrossingModel
+
+    id_a = _crear_factura(
+        nombre="Empresa A",
+        nit="900111",
+        numero="FE-AAAA",
+        fecha="2026-03-10",
+        total=1000000,
+        filename="a.pdf",
+    )
+    id_b = _crear_factura(
+        nombre="Empresa B",
+        nit="900222",
+        numero="FE-BBBB",
+        fecha="2026-03-11",
+        total=2000000,
+        filename="b.pdf",
+    )
+    db = SessionLocal()
+    try:
+        db.add_all(
+            [
+                AccountCrossingModel(
+                    document_id=id_a,
+                    estado=CrossingStatus.PENDIENTE,
+                    fecha_pago="2026-03-20",
+                    proveedor_nombre="Cruce A",
+                ),
+                AccountCrossingModel(
+                    document_id=id_b,
+                    estado=CrossingStatus.PENDIENTE,
+                    fecha_pago="2026-03-28",
+                    proveedor_nombre="Cruce B",
+                ),
+            ]
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    excel_a = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
+    assert excel_a.status_code == 200, excel_a.text
+    dumped = _xlsx_text(excel_a.content)
+    assert "FE-AAAA" in dumped
+    assert "FE-BBBB" not in dumped
+    assert "Empresa B" not in dumped
+    assert "Cruce B" not in dumped
+    wb = load_workbook(io.BytesIO(excel_a.content))
+    enero = wb["AÑO  2026 ENERO - ABRIL"]
+    assert enero["A1"].value == "Empresa A"
+    assert enero["D3"].value == 1000000
+    pago = enero["F3"].value
+    assert "2026-03-28" not in str(pago)
+    if pago is not None:
+        assert getattr(pago, "day", 20) == 20 or "2026-03-20" in str(pago)
 
 
 def test_export_bloquea_facturas_en_proceso(client):

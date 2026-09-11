@@ -150,7 +150,7 @@ FIELD_SOURCES: dict[str, tuple[str, str, str]] = {
     "ORDEN DE COMPRA": ("account_crossings / autobits_records", "numero_compra", ""),
     "REF.": ("account_crossings / autobits_records", "numero_reserva", ""),
     "VALOR": ("account_crossings / autobits_records", "valor_autobits / valor", "Decimal; vacío si no hay valor"),
-    "FACTURA/CDC": ("account_crossings / documents", "factura_cdc / numero_documento", "vacío si falta"),
+    "FACTURA/CDC": ("documents", "numero_documento", "vacío si falta; no Autobits"),
     "FECHA DE PAGO": ("account_crossings", "fecha_pago", "no se usa payments.paid_at: es confirmación bancaria distinta"),
     "Nombre proveedor (bloque)": ("account_crossings / autobits_records / providers", "proveedor_nombre / proveedor / nombre", ""),
     "NIT/CC": ("autobits_records / providers", "nit", "no asumir igualdad con NIT de factura sin matching"),
