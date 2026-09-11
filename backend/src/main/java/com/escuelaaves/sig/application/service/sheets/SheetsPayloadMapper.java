@@ -23,9 +23,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -701,7 +699,7 @@ public class SheetsPayloadMapper {
         }
 
         return new SeguimientoWhatsappDto(
-                normalizeDate(fecha),
+                SheetDates.contactFecha(fecha),
                 col(row, cols, "tipo"),
                 canal.isBlank() ? "SIN_DATO" : canal.trim().toUpperCase(Locale.ROOT),
                 cliente,
@@ -786,9 +784,9 @@ public class SheetsPayloadMapper {
         );
         String fecha = "";
         if (looksLikeDate(venta.fechaCot())) {
-            fecha = normalizeDate(venta.fechaCot());
+            fecha = SheetDates.contactFecha(venta.fechaCot());
         } else if (looksLikeDate(venta.fechaServicio())) {
-            fecha = normalizeDate(venta.fechaServicio());
+            fecha = SheetDates.contactFecha(venta.fechaServicio());
         }
         String notas = blank(venta.soporteDrive());
         return new SeguimientoWhatsappDto(
@@ -1601,51 +1599,11 @@ public class SheetsPayloadMapper {
     }
 
     private static String normalizeDate(String value) {
-        if (value == null || value.isBlank()) {
-            return "";
-        }
-        String v = value.trim();
-        if (v.length() >= 10 && v.charAt(4) == '-' && v.charAt(7) == '-') {
-            return v.substring(0, 10);
-        }
-        if (v.endsWith("Z") || v.contains("T")) {
-            try {
-                return Instant.parse(v).atZone(ZoneOffset.UTC).toLocalDate().toString();
-            } catch (DateTimeParseException ignored) {
-                // fall through
-            }
-        }
-        try {
-            return LocalDate.parse(v).toString();
-        } catch (DateTimeParseException ignored) {
-            return v;
-        }
+        return SheetDates.calendar(value);
     }
 
     private static boolean looksLikeDate(String value) {
-        if (value == null || value.isBlank()) {
-            return false;
-        }
-        String v = value.trim();
-        if (v.length() >= 10 && v.charAt(4) == '-' && Character.isDigit(v.charAt(0))) {
-            return true;
-        }
-        if (v.contains("T") && v.length() >= 10 && Character.isDigit(v.charAt(0))) {
-            return true;
-        }
-        if (v.matches("\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4}")) {
-            return true;
-        }
-        String d = normalizeDate(value);
-        if (d.length() >= 10) {
-            try {
-                LocalDate.parse(d.substring(0, 10));
-                return true;
-            } catch (DateTimeParseException ignored) {
-                return false;
-            }
-        }
-        return false;
+        return SheetDates.parse(value) != null;
     }
 
     private static String monthKey(String fecha) {

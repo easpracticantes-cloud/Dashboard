@@ -5,6 +5,7 @@ import com.escuelaaves.sig.application.dto.dashboard.sheets.SheetsDashboardDto;
 import com.escuelaaves.sig.application.dto.dashboard.sheets.ToqueDto;
 import com.escuelaaves.sig.application.dto.dashboard.sheets.VentaDto;
 import com.escuelaaves.sig.application.dto.integration.SheetsSyncResultDto;
+import com.escuelaaves.sig.application.service.sheets.SheetDates;
 import com.escuelaaves.sig.application.service.sheets.SheetsPayloadMapper;
 import com.escuelaaves.sig.domain.model.ChannelType;
 import com.escuelaaves.sig.domain.model.ClientSegment;
@@ -52,8 +53,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1058,24 +1057,7 @@ public class SheetsSyncService {
     }
 
     private static LocalDate parseFlexibleDateStatic(String date) {
-        if (date == null || date.isBlank()) {
-            return null;
-        }
-        String value = date.trim();
-        if (value.length() >= 10 && value.charAt(4) == '-') {
-            try {
-                return LocalDate.parse(value.substring(0, 10));
-            } catch (DateTimeParseException ignored) {
-            }
-        }
-        String[] patterns = {"yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "MM/dd/yyyy"};
-        for (String pattern : patterns) {
-            try {
-                return LocalDate.parse(value, DateTimeFormatter.ofPattern(pattern));
-            } catch (DateTimeParseException ignored) {
-            }
-        }
-        return null;
+        return SheetDates.parse(date);
     }
 
     private Instant parseInstant(String fecha) {

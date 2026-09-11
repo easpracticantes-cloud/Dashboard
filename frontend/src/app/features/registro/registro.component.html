@@ -425,7 +425,7 @@
                   </button>
                 </div>
               </td>
-              <td>{{ r.fecha | date: 'dd/MM/yyyy' }}</td>
+              <td>{{ fechaTabla(r.fecha) }}</td>
               <td>{{ r.tipo || '—' }}</td>
               <td>{{ r.canal || '—' }}</td>
               <td>{{ r.cliente || '—' }}</td>
@@ -436,13 +436,13 @@
               <td>{{ r.solicitud || '—' }}</td>
               <td>{{ r.respuesta || '—' }}</td>
               <td>{{ r.semaforo || '—' }}</td>
-              <td>{{ r.fechaCotizado || '—' }}</td>
+              <td>{{ fechaCelda(r.fechaCotizado) }}</td>
               <td>{{ r.notas || '—' }}</td>
-              <td>{{ r.proximoSeguimiento || '—' }}</td>
+              <td>{{ fechaCelda(r.proximoSeguimiento) }}</td>
               <td>{{ r.priorizar || '—' }}</td>
               <td>{{ r.pendiente || '—' }}</td>
               <td>{{ r.asignado || '—' }}</td>
-              <td>{{ r.fechaServicio || '—' }}</td>
+              <td>{{ fechaCelda(r.fechaServicio) }}</td>
               <td>{{ r.registrado || '—' }}</td>
               <td>{{ r.objecion || '—' }}</td>
               <td>{{ r.encuesta ? 'SI' : 'NO' }}</td>

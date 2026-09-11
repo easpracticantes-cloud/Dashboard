@@ -50,6 +50,7 @@ import {
   filterSeguimientos,
   uniqueSorted
 } from './sheets-analytics.util';
+import { formatContactFecha } from '../../../core/utils/sheet-date';
 
 const FONT = 'Sora, sans-serif';
 const REFRESH_MS = 8 * 60 * 1000;
@@ -287,6 +288,10 @@ export class DashboardSheetsComponent implements AfterViewInit {
   patchFilter<K extends keyof SheetsFilters>(key: K, value: SheetsFilters[K]): void {
     this.filters.update((f) => ({ ...f, [key]: value }));
     if (this.paginator) this.paginator.firstPage();
+  }
+
+  fechaTabla(raw?: string | null): string {
+    return formatContactFecha(raw);
   }
 
   clearFilters(): void {

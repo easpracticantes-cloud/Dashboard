@@ -1,4 +1,4 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -12,6 +12,13 @@ import {
 } from '../../core/services/whatsapp-registro-api.service';
 import { SeguimientoWhatsapp, SheetsDashboard } from '../../core/models/sheets-dashboard.model';
 import { AveUiContextService } from '../../shared/components/ave-copilot/ave-ui-context.service';
+import {
+  formatContactFecha,
+  formatSheetDate,
+  sheetCalendarDate,
+  sheetContactFecha,
+  sheetDateKey,
+} from '../../core/utils/sheet-date';
 
 const TIPO_BASE = ['B2B', 'B2C', 'AGENCIA', 'PARTICULAR'];
 const CANAL_BASE = ['RESERVAS', 'WHATSAPP', 'INSTAGRAM', 'WEB', 'EMAIL', 'TELEFONO'];
@@ -94,7 +101,7 @@ function emptyDraft(hoja = ''): Draft {
 function fromRow(row: SeguimientoWhatsapp): Draft {
   return {
     hojaOrigen: row.hojaOrigen || '',
-    fecha: (row.fecha || '').slice(0, 10),
+    fecha: sheetContactFecha(row.fecha),
     tipo: row.tipo || '',
     canal: row.canal || '',
     cliente: row.cliente || '',
@@ -103,13 +110,13 @@ function fromRow(row: SeguimientoWhatsapp): Draft {
     solicitud: row.solicitud || '',
     respuesta: row.respuesta || '',
     semaforo: row.semaforo || '',
-    fechaCotizado: (row.fechaCotizado || '').slice(0, 10),
+    fechaCotizado: sheetCalendarOrEmpty(row.fechaCotizado),
     notas: row.notas || '',
-    proximoSeguimiento: (row.proximoSeguimiento || '').slice(0, 10),
+    proximoSeguimiento: sheetCalendarDate(row.proximoSeguimiento),
     priorizar: row.priorizar || '',
     pendiente: row.pendiente || '',
     asignado: row.asignado || '',
-    fechaServicio: (row.fechaServicio || '').slice(0, 10),
+    fechaServicio: sheetCalendarOrEmpty(row.fechaServicio),
     registrado: row.registrado || '',
     objecion: row.objecion || '',
     encuesta: row.encuesta ? 'SI' : row.encuesta === false ? 'NO' : '',
@@ -120,9 +127,8 @@ function digits(value: string | undefined): string {
   return (value || '').replace(/\D+/g, '');
 }
 
-function dateKey(raw?: string | null): number {
-  const t = Date.parse((raw || '').slice(0, 10));
-  return Number.isFinite(t) ? t : 0;
+function sheetCalendarOrEmpty(raw?: string | null): string {
+  return sheetCalendarDate(raw);
 }
 
 function encuestaKey(raw: unknown): string {
@@ -161,7 +167,7 @@ function discTone(raw?: string | null): string {
 @Component({
   selector: 'eas-registro',
   standalone: true,
-  imports: [DatePipe, DecimalPipe, FormsModule],
+  imports: [DecimalPipe, FormsModule],
   templateUrl: './registro.component.html',
   styleUrl: './registro.component.scss',
 })
@@ -230,11 +236,12 @@ export class RegistroComponent {
     return (this.data()?.seguimientoWhatsapp ?? [])
       .filter((r) => {
         if (hoja && (r.hojaOrigen || '') !== hoja) return false;
-        if (fecha && (r.fecha || '').slice(0, 10) !== fecha) return false;
-        if (mes && (r.fecha || '').slice(0, 7) !== mes) return false;
+        const rowFecha = sheetContactFecha(r.fecha);
+        if (fecha && rowFecha !== fecha) return false;
+        if (mes && rowFecha.slice(0, 7) !== mes) return false;
         if (tipo && (r.tipo || '') !== tipo) return false;
         if (semaforo && (r.semaforo || '') !== semaforo) return false;
-        if (prox && (r.proximoSeguimiento || '').slice(0, 10) !== prox) return false;
+        if (prox && sheetCalendarDate(r.proximoSeguimiento) !== prox) return false;
         if (prioridad && (r.priorizar || '') !== prioridad) return false;
         if (pendiente && (r.pendiente || '') !== pendiente) return false;
         if (encuesta && encuestaKey(r.encuesta) !== encuesta) return false;
@@ -242,7 +249,7 @@ export class RegistroComponent {
         if (numero && !digits(r.celular).includes(numero)) return false;
         return true;
       })
-      .sort((a, b) => dateKey(b.fecha) - dateKey(a.fecha));
+      .sort((a, b) => sheetDateKey(b.fecha).localeCompare(sheetDateKey(a.fecha)));
   });
 
   readonly totalPaginas = computed(() =>
@@ -279,6 +286,14 @@ export class RegistroComponent {
 
   discTone(raw?: string | null): string {
     return discTone(raw);
+  }
+
+  fechaTabla(raw?: string | null): string {
+    return formatContactFecha(raw);
+  }
+
+  fechaCelda(raw?: string | null): string {
+    return formatSheetDate(raw);
   }
   readonly opcionesSemaforo = computed(() => this.mergeOpts(SEMAFORO_BASE, (r) => r.semaforo));
   readonly opcionesPrioridad = computed(() => this.mergeOpts(PRIORIDAD_BASE, (r) => r.priorizar));
