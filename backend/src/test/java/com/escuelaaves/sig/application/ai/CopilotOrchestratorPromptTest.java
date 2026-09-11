@@ -1,6 +1,7 @@
 package com.escuelaaves.sig.application.ai;
 
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.CopilotRequest;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.QuoteDraftDto;
 import com.escuelaaves.sig.domain.ai.model.AiProviderType;
 import com.escuelaaves.sig.domain.ai.model.SessionSlotState;
 import com.escuelaaves.sig.domain.ai.port.AiProviderFactory;
@@ -25,7 +26,9 @@ import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -177,5 +180,31 @@ class CopilotOrchestratorPromptTest {
         assertTrue(capturedUser.get().contains("Juan Pérez"));
         assertTrue(capturedUser.get().contains("Contexto de pantalla"));
         verify(memoryPort).appendMessage(eq("sess-ui"), eq("user"), eq("¿qué info tenemos de este cliente?"));
+    }
+
+    @Test
+    void quoteRequestOpensPanelWithoutCallingClaude() {
+        var draft = new QuoteDraftDto(
+                "RAFTING_EN_EL_EJE_CAFETERO",
+                "Rafting",
+                "PRIVADO",
+                4,
+                java.math.BigDecimal.valueOf(150000),
+                java.math.BigDecimal.valueOf(600000),
+                "COP",
+                null,
+                "Armenia",
+                null,
+                null,
+                null,
+                null,
+                false,
+                java.util.Map.of()
+        );
+        when(catalogQuoteService.draftForRequest(anyString())).thenReturn(draft);
+        var res = orchestrator.chat(new CopilotRequest("Cotización de rafting para 4 personas", null));
+        assertEquals("QUOTE", res.mode());
+        assertNotNull(res.quoteDraft());
+        verify(generativeAiPort, never()).chat(anyString(), anyString(), anyString());
     }
 }

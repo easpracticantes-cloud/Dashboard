@@ -2,6 +2,7 @@ package com.escuelaaves.sig.application.ai;
 
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.CopilotRequest;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.CopilotResponse;
+import com.escuelaaves.sig.domain.ai.model.SessionSlotState;
 import com.escuelaaves.sig.domain.ai.port.AiProviderFactory;
 import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
 import com.escuelaaves.sig.domain.ai.port.out.AiObservabilityPort;
@@ -137,13 +138,16 @@ public class CopilotOrchestrator {
         AiPromptTrace.begin(requestId);
         try {
             var slots = sessionSlotStore.getOrCreate(sessionId);
+            slots.merge(HeuristicQuoteInterpreter.interpret(message));
+            if (AveQuoteIntent.isQuoteRequest(message)) {
+                return openQuotePanel(sessionId, message, slots, "local");
+            }
             boolean businessTurn = SigTopicDetector.needsBusinessContext(message);
             String llmMessage = withScreenContext(message, uiContext);
 
             String catalog = "";
             String slotsJson = "";
             if (businessTurn) {
-                slots.merge(HeuristicQuoteInterpreter.interpret(message));
                 catalog = contextRetriever.buildCompactContext(message, slots, 6, 3);
                 slotsJson = slots.toPromptJson();
             }
@@ -219,6 +223,9 @@ public class CopilotOrchestrator {
                 }
             }
 
+            if (AveQuoteIntent.looksLikeQuoteRefusal(text) || AveQuoteIntent.isQuoteRequest(message)) {
+                return openQuotePanel(sessionId, message, slots, provider);
+            }
             if (CLEAR_QUOTE.matcher(message).find() && HAS_PEOPLE.matcher(message).find()) {
                 var maybe = catalogQuoteService.tryQuote(message);
                 if (maybe.isPresent()) {
@@ -266,18 +273,50 @@ public class CopilotOrchestrator {
     private record ChatAttempt(String providerId, String text) {}
 
     private CopilotResponse doQuote(String sessionId, String message, String provider) {
-        try {
-            CatalogQuoteService.QuoteResult q = catalogQuoteService.quote(message);
-            return quoteResponse(sessionId, q.markdown(), List.of("catalog-quote", q.code()), provider, q);
-        } catch (Exception ex) {
-            log.warn("[Ave] cotización: {}", ex.getMessage());
-            String soft = """
-                    No encontré esa tarifa exacta en el catálogo.
-                    Dime el nombre del tour (ej. Acaime, Rafting, Parapente) y cuántas personas.
-                    Si el tour falta en el catálogo, lo podemos agregar después — no inventaré un precio.
-                    """;
-            return new CopilotResponse(sessionId, soft.trim(), "ANSWER", List.of("quote-miss"), provider, true);
+        return openQuotePanel(sessionId, message, sessionSlotStore.getOrCreate(sessionId), provider);
+    }
+
+    private CopilotResponse openQuotePanel(
+            String sessionId,
+            String message,
+            SessionSlotState slots,
+            String provider
+    ) {
+        String seed = enrichQuoteSeed(message, slots);
+        var draft = catalogQuoteService.draftForRequest(seed);
+        boolean priced = draft.total() != null && draft.total().signum() > 0;
+        String reply = priced
+                ? "Listo. Completa o ajusta los datos en el panel y descarga el PDF de la plantilla."
+                : "Abre el panel, completa tour, personas, precios y datos del cliente, y descarga el PDF.";
+        return new CopilotResponse(
+                sessionId,
+                reply,
+                "QUOTE",
+                List.of("quote-panel"),
+                provider != null ? provider : "local",
+                true,
+                draft
+        );
+    }
+
+    private String enrichQuoteSeed(String message, SessionSlotState slots) {
+        StringBuilder sb = new StringBuilder(message != null ? message : "");
+        if (slots == null) {
+            return sb.toString().trim();
         }
+        var map = slots.toMap();
+        Object tour = map.get("tourCode");
+        if (tour != null && !sb.toString().toUpperCase(Locale.ROOT).contains(String.valueOf(tour))) {
+            sb.append(' ').append(tour);
+        }
+        if (map.get("people") != null && !HAS_PEOPLE.matcher(sb).find()) {
+            sb.append(' ').append(map.get("people")).append(" personas");
+        }
+        Object pickup = map.get("pickup");
+        if (pickup != null) {
+            sb.append(" pickup ").append(pickup);
+        }
+        return sb.toString().trim();
     }
 
     private CopilotResponse doProviders(String sessionId, String tour, String category, String provider) {
@@ -309,6 +348,9 @@ public class CopilotOrchestrator {
      * En cualquier otro caso: error técnico honesto (nunca fingir menú tour/jeep/proveedores).
      */
     private CopilotResponse recoverFromLlmFailure(String sessionId, String message, Exception ex) {
+        if (message != null && AveQuoteIntent.isQuoteRequest(message)) {
+            return openQuotePanel(sessionId, message, sessionSlotStore.getOrCreate(sessionId), "local");
+        }
         if (message != null && CLEAR_QUOTE.matcher(message).find()) {
             var quoted = catalogQuoteService.tryQuote(message);
             if (quoted.isPresent()) {

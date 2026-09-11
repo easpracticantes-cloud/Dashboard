@@ -149,6 +149,43 @@ public class CatalogQuoteService {
         );
     }
 
+    /** Siempre abre panel: tarifa de catálogo si hay match, si no un borrador vacío para completar. */
+    public QuoteDraftDto draftForRequest(String naturalMessage) {
+        return tryQuote(naturalMessage).map(this::toDraft).orElseGet(() -> blankDraft(naturalMessage));
+    }
+
+    public QuoteDraftDto blankDraft(String naturalMessage) {
+        QuoteInterpretation hint = HeuristicQuoteInterpreter.interpret(naturalMessage);
+        String code = hint.tour() != null ? hint.tour() : "";
+        String name = humanizeCode(code);
+        int people = hint.people() != null && hint.people() > 0 ? hint.people() : 2;
+        return new QuoteDraftDto(
+                code,
+                name,
+                "PRIVADO",
+                people,
+                java.math.BigDecimal.ZERO,
+                java.math.BigDecimal.ZERO,
+                "COP",
+                hint.date(),
+                hint.pickup(),
+                null,
+                "Completa tour, personas y precios en el panel para generar el PDF.",
+                null,
+                null,
+                false,
+                Map.of()
+        );
+    }
+
+    private static String humanizeCode(String code) {
+        if (code == null || code.isBlank()) {
+            return "";
+        }
+        String spaced = code.replace('_', ' ').toLowerCase(Locale.ROOT);
+        return Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
+    }
+
     private static String formatMoney(BigDecimal amount, String currency) {
         NumberFormat nf = NumberFormat.getNumberInstance(Locale.of("es", "CO"));
         nf.setMaximumFractionDigits(0);

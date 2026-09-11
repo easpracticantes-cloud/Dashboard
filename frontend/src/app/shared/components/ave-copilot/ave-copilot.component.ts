@@ -54,6 +54,7 @@ import {
 } from './ave-thread-focus';
 import { AveUiContextService } from './ave-ui-context.service';
 import { AVE_COPY, stripWakePrefix } from './ave-wake';
+import { looksLikeQuoteRequest, mergeQuoteDraft, seedQuoteDraft } from './ave-quote-intent';
 
 interface AvePendingCrmAction extends PendingActionConfirm {
   instruction: string;
@@ -553,6 +554,9 @@ export class AveCopilotComponent {
     this.lastUserText = text;
     this.showSuggestions.set(false);
     this.messages.update((m) => [...m, { id: uid(), role: 'user', text }]);
+    if (looksLikeQuoteRequest(text)) {
+      this.quoteDraft.set(seedQuoteDraft(text, this.quoteDraft() || this.lastQuote));
+    }
     this.sending.set(true);
     this.scrollBottom(true);
 
@@ -783,9 +787,12 @@ export class AveCopilotComponent {
           : b
       )
     );
-    if (hasQuote && res.quoteDraft) {
-      this.lastQuote = res.quoteDraft;
-      this.quoteDraft.set(res.quoteDraft);
+    if (res.quoteDraft) {
+      const merged = mergeQuoteDraft(res.quoteDraft, this.lastUserText, this.quoteDraft() || this.lastQuote);
+      this.lastQuote = merged;
+      this.quoteDraft.set(merged);
+    } else if (looksLikeQuoteRequest(this.lastUserText) && !this.quoteDraft()) {
+      this.quoteDraft.set(seedQuoteDraft(this.lastUserText, this.lastQuote));
     }
     this.sending.set(false);
     this.voiceIn.reset();

@@ -31,9 +31,6 @@
     display: none;
   }
 
-  .login-hero__logo {
-    height: clamp(72px, 16vw, 110px) !important;
-  }
 
   .login-hero__tagline {
     font-size: 0.72rem;
@@ -145,18 +142,6 @@
   display: flex;
   align-items: center;
   animation: login-rise 0.85s 0.06s ease both;
-}
-
-.login-hero__logo {
-  display: block;
-  height: clamp(96px, 14vw, 148px);
-  width: auto;
-  max-width: min(420px, 86%);
-  object-fit: contain;
-  background: #fff;
-  border-radius: 18px;
-  padding: 0.7rem 1rem;
-  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.35);
 }
 
 .login-hero__brand-letter {
@@ -307,16 +292,6 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  background: linear-gradient(145deg, #f7faf8, #eef4f0);
-  border: 1px solid rgba(20, 38, 28, 0.06);
-  box-shadow: 0 8px 18px rgba(20, 38, 28, 0.06);
-}
-
-.login-panel__mark .brand-logo--mark {
-  max-height: 30px !important;
 }
 
 .login-panel__eyebrow {
@@ -741,8 +716,8 @@ html[data-theme='dark'] .login-foot {
 }
 
 html[data-theme='dark'] .login-panel__mark {
-  background: rgba(238, 244, 240, 0.06);
-  border-color: rgba(238, 244, 240, 0.1);
+  background: transparent;
+  border-color: transparent;
 }
 
 html[data-theme='dark'] .field__control .eas-input {
