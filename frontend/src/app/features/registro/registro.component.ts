@@ -120,6 +120,20 @@ function digits(value: string | undefined): string {
   return (value || '').replace(/\D+/g, '');
 }
 
+function dateKey(raw?: string | null): number {
+  const t = Date.parse((raw || '').slice(0, 10));
+  return Number.isFinite(t) ? t : 0;
+}
+
+function encuestaKey(raw: unknown): string {
+  if (raw === true || raw === 'SI' || raw === 'true') return 'SI';
+  if (raw === false || raw === 'NO' || raw === 'false') return 'NO';
+  const t = String(raw || '')
+    .trim()
+    .toUpperCase();
+  return t || 'PENDIENTE';
+}
+
 function normalizeDisc(raw?: string | null): string {
   const t = (raw || '')
     .trim()
@@ -169,6 +183,13 @@ export class RegistroComponent {
   readonly original = signal<SeguimientoWhatsapp | null>(null);
   readonly hojaFiltro = signal('');
   readonly fechaFiltro = signal('');
+  readonly mesFiltro = signal('');
+  readonly tipoFiltro = signal('');
+  readonly semaforoFiltro = signal('');
+  readonly proxSeguimientoFiltro = signal('');
+  readonly prioridadFiltro = signal('');
+  readonly pendienteFiltro = signal('');
+  readonly encuestaFiltro = signal('');
   readonly nombreFiltro = signal('');
   readonly numeroFiltro = signal('');
   readonly pagina = signal(1);
@@ -197,15 +218,31 @@ export class RegistroComponent {
   readonly filasFiltradas = computed(() => {
     const hoja = this.hojaFiltro();
     const fecha = this.fechaFiltro();
+    const mes = this.mesFiltro();
+    const tipo = this.tipoFiltro();
+    const semaforo = this.semaforoFiltro();
+    const prox = this.proxSeguimientoFiltro();
+    const prioridad = this.prioridadFiltro();
+    const pendiente = this.pendienteFiltro();
+    const encuesta = this.encuestaFiltro();
     const nombre = this.nombreFiltro().trim().toLowerCase();
     const numero = digits(this.numeroFiltro());
-    return (this.data()?.seguimientoWhatsapp ?? []).filter((r) => {
-      if (hoja && (r.hojaOrigen || '') !== hoja) return false;
-      if (fecha && (r.fecha || '').slice(0, 10) !== fecha) return false;
-      if (nombre && !(r.cliente || '').toLowerCase().includes(nombre)) return false;
-      if (numero && !digits(r.celular).includes(numero)) return false;
-      return true;
-    });
+    return (this.data()?.seguimientoWhatsapp ?? [])
+      .filter((r) => {
+        if (hoja && (r.hojaOrigen || '') !== hoja) return false;
+        if (fecha && (r.fecha || '').slice(0, 10) !== fecha) return false;
+        if (mes && (r.fecha || '').slice(0, 7) !== mes) return false;
+        if (tipo && (r.tipo || '') !== tipo) return false;
+        if (semaforo && (r.semaforo || '') !== semaforo) return false;
+        if (prox && (r.proximoSeguimiento || '').slice(0, 10) !== prox) return false;
+        if (prioridad && (r.priorizar || '') !== prioridad) return false;
+        if (pendiente && (r.pendiente || '') !== pendiente) return false;
+        if (encuesta && encuestaKey(r.encuesta) !== encuesta) return false;
+        if (nombre && !(r.cliente || '').toLowerCase().includes(nombre)) return false;
+        if (numero && !digits(r.celular).includes(numero)) return false;
+        return true;
+      })
+      .sort((a, b) => dateKey(b.fecha) - dateKey(a.fecha));
   });
 
   readonly totalPaginas = computed(() =>
@@ -321,6 +358,41 @@ export class RegistroComponent {
 
   setFiltroFecha(value: string): void {
     this.fechaFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroMes(value: string): void {
+    this.mesFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroTipo(value: string): void {
+    this.tipoFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroSemaforo(value: string): void {
+    this.semaforoFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroProxSeguimiento(value: string): void {
+    this.proxSeguimientoFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroPrioridad(value: string): void {
+    this.prioridadFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroPendiente(value: string): void {
+    this.pendienteFiltro.set(value);
+    this.pagina.set(1);
+  }
+
+  setFiltroEncuesta(value: string): void {
+    this.encuestaFiltro.set(value);
     this.pagina.set(1);
   }
 

@@ -4,8 +4,8 @@
     <h2>Paso a paso</h2>
     <p class="wiz__lead">
       1) Autobits trae compra, fecha, proveedor y valor.
-      2) Cruce de Cuentas analiza SIG y genera el Excel estándar (sin adjuntar un libro de cruce).
-      3) Las facturas se pueden subir en cuanto haya Autobits; no esperan un Excel de entrada.
+      2) Sube las facturas de la semana.
+      3) Genera el Cruce de Cuentas desde SIG (sin adjuntar un libro de cruce).
     </p>
     <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando()">
       {{ limpiando() ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
@@ -100,7 +100,122 @@
   </section>
 
   <section class="wiz__card" [class.is-dim]="paso() < 2">
-    <h3>2. Cruce de Cuentas</h3>
+    <h3>2. Facturas de la semana</h3>
+    <p>
+      Paquetes de máximo {{ packMax }} archivos (PDF, foto o escaneo).
+      El OCR + visión lee facturas físicas, electrónicas o borrosas; si algo es dudoso lo marca para revisión.
+    </p>
+    <label class="wiz__label" for="solicitud-ia">Qué quieres que saque o revise (opcional)</label>
+    <textarea
+      id="solicitud-ia"
+      class="wiz__prompt"
+      rows="3"
+      [(ngModel)]="solicitud"
+      placeholder="Ej. Extrae NIT, número, total y compra. Si el total no cuadra o el sello tapó un dígito, asume y marca revisión."
+    ></textarea>
+    <label class="wiz__drop">
+      <input
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        multiple
+        (change)="onFacturas($event)"
+        [disabled]="subiendoFacturas() || !autobits()"
+      />
+      <mat-icon>photo_library</mat-icon>
+      <span>{{ subiendoFacturas() ? 'Subiendo y encolando OCR…' : 'Soltar hasta ' + packMax + ' facturas (PDF o foto)' }}</span>
+    </label>
+    @if (packMsg()) {
+      <p class="wiz__hint">{{ packMsg() }}</p>
+    }
+    @if (facturaItems().length) {
+      <ul class="wiz__files">
+        @for (it of facturaItems(); track it.filename) {
+          <li [class.is-bad]="!it.ok">
+            <strong>{{ it.filename }}</strong>
+            <small>{{ it.ok ? (it.document?.estado || 'en cola') : it.error }}</small>
+          </li>
+        }
+      </ul>
+    }
+    @if (documentos().length) {
+      <h4 class="wiz__sub">Ya importadas</h4>
+      <div class="wiz__table-wrap">
+        <table class="wiz__table">
+          <thead>
+            <tr>
+              <th>Archivo</th>
+              <th>N° factura</th>
+              <th>Proveedor</th>
+              <th>Total</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of documentos(); track d.id) {
+              <tr [class.is-miss]="d.requiere_revision">
+                <td>{{ d.filename }}</td>
+                <td>{{ d.numero_documento || '—' }}</td>
+                <td>{{ d.proveedor_nombre || '—' }}</td>
+                <td>{{ formatCop(d.total) }}</td>
+                <td>
+                  <span class="wiz__chip" [class]="'is-' + tonoEstado(d.estado)">
+                    {{ d.estado }}
+                    @if (d.requiere_revision) {
+                      · revisar
+                    }
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <section class="wiz__card wiz__chat" [class.is-dim]="paso() < 2">
+    <h3>Chat con la IA sobre este paquete</h3>
+    <p class="wiz__hint">
+      Pregunta sobre las facturas ya subidas (máx. {{ packMax }}), vinculadas al cruce de Autobits y documentos de SIG.
+    </p>
+    <div class="wiz__chips">
+      @for (s of chatSugerencias; track s) {
+        <button type="button" class="wiz__chip-btn" (click)="usarSugerencia(s)" [disabled]="preguntando() || !documentos().length">
+          {{ s }}
+        </button>
+      }
+    </div>
+    <div class="wiz__msgs" aria-live="polite">
+      @if (!chatMsgs().length) {
+        <p class="wiz__hint">Aún no hay mensajes. Sube el paquete y pregunta.</p>
+      }
+      @for (m of chatMsgs(); track $index) {
+        <article class="wiz__msg" [class.is-user]="m.role === 'user'">
+          <strong>{{ m.role === 'user' ? 'Tú' : 'IA contable' }}</strong>
+          <p>{{ m.text }}</p>
+        </article>
+      }
+      @if (preguntando()) {
+        <article class="wiz__msg"><strong>IA contable</strong><p>Pensando…</p></article>
+      }
+    </div>
+    <div class="wiz__ask">
+      <input
+        type="text"
+        class="wiz__prompt"
+        [(ngModel)]="chatInput"
+        (keydown.enter)="preguntar()"
+        placeholder="Escribe el pedido y pulsa Preguntar"
+        [disabled]="preguntando()"
+      />
+      <button type="button" class="wiz__copy wiz__copy--primary" (click)="preguntar()" [disabled]="preguntando() || !chatInput.trim()">
+        Preguntar
+      </button>
+    </div>
+  </section>
+
+  <section class="wiz__card" [class.is-dim]="paso() < 3">
+    <h3>3. Generar cruce</h3>
     <p>
       Toma Autobits, facturas, proveedores y pagos ya persistidos.
       No hay que adjuntar un Excel de cruce: el sistema analiza y luego genera el libro estándar.
@@ -199,121 +314,6 @@
       </div>
     </section>
   }
-
-  <section class="wiz__card" [class.is-dim]="paso() < 2">
-    <h3>3. Facturas de la semana</h3>
-    <p>
-      Paquetes de máximo {{ packMax }} archivos (PDF, foto o escaneo).
-      El OCR + visión lee facturas físicas, electrónicas o borrosas; si algo es dudoso lo marca para revisión.
-    </p>
-    <label class="wiz__label" for="solicitud-ia">Qué quieres que saque o revise (opcional)</label>
-    <textarea
-      id="solicitud-ia"
-      class="wiz__prompt"
-      rows="3"
-      [(ngModel)]="solicitud"
-      placeholder="Ej. Extrae NIT, número, total y compra. Si el total no cuadra o el sello tapó un dígito, asume y marca revisión."
-    ></textarea>
-    <label class="wiz__drop">
-      <input
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
-        multiple
-        (change)="onFacturas($event)"
-        [disabled]="subiendoFacturas() || (!autobits() && !cruce())"
-      />
-      <mat-icon>photo_library</mat-icon>
-      <span>{{ subiendoFacturas() ? 'Subiendo y encolando OCR…' : 'Soltar hasta ' + packMax + ' facturas (PDF o foto)' }}</span>
-    </label>
-    @if (packMsg()) {
-      <p class="wiz__hint">{{ packMsg() }}</p>
-    }
-    @if (facturaItems().length) {
-      <ul class="wiz__files">
-        @for (it of facturaItems(); track it.filename) {
-          <li [class.is-bad]="!it.ok">
-            <strong>{{ it.filename }}</strong>
-            <small>{{ it.ok ? (it.document?.estado || 'en cola') : it.error }}</small>
-          </li>
-        }
-      </ul>
-    }
-    @if (documentos().length) {
-      <h4 class="wiz__sub">Ya importadas</h4>
-      <div class="wiz__table-wrap">
-        <table class="wiz__table">
-          <thead>
-            <tr>
-              <th>Archivo</th>
-              <th>N° factura</th>
-              <th>Proveedor</th>
-              <th>Total</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (d of documentos(); track d.id) {
-              <tr [class.is-miss]="d.requiere_revision">
-                <td>{{ d.filename }}</td>
-                <td>{{ d.numero_documento || '—' }}</td>
-                <td>{{ d.proveedor_nombre || '—' }}</td>
-                <td>{{ formatCop(d.total) }}</td>
-                <td>
-                  <span class="wiz__chip" [class]="'is-' + tonoEstado(d.estado)">
-                    {{ d.estado }}
-                    @if (d.requiere_revision) {
-                      · revisar
-                    }
-                  </span>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    }
-  </section>
-
-  <section class="wiz__card wiz__chat" [class.is-dim]="paso() < 3">
-    <h3>Chat con la IA sobre este paquete</h3>
-    <p class="wiz__hint">
-      Pregunta sobre las facturas ya subidas (máx. {{ packMax }}), vinculadas al cruce de Autobits y documentos de SIG.
-    </p>
-    <div class="wiz__chips">
-      @for (s of chatSugerencias; track s) {
-        <button type="button" class="wiz__chip-btn" (click)="usarSugerencia(s)" [disabled]="preguntando() || !documentos().length">
-          {{ s }}
-        </button>
-      }
-    </div>
-    <div class="wiz__msgs" aria-live="polite">
-      @if (!chatMsgs().length) {
-        <p class="wiz__hint">Aún no hay mensajes. Sube el paquete y pregunta.</p>
-      }
-      @for (m of chatMsgs(); track $index) {
-        <article class="wiz__msg" [class.is-user]="m.role === 'user'">
-          <strong>{{ m.role === 'user' ? 'Tú' : 'IA contable' }}</strong>
-          <p>{{ m.text }}</p>
-        </article>
-      }
-      @if (preguntando()) {
-        <article class="wiz__msg"><strong>IA contable</strong><p>Pensando…</p></article>
-      }
-    </div>
-    <div class="wiz__ask">
-      <input
-        type="text"
-        class="wiz__prompt"
-        [(ngModel)]="chatInput"
-        (keydown.enter)="preguntar()"
-        placeholder="Escribe el pedido y pulsa Preguntar"
-        [disabled]="preguntando()"
-      />
-      <button type="button" class="wiz__copy wiz__copy--primary" (click)="preguntar()" [disabled]="preguntando() || !chatInput.trim()">
-        Preguntar
-      </button>
-    </div>
-  </section>
 
   @if (crossings().length) {
     <section class="wiz__card">

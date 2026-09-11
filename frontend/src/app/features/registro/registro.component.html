@@ -320,8 +320,61 @@
         </select>
       </label>
       <label>
+        Mes
+        <input type="month" [ngModel]="mesFiltro()" (ngModelChange)="setFiltroMes($event)" />
+      </label>
+      <label>
         Fecha
         <input type="date" [ngModel]="fechaFiltro()" (ngModelChange)="setFiltroFecha($event)" />
+      </label>
+      <label>
+        Tipo / agencia
+        <select [ngModel]="tipoFiltro()" (ngModelChange)="setFiltroTipo($event)">
+          <option value="">Todos</option>
+          @for (o of opcionesTipo(); track o) {
+            <option [value]="o">{{ o }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Semáforo
+        <select [ngModel]="semaforoFiltro()" (ngModelChange)="setFiltroSemaforo($event)">
+          <option value="">Todos</option>
+          @for (o of opcionesSemaforo(); track o) {
+            <option [value]="o">{{ o }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Próx. seguimiento
+        <input type="date" [ngModel]="proxSeguimientoFiltro()" (ngModelChange)="setFiltroProxSeguimiento($event)" />
+      </label>
+      <label>
+        Prioridad
+        <select [ngModel]="prioridadFiltro()" (ngModelChange)="setFiltroPrioridad($event)">
+          <option value="">Todas</option>
+          @for (o of opcionesPrioridad(); track o) {
+            <option [value]="o">{{ o }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Pendiente
+        <select [ngModel]="pendienteFiltro()" (ngModelChange)="setFiltroPendiente($event)">
+          <option value="">Todos</option>
+          @for (o of opcionesSiNo; track o) {
+            <option [value]="o">{{ o }}</option>
+          }
+        </select>
+      </label>
+      <label>
+        Encuesta
+        <select [ngModel]="encuestaFiltro()" (ngModelChange)="setFiltroEncuesta($event)">
+          <option value="">Todas</option>
+          @for (o of opcionesEncuesta; track o) {
+            <option [value]="o">{{ o }}</option>
+          }
+        </select>
       </label>
       <label class="reg__search">
         Nombre

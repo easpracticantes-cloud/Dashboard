@@ -54,8 +54,8 @@ export class WizardComponent implements OnInit, OnDestroy {
   readonly packMax = PACK_MAX;
   readonly steps = [
     { n: 1, title: 'Excel Autobits', hint: 'De ahí salen compra, fecha, proveedor y valor.' },
-    { n: 2, title: 'Cruce de Cuentas', hint: 'Analiza SIG y genera el Excel estándar.' },
-    { n: 3, title: 'Facturas + chat IA', hint: `Hasta ${PACK_MAX} por paquete. Pide lo que necesites.` },
+    { n: 2, title: 'Facturas + chat IA', hint: `Hasta ${PACK_MAX} por paquete. Pide lo que necesites.` },
+    { n: 3, title: 'Generar cruce', hint: 'Analiza SIG y genera el Excel estándar.' },
   ];
   readonly chatSugerencias = [
     'Resume cada factura: proveedor, número, fecha y total.',
@@ -252,8 +252,8 @@ export class WizardComponent implements OnInit, OnDestroy {
     const files = Array.from((ev.target as HTMLInputElement).files || []);
     (ev.target as HTMLInputElement).value = '';
     if (!files.length) return;
-    if (!this.autobits() && !this.cruce()) {
-      this.error.set('Carga Autobits o procesa el cruce antes de subir facturas.');
+    if (!this.autobits()) {
+      this.error.set('Carga Autobits antes de subir facturas.');
       return;
     }
     if (files.length > PACK_MAX) {
@@ -291,6 +291,7 @@ export class WizardComponent implements OnInit, OnDestroy {
         }
         this.refrescarFacturas();
         this.startPoll();
+        this.paso.set(3);
       },
       error: (err) => {
         this.error.set(this.detalleError(err, 'No se pudieron subir las facturas.'));
@@ -490,7 +491,7 @@ export class WizardComponent implements OnInit, OnDestroy {
                 comparacion: p.comparacion || [],
                 pendientes: p.pendientes,
               });
-              this.paso.set(2);
+              this.paso.set(3);
             } else if (p.has_autobits) {
               this.paso.set(2);
             }
