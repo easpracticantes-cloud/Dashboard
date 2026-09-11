@@ -32,4 +32,20 @@ class WhatsAppRegistroSecurityIT {
         mockMvc.perform(multipart("/api/v1/registro/whatsapp/analyze").file(empty))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    @WithMockUser(username = "comercial", authorities = "ROLE_COMERCIAL")
+    void autenticadoRechazaLoteVacioEnFiles() throws Exception {
+        MockMultipartFile empty = new MockMultipartFile("files", "vacio.txt", "text/plain", new byte[0]);
+        mockMvc.perform(multipart("/api/v1/registro/whatsapp/analyze").file(empty))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void anonimoNoPuedeConfirmarLote() throws Exception {
+        mockMvc.perform(post("/api/v1/registro/whatsapp/confirm-batch")
+                        .contentType("application/json")
+                        .content("{\"items\":[]}"))
+                .andExpect(status().isUnauthorized());
+    }
 }

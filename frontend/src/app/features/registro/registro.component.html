@@ -16,8 +16,8 @@
   <section class="reg__card">
     <h3>Cargar chats de WhatsApp</h3>
     <p class="reg__lead">
-      Exporta el chat desde WhatsApp (.txt o .zip). La IA (Claude) lo convierte a las columnas del Excel de Registro.
-      Nada se guarda hasta que confirmes.
+      Sube varios .txt o un .zip (WhatsApp incluye fotos; se ignoran). Hasta {{ maxWaFiles }} chats a la vez.
+      La IA descomprime, lee cada conversación y arma las columnas del Excel. Nada se guarda hasta que confirmes.
     </p>
     <ol class="reg__wa-flow" aria-label="Flujo de carga WhatsApp">
       <li [class.is-on]="waEstado() === 'idle' || waEstado() === 'error'">WhatsApp</li>
@@ -32,40 +32,89 @@
       (dragleave)="arrastrandoWa.set(false)"
       (drop)="onWhatsappDrop($event)"
     >
-      <input type="file" accept=".txt,.zip,text/plain,application/zip" (change)="onWhatsappFile($event)" [disabled]="waEstado() === 'analizando'" />
-      <strong>{{ waEstado() === 'analizando' ? 'Analizando conversación…' : 'Arrastrar archivos aquí' }}</strong>
-      <small>WhatsApp Chat — Cliente.txt</small>
+      <input
+        type="file"
+        multiple
+        accept=".txt,.zip,text/plain,application/zip"
+        (change)="onWhatsappFile($event)"
+        [disabled]="waEstado() === 'analizando'"
+      />
+      <strong>
+        @if (waEstado() === 'analizando') {
+          Analizando chats… puede tardar varios minutos
+        } @else {
+          Arrastrar archivos o un ZIP
+        }
+      </strong>
+      <small>Hasta {{ maxWaFiles }} chats · .txt o .zip exportados desde WhatsApp</small>
     </label>
-    @if (waFile()) {
-      <p class="reg__hint">Archivo: {{ waFile()!.name }} · {{ (waFile()!.size / 1024) | number: '1.0-0' }} KB</p>
+    @if (waQueue().length) {
+      <ul class="reg__wa-files">
+        @for (f of waQueue(); track f.name + '-' + f.size) {
+          <li>
+            <span>{{ f.name }} · {{ (f.size / 1024) | number: '1.0-0' }} KB</span>
+            <button type="button" class="reg__ghost" (click)="quitarWaFile(f)" [disabled]="waEstado() === 'analizando'">
+              Quitar
+            </button>
+          </li>
+        }
+      </ul>
+      <div class="reg__form-actions">
+        <button
+          type="button"
+          class="reg__btn"
+          (click)="analizarWhatsappLote()"
+          [disabled]="waEstado() === 'analizando'"
+        >
+          {{ waEstado() === 'analizando' ? 'Analizando…' : 'Analizar ' + waQueue().length + ' archivo(s)' }}
+        </button>
+      </div>
     }
     @if (waError()) {
       <p class="reg__alert">{{ waError() }}</p>
     }
-    @if (waPreview(); as p) {
-      <div class="reg__preview">
-        <p><strong>✓ Conversación analizada</strong> · {{ p.messageCount }} mensajes</p>
-        <p>Cliente: {{ p.campos['cliente']?.valor || 'NO_IDENTIFICADO' }}</p>
-        <p>Última cotización: {{ p.ultimaCotizacion?.valor || p.ultimaCotizacion?.servicio || 'NO_IDENTIFICADO' }}
-          @if (p.ultimaCotizacion?.fecha) {
-            ({{ p.ultimaCotizacion?.fecha }})
-          }
-        </p>
-        <p>Estado: {{ p.ultimaCotizacion?.estado || p.campos['semaforo']?.valor || '—' }}</p>
-        @if (p.coincidencias; as hits) {
-          @if (hits.length) {
-            <p class="reg__alert">Posible actualización de registro existente ({{ hits[0].cliente }} · {{ hits[0].celular }}).</p>
-          }
+    @if (waErrors().length) {
+      <ul class="reg__wa-errors">
+        @for (e of waErrors(); track $index) {
+          <li>{{ e.filename ? e.filename + ': ' : '' }}{{ e.message }}</li>
         }
-        <div class="reg__form-actions">
-          <button type="button" class="reg__ghost" (click)="cancelarWhatsapp()" [disabled]="waConfirmando()">Cancelar</button>
-          @if (p.coincidencias?.length) {
-            <button type="button" class="reg__btn" (click)="confirmarWhatsapp(true)" [disabled]="waConfirmando()">
-              Confirmar actualización
-            </button>
+      </ul>
+    }
+    @if (waItems().length) {
+      <div class="reg__preview">
+        <p>
+          <strong>✓ {{ waItems().length }} chat(s) listos</strong>
+          · revisa uno o guarda el lote. Nada está en el Excel todavía.
+        </p>
+        <ul class="reg__wa-items">
+          @for (p of waItems(); track p.previewId) {
+            <li [class.is-on]="waPreview()?.previewId === p.previewId">
+              <div>
+                <strong>{{ waCliente(p) }}</strong>
+                <small>{{ p.filename }} · {{ p.messageCount }} mensajes</small>
+                @if (p.coincidencias?.length) {
+                  <span class="reg__wa-dup">Posible duplicado</span>
+                }
+              </div>
+              <div class="reg__row-actions">
+                <button type="button" class="reg__copy" (click)="revisarWhatsapp(p)" [disabled]="waConfirmando()">
+                  Revisar
+                </button>
+                @if (p.coincidencias?.length && waPreview()?.previewId === p.previewId) {
+                  <button type="button" class="reg__btn" (click)="confirmarWhatsapp(true)" [disabled]="waConfirmando()">
+                    Actualizar existente
+                  </button>
+                }
+              </div>
+            </li>
           }
-          <button type="button" class="reg__btn" (click)="confirmarWhatsapp(false)" [disabled]="waConfirmando()">
-            Revisar antes de guardar
+        </ul>
+        <div class="reg__form-actions">
+          <button type="button" class="reg__ghost" (click)="cancelarWhatsapp()" [disabled]="waConfirmando()">
+            Cancelar lote
+          </button>
+          <button type="button" class="reg__btn" (click)="confirmarTodosWhatsapp()" [disabled]="waConfirmando()">
+            {{ waConfirmando() ? 'Guardando…' : 'Guardar todos en Excel' }}
           </button>
         </div>
       </div>
@@ -78,7 +127,21 @@
 
   @if (modo() !== 'lista') {
     <section class="reg__card">
-      <h3>{{ modo() === 'nueva' ? 'Agregar al Excel' : 'Editar fila' }}</h3>
+      <h3>
+        @if (waPreview(); as p) {
+          Revisar chat · {{ p.filename }}
+        } @else {
+          {{ modo() === 'nueva' ? 'Agregar al Excel' : 'Editar fila' }}
+        }
+      </h3>
+      @if (waPreview(); as p) {
+        @if (p.coincidencias?.[0]; as hit) {
+          <p class="reg__alert">
+            Posible registro existente ({{ hit.cliente }} · {{ hit.celular }}).
+            Puedes actualizarlo desde la lista o guardar este chat como fila nueva.
+          </p>
+        }
+      }
       <div class="reg__grid">
         <label>
           Hoja
@@ -224,8 +287,8 @@
         </label>
       </div>
       <div class="reg__form-actions">
-        <button type="button" class="reg__btn" (click)="guardar()" [disabled]="saving()">
-          {{ saving() ? 'Guardando…' : 'Guardar en Excel' }}
+        <button type="button" class="reg__btn" (click)="guardar()" [disabled]="saving() || waConfirmando()">
+          {{ saving() || waConfirmando() ? 'Guardando…' : waPreview() ? 'Guardar este chat' : 'Guardar en Excel' }}
         </button>
         <button type="button" class="reg__ghost" (click)="cancelar()">Cancelar</button>
         @if (modo() === 'editar') {

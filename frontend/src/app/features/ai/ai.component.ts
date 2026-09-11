@@ -7,6 +7,7 @@ import {
   AnalyticsInsight,
   ChecklistResponse,
   EnterpriseAiService,
+  AiProviderStatus,
   ProviderRec,
   QuotationResponse,
   RuleListItem,
@@ -29,7 +30,7 @@ export class AiComponent implements OnInit {
   readonly tab = signal<AiTab>('quote');
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly providerStatus = signal<Record<string, string> | null>(null);
+  readonly providerStatus = signal<AiProviderStatus | null>(null);
 
   quoteMessage = 'Necesito una cotización para cinco personas al tour Acaime desde Armenia con transporte y almuerzo.';
   readonly quotation = signal<QuotationResponse | null>(null);

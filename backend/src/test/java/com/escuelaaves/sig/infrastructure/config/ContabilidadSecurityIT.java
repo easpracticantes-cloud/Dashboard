@@ -65,6 +65,26 @@ class ContabilidadSecurityIT {
 
     @Test
     @WithMockUser(username = "asesor", authorities = "ROLE_ASESOR")
+    void asesorForbiddenOnCruceExcelExport() throws Exception {
+        mockMvc.perform(get("/api/v1/contabilidad/cruce-excel/export.xlsx"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "conta", authorities = "ROLE_CONTABILIDAD")
+    void contabilidadCanReachCruceExcelExport() throws Exception {
+        var result = mockMvc.perform(get("/api/v1/contabilidad/cruce-excel/export.xlsx")).andReturn();
+        int code = result.getResponse().getStatus();
+        org.junit.jupiter.api.Assertions.assertNotEquals(401, code);
+        org.junit.jupiter.api.Assertions.assertNotEquals(403, code);
+        org.junit.jupiter.api.Assertions.assertTrue(
+                code == 200 || code == 400 || code == 404 || code == 502 || code == 503,
+                "esperado 200/400/404/502/503, fue " + code
+        );
+    }
+
+    @Test
+    @WithMockUser(username = "asesor", authorities = "ROLE_ASESOR")
     void asesorForbiddenOnChatAsk() throws Exception {
         mockMvc.perform(
                 post("/api/v1/contabilidad/documents/ask")

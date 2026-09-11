@@ -153,6 +153,11 @@ def test_export_xlsx_estructura_estandar(client):
     assert export.status_code == 200, export.text
     assert "spreadsheet" in export.headers["content-type"]
     assert "Cruce_Cuentas_" in export.headers.get("content-disposition", "")
+    assert export.content[:2] == b"PK"
+    assert len(export.content) > 200
+    alias = client.get("/api/cruce-excel/export")
+    assert alias.status_code == 200, alias.text
+    assert alias.content[:2] == b"PK"
 
     wb = load_workbook(io.BytesIO(export.content))
     year = 2026

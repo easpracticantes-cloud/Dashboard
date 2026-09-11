@@ -25,7 +25,9 @@ public record AnthropicProperties(
         double priceFastInputPerMtok,
         double priceFastOutputPerMtok,
         double priceReasoningInputPerMtok,
-        double priceReasoningOutputPerMtok
+        double priceReasoningOutputPerMtok,
+        /** Crédito Claude mostrado en el centro de mando. */
+        Double budgetUsd
 ) {
     public AnthropicProperties {
         if (modelFast == null || modelFast.isBlank()) {
@@ -63,6 +65,9 @@ public record AnthropicProperties(
         }
         if (priceReasoningOutputPerMtok <= 0) {
             priceReasoningOutputPerMtok = 15.0;
+        }
+        if (budgetUsd == null || budgetUsd <= 0) {
+            budgetUsd = 5.0;
         }
         if (workspaceId != null) {
             workspaceId = workspaceId.trim();

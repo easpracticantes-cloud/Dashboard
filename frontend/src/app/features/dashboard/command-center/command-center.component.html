@@ -64,20 +64,40 @@
     <div class="cc-claude__grid">
       <div class="cc-claude__cell">
         <p class="cc-claude__label">Saldo disponible</p>
-        <p class="cc-claude__value cc-claude__value--muted">No disponible</p>
-        <p class="cc-claude__hint">No hay presupuesto ni crédito de Claude configurado en SIG.</p>
-      </div>
-      <div class="cc-claude__cell">
-        <p class="cc-claude__label">Gastado (registros observados)</p>
         @if (claudeLoading()) {
           <p class="cc-claude__value">…</p>
-        } @else if (claudeUnavailable() || claudeSpentUsd() === null) {
+        } @else {
+          <p
+            class="cc-claude__value"
+            [class.is-low]="claudeLow()"
+            [class.is-empty]="claudeEmpty()"
+          >
+            {{ claudeRemainingUsd() | currency: 'USD' : 'symbol' : '1.2-4' }}
+          </p>
+          <div class="cc-claude__bar" role="progressbar" [attr.aria-valuenow]="claudeRemainingPct()" aria-valuemin="0" aria-valuemax="100">
+            <i [style.width.%]="claudeRemainingPct()"></i>
+          </div>
+          <p class="cc-claude__hint">
+            De {{ claudeBudgetUsd() | currency: 'USD' : 'symbol' : '1.2-2' }} de crédito.
+            @if (claudeEmpty()) {
+              Crédito agotado.
+            } @else {
+              Baja a medida que se usa Claude.
+            }
+          </p>
+        }
+      </div>
+      <div class="cc-claude__cell">
+        <p class="cc-claude__label">Gastado</p>
+        @if (claudeLoading()) {
+          <p class="cc-claude__value">…</p>
+        } @else if (claudeUnavailable()) {
           <p class="cc-claude__value cc-claude__value--muted">Datos de consumo no disponibles</p>
         } @else {
-          <p class="cc-claude__value">{{ claudeSpentUsd()! | currency: 'USD' : 'symbol' : '1.2-4' }}</p>
+          <p class="cc-claude__value">{{ claudeSpentUsd() | currency: 'USD' : 'symbol' : '1.2-4' }}</p>
           <p class="cc-claude__hint">
-            {{ claudeCalls() }} llamada{{ claudeCalls() === 1 ? '' : 's' }} Claude en los últimos registros.
-            Estimación a partir de costos guardados — no se inventa un % de presupuesto.
+            {{ claudeCalls() }} llamada{{ claudeCalls() === 1 ? '' : 's' }} Claude.
+            Restado del crédito de {{ claudeBudgetUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}.
           </p>
         }
       </div>

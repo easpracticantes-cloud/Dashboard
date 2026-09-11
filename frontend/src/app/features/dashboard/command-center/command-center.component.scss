@@ -541,10 +541,28 @@ eas-command-center,
   color: var(--eas-ink);
 }
 
-.cc-claude__value--muted {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--eas-muted);
+.cc-claude__value.is-low {
+  color: var(--eas-amber-deep, #9a6410);
+}
+
+.cc-claude__value.is-empty {
+  color: #9b1c1c;
+}
+
+.cc-claude__bar {
+  margin: 0.55rem 0 0;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--eas-line) 55%, var(--eas-mist));
+  overflow: hidden;
+}
+
+.cc-claude__bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--eas-leaf), var(--eas-amber));
+  transition: width 0.4s ease;
 }
 
 .cc-claude__hint {

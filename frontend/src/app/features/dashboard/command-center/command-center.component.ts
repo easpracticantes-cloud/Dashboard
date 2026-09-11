@@ -4,11 +4,11 @@ import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
-import { catchError, forkJoin, interval, of } from 'rxjs';
+import { catchError, interval, of } from 'rxjs';
 import { BusinessPulse, FunnelMetrics, OpsService } from '../../../core/services/ops.service';
 import { ReservationDto } from '../../../core/services/commercial.service';
 import { LiveSyncService } from '../../../core/services/live-sync.service';
-import { EnterpriseAiService, UsageLog } from '../../../core/services/enterprise-ai.service';
+import { EnterpriseAiService } from '../../../core/services/enterprise-ai.service';
 
 @Component({
   selector: 'eas-command-center',
@@ -36,9 +36,22 @@ export class CommandCenterComponent implements OnInit {
   readonly claudeUnavailable = signal(false);
   readonly claudeProvider = signal('claude');
   readonly claudeStatus = signal('');
-  readonly claudeSpentUsd = signal<number | null>(null);
+  readonly claudeBudgetUsd = signal(5);
+  readonly claudeSpentUsd = signal(0);
+  readonly claudeRemainingUsd = signal(5);
   readonly claudeCalls = signal(0);
   readonly claudeUpdated = signal<string | null>(null);
+
+  readonly claudeRemainingPct = computed(() => {
+    const budget = this.claudeBudgetUsd();
+    if (budget <= 0) {
+      return 0;
+    }
+    return Math.max(0, Math.min(100, (this.claudeRemainingUsd() / budget) * 100));
+  });
+
+  readonly claudeLow = computed(() => this.claudeRemainingUsd() > 0 && this.claudeRemainingPct() <= 20);
+  readonly claudeEmpty = computed(() => this.claudeRemainingUsd() <= 0);
 
   readonly claudeReady = computed(() => {
     const s = this.claudeStatus().toUpperCase();
@@ -68,7 +81,7 @@ export class CommandCenterComponent implements OnInit {
 
   ngOnInit(): void {
     this.reload();
-    this.reloadClaude();
+    this.reloadClaude(true);
     this.lastTick = this.liveSync.tick();
     interval(2000)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -78,8 +91,12 @@ export class CommandCenterComponent implements OnInit {
           this.lastTick = t;
           this.ops.invalidateCommandCenter();
           this.reload();
+          this.reloadClaude(false);
         }
       });
+    interval(15000)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.reloadClaude(false));
   }
 
   reload(): void {
@@ -97,34 +114,30 @@ export class CommandCenterComponent implements OnInit {
     });
   }
 
-  private reloadClaude(): void {
-    this.claudeLoading.set(true);
-    forkJoin({
-      status: this.ai.status().pipe(catchError(() => of(null))),
-      logs: this.ai.usageLogs().pipe(catchError(() => of(null as UsageLog[] | null)))
-    }).subscribe({
-      next: ({ status, logs }) => {
-        if (status) {
-          this.claudeProvider.set(String(status['provider'] || status['activeType'] || 'claude'));
-          this.claudeStatus.set(String(status['status'] || ''));
-        }
-        if (!logs) {
+  private reloadClaude(showLoading: boolean): void {
+    if (showLoading) {
+      this.claudeLoading.set(true);
+    }
+    this.ai.status().pipe(catchError(() => of(null))).subscribe({
+      next: (status) => {
+        if (!status) {
           this.claudeUnavailable.set(true);
-          this.claudeSpentUsd.set(null);
-          this.claudeCalls.set(0);
-          this.claudeUpdated.set(null);
-        } else {
-          const claudeLogs = logs.filter((u) => {
-            const p = (u.provider || '').toLowerCase();
-            return p === 'claude' || p === 'anthropic';
-          });
-          this.claudeUnavailable.set(false);
-          this.claudeCalls.set(claudeLogs.length);
-          const spent = claudeLogs.reduce((sum, u) => sum + (Number(u.estimatedCostUsd) || 0), 0);
-          this.claudeSpentUsd.set(spent);
-          const latest = claudeLogs.find((u) => !!u.createdAt)?.createdAt ?? logs[0]?.createdAt ?? null;
-          this.claudeUpdated.set(latest);
+          this.claudeLoading.set(false);
+          return;
         }
+        this.claudeUnavailable.set(false);
+        this.claudeProvider.set(String(status.provider || status.activeType || 'claude'));
+        this.claudeStatus.set(String(status.status || ''));
+        const budget = Number(status.budgetUsd);
+        const spent = Number(status.spentUsd);
+        const remaining = Number(status.remainingUsd);
+        this.claudeBudgetUsd.set(Number.isFinite(budget) && budget > 0 ? budget : 5);
+        this.claudeSpentUsd.set(Number.isFinite(spent) && spent > 0 ? spent : 0);
+        this.claudeRemainingUsd.set(
+          Number.isFinite(remaining) ? Math.max(0, remaining) : Math.max(0, this.claudeBudgetUsd() - this.claudeSpentUsd())
+        );
+        this.claudeCalls.set(Number(status.callCount) || 0);
+        this.claudeUpdated.set(status.lastUsageAt || null);
         this.claudeLoading.set(false);
       },
       error: () => {

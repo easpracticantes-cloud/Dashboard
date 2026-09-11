@@ -86,6 +86,18 @@ export interface UsageLog {
   createdAt: string;
 }
 
+export interface AiProviderStatus {
+  provider?: string;
+  code?: string;
+  status?: string;
+  activeType?: string;
+  budgetUsd?: number;
+  spentUsd?: number;
+  remainingUsd?: number;
+  callCount?: number;
+  lastUsageAt?: string | null;
+}
+
 export interface AnalyticsInsight {
   summary: string;
   highlights: string[];
@@ -99,7 +111,7 @@ export class EnterpriseAiService {
   private readonly appConfig = inject(AppConfigService);
   private readonly auth = inject(AuthService);
 
-  status(): Observable<Record<string, string>> {
+  status(): Observable<AiProviderStatus> {
     return this.api.get('/ai/status');
   }
 

@@ -17,7 +17,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -28,8 +27,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +37,7 @@ import java.util.zip.ZipInputStream;
 public class WhatsAppRegistroService {
 
     private static final int MAX_MESSAGES_FOR_MODEL = 220;
-    private static final long MAX_BYTES = 8 * 1024 * 1024;
+    private static final int ANALYZE_CONCURRENCY = 4;
 
     private final IntelligenceService intelligenceService;
     private final SheetsSyncService sheetsSyncService;
@@ -46,64 +46,119 @@ public class WhatsAppRegistroService {
     private final ObjectMapper objectMapper;
 
     public Map<String, Object> analyze(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new BadRequestException("Seleccione un chat exportado de WhatsApp (.txt o .zip).");
-        }
-        if (file.getSize() > MAX_BYTES) {
-            throw new BadRequestException("El archivo supera 8 MB.");
-        }
-        String filename = file.getOriginalFilename() == null ? "chat.txt" : file.getOriginalFilename();
-        String lower = filename.toLowerCase(Locale.ROOT);
-        if (!(lower.endsWith(".txt") || lower.endsWith(".zip"))) {
-            throw new BadRequestException("Formato no soportado. Use un .txt o .zip exportado por WhatsApp.");
-        }
-        try {
-            String raw = lower.endsWith(".zip") ? readZipChat(file) : new String(file.getBytes(), StandardCharsets.UTF_8);
-            WhatsAppChatParser.ParsedWhatsAppChat parsed = WhatsAppChatParser.parse(filename, raw);
-            if (parsed.messages().isEmpty()) {
-                throw new BadRequestException("No se reconocieron mensajes en el archivo.");
+        return analyze(file == null ? List.of() : List.of(file));
+    }
+
+    public Map<String, Object> analyze(List<MultipartFile> files) {
+        List<WhatsAppChatArchive.ExtractedChat> chats = WhatsAppChatArchive.collect(files);
+        List<AiDraft> drafts = extractInParallel(chats);
+        List<Map<String, Object>> items = new ArrayList<>();
+        List<Map<String, Object>> errors = new ArrayList<>();
+        for (AiDraft draft : drafts) {
+            if (draft.error() != null) {
+                Map<String, Object> err = new LinkedHashMap<>();
+                err.put("filename", draft.filename());
+                err.put("message", draft.error());
+                errors.add(err);
+                continue;
             }
-            List<WhatsAppChatParser.WhatsAppMessage> compact =
-                    WhatsAppChatParser.compactForModel(parsed.messages(), MAX_MESSAGES_FOR_MODEL);
-            String rendered = WhatsAppChatParser.renderForModel(compact);
-            SeguimientoExtraction extraction = intelligenceService.extractSeguimientoFromChat(rendered);
-            if (parsed.inferredPhone() != null && blank(extraction.valor("celular"))) {
-                extraction.campos().put(
-                        "celular",
-                        SeguimientoExtraction.FieldValue.of(parsed.inferredPhone(), "INFERIDO", 0.7)
-                );
+            try {
+                items.add(persistPreview(draft));
+            } catch (Exception ex) {
+                Map<String, Object> err = new LinkedHashMap<>();
+                err.put("filename", draft.filename());
+                err.put("message", "No se pudo guardar el análisis de " + draft.filename() + ".");
+                errors.add(err);
             }
-            List<Map<String, Object>> matches = findPossibleDuplicates(extraction);
-            String json = objectMapper.writeValueAsString(extraction);
-            WhatsAppImportAuditEntity saved = auditRepository.save(WhatsAppImportAuditEntity.builder()
-                    .filename(safeName(filename))
-                    .fileHash(sha256(file.getBytes()))
-                    .sourceKind(lower.endsWith(".zip") ? "zip" : "txt")
-                    .messageCount(parsed.messages().size())
-                    .model("claude")
-                    .extractedJson(json)
-                    .status("PREVIEW")
-                    .build());
-            log.info("[WhatsAppRegistro] analizado fileHash={} mensajes={} previewId={}",
-                    saved.getFileHash(), parsed.messages().size(), saved.getId());
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("previewId", saved.getId().toString());
-            out.put("filename", saved.getFilename());
-            out.put("messageCount", parsed.messages().size());
-            out.put("campos", extraction.campos());
-            out.put("ultimaCotizacion", extraction.ultimaCotizacion());
-            out.put("historialCotizaciones", extraction.historialCotizaciones());
-            out.put("resumen", extraction.resumen());
-            out.put("posibleDuplicado", matches.isEmpty() ? extraction.posibleDuplicado() : "REVISAR POSIBLE DUPLICADO");
-            out.put("coincidencias", matches);
-            out.put("requiereConfirmacion", true);
-            return out;
-        } catch (BadRequestException ex) {
-            throw ex;
+        }
+        if (items.isEmpty()) {
+            throw new BadRequestException("No se pudo analizar ningún chat de WhatsApp.");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("total", chats.size());
+        out.put("ok", items.size());
+        out.put("failed", errors.size());
+        out.put("items", items);
+        out.put("errors", errors);
+        out.put("requiereConfirmacion", true);
+        if (items.size() == 1) {
+            out.putAll(items.getFirst());
+        }
+        return out;
+    }
+
+    private List<AiDraft> extractInParallel(List<WhatsAppChatArchive.ExtractedChat> chats) {
+        Semaphore slots = new Semaphore(ANALYZE_CONCURRENCY);
+        List<AiDraft> drafts = new ArrayList<>();
+        try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Future<AiDraft>> futures = new ArrayList<>();
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            for (WhatsAppChatArchive.ExtractedChat chat : chats) {
+                futures.add(exec.submit(() -> {
+                    slots.acquireUninterruptibly();
+                    try {
+                        SecurityContextHolder.getContext().setAuthentication(auth);
+                        return extractWithAi(chat);
+                    } catch (Exception ex) {
+                        log.warn("[WhatsAppRegistro] chat {} falló: {}", chat.filename(), ex.getMessage());
+                        String msg = ex instanceof BadRequestException && ex.getMessage() != null
+                                ? ex.getMessage()
+                                : "No se pudo analizar " + chat.filename() + ".";
+                        return AiDraft.failed(chat.filename(), msg);
+                    } finally {
+                        SecurityContextHolder.clearContext();
+                        slots.release();
+                    }
+                }));
+            }
+            for (Future<AiDraft> future : futures) {
+                drafts.add(future.get());
+            }
         } catch (Exception ex) {
-            log.warn("[WhatsAppRegistro] análisis falló tipo={} size={}", extOf(filename), file.getSize());
-            throw new BadRequestException("No se pudo analizar el chat de WhatsApp.");
+            throw new BadRequestException("No se pudieron analizar los chats de WhatsApp.");
         }
+        return drafts;
+    }
+
+    public Map<String, Object> confirmBatch(List<Map<String, Object>> items) {
+        if (items == null || items.isEmpty()) {
+            throw new BadRequestException("No hay chats para confirmar.");
+        }
+        if (items.size() > WhatsAppChatArchive.MAX_CHATS) {
+            throw new BadRequestException("Máximo " + WhatsAppChatArchive.MAX_CHATS + " chats por lote.");
+        }
+        int ok = 0;
+        List<Map<String, Object>> errors = new ArrayList<>();
+        for (Map<String, Object> item : items) {
+            if (item == null || item.get("previewId") == null) {
+                Map<String, Object> err = new LinkedHashMap<>();
+                err.put("message", "previewId es obligatorio");
+                errors.add(err);
+                continue;
+            }
+            try {
+                UUID previewId = UUID.fromString(String.valueOf(item.get("previewId")));
+                boolean updateExisting = Boolean.TRUE.equals(item.get("updateExisting"));
+                @SuppressWarnings("unchecked")
+                Map<String, Object> row = item.get("row") instanceof Map<?, ?> m
+                        ? (Map<String, Object>) m
+                        : Map.of();
+                confirm(previewId, row, updateExisting);
+                ok++;
+            } catch (Exception ex) {
+                Map<String, Object> err = new LinkedHashMap<>();
+                err.put("previewId", String.valueOf(item.get("previewId")));
+                err.put("message", ex.getMessage() == null ? "No se pudo guardar." : ex.getMessage());
+                errors.add(err);
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", ok);
+        out.put("failed", errors.size());
+        out.put("errors", errors);
+        out.put("message", ok + " fila(s) escritas en el Excel"
+                + (errors.isEmpty() ? "." : " · " + errors.size() + " con error."));
+        return out;
     }
 
     public Map<String, Object> confirm(UUID previewId, Map<String, Object> editedRow, boolean updateExisting) {
@@ -177,22 +232,73 @@ public class WhatsAppRegistroService {
         return hits;
     }
 
-    private String readZipChat(MultipartFile file) throws Exception {
-        try (ZipInputStream zip = new ZipInputStream(file.getInputStream())) {
-            ZipEntry entry;
-            while ((entry = zip.getNextEntry()) != null) {
-                String name = entry.getName().toLowerCase(Locale.ROOT);
-                if (entry.isDirectory() || !name.endsWith(".txt")) {
-                    continue;
-                }
-                if (name.contains("chat") || name.endsWith(".txt")) {
-                    ByteArrayOutputStream buf = new ByteArrayOutputStream();
-                    zip.transferTo(buf);
-                    return buf.toString(StandardCharsets.UTF_8);
-                }
-            }
+    private AiDraft extractWithAi(WhatsAppChatArchive.ExtractedChat chat) {
+        WhatsAppChatParser.ParsedWhatsAppChat parsed = WhatsAppChatParser.parse(chat.filename(), chat.text());
+        if (parsed.messages().isEmpty()) {
+            throw new BadRequestException("No se reconocieron mensajes en " + chat.filename() + ".");
         }
-        throw new BadRequestException("El ZIP no contiene un chat de WhatsApp (.txt).");
+        List<WhatsAppChatParser.WhatsAppMessage> compact =
+                WhatsAppChatParser.compactForModel(parsed.messages(), MAX_MESSAGES_FOR_MODEL);
+        String rendered = WhatsAppChatParser.renderForModel(compact);
+        SeguimientoExtraction extraction = intelligenceService.extractSeguimientoFromChat(rendered);
+        if (parsed.inferredPhone() != null && blank(extraction.valor("celular"))) {
+            extraction.campos().put(
+                    "celular",
+                    SeguimientoExtraction.FieldValue.of(parsed.inferredPhone(), "INFERIDO", 0.7)
+            );
+        }
+        return new AiDraft(chat, parsed, extraction, null);
+    }
+
+    private Map<String, Object> persistPreview(AiDraft draft) throws Exception {
+        WhatsAppChatArchive.ExtractedChat chat = draft.chat();
+        WhatsAppChatParser.ParsedWhatsAppChat parsed = draft.parsed();
+        SeguimientoExtraction extraction = draft.extraction();
+        List<Map<String, Object>> matches = findPossibleDuplicates(extraction);
+        String json = objectMapper.writeValueAsString(extraction);
+        WhatsAppImportAuditEntity saved = auditRepository.save(WhatsAppImportAuditEntity.builder()
+                .filename(WhatsAppChatArchive.safeName(chat.filename()))
+                .fileHash(sha256(chat.text().getBytes(StandardCharsets.UTF_8)))
+                .sourceKind(chat.sourceKind())
+                .messageCount(parsed.messages().size())
+                .model("claude")
+                .extractedJson(json)
+                .status("PREVIEW")
+                .build());
+        log.info("[WhatsAppRegistro] analizado fileHash={} mensajes={} previewId={}",
+                saved.getFileHash(), parsed.messages().size(), saved.getId());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("previewId", saved.getId().toString());
+        out.put("filename", saved.getFilename());
+        out.put("messageCount", parsed.messages().size());
+        out.put("campos", extraction.campos());
+        out.put("ultimaCotizacion", extraction.ultimaCotizacion());
+        out.put("historialCotizaciones", extraction.historialCotizaciones());
+        out.put("resumen", extraction.resumen());
+        out.put("posibleDuplicado", matches.isEmpty() ? extraction.posibleDuplicado() : "REVISAR POSIBLE DUPLICADO");
+        out.put("coincidencias", matches);
+        out.put("requiereConfirmacion", true);
+        return out;
+    }
+
+    private record AiDraft(
+            WhatsAppChatArchive.ExtractedChat chat,
+            WhatsAppChatParser.ParsedWhatsAppChat parsed,
+            SeguimientoExtraction extraction,
+            String error
+    ) {
+        static AiDraft failed(String filename, String message) {
+            return new AiDraft(
+                    new WhatsAppChatArchive.ExtractedChat(filename, "", "txt"),
+                    null,
+                    null,
+                    message
+            );
+        }
+
+        String filename() {
+            return chat == null ? "" : chat.filename();
+        }
     }
 
     private static String currentUsername() {
@@ -203,16 +309,6 @@ public class WhatsAppRegistroService {
     private static String sha256(byte[] data) throws Exception {
         byte[] digest = MessageDigest.getInstance("SHA-256").digest(data);
         return HexFormat.of().formatHex(digest);
-    }
-
-    private static String safeName(String filename) {
-        int slash = Math.max(filename.lastIndexOf('/'), filename.lastIndexOf('\\'));
-        return slash >= 0 ? filename.substring(slash + 1) : filename;
-    }
-
-    private static String extOf(String filename) {
-        int dot = filename.lastIndexOf('.');
-        return dot >= 0 ? filename.substring(dot + 1) : "";
     }
 
     private static boolean blank(String v) {

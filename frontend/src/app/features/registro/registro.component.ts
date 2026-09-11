@@ -5,7 +5,11 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { DashboardService } from '../../core/services/dashboard.service';
 import { IntegrationsService } from '../../core/services/integrations.service';
-import { WhatsappPreview, WhatsappRegistroApiService } from '../../core/services/whatsapp-registro-api.service';
+import {
+  WhatsappAnalyzeError,
+  WhatsappPreview,
+  WhatsappRegistroApiService,
+} from '../../core/services/whatsapp-registro-api.service';
 import { SeguimientoWhatsapp, SheetsDashboard } from '../../core/models/sheets-dashboard.model';
 import { AveUiContextService } from '../../shared/components/ave-copilot/ave-ui-context.service';
 
@@ -18,6 +22,7 @@ const SI_NO = ['SI', 'NO'];
 const REGISTRADA_BASE = ['AUTOBITS', 'FISICO', 'WHATSAPP', 'PENDIENTE'];
 const ENCUESTA_BASE = ['SI', 'NO', 'PENDIENTE'];
 const PAGE_SIZE = 20;
+const MAX_WA_FILES = 50;
 const EXCLUDED_HOJAS = new Set([
   'VENTAS',
   'TOQUES',
@@ -138,9 +143,13 @@ export class RegistroComponent {
   readonly numeroFiltro = signal('');
   readonly pagina = signal(1);
   readonly pageSize = PAGE_SIZE;
-  readonly waFile = signal<File | null>(null);
+  readonly maxWaFiles = MAX_WA_FILES;
+  readonly waQueue = signal<File[]>([]);
   readonly waEstado = signal<'idle' | 'analizando' | 'preview' | 'error'>('idle');
   readonly waPreview = signal<WhatsappPreview | null>(null);
+  readonly waItems = signal<WhatsappPreview[]>([]);
+  readonly waDrafts = signal<Record<string, Draft>>({});
+  readonly waErrors = signal<WhatsappAnalyzeError[]>([]);
   readonly waError = signal('');
   readonly waConfirmando = signal(false);
   readonly arrastrandoWa = signal(false);
@@ -234,7 +243,14 @@ export class RegistroComponent {
   }
 
   patch(key: keyof Draft, value: string): void {
-    this.draft.update((d) => ({ ...d, [key]: value }));
+    this.draft.update((d) => {
+      const next = { ...d, [key]: value };
+      const preview = this.waPreview();
+      if (preview) {
+        this.waDrafts.update((m) => ({ ...m, [preview.previewId]: next }));
+      }
+      return next;
+    });
   }
 
   setFiltroHoja(value: string): void {
@@ -279,54 +295,214 @@ export class RegistroComponent {
   }
 
   cancelar(): void {
+    if (this.waItems().length && this.waPreview()) {
+      this.waPreview.set(null);
+      this.modo.set('lista');
+      this.original.set(null);
+      this.aveUi.clearEntity();
+      return;
+    }
     this.modo.set('lista');
     this.original.set(null);
     this.aveUi.clearEntity();
   }
 
   onWhatsappFile(ev: Event): void {
-    const file = (ev.target as HTMLInputElement).files?.[0];
-    (ev.target as HTMLInputElement).value = '';
-    if (file) this.analizarWhatsapp(file);
+    const input = ev.target as HTMLInputElement;
+    const files = input.files ? Array.from(input.files) : [];
+    input.value = '';
+    this.enqueueWhatsapp(files);
   }
 
   onWhatsappDrop(ev: DragEvent): void {
     ev.preventDefault();
     this.arrastrandoWa.set(false);
-    const file = ev.dataTransfer?.files?.[0];
-    if (file) this.analizarWhatsapp(file);
+    const files = ev.dataTransfer?.files ? Array.from(ev.dataTransfer.files) : [];
+    this.enqueueWhatsapp(files);
   }
 
-  analizarWhatsapp(file: File): void {
-    const name = file.name.toLowerCase();
-    if (!name.endsWith('.txt') && !name.endsWith('.zip')) {
-      this.waEstado.set('error');
-      this.waError.set('Use un .txt o .zip exportado desde WhatsApp.');
-      return;
+  quitarWaFile(file: File): void {
+    if (this.waEstado() === 'analizando') return;
+    this.waQueue.update((list) => list.filter((f) => f !== file));
+  }
+
+  enqueueWhatsapp(files: File[]): void {
+    if (!files.length || this.waEstado() === 'analizando') return;
+    const accepted: File[] = [];
+    const rejected: string[] = [];
+    for (const file of files) {
+      const name = file.name.toLowerCase();
+      if (!name.endsWith('.txt') && !name.endsWith('.zip')) {
+        rejected.push(file.name);
+        continue;
+      }
+      accepted.push(file);
     }
-    this.waFile.set(file);
+    this.waQueue.update((current) => {
+      const merged = [...current];
+      for (const file of accepted) {
+        const dup = merged.some((f) => f.name === file.name && f.size === file.size);
+        if (!dup) merged.push(file);
+      }
+      if (merged.length > MAX_WA_FILES) {
+        this.waError.set(`Máximo ${MAX_WA_FILES} archivos. El ZIP interno también cuenta hasta ${MAX_WA_FILES} chats.`);
+        return merged.slice(0, MAX_WA_FILES);
+      }
+      return merged;
+    });
+    if (rejected.length) {
+      this.waError.set('Solo .txt o .zip exportados desde WhatsApp: ' + rejected.slice(0, 4).join(', '));
+    } else if (!this.waError().includes('Máximo')) {
+      this.waError.set('');
+    }
+  }
+
+  analizarWhatsappLote(): void {
+    const files = this.waQueue();
+    if (!files.length || this.waEstado() === 'analizando') return;
     this.waEstado.set('analizando');
     this.waError.set('');
+    this.waErrors.set([]);
+    this.waItems.set([]);
     this.waPreview.set(null);
-    this.whatsappApi.analyze(file).subscribe({
-      next: (preview) => {
-        this.waPreview.set(preview);
+    this.waDrafts.set({});
+    this.whatsappApi.analyze(files).subscribe({
+      next: (res) => {
+        const items = res.items || [];
+        this.waItems.set(items);
+        this.waErrors.set(res.errors || []);
+        if (!items.length) {
+          this.waEstado.set('error');
+          this.waError.set(
+            res.errors?.[0]?.message || 'No se pudo analizar ningún chat de WhatsApp.'
+          );
+          return;
+        }
+        const drafts: Record<string, Draft> = {};
+        for (const item of items) {
+          drafts[item.previewId] = this.draftFromWhatsapp(item);
+        }
+        this.waDrafts.set(drafts);
         this.waEstado.set('preview');
-        this.draft.set(this.draftFromWhatsapp(preview));
-        this.modo.set('nueva');
+        if (items.length === 1) {
+          this.revisarWhatsapp(items[0]);
+        }
       },
       error: (err) => {
         this.waEstado.set('error');
-        this.waError.set(err?.error?.message || err?.error?.detail || 'No se pudo analizar el chat.');
+        this.waError.set(err?.error?.message || err?.error?.detail || 'No se pudo analizar el lote.');
       },
     });
+  }
+
+  waCliente(preview: WhatsappPreview): string {
+    return preview.campos?.['cliente']?.valor || 'NO_IDENTIFICADO';
+  }
+
+  revisarWhatsapp(preview: WhatsappPreview): void {
+    this.waPreview.set(preview);
+    this.draft.set(this.waDrafts()[preview.previewId] || this.draftFromWhatsapp(preview));
+    this.aviso.set('');
+    this.modo.set('nueva');
+    this.original.set(null);
   }
 
   confirmarWhatsapp(updateExisting: boolean): void {
     const preview = this.waPreview();
     if (!preview || this.waConfirmando()) return;
     this.waConfirmando.set(true);
-    const d = this.draft();
+    const d = this.waDrafts()[preview.previewId] || this.draft();
+    const row = this.rowFromDraft(d, preview, updateExisting);
+    const hit = preview.coincidencias?.[0];
+    this.whatsappApi.confirm(preview.previewId, row, updateExisting && !!hit).subscribe({
+      next: (res) => {
+        this.waConfirmando.set(false);
+        this.finishSave(d, updateExisting && hit ? this.rowFromHit(hit) : null, res.message);
+        this.quitarPreview(preview.previewId);
+      },
+      error: (err) => {
+        this.waConfirmando.set(false);
+        this.aviso.set(err?.error?.message || 'No se pudo guardar en el Registro.');
+      },
+    });
+  }
+
+  confirmarTodosWhatsapp(): void {
+    const items = this.waItems();
+    if (!items.length || this.waConfirmando()) return;
+    const hoja = this.hojaFiltro() || this.hojas()[0] || '';
+    if (!hoja) {
+      this.aviso.set('Elige la hoja del Excel antes de guardar el lote.');
+      return;
+    }
+    this.waConfirmando.set(true);
+    const payload = items.map((preview) => {
+      const draft = {
+        ...(this.waDrafts()[preview.previewId] || this.draftFromWhatsapp(preview)),
+        hojaOrigen: this.waDrafts()[preview.previewId]?.hojaOrigen || hoja,
+      };
+      return {
+        previewId: preview.previewId,
+        updateExisting: false,
+        row: this.rowFromDraft(draft, preview, false),
+      };
+    });
+    this.whatsappApi.confirmBatch(payload).subscribe({
+      next: (res) => {
+        this.waConfirmando.set(false);
+        const failedIds = new Set((res.errors || []).map((e) => e.previewId).filter(Boolean));
+        const saved = items.filter((p) => !failedIds.has(p.previewId));
+        for (const preview of saved) {
+          const d = this.waDrafts()[preview.previewId] || this.draftFromWhatsapp(preview);
+          this.applyLocal({ ...d, hojaOrigen: d.hojaOrigen || hoja }, null);
+        }
+        this.aviso.set(res.message);
+        this.dashboard.invalidateCache();
+        if (failedIds.size) {
+          this.waItems.set(items.filter((p) => failedIds.has(p.previewId)));
+          this.waErrors.set(
+            (res.errors || []).map((e) => ({ filename: e.previewId, message: e.message || 'Error' }))
+          );
+          this.waEstado.set('preview');
+        } else {
+          this.limpiarWhatsapp();
+        }
+        this.modo.set('lista');
+        this.original.set(null);
+        this.aveUi.clearEntity();
+      },
+      error: (err) => {
+        this.waConfirmando.set(false);
+        this.aviso.set(err?.error?.message || 'No se pudo guardar el lote en el Registro.');
+      },
+    });
+  }
+
+  cancelarWhatsapp(): void {
+    for (const item of this.waItems()) {
+      this.whatsappApi.cancel(item.previewId).subscribe({ error: () => undefined });
+    }
+    this.limpiarWhatsapp();
+    this.modo.set('lista');
+    this.original.set(null);
+    this.aveUi.clearEntity();
+  }
+
+  private quitarPreview(previewId: string): void {
+    const rest = this.waItems().filter((p) => p.previewId !== previewId);
+    this.waItems.set(rest);
+    this.waDrafts.update((m) => {
+      const next = { ...m };
+      delete next[previewId];
+      return next;
+    });
+    this.waPreview.set(null);
+    if (!rest.length) {
+      this.limpiarWhatsapp();
+    }
+  }
+
+  private rowFromDraft(d: Draft, preview: WhatsappPreview, updateExisting: boolean): Record<string, unknown> {
     const row: Record<string, unknown> = {
       ...d,
       canal: 'WHATSAPP',
@@ -340,31 +516,15 @@ export class RegistroComponent {
       row['matchCliente'] = hit.cliente;
       row['hojaOrigen'] = hit.hojaOrigen || d.hojaOrigen;
     }
-    this.whatsappApi.confirm(preview.previewId, row, updateExisting && !!hit).subscribe({
-      next: (res) => {
-        this.waConfirmando.set(false);
-        this.finishSave(d, updateExisting && hit ? this.rowFromHit(hit) : null, res.message);
-        this.limpiarWhatsapp();
-      },
-      error: (err) => {
-        this.waConfirmando.set(false);
-        this.aviso.set(err?.error?.message || 'No se pudo guardar en el Registro.');
-      },
-    });
-  }
-
-  cancelarWhatsapp(): void {
-    const preview = this.waPreview();
-    if (preview?.previewId) {
-      this.whatsappApi.cancel(preview.previewId).subscribe({ error: () => undefined });
-    }
-    this.limpiarWhatsapp();
-    this.cancelar();
+    return row;
   }
 
   private limpiarWhatsapp(): void {
-    this.waFile.set(null);
+    this.waQueue.set([]);
     this.waPreview.set(null);
+    this.waItems.set([]);
+    this.waDrafts.set({});
+    this.waErrors.set([]);
     this.waEstado.set('idle');
     this.waError.set('');
   }
@@ -416,6 +576,10 @@ export class RegistroComponent {
   }
 
   guardar(): void {
+    if (this.waPreview()) {
+      this.confirmarWhatsapp(false);
+      return;
+    }
     if (this.saving()) return;
     const d = this.draft();
     if (!d.hojaOrigen) {

@@ -38,6 +38,10 @@ spring:
       mode: never
   jackson:
     default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 80MB
+      max-request-size: 100MB
 
 springdoc:
   swagger-ui:
@@ -88,6 +92,7 @@ app:
       price-fast-output-per-mtok: ${AI_PRICE_HAIKU_OUTPUT:5.0}
       price-reasoning-input-per-mtok: ${AI_PRICE_SONNET_INPUT:3.0}
       price-reasoning-output-per-mtok: ${AI_PRICE_SONNET_OUTPUT:15.0}
+      budget-usd: ${CLAUDE_BUDGET_USD:5}
     voice:
       provider: ${VOICE_PROVIDER:kokoro}
       model: ${VOICE_MODEL:kokoro}

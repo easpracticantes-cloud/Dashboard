@@ -42,6 +42,7 @@ def analizar_cruce(
 
 
 @router.get("/export.xlsx")
+@router.get("/export")
 def exportar_excel(
     request: Request,
     batch_id: int | None = None,

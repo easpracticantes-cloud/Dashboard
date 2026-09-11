@@ -51,7 +51,7 @@ export class ContabilidadDownloadService {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
     if (!res.ok) {
-      throw new Error(`No se pudo descargar (${res.status}).`);
+      throw new Error(await this.mensajeError(res, url));
     }
     const blob = await res.blob();
     const cd = res.headers.get('Content-Disposition') || '';
@@ -77,5 +77,24 @@ export class ContabilidadDownloadService {
     }
     const blob = await res.blob();
     return URL.createObjectURL(blob);
+  }
+
+  private async mensajeError(res: Response, url: string): Promise<string> {
+    if (res.status === 401) {
+      return 'Sesión expirada. Vuelve a iniciar sesión.';
+    }
+    if (res.status === 403) {
+      return 'No tienes permiso para este Excel.';
+    }
+    const generaAlVuelo = /\/export(\.xlsx)?(\?|$)/i.test(url);
+    if (res.status === 404) {
+      return generaAlVuelo
+        ? 'No se pudo generar el Excel.'
+        : 'El archivo generado ya no está disponible.';
+    }
+    if (res.status >= 500) {
+      return 'No se pudo generar el Excel.';
+    }
+    return 'No se pudo descargar el Excel.';
   }
 }

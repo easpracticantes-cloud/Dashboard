@@ -31,11 +31,14 @@ import com.escuelaaves.sig.domain.ai.model.ActionPlanOutcome;
 import com.escuelaaves.sig.domain.port.in.AIUseCase;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity.AiUsageLogEntity;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.AiUsageLogJpaRepository;
+import com.escuelaaves.sig.infrastructure.ai.config.AnthropicProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -62,6 +65,7 @@ public class IntelligenceService implements AIUseCase {
     private final WhatsAppAiAssistPort whatsAppAiAssistPort;
     private final AnalyticsInsightPort analyticsInsightPort;
     private final AiUsageLogJpaRepository usageLogRepository;
+    private final AnthropicProperties anthropicProperties;
 
     private GenerativeAiPort ai() {
         return aiProviderFactory.getActiveProvider();
@@ -162,14 +166,31 @@ public class IntelligenceService implements AIUseCase {
         return new AiModuleDtos.ChecklistResponse(c.tourCode(), c.title(), items);
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> providerStatus() {
         GenerativeAiPort provider = ai();
-        return Map.of(
-                "provider", provider.providerId(),
-                "code", provider.code().name(),
-                "status", provider.status().name(),
-                "activeType", aiProviderFactory.activeType().id()
-        );
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("provider", provider.providerId());
+        out.put("code", provider.code().name());
+        out.put("status", provider.status().name());
+        out.put("activeType", aiProviderFactory.activeType().id());
+        out.putAll(claudeBudgetSnapshot());
+        return out;
+    }
+
+    private Map<String, Object> claudeBudgetSnapshot() {
+        BigDecimal spentBd = usageLogRepository.sumClaudeEstimatedCostUsd();
+        double budget = anthropicProperties.budgetUsd() == null ? 5.0 : anthropicProperties.budgetUsd();
+        double spent = spentBd == null ? 0 : spentBd.doubleValue();
+        double remaining = Math.max(0, budget - spent);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("budgetUsd", budget);
+        out.put("spentUsd", spent);
+        out.put("remainingUsd", remaining);
+        out.put("callCount", usageLogRepository.countClaudeCalls());
+        usageLogRepository.lastClaudeUsageAt()
+                .ifPresent(at -> out.put("lastUsageAt", at.toString()));
+        return out;
     }
 
     public String startMemorySession(Long userId, String title) {
