@@ -49,25 +49,46 @@ export function mergeQuoteDraft(
   return {
     ...seeded,
     ...incoming,
+    items: incoming.items?.length ? incoming.items : seeded.items,
     clientName: incoming.clientName || seeded.clientName,
     clientNit: incoming.clientNit || seeded.clientNit,
     clientPhone: incoming.clientPhone || seeded.clientPhone,
     clientEmail: incoming.clientEmail || seeded.clientEmail,
-    clientCity: incoming.clientCity || seeded.clientCity
+    clientCity: incoming.clientCity || seeded.clientCity,
+    clientContact: incoming.clientContact || seeded.clientContact,
+    advisorName: incoming.advisorName || seeded.advisorName,
+    validUntil: incoming.validUntil || seeded.validUntil,
+    observations: incoming.observations || seeded.observations
   };
 }
 
 export function seedQuoteDraft(message: string, previous?: QuoteDraft | null): QuoteDraft {
   const contacts = extractQuoteContacts(message);
   const people = extractPeople(message) || previous?.people || 2;
+  const name = previous?.name || guessTourName(message);
+  const unitPrice = previous?.unitPrice || 0;
+  const items = previous?.items?.length
+    ? previous.items
+    : [
+        {
+          description: name,
+          quantity: people,
+          unit: 'pax',
+          unitPrice,
+          discount: 0,
+          total: Math.round(unitPrice * people)
+        }
+      ];
   return {
     ...previous,
-    name: previous?.name || guessTourName(message),
+    name,
     people,
     modality: previous?.modality || 'PRIVADO',
     currency: previous?.currency || 'COP',
-    unitPrice: previous?.unitPrice || 0,
-    total: previous?.total || 0,
+    unitPrice,
+    total: previous?.total || items.reduce((sum, item) => sum + (item.total || 0), 0),
+    status: previous?.status || 'DRAFT',
+    items,
     clientName: contacts.clientName || previous?.clientName,
     clientNit: contacts.clientNit || previous?.clientNit,
     clientPhone: contacts.clientPhone || previous?.clientPhone,

@@ -168,6 +168,20 @@ public final class AiModuleDtos {
     }
 
     /**
+     * Línea estructurada de cotización. La IA solo llena datos, nunca HTML.
+     */
+    public record QuoteLineItemDto(
+            String description,
+            Integer quantity,
+            String unit,
+            java.math.BigDecimal unitPrice,
+            java.math.BigDecimal discount,
+            java.math.BigDecimal iva,
+            java.math.BigDecimal total
+    ) {
+    }
+
+    /**
      * Borrador de cotización para revisión en UI (editable + PDF).
      */
     public record QuoteDraftDto(
@@ -185,7 +199,52 @@ public final class AiModuleDtos {
             String includes,
             String excludes,
             boolean reviewFlag,
-            java.util.Map<String, java.math.BigDecimal> priceScaleByPax
+            java.util.Map<String, java.math.BigDecimal> priceScaleByPax,
+            java.util.List<QuoteLineItemDto> items,
+            String clientNit,
+            String clientPhone,
+            String clientEmail,
+            String clientCity,
+            String clientContact,
+            String clientAddress,
+            String advisorName,
+            String quoteNumber,
+            String issuedAt,
+            String validUntil,
+            String observations,
+            String commercialConditions,
+            String status
+    ) {
+        public QuoteDraftDto(
+                String code,
+                String name,
+                String modality,
+                Integer people,
+                java.math.BigDecimal unitPrice,
+                java.math.BigDecimal total,
+                String currency,
+                String date,
+                String pickup,
+                String clientName,
+                String notes,
+                String includes,
+                String excludes,
+                boolean reviewFlag,
+                java.util.Map<String, java.math.BigDecimal> priceScaleByPax
+        ) {
+            this(
+                    code, name, modality, people, unitPrice, total, currency, date, pickup,
+                    clientName, notes, includes, excludes, reviewFlag, priceScaleByPax,
+                    null, null, null, null, null, null, null, null, null, null, null,
+                    null, null, "DRAFT"
+            );
+        }
+    }
+
+    public record QuoteDocumentResponse(
+            QuoteDraftDto document,
+            java.util.List<String> errors,
+            boolean valid
     ) {
     }
 

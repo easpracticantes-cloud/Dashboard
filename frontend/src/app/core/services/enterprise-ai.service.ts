@@ -182,6 +182,11 @@ export class EnterpriseAiService {
     return this.api.post('/ai/copilot', { message, sessionId, uiContext });
   }
 
+  validateQuoteDocument(document: QuoteDraft, save = false): Observable<QuoteDocumentResponse> {
+    const q = save ? '?save=true' : '';
+    return this.api.post(`/ai/quotes/document${q}`, document);
+  }
+
   memoryMessages(sessionId: string): Observable<Array<{ role: string; content: string }>> {
     return this.api.get(`/ai/memory/${encodeURIComponent(sessionId)}/messages`);
   }
@@ -276,6 +281,16 @@ export interface CopilotResponse {
   quoteDraft?: QuoteDraft | null;
 }
 
+export interface QuoteDraftItem {
+  description?: string;
+  quantity?: number;
+  unit?: string;
+  unitPrice?: number;
+  discount?: number;
+  iva?: number;
+  total?: number;
+}
+
 export interface QuoteDraft {
   code?: string;
   name?: string;
@@ -291,11 +306,27 @@ export interface QuoteDraft {
   clientPhone?: string;
   clientEmail?: string;
   clientCity?: string;
+  clientContact?: string;
+  clientAddress?: string;
+  advisorName?: string;
+  quoteNumber?: string;
+  issuedAt?: string;
+  validUntil?: string;
+  status?: string;
   notes?: string;
+  observations?: string;
+  commercialConditions?: string;
   includes?: string;
   excludes?: string;
   reviewFlag?: boolean;
   priceScaleByPax?: Record<string, number>;
+  items?: QuoteDraftItem[];
+}
+
+export interface QuoteDocumentResponse {
+  document: QuoteDraft;
+  errors: string[];
+  valid: boolean;
 }
 
 export interface ActionExecuteResponse {

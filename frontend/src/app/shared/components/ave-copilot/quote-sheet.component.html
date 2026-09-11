@@ -1,0 +1,309 @@
+<article class="qs" [class.qs--edit]="editing()" aria-label="Cotización Escuela Aves Salento">
+  <header class="qs-hero">
+    <div class="qs-hero__brand">
+      <img class="qs-hero__logo" [src]="logo" alt="escuelaaves Salento" />
+      <p class="qs-hero__inspire">Naturaleza que inspira</p>
+    </div>
+    <div class="qs-hero__bird" [style.background-image]="'url(' + plantilla + ')'" role="img" aria-label="Ave"></div>
+    <ul class="qs-hero__pills">
+      <li>
+        <span class="qs-ico qs-ico--leaf" aria-hidden="true"></span>
+        Avistamiento de aves
+      </li>
+      <li>
+        <span class="qs-ico qs-ico--peak" aria-hidden="true"></span>
+        Experiencias naturales
+      </li>
+      <li>
+        <span class="qs-ico qs-ico--mount" aria-hidden="true"></span>
+        Conexión con la biodiversidad
+      </li>
+    </ul>
+  </header>
+
+  <div class="qs-gold" aria-hidden="true"></div>
+
+  <section class="qs-title">
+    <div class="qs-title__left">
+      <span class="qs-ico qs-ico--doc" aria-hidden="true"></span>
+      <div>
+        <h1>COTIZACIÓN</h1>
+        <p>{{ company.tagline }}</p>
+      </div>
+    </div>
+    <dl class="qs-meta">
+      <div>
+        <dt>N.º Cotización:</dt>
+        <dd>
+          @if (editing()) {
+            <input class="qs-in" type="text" [ngModel]="document().quoteNumber" (ngModelChange)="patch({ quoteNumber: $event })" placeholder="—" />
+          } @else {
+            {{ dash(document().quoteNumber) }}
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>Fecha de emisión:</dt>
+        <dd>
+          @if (editing()) {
+            <input class="qs-in" type="date" [ngModel]="document().issuedAt" (ngModelChange)="patch({ issuedAt: $event })" />
+          } @else {
+            {{ document().issuedAt ? dateText(document().issuedAt) : '—' }}
+          }
+        </dd>
+      </div>
+      <div>
+        <dt>Válida hasta:</dt>
+        <dd>
+          @if (editing()) {
+            <input class="qs-in" type="date" [ngModel]="document().validUntil" (ngModelChange)="patch({ validUntil: $event })" />
+          } @else {
+            {{ document().validUntil ? dateText(document().validUntil) : '—' }}
+          }
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="qs-split">
+    <div class="qs-card">
+      <h2>
+        <span class="qs-ico qs-ico--user" aria-hidden="true"></span>
+        Datos del cliente
+      </h2>
+      <dl class="qs-kv">
+        <div>
+          <dt>Nombre:</dt>
+          <dd>
+            @if (editing()) {
+              <input class="qs-in" type="text" [ngModel]="document().clientName" (ngModelChange)="patch({ clientName: $event })" placeholder="—" />
+            } @else {
+              {{ dash(document().clientName) }}
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>NIT / C.C.:</dt>
+          <dd>
+            @if (editing()) {
+              <input class="qs-in" type="text" [ngModel]="document().clientNit" (ngModelChange)="patch({ clientNit: $event })" placeholder="—" />
+            } @else {
+              {{ dash(document().clientNit) }}
+            }
+          </dd>
+        </div>
+        @if (editing() || document().clientContact) {
+        <div>
+          <dt>Contacto:</dt>
+          <dd>
+            @if (editing()) {
+              <input class="qs-in" type="text" [ngModel]="document().clientContact" (ngModelChange)="patch({ clientContact: $event })" placeholder="—" />
+            } @else {
+              {{ dash(document().clientContact) }}
+            }
+          </dd>
+        </div>
+        }
+        <div>
+          <dt>Teléfono:</dt>
+          <dd>
+            @if (editing()) {
+              <input class="qs-in" type="text" [ngModel]="document().clientPhone" (ngModelChange)="patch({ clientPhone: $event })" placeholder="—" />
+            } @else {
+              {{ dash(document().clientPhone) }}
+            }
+          </dd>
+        </div>
+        <div>
+          <dt>Correo:</dt>
+          <dd>
+            @if (editing()) {
+              <input class="qs-in" type="email" [ngModel]="document().clientEmail" (ngModelChange)="patch({ clientEmail: $event })" placeholder="—" />
+            } @else {
+              {{ dash(document().clientEmail) }}
+            }
+          </dd>
+        </div>
+        @if (editing() || document().clientAddress) {
+        <div>
+          <dt>Dirección:</dt>
+          <dd>
+            @if (editing()) {
+              <input class="qs-in" type="text" [ngModel]="document().clientAddress" (ngModelChange)="patch({ clientAddress: $event })" placeholder="—" />
+            } @else {
+              {{ dash(document().clientAddress) }}
+            }
+          </dd>
+        </div>
+        }
+        <div>
+          <dt>Ciudad:</dt>
+          <dd>
+            @if (editing()) {
+              <input class="qs-in" type="text" [ngModel]="document().clientCity" (ngModelChange)="patch({ clientCity: $event })" placeholder="—" />
+            } @else {
+              {{ dash(document().clientCity) }}
+            }
+          </dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="qs-card">
+      <h2>
+        <span class="qs-ico qs-ico--grid" aria-hidden="true"></span>
+        Nuestra información
+      </h2>
+      <div class="qs-company">
+        <div>
+          <p class="qs-company__name">{{ company.legalName }}</p>
+          <dl class="qs-kv qs-kv--plain">
+            <div><dt>NIT:</dt><dd>{{ company.nit }}</dd></div>
+            <div><dt>Dirección:</dt><dd>{{ company.address }}</dd></div>
+            <div><dt>Teléfono:</dt><dd>{{ company.phone }}</dd></div>
+            <div><dt>Correo:</dt><dd>{{ company.email }}</dd></div>
+            @if (editing() || document().advisorName) {
+            <div>
+              <dt>Asesor:</dt>
+              <dd>
+                @if (editing()) {
+                  <input class="qs-in" type="text" [ngModel]="document().advisorName" (ngModelChange)="patch({ advisorName: $event })" placeholder="—" />
+                } @else {
+                  {{ dash(document().advisorName) }}
+                }
+              </dd>
+            </div>
+            }
+          </dl>
+        </div>
+        <p class="qs-company__slogan">{{ company.slogan }}</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="qs-detail">
+    <h2>
+      <span class="qs-ico qs-ico--leaf" aria-hidden="true"></span>
+      Detalle de la cotización
+    </h2>
+    <div class="qs-table-wrap">
+      <table class="qs-table">
+        <thead>
+          <tr>
+            <th class="qs-table__item">Ítem</th>
+            <th>Descripción</th>
+            <th>Cantidad</th>
+            <th>Valor unitario</th>
+            <th>Valor total</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of rows(); track item.id; let i = $index) {
+            <tr>
+              <td class="qs-table__item">
+                <span class="qs-num">{{ i + 1 }}</span>
+                @if (editing()) {
+                  <span class="qs-row-tools">
+                    <button type="button" class="qs-tiny" (click)="moveItem(i, -1)" [disabled]="i === 0" aria-label="Subir">↑</button>
+                    <button type="button" class="qs-tiny" (click)="moveItem(i, 1)" [disabled]="i === document().items.length - 1" aria-label="Bajar">↓</button>
+                    <button type="button" class="qs-tiny qs-tiny--danger" (click)="removeItem(i)" aria-label="Eliminar">×</button>
+                  </span>
+                }
+              </td>
+              <td>
+                @if (editing()) {
+                  <textarea class="qs-in qs-in--area" rows="2" [ngModel]="item.description" (ngModelChange)="patchItem(i, { description: $event })" placeholder="—"></textarea>
+                } @else {
+                  {{ dash(item.description) }}
+                }
+              </td>
+              <td class="qs-table__qty">
+                @if (editing()) {
+                  <div class="qs-qty">
+                    <input class="qs-in qs-in--num" type="number" min="0" [ngModel]="item.quantity" (ngModelChange)="patchItem(i, { quantity: +$event })" />
+                    <input class="qs-in qs-in--unit" type="text" [ngModel]="item.unit" (ngModelChange)="patchItem(i, { unit: $event })" placeholder="und" />
+                  </div>
+                } @else {
+                  {{ dash(qtyLabel(item)) }}
+                }
+              </td>
+              <td class="qs-table__money">
+                @if (editing()) {
+                  <input class="qs-in qs-in--num" type="number" min="0" step="1000" [ngModel]="item.unitPrice" (ngModelChange)="patchItem(i, { unitPrice: +$event })" />
+                  <label class="qs-disc">
+                    <span>Desc.</span>
+                    <input class="qs-in qs-in--num" type="number" min="0" step="1000" [ngModel]="item.discount" (ngModelChange)="patchItem(i, { discount: +$event })" />
+                  </label>
+                } @else {
+                  {{ moneyOrDash(item.unitPrice) }}
+                }
+              </td>
+              <td class="qs-table__money qs-table__strong">
+                {{ moneyOrDash(item.total) }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (editing()) {
+      <button type="button" class="qs-add" (click)="addItem()">+ Agregar producto o servicio</button>
+    }
+  </section>
+
+  <section class="qs-mid">
+    <ul class="qs-trust">
+      <li><span class="qs-ico qs-ico--binoc" aria-hidden="true"></span>Guías expertos en aviturismo</li>
+      <li><span class="qs-ico qs-ico--shield" aria-hidden="true"></span>Seguridad en todo el recorrido</li>
+      <li><span class="qs-ico qs-ico--leaf" aria-hidden="true"></span>Experiencias sostenibles</li>
+      <li><span class="qs-ico qs-ico--star" aria-hidden="true"></span>Atención personalizada</li>
+    </ul>
+    <dl class="qs-totals">
+      <div><dt>Subtotal</dt><dd>{{ subtotalText() }}</dd></div>
+      <div><dt>IVA (19%)</dt><dd>{{ ivaText() }}</dd></div>
+      <div class="qs-totals__grand"><dt>Total</dt><dd>{{ totalText() }}</dd></div>
+    </dl>
+  </section>
+
+  @if (editing() || document().observations) {
+    <section class="qs-notes">
+      <h2>Observaciones</h2>
+      @if (editing()) {
+        <textarea class="qs-in qs-in--area" rows="3" [ngModel]="document().observations" (ngModelChange)="patch({ observations: $event })" placeholder="—"></textarea>
+      } @else {
+        <p>{{ dash(document().observations) }}</p>
+      }
+    </section>
+  }
+
+  <section class="qs-pay">
+    <div>
+      <h2>
+        <span class="qs-ico qs-ico--info" aria-hidden="true"></span>
+        Condiciones y forma de pago
+      </h2>
+      <ul>
+        @for (line of company.payment; track line) {
+          <li>{{ line }}</li>
+        }
+      </ul>
+      @if (editing()) {
+        <textarea class="qs-in qs-in--area" rows="2" [ngModel]="document().commercialConditions" (ngModelChange)="patch({ commercialConditions: $event })" placeholder="Condiciones adicionales"></textarea>
+      } @else if (document().commercialConditions) {
+        <p>{{ document().commercialConditions }}</p>
+      }
+    </div>
+    <p class="qs-magic">{{ company.magic }}</p>
+  </section>
+
+  <footer class="qs-foot">
+    <div class="qs-foot__bar">
+      <span><i class="qs-ico qs-ico--phone" aria-hidden="true"></i>{{ company.phone }}</span>
+      <span><i class="qs-ico qs-ico--mail" aria-hidden="true"></i>{{ company.email }}</span>
+      <span><i class="qs-ico qs-ico--pin" aria-hidden="true"></i>{{ company.address }}</span>
+    </div>
+    <div class="qs-foot__land" [style.background-image]="'url(' + plantilla + ')'">
+      <p>{{ company.footerLine }}</p>
+    </div>
+  </footer>
+</article>

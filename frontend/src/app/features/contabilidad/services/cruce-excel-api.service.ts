@@ -130,8 +130,15 @@ export class CruceExcelApiService {
     return `${this.base}/pendientes/export${q}`;
   }
 
-  exportExcelUrl(batchId?: number): string {
-    const q = batchId ? `?batch_id=${batchId}` : '';
-    return `${this.base}/export.xlsx${q}`;
+  exportExcelUrl(batchId?: number, documentIds?: number[]): string {
+    const params = new URLSearchParams();
+    if (batchId) {
+      params.set('batch_id', String(batchId));
+    }
+    if (documentIds?.length) {
+      params.set('document_ids', documentIds.filter((id) => Number.isFinite(id)).join(','));
+    }
+    const q = params.toString();
+    return `${this.base}/export.xlsx${q ? `?${q}` : ''}`;
   }
 }

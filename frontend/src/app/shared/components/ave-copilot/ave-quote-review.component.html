@@ -4,11 +4,21 @@
     <header class="aqr__head">
       <div>
         <p class="aqr__eyebrow">Cotización · plantilla Escuela Aves</p>
-        <h2>Completa los datos y descarga el PDF</h2>
+        <h2>{{ editing() ? 'Editar cotización' : 'Vista previa' }}</h2>
       </div>
-      <button type="button" class="aqr__x" (click)="close()" aria-label="Cerrar">
-        <mat-icon>close</mat-icon>
-      </button>
+      <div class="aqr__head-tools">
+        <label class="aqr__status">
+          <span>Estado</span>
+          <select [ngModel]="doc().status" (ngModelChange)="setStatus($event)">
+            @for (st of statuses; track st) {
+              <option [value]="st">{{ st }}</option>
+            }
+          </select>
+        </label>
+        <button type="button" class="aqr__x" (click)="close()" aria-label="Cerrar">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
     </header>
 
     @if (reviewFlag()) {
@@ -18,136 +28,34 @@
       </p>
     }
 
-    <div class="aqr__layout">
-    <div class="aqr__body">
-      <label class="aqr__field aqr__field--full">
-        <span>Tour / experiencia</span>
-        <input type="text" [ngModel]="name()" (ngModelChange)="name.set($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Código</span>
-        <input type="text" [ngModel]="code()" (ngModelChange)="code.set($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Modalidad</span>
-        <select [ngModel]="modality()" (ngModelChange)="modality.set($event)">
-          <option value="PRIVADO">PRIVADO</option>
-          <option value="COMPARTIDO">COMPARTIDO</option>
-        </select>
-      </label>
-
-      <label class="aqr__field">
-        <span>Cliente</span>
-        <input type="text" placeholder="Nombre del cliente" [ngModel]="clientName()" (ngModelChange)="clientName.set($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>NIT / C.C.</span>
-        <input type="text" placeholder="Documento del cliente" [ngModel]="clientNit()" (ngModelChange)="clientNit.set($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Teléfono</span>
-        <input type="text" placeholder="Celular" [ngModel]="clientPhone()" (ngModelChange)="clientPhone.set($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Correo</span>
-        <input type="email" placeholder="zoe.m@example.net" [ngModel]="clientEmail()" (ngModelChange)="clientEmail.set($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Ciudad</span>
-        <input type="text" placeholder="Ciudad del cliente" [ngModel]="clientCity()" (ngModelChange)="clientCity.set($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Personas</span>
-        <input type="number" min="1" [ngModel]="people()" (ngModelChange)="onPeopleChange($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Fecha del servicio</span>
-        <input type="date" [ngModel]="date()" (ngModelChange)="date.set($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Pickup</span>
-        <input type="text" placeholder="Armenia, Salento…" [ngModel]="pickup()" (ngModelChange)="pickup.set($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Precio / persona ({{ unitPrice() | currency: currency():'symbol-narrow':'1.0-0' }})</span>
-        <input type="number" min="0" step="1000" [ngModel]="unitPrice()" (ngModelChange)="onUnitChange($event)" />
-      </label>
-
-      <label class="aqr__field">
-        <span>Total ({{ displayTotal() | currency: currency():'symbol-narrow':'1.0-0' }})</span>
-        <input type="number" min="0" step="1000" [ngModel]="total()" (ngModelChange)="onTotalChange($event)" />
-      </label>
-
-      <label class="aqr__field aqr__field--full">
-        <span>Incluye</span>
-        <textarea rows="3" [ngModel]="includes()" (ngModelChange)="includes.set($event)"></textarea>
-      </label>
-
-      <label class="aqr__field aqr__field--full">
-        <span>No incluye</span>
-        <textarea rows="2" [ngModel]="excludes()" (ngModelChange)="excludes.set($event)"></textarea>
-      </label>
-
-      <label class="aqr__field aqr__field--full">
-        <span>Notas</span>
-        <textarea rows="2" [ngModel]="notes()" (ngModelChange)="notes.set($event)"></textarea>
-      </label>
-    </div>
-
-    <aside class="aqr__preview" aria-label="Vista de la plantilla">
-      <p class="aqr__preview-label">Plantilla Escuela Aves</p>
-      <div class="aqr-sheet">
-        <img [src]="templateImage" alt="Plantilla de cotización Escuela Aves Salento" />
-        @for (box of overlayFields(); track box.id) {
-          <span
-            class="aqr-sheet__field"
-            [class.aqr-sheet__field--right]="box.align === 'right'"
-            [class.aqr-sheet__field--center]="box.align === 'center'"
-            [class.aqr-sheet__field--light]="box.color?.startsWith('#f')"
-            [style.left.%]="box.x"
-            [style.top.%]="box.y"
-            [style.width.%]="box.w"
-            [style.height.%]="box.h"
-            [style.font-weight]="box.weight || 500"
-          >{{ box.text }}</span>
-        }
-      </div>
-    </aside>
-    </div>
-
-    <div class="aqr__summary">
-      <div>
-        <span>Total a cotizar</span>
-        <strong>{{ displayTotal() | currency: currency():'symbol-narrow':'1.0-0' }}</strong>
-      </div>
-      @if (reviewed()) {
-        <span class="aqr__ok"><mat-icon>task_alt</mat-icon> Revisada</span>
-      }
-    </div>
-
-    <footer class="aqr__foot">
-      <button type="button" class="aqr__btn aqr__btn--ghost" (click)="close()">Cerrar</button>
-      <button type="button" class="aqr__btn aqr__btn--soft" (click)="markReviewed()">
-        <mat-icon>fact_check</mat-icon>
-        Confirmar revisión
+    <div class="aqr__toolbar">
+      <button type="button" class="aqr__btn" [class.aqr__btn--soft]="editing()" (click)="edit()">
+        <mat-icon>edit</mat-icon>
+        Editar
+      </button>
+      <button type="button" class="aqr__btn" [class.aqr__btn--soft]="!editing()" (click)="preview()">
+        <mat-icon>visibility</mat-icon>
+        Vista previa
+      </button>
+      <button type="button" class="aqr__btn aqr__btn--soft" [disabled]="saving()" (click)="save()">
+        <mat-icon>save</mat-icon>
+        {{ saving() ? 'Guardando…' : 'Guardar' }}
       </button>
       <button type="button" class="aqr__btn aqr__btn--primary" [disabled]="downloading()" (click)="downloadPdf()">
         <mat-icon>picture_as_pdf</mat-icon>
-        {{ downloading() ? 'Generando…' : 'Descargar PDF' }}
+        {{ downloading() ? 'Generando…' : 'Generar PDF' }}
       </button>
-    </footer>
-    @if (downloadError()) {
-      <p class="aqr__dl-error">{{ downloadError() }}</p>
+      @if (reviewed()) {
+        <span class="aqr__ok"><mat-icon>task_alt</mat-icon> Guardada</span>
+      }
+    </div>
+
+    @if (formError()) {
+      <p class="aqr__dl-error">{{ formError() }}</p>
     }
+
+    <div class="aqr__sheet-wrap" [class.aqr__sheet-wrap--preview]="!editing()">
+      <eas-quote-sheet [document]="doc()" [editing]="editing()" (documentChange)="onDocumentChange($event)" />
+    </div>
   </section>
 </div>

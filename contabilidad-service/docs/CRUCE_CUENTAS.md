@@ -27,7 +27,11 @@ Pagos / fecha_pago
 ```
 
 - `POST /api/cruce-excel/analizar` — consolida SIG y reporta pendientes.
-- `GET /api/cruce-excel/export.xlsx` — genera `Cruce_Cuentas_YYYY-MM-DD.xlsx`.
+- `GET /api/cruce-excel/export.xlsx` — clona la plantilla maestra
+  `src/infrastructure/cruce/templates/CRUCE_DE_CUENTAS_MAESTRO.xlsx`
+  (copia intacta de «CRUCE DE CUENTAS 2026.xlsx»), limpia datos históricos
+  y escribe las filas del lote/`document_ids` actuales. El archivo original
+  del usuario no se modifica. Nombre de salida: `Cruce_Cuentas_YYYY-MM-DD.xlsx`.
 - `GET /api/cruce-excel/pendientes` — bandeja SIG; no relee un Excel de cruce
   histórico aunque exista un snapshot de upload.
 - `POST /api/cruce-excel/upload` **se conserva** por compatibilidad; la UI de

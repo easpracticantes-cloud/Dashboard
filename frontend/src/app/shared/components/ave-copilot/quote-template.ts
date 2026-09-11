@@ -1,18 +1,24 @@
-/** Plantilla comercial Escuela Aves Salento — se llena con la cotización actual. */
+/** Datos fijos de la plantilla comercial Escuela Aves Salento. */
+
+import { documentTotals, IVA_RATE as SHEET_IVA, splitIvaIncluded } from './quote-sheet.math';
 
 export const QUOTE_TEMPLATE_IMAGE = 'assets/brand/plantilla-cotizacion.jpg';
-export const QUOTE_TEMPLATE_SIZE = { width: 682, height: 1024 };
+export const QUOTE_LOGO = 'assets/brand/logo-escuela-aves-salento.png';
+export const QUOTE_MARK = 'assets/brand/logo-escuela-aves-mark.png';
 
-export const IVA_RATE = 0.19;
+export const IVA_RATE = SHEET_IVA;
 
 export const ESCUELA_AVES_COMPANY = {
   legalName: 'ESCUELA AVES SALENTO S.A.S.',
   nit: '901.814.243-5',
-  address: 'Cra. 13 #22-10, Ed. Bariloche, Local 27',
+  address: 'CR 13 #22-10 ED BARILOCHE LC 27',
   city: 'Salento, Quindío',
   phone: '310 833 7003',
   email: 'escuelaavescontabilidad@gmail.com',
   slogan: '¡La naturaleza se vive!',
+  tagline: 'Descubre, observa, protege',
+  magic: '¡Vive la magia de Salento con nosotros!',
+  footerLine: 'Aves, paisajes y personas que hacen la diferencia',
   payment: [
     'Forma de pago: 50% a la reserva y 50% el día del tour.',
     'Transferencia bancaria, Nequi o Daviplata.',
@@ -36,19 +42,38 @@ export interface QuoteTemplateInput {
   clientPhone?: string;
   clientEmail?: string;
   clientCity?: string;
+  clientContact?: string;
+  clientAddress?: string;
+  advisorName?: string;
   notes?: string;
+  observations?: string;
+  commercialConditions?: string;
   includes?: string;
   excludes?: string;
   quoteNumber?: string;
   issuedAt?: string;
   validUntil?: string;
+  items?: Array<{
+    description?: string;
+    quantity?: number | string;
+    unit?: string;
+    unitPrice?: number | string;
+    discount?: number | string;
+    total?: number | string;
+  }>;
 }
 
 export interface QuoteLineItem {
   description: string;
   quantity: string;
+  unit: string;
   unitPrice: string;
+  discount: string;
   total: string;
+  rawQuantity: number;
+  rawUnitPrice: number;
+  rawDiscount: number;
+  rawTotal: number;
 }
 
 export interface FilledQuoteTemplate {
@@ -69,56 +94,6 @@ export interface FilledQuoteTemplate {
   rawIva: number;
   rawTotal: number;
 }
-
-export interface TemplateFieldBox {
-  id: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  align?: 'left' | 'right' | 'center';
-  font?: number;
-  weight?: number;
-  color?: string;
-}
-
-/** Cajas sobre los placeholders de la plantilla (porcentajes 0–100). */
-export const QUOTE_TEMPLATE_BOXES: TemplateFieldBox[] = [
-  { id: 'quoteNumber', x: 74.2, y: 23.35, w: 21.5, h: 1.85, font: 1.55, weight: 700 },
-  { id: 'issuedAt', x: 74.2, y: 25.55, w: 21.5, h: 1.85, font: 1.45 },
-  { id: 'validUntil', x: 74.2, y: 27.75, w: 21.5, h: 1.85, font: 1.45 },
-  { id: 'clientName', x: 21.8, y: 34.55, w: 26.2, h: 1.75, font: 1.4 },
-  { id: 'clientNit', x: 21.8, y: 36.85, w: 26.2, h: 1.75, font: 1.4 },
-  { id: 'clientPhone', x: 21.8, y: 39.15, w: 26.2, h: 1.75, font: 1.4 },
-  { id: 'clientEmail', x: 21.8, y: 41.45, w: 26.2, h: 1.75, font: 1.35 },
-  { id: 'clientCity', x: 21.8, y: 43.75, w: 26.2, h: 1.75, font: 1.4 },
-  { id: 'item1Desc', x: 13.4, y: 51.15, w: 35.6, h: 3.55, font: 1.2 },
-  { id: 'item1Qty', x: 50.2, y: 51.55, w: 12.4, h: 2.7, align: 'center', font: 1.35 },
-  { id: 'item1Unit', x: 63.2, y: 51.55, w: 15.6, h: 2.7, align: 'right', font: 1.3 },
-  { id: 'item1Total', x: 79.4, y: 51.55, w: 15.8, h: 2.7, align: 'right', font: 1.3, weight: 700 },
-  { id: 'item2Desc', x: 13.4, y: 55.15, w: 35.6, h: 3.55, font: 1.2 },
-  { id: 'item2Qty', x: 50.2, y: 55.55, w: 12.4, h: 2.7, align: 'center', font: 1.35 },
-  { id: 'item2Unit', x: 63.2, y: 55.55, w: 15.6, h: 2.7, align: 'right', font: 1.3 },
-  { id: 'item2Total', x: 79.4, y: 55.55, w: 15.8, h: 2.7, align: 'right', font: 1.3, weight: 700 },
-  { id: 'item3Desc', x: 13.4, y: 59.15, w: 35.6, h: 3.55, font: 1.2 },
-  { id: 'item3Qty', x: 50.2, y: 59.55, w: 12.4, h: 2.7, align: 'center', font: 1.35 },
-  { id: 'item3Unit', x: 63.2, y: 59.55, w: 15.6, h: 2.7, align: 'right', font: 1.3 },
-  { id: 'item3Total', x: 79.4, y: 59.55, w: 15.8, h: 2.7, align: 'right', font: 1.3, weight: 700 },
-  { id: 'item4Desc', x: 13.4, y: 63.15, w: 35.6, h: 3.55, font: 1.2 },
-  { id: 'item4Qty', x: 50.2, y: 63.55, w: 12.4, h: 2.7, align: 'center', font: 1.35 },
-  { id: 'item4Unit', x: 63.2, y: 63.55, w: 15.6, h: 2.7, align: 'right', font: 1.3 },
-  { id: 'item4Total', x: 79.4, y: 63.55, w: 15.8, h: 2.7, align: 'right', font: 1.3, weight: 700 },
-  { id: 'item5Desc', x: 13.4, y: 67.15, w: 35.6, h: 3.55, font: 1.2 },
-  { id: 'item5Qty', x: 50.2, y: 67.55, w: 12.4, h: 2.7, align: 'center', font: 1.35 },
-  { id: 'item5Unit', x: 63.2, y: 67.55, w: 15.6, h: 2.7, align: 'right', font: 1.3 },
-  { id: 'item5Total', x: 79.4, y: 67.55, w: 15.8, h: 2.7, align: 'right', font: 1.3, weight: 700 },
-  { id: 'subtotal', x: 79.4, y: 71.15, w: 15.8, h: 1.9, align: 'right', font: 1.4, weight: 600 },
-  { id: 'iva', x: 79.4, y: 73.2, w: 15.8, h: 1.9, align: 'right', font: 1.4, weight: 600 },
-  { id: 'total', x: 79.4, y: 75.25, w: 15.8, h: 2.15, align: 'right', font: 1.55, weight: 800, color: '#0b3d28' },
-  { id: 'footerPhone', x: 8.2, y: 83.55, w: 22, h: 1.7, font: 1.2, color: '#f4efe4' },
-  { id: 'footerEmail', x: 36.5, y: 83.55, w: 28, h: 1.7, font: 1.15, color: '#f4efe4' },
-  { id: 'footerAddress', x: 68.2, y: 83.55, w: 26.5, h: 1.7, font: 1.1, color: '#f4efe4' }
-];
 
 export function formatCop(amount: number, currency = 'COP'): string {
   const n = Number.isFinite(amount) ? amount : 0;
@@ -162,18 +137,20 @@ export function buildQuoteNumber(code?: string, issued = new Date()): string {
   return `${slug}-${toIsoDate(issued).replace(/-/g, '')}`;
 }
 
-export function splitIvaIncluded(total: number): { subtotal: number; iva: number; total: number } {
-  const rawTotal = Math.max(0, Math.round(Number(total) || 0));
-  const subtotal = Math.round(rawTotal / (1 + IVA_RATE));
-  return { subtotal, iva: rawTotal - subtotal, total: rawTotal };
-}
+export { splitIvaIncluded } from './quote-sheet.math';
 
 export function fillQuoteTemplate(input: QuoteTemplateInput, now = new Date()): FilledQuoteTemplate {
   const issuedIso = input.issuedAt || toIsoDate(now);
   const validIso = input.validUntil || addDays(issuedIso, 15);
-  const money = splitIvaIncluded(Number(input.total) || 0);
   const currency = input.currency || 'COP';
-  const items = buildLineItems(input, money, currency);
+  const items = buildLineItems(input, currency);
+  const money = items.some((item) => item.rawTotal > 0)
+    ? documentTotals(items.map((item) => ({
+        quantity: item.rawQuantity,
+        unitPrice: item.rawUnitPrice,
+        discount: item.rawDiscount
+      })))
+    : splitIvaIncluded(Number(input.total) || 0);
   return {
     quoteNumber: input.quoteNumber || buildQuoteNumber(input.code, now),
     issuedAt: formatQuoteDate(issuedIso),
@@ -194,44 +171,33 @@ export function fillQuoteTemplate(input: QuoteTemplateInput, now = new Date()): 
   };
 }
 
-export function overlayValues(filled: FilledQuoteTemplate): Record<string, string> {
-  const values: Record<string, string> = {
-    quoteNumber: filled.quoteNumber,
-    issuedAt: filled.issuedAt,
-    validUntil: filled.validUntil,
-    clientName: filled.clientName,
-    clientNit: filled.clientNit,
-    clientPhone: filled.clientPhone,
-    clientEmail: filled.clientEmail,
-    clientCity: filled.clientCity,
-    subtotal: filled.subtotal,
-    iva: filled.iva,
-    total: filled.total,
-    footerPhone: ESCUELA_AVES_COMPANY.phone,
-    footerEmail: ESCUELA_AVES_COMPANY.email,
-    footerAddress: `${ESCUELA_AVES_COMPANY.address}, ${ESCUELA_AVES_COMPANY.city}`
-  };
-  filled.items.forEach((item, idx) => {
-    const n = idx + 1;
-    values[`item${n}Desc`] = item.description;
-    values[`item${n}Qty`] = item.quantity;
-    values[`item${n}Unit`] = item.unitPrice;
-    values[`item${n}Total`] = item.total;
-  });
-  return values;
-}
-
-function buildLineItems(
-  input: QuoteTemplateInput,
-  money: { subtotal: number; iva: number; total: number },
-  currency: string
-): QuoteLineItem[] {
-  const empty: QuoteLineItem = { description: '', quantity: '', unitPrice: '', total: '' };
-  const items: QuoteLineItem[] = [empty, empty, empty, empty, empty].map((x) => ({ ...x }));
+function buildLineItems(input: QuoteTemplateInput, currency: string): QuoteLineItem[] {
+  if (input.items?.length) {
+    return input.items.map((item) => {
+      const qty = Number(item.quantity) || 0;
+      const unitPrice = Number(item.unitPrice) || 0;
+      const discount = Number(item.discount) || 0;
+      const total = Number(item.total) || Math.max(0, Math.round(qty * unitPrice) - discount);
+      return {
+        description: item.description || '',
+        quantity: qty > 0 ? String(qty) : '',
+        unit: item.unit || '',
+        unitPrice: unitPrice > 0 ? formatCop(unitPrice, currency) : '',
+        discount: discount > 0 ? formatCop(discount, currency) : '',
+        total: total > 0 ? formatCop(total, currency) : '',
+        rawQuantity: qty,
+        rawUnitPrice: unitPrice,
+        rawDiscount: discount,
+        rawTotal: total
+      };
+    });
+  }
   const qty = Math.max(1, Number(input.people) || 1);
-  const unit = Number(input.unitPrice) || Math.round(money.total / qty);
+  const fallbackTotal = Number(input.total) || 0;
+  const unit = Number(input.unitPrice) || (fallbackTotal ? Math.round(fallbackTotal / qty) : 0);
+  const total = fallbackTotal || Math.round(unit * qty);
   const desc = [
-    input.name || 'Experiencia Escuela Aves',
+    input.name,
     input.modality ? `Modalidad ${input.modality.toLowerCase()}` : '',
     input.date ? `Fecha de servicio ${formatQuoteDate(input.date)}` : '',
     input.pickup ? `Pickup: ${input.pickup}` : '',
@@ -239,30 +205,20 @@ function buildLineItems(
   ]
     .filter(Boolean)
     .join(' · ');
-  items[0] = {
-    description: desc,
-    quantity: String(qty),
-    unitPrice: formatCop(unit, currency),
-    total: formatCop(money.total, currency)
-  };
-  if (input.excludes) {
-    items[1] = {
-      description: `No incluye: ${compactText(input.excludes, 110)}`,
-      quantity: '',
-      unitPrice: '',
-      total: ''
-    };
-  }
-  if (input.notes) {
-    const slot = input.excludes ? 2 : 1;
-    items[slot] = {
-      description: `Notas: ${compactText(input.notes, 110)}`,
-      quantity: '',
-      unitPrice: '',
-      total: ''
-    };
-  }
-  return items;
+  return [
+    {
+      description: desc,
+      quantity: total || desc ? String(qty) : '',
+      unit: 'pax',
+      unitPrice: unit > 0 ? formatCop(unit, currency) : '',
+      discount: '',
+      total: total > 0 ? formatCop(total, currency) : '',
+      rawQuantity: qty,
+      rawUnitPrice: unit,
+      rawDiscount: 0,
+      rawTotal: total
+    }
+  ];
 }
 
 function compactText(text: string, max: number): string {
@@ -272,5 +228,5 @@ function compactText(text: string, max: number): string {
 
 function dash(value?: string): string {
   const v = (value || '').trim();
-  return v || 'Por confirmar';
+  return v || '—';
 }

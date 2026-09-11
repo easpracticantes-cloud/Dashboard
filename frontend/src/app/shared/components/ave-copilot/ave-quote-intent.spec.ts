@@ -22,5 +22,7 @@ describe('ave-quote-intent', () => {
     const draft = seedQuoteDraft('Cotización de rafting para 4 personas');
     expect(draft.people).toBe(4);
     expect(draft.name).toMatch(/Rafting/i);
+    expect(draft.items?.[0].quantity).toBe(4);
+    expect(draft.items?.[0].description).toMatch(/Rafting/i);
   });
 });

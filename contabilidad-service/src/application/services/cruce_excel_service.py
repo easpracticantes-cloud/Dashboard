@@ -451,18 +451,27 @@ class CruceExcelService:
         self,
         *,
         batch_id: int | None = None,
+        document_ids: list[int] | None = None,
         usuario: str = "SISTEMA",
     ) -> tuple[bytes, str, dict]:
         """Analiza SIG y produce el Excel estándar de salida."""
+        ids = self._normalize_document_ids(document_ids)
+        if ids:
+            self._assert_documents_ready(ids)
         analisis = self.analizar_desde_sistema(
             batch_id=batch_id, usuario=usuario, cruzar_facturas=True
         )
         batch = self.autobits_repo.get_batch(batch_id) if batch_id else None
-        if not batch:
+        if not batch and not ids:
             batch = self.autobits_repo.get_latest_batch()
-        crossings = self._crossings_del_contexto(batch.id if batch else None)
+        if ids and not batch:
+            crossings = self._crossings_de_documentos(ids)
+        else:
+            crossings = self._crossings_del_contexto(batch.id if batch else None)
         rows = self._export_rows(crossings)
-        rows.extend(self._filas_documentos_sin_cruce(rows, batch))
+        if ids:
+            self._restringir_facturas_a_ids(rows, ids)
+            rows.extend(self._filas_documentos_por_ids(ids, rows))
         self._marcar_duplicados(rows)
         year = None
         if batch and batch.period_start:
@@ -482,6 +491,27 @@ class CruceExcelService:
         )
         self.db.commit()
         return content, filename, analisis
+
+    def _crossings_de_documentos(self, document_ids: list[int]) -> list[AccountCrossingModel]:
+        """Solo cruces ligados a las facturas pedidas. No usa el último lote global."""
+        from sqlalchemy.orm import joinedload
+
+        return (
+            self.db.query(AccountCrossingModel)
+            .options(
+                joinedload(AccountCrossingModel.document).joinedload(DocumentModel.provider),
+                joinedload(AccountCrossingModel.autobits_record),
+            )
+            .filter(
+                AccountCrossingModel.document_id.in_(document_ids),
+                AccountCrossingModel.estado.notin_(_ESTADOS_CERRADOS),
+            )
+            .order_by(
+                AccountCrossingModel.proveedor_nombre.asc(),
+                AccountCrossingModel.fecha_ejecucion.asc(),
+            )
+            .all()
+        )
 
     def _crossings_del_contexto(self, batch_id: int | None) -> list[AccountCrossingModel]:
         from sqlalchemy.orm import joinedload
@@ -575,6 +605,74 @@ class CruceExcelService:
                 )
             )
         return rows
+
+    def _normalize_document_ids(self, raw: list[int] | None) -> list[int]:
+        if not raw:
+            return []
+        seen: set[int] = set()
+        out: list[int] = []
+        for value in raw:
+            try:
+                doc_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            if doc_id > 0 and doc_id not in seen:
+                seen.add(doc_id)
+                out.append(doc_id)
+        return out
+
+    def _assert_documents_ready(self, document_ids: list[int]) -> None:
+        docs = (
+            self.db.query(DocumentModel)
+            .filter(DocumentModel.id.in_(document_ids))
+            .all()
+        )
+        found = {doc.id for doc in docs}
+        missing = [doc_id for doc_id in document_ids if doc_id not in found]
+        if missing:
+            raise CruceExcelServiceError(
+                "No se encontraron las facturas solicitadas.",
+                "FACTURAS_NO_ENCONTRADAS",
+                404,
+            )
+        ocupados = {DocumentStatus.RECIBIDO, DocumentStatus.PROCESANDO}
+        pendientes = [
+            doc.id for doc in docs if (doc.estado or "").upper() in {s.value for s in ocupados}
+        ]
+        if pendientes:
+            raise CruceExcelServiceError(
+                "Hay facturas todavía en procesamiento (OCR/IA). Espere a que queden procesadas.",
+                "FACTURAS_EN_PROCESO",
+                409,
+            )
+
+    def _restringir_facturas_a_ids(self, rows: list[CruceExportRow], document_ids: list[int]) -> None:
+        allowed = set(document_ids)
+        for row in rows:
+            if row.document_id and row.document_id not in allowed:
+                row.factura_cdc = None
+                row.document_id = None
+                if row.origen == "AMBOS":
+                    row.origen = "AUTOBITS"
+
+    def _filas_documentos_por_ids(
+        self,
+        document_ids: list[int],
+        ya: list[CruceExportRow],
+    ) -> list[CruceExportRow]:
+        usados = {r.document_id for r in ya if r.document_id}
+        faltantes = [doc_id for doc_id in document_ids if doc_id not in usados]
+        if not faltantes:
+            return []
+        from sqlalchemy.orm import joinedload
+
+        docs = (
+            self.db.query(DocumentModel)
+            .options(joinedload(DocumentModel.provider))
+            .filter(DocumentModel.id.in_(faltantes))
+            .all()
+        )
+        return [self._fila_documento_suelto(doc) for doc in docs]
 
     def _filas_documentos_sin_cruce(
         self,

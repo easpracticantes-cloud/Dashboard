@@ -6,13 +6,16 @@ from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal
 from io import BytesIO
+from pathlib import Path
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.cell.cell import MergedCell
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from domain.cruce.export_row import CruceExportRow
+from domain.cruce.fields import fold, match_block_field
 from domain.cruce.workbook_spec import (
     BLOCK_GAP,
     BLOCK_WIDTH,
@@ -45,6 +48,20 @@ _TABLE_HEADER_FONT = Font(name=FONT_NAME_TABLE, size=12, bold=True)
 _MONEY_FMT = '#,##0'
 _DATE_FMT = "YYYY-MM-DD"
 
+MASTER_TEMPLATE_PATH = (
+    Path(__file__).resolve().parent / "templates" / "CRUCE_DE_CUENTAS_MAESTRO.xlsx"
+)
+_STRUCTURAL_LABELS = {
+    "total pagados",
+    "total",
+    "unidades disponibles año",
+    "unidades disponibles año 2026",
+    "ventas_duster",
+    "cdc bosque de palmas",
+    "precompra luger",
+    "tour de cafe",
+}
+
 
 def _fill(rgb: str) -> PatternFill:
     return PatternFill("solid", fgColor=rgb)
@@ -67,15 +84,26 @@ def _as_number(value: Decimal | None):
 
 
 class CruceWorkbookBuilder:
+    def __init__(self) -> None:
+        self._from_template = False
+
     def build(self, rows: list[CruceExportRow], *, year: int | None = None) -> bytes:
         year = year or self._infer_year(rows)
-        wb = Workbook()
-        default = wb.active
         names = standard_sheet_names(year)
-        default.title = names[0]
-
-        for name in names[1:]:
-            wb.create_sheet(name)
+        self._from_template = MASTER_TEMPLATE_PATH.exists()
+        if self._from_template:
+            wb = load_workbook(MASTER_TEMPLATE_PATH)
+            self._align_template_years(wb, year)
+            self._clear_sample_values(wb)
+            for name in names:
+                if name not in wb.sheetnames:
+                    wb.create_sheet(name)
+        else:
+            wb = Workbook()
+            default = wb.active
+            default.title = names[0]
+            for name in names[1:]:
+                wb.create_sheet(name)
 
         specials, period_rows = self._split(rows)
         self._write_period_sheets(wb, period_rows, year)
@@ -86,6 +114,84 @@ class CruceWorkbookBuilder:
         buf = BytesIO()
         wb.save(buf)
         return buf.getvalue()
+
+    def _unmerge_overlapping(
+        self, ws: Worksheet, min_row: int, min_col: int, max_row: int, max_col: int
+    ) -> None:
+        """Libera merges que taparían celdas de datos nuevos. No toca el archivo maestro."""
+        for rng in list(ws.merged_cells.ranges):
+            if (
+                rng.max_row < min_row
+                or rng.min_row > max_row
+                or rng.max_col < min_col
+                or rng.min_col > max_col
+            ):
+                continue
+            ws.unmerge_cells(str(rng))
+
+    def _set_cell(self, ws: Worksheet, row: int, col: int, value=None):
+        self._unmerge_overlapping(ws, row, col, row, col)
+        if value is None:
+            return ws.cell(row, col)
+        return ws.cell(row, col, value)
+
+    def _merge_block(
+        self, ws: Worksheet, start_row: int, start_col: int, end_row: int, end_col: int
+    ) -> None:
+        if start_row == end_row and start_col == end_col:
+            return
+        for rng in list(ws.merged_cells.ranges):
+            if (
+                rng.min_row == start_row
+                and rng.max_row == end_row
+                and rng.min_col == start_col
+                and rng.max_col == end_col
+            ):
+                return
+        self._unmerge_overlapping(ws, start_row, start_col, end_row, end_col)
+        ws.merge_cells(
+            start_row=start_row,
+            start_column=start_col,
+            end_row=end_row,
+            end_column=end_col,
+        )
+
+    def _align_template_years(self, wb, year: int) -> None:
+        """Renombra hojas del maestro 2026 si el lote es de otro año. No altera el archivo original."""
+        mapping = {
+            "AÑO  2026 ENERO - ABRIL": f"AÑO  {year} ENERO - ABRIL",
+            "PRECOMPRA LUGER 2026": luger_sheet_name(year),
+        }
+        for old, new in mapping.items():
+            if old in wb.sheetnames and old != new:
+                wb[old].title = new
+
+    def _clear_sample_values(self, wb) -> None:
+        """Quita datos históricos del maestro. Conserva estilos, anchos, merges y encabezados."""
+        for name in wb.sheetnames:
+            ws = wb[name]
+            for row in ws.iter_rows(
+                min_row=1,
+                max_row=ws.max_row or 1,
+                max_col=ws.max_column or 1,
+            ):
+                for cell in row:
+                    if isinstance(cell, MergedCell) or cell.value is None:
+                        continue
+                    if self._is_structural_cell(cell.value):
+                        continue
+                    cell.value = None
+
+    def _is_structural_cell(self, value) -> bool:
+        if not isinstance(value, str):
+            return False
+        text = value.strip()
+        if not text or text.startswith("="):
+            return False
+        folded = fold(text)
+        if folded in _STRUCTURAL_LABELS or any(folded.startswith(label) for label in _STRUCTURAL_LABELS):
+            return True
+        return match_block_field(text) is not None
 
     def _infer_year(self, rows: list[CruceExportRow]) -> int:
         years = [r.year() for r in rows if r.year()]
@@ -143,8 +249,9 @@ class CruceWorkbookBuilder:
         self, ws: Worksheet, groups: list[tuple[str, list[CruceExportRow]]]
     ) -> None:
         if not groups:
-            self._style_header_row(ws, 2, 1, PERIOD_BLOCK_HEADERS, HEADER_FILL_BLUE)
-            self._autosize(ws, BLOCK_WIDTH)
+            if not self._from_template:
+                self._style_header_row(ws, 2, 1, PERIOD_BLOCK_HEADERS, HEADER_FILL_BLUE)
+                self._autosize(ws, BLOCK_WIDTH)
             return
 
         start_row = 1
@@ -155,14 +262,15 @@ class CruceWorkbookBuilder:
                 col0 = 1 + idx * (BLOCK_WIDTH + BLOCK_GAP)
                 fill = HEADER_FILL_BLUE if idx % 2 == 0 else HEADER_FILL_PEACH
                 title = proveedor if proveedor and proveedor != "(Sin proveedor)" else None
-                title_cell = ws.cell(start_row, col0, title)
+                title_cell = self._set_cell(ws, start_row, col0, title)
                 title_cell.font = _TITLE_FONT
                 if BLOCK_WIDTH > 1:
-                    ws.merge_cells(
-                        start_row=start_row,
-                        start_column=col0,
-                        end_row=start_row,
-                        end_column=col0 + BLOCK_WIDTH - 1,
+                    self._merge_block(
+                        ws,
+                        start_row,
+                        col0,
+                        start_row,
+                        col0 + BLOCK_WIDTH - 1,
                     )
                 self._style_header_row(
                     ws, start_row + 1, col0, PERIOD_BLOCK_HEADERS, fill
@@ -178,7 +286,7 @@ class CruceWorkbookBuilder:
                         _as_date(row.fecha_pago),
                     ]
                     for c, value in enumerate(values):
-                        cell = ws.cell(r, col0 + c, value)
+                        cell = self._set_cell(ws, r, col0 + c, value)
                         cell.border = _THIN
                         if c == 3 and value is not None:
                             cell.number_format = _MONEY_FMT
@@ -190,9 +298,10 @@ class CruceWorkbookBuilder:
                 pago_col = get_column_letter(col0 + 5)
                 first = start_row + 2
                 last = start_row + 1 + max_data
-                label = ws.cell(total_row, col0 + 2, "TOTAL PAGADOS")
+                label = self._set_cell(ws, total_row, col0 + 2, "TOTAL PAGADOS")
                 label.font = Font(name=FONT_NAME, bold=True)
-                total_cell = ws.cell(
+                total_cell = self._set_cell(
+                    ws,
                     total_row,
                     col0 + 3,
                     f'=SUMIF({pago_col}{first}:{pago_col}{last},"<>",{valor_col}{first}:{valor_col}{last})',
@@ -202,8 +311,10 @@ class CruceWorkbookBuilder:
             start_row += max_data + 5
 
         last_col = PROVIDERS_PER_BAND * (BLOCK_WIDTH + BLOCK_GAP)
-        self._autosize(ws, last_col)
-        ws.freeze_panes = "A3"
+        if not self._from_template:
+            self._autosize(ws, last_col)
+        if not ws.freeze_panes:
+            ws.freeze_panes = "A3"
 
     def _style_header_row(
         self, ws: Worksheet, row: int, col0: int, headers: tuple[str, ...], rgb: str
@@ -214,16 +325,16 @@ class CruceWorkbookBuilder:
             name=FONT_NAME, size=11, bold=True
         )
         for i, header in enumerate(headers):
-            cell = ws.cell(row, col0 + i, header)
+            cell = self._set_cell(ws, row, col0 + i, header)
             cell.fill = fill
             cell.font = font
             cell.alignment = align
             cell.border = _THIN
 
     def _write_duster(self, ws: Worksheet, rows: list[CruceExportRow]) -> None:
-        ws.merge_cells("B1:J1")
-        ws["B1"] = "VENTAS_DUSTER"
-        ws["B1"].font = _TITLE_FONT
+        self._merge_block(ws, 1, 2, 1, 10)
+        title = self._set_cell(ws, 1, 2, "VENTAS_DUSTER")
+        title.font = _TITLE_FONT
         self._write_table_headers(ws, 2, DUSTER_HEADERS, eas_col=9, terc_col=10)
         for i, row in enumerate(rows, start=3):
             values = [
@@ -239,7 +350,7 @@ class CruceWorkbookBuilder:
                 _as_number(row.precio_terceros),
             ]
             for c, value in enumerate(values, start=1):
-                cell = ws.cell(i, c, value)
+                cell = self._set_cell(ws, i, c, value)
                 cell.border = _THIN
                 if c == 6 and isinstance(value, date):
                     cell.number_format = _DATE_FMT
@@ -247,17 +358,22 @@ class CruceWorkbookBuilder:
                     cell.number_format = _MONEY_FMT
         if rows:
             last = 2 + len(rows)
-            total = ws.cell(last + 1, 9, f"=SUM(I3:I{last})")
+            total = self._set_cell(ws, last + 1, 9, f"=SUM(I3:I{last})")
             total.number_format = _MONEY_FMT
             total.font = Font(name=FONT_NAME_TABLE, bold=True)
-            ws.cell(last + 1, 8, "TOTAL")
-        ws.auto_filter.ref = f"A2:J{max(2, 2 + len(rows))}"
-        ws.freeze_panes = "A3"
-        self._autosize(ws, 10)
+            self._set_cell(ws, last + 1, 8, "TOTAL")
+        if not ws.auto_filter.ref:
+            ws.auto_filter.ref = f"A2:J{max(2, 2 + len(rows))}"
+        elif rows:
+            ws.auto_filter.ref = f"A2:J{max(2, 2 + len(rows))}"
+        if not ws.freeze_panes:
+            ws.freeze_panes = "A3"
+        if not self._from_template:
+            self._autosize(ws, 10)
 
     def _write_bosque(self, ws: Worksheet, rows: list[CruceExportRow]) -> None:
-        ws.cell(1, 2, "CDC BOSQUE DE PALMAS")
-        ws["B1"].font = _TITLE_FONT
+        title = self._set_cell(ws, 1, 2, "CDC BOSQUE DE PALMAS")
+        title.font = _TITLE_FONT
         self._write_table_headers(ws, 9, BOSQUE_HEADERS)
         for i, row in enumerate(rows, start=10):
             values = [
@@ -273,7 +389,7 @@ class CruceWorkbookBuilder:
                 _as_number(row.valor),
             ]
             for c, value in enumerate(values, start=1):
-                cell = ws.cell(i, c, value)
+                cell = self._set_cell(ws, i, c, value)
                 cell.border = _THIN
                 if c == 7 and isinstance(value, date):
                     cell.number_format = _DATE_FMT
@@ -281,26 +397,31 @@ class CruceWorkbookBuilder:
                     cell.number_format = _MONEY_FMT
         if rows:
             last = 9 + len(rows)
-            total = ws.cell(last + 1, 10, f"=SUM(J10:J{last})")
+            total = self._set_cell(ws, last + 1, 10, f"=SUM(J10:J{last})")
             total.number_format = _MONEY_FMT
             total.font = Font(name=FONT_NAME_TABLE, bold=True)
-        ws.freeze_panes = "A10"
-        self._autosize(ws, 10)
+        if not ws.freeze_panes:
+            ws.freeze_panes = "A10"
+        if not self._from_template:
+            self._autosize(ws, 10)
 
     def _write_luger(self, ws: Worksheet, rows: list[CruceExportRow]) -> None:
-        ws.cell(2, 2, "UNIDADES DISPONIBLES AÑO")
-        ws["B2"].font = _TITLE_FONT
+        title = self._set_cell(ws, 2, 2, "UNIDADES DISPONIBLES AÑO")
+        title.font = _TITLE_FONT
         self._style_header_row(ws, 5, 2, LUGER_HEADERS, HEADER_FILL_TEAL)
         # INGRESO no existe en SIG: no se escribe la cadena EGRESO (depende de ese saldo).
         for i, row in enumerate(rows, start=6):
-            ws.cell(i, 2, _as_date(row.fecha_ejecucion)).number_format = _DATE_FMT
-            ws.cell(i, 3, row.numero_compra)
-            valor = ws.cell(i, 4, _as_number(row.valor))
+            fecha = self._set_cell(ws, i, 2, _as_date(row.fecha_ejecucion))
+            fecha.number_format = _DATE_FMT
+            self._set_cell(ws, i, 3, row.numero_compra)
+            valor = self._set_cell(ws, i, 4, _as_number(row.valor))
             if row.valor is not None:
                 valor.number_format = _MONEY_FMT
             # E4 INGRESO y F EGRESO se dejan vacíos: sin saldo de apertura en SIG.
-        ws.freeze_panes = "B6"
-        self._autosize(ws, 6)
+        if not ws.freeze_panes:
+            ws.freeze_panes = "B6"
+        if not self._from_template:
+            self._autosize(ws, 6)
 
     def _write_table_headers(
         self,
@@ -313,7 +434,7 @@ class CruceWorkbookBuilder:
     ) -> None:
         align = Alignment(horizontal="center", wrap_text=True)
         for i, header in enumerate(headers, start=1):
-            cell = ws.cell(row, i, header)
+            cell = self._set_cell(ws, row, i, header)
             if eas_col and i == eas_col:
                 cell.fill = _fill(PRECIO_EAS_FILL)
             elif terc_col and i == terc_col:

@@ -41,11 +41,23 @@ def analizar_cruce(
         ) from exc
 
 
+def _parse_document_ids(raw: str | None) -> list[int] | None:
+    if not raw:
+        return None
+    ids: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if part.isdigit():
+            ids.append(int(part))
+    return ids or None
+
+
 @router.get("/export.xlsx")
 @router.get("/export")
 def exportar_excel(
     request: Request,
     batch_id: int | None = None,
+    document_ids: str | None = None,
     db: Session = Depends(get_db),
 ):
     """Genera el Excel estándar de Cruce de Cuentas a partir de SIG."""
@@ -53,6 +65,7 @@ def exportar_excel(
     try:
         content, filename, _analisis = service.generar_excel(
             batch_id=batch_id,
+            document_ids=_parse_document_ids(document_ids),
             usuario=resolve_usuario(request),
         )
     except CruceExcelServiceError as exc:

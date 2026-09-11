@@ -233,9 +233,9 @@
         type="button"
         class="wiz__copy"
         (click)="generarExcel()"
-        [disabled]="generandoExcel() || subiendoCruce() || (!autobits() && !documentos().length)"
+        [disabled]="!puedeGenerarExcel()"
       >
-        {{ generandoExcel() ? 'Generando Excel…' : 'Generar Excel' }}
+        {{ generandoExcel() ? 'Generando Excel…' : facturasEnProceso() ? 'Esperando facturas…' : 'Generar Excel' }}
       </button>
     </div>
     @if (cruce(); as cr) {

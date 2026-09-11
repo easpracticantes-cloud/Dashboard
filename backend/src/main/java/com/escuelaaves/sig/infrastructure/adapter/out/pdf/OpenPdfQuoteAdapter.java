@@ -193,12 +193,12 @@ public class OpenPdfQuoteAdapter implements QuotePdfPort {
 
     private String clientName(QuoteEntity quote) {
         return quote.getClient() != null && quote.getClient().getName() != null
-                ? quote.getClient().getName() : "Cliente";
+                ? quote.getClient().getName() : "—";
     }
 
     private String advisorName(QuoteEntity quote) {
         return quote.getAdvisor() != null && quote.getAdvisor().getFullName() != null
-                ? quote.getAdvisor().getFullName() : "Equipo comercial";
+                ? quote.getAdvisor().getFullName() : "—";
     }
 
     private String formatMoney(BigDecimal amount, String currency) {

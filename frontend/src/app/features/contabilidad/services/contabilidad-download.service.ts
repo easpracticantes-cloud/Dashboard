@@ -92,8 +92,19 @@ export class ContabilidadDownloadService {
         ? 'No se pudo generar el Excel.'
         : 'El archivo generado ya no está disponible.';
     }
+    if (res.status === 409) {
+      return 'Hay facturas todavía en procesamiento. Espere a que terminen OCR/IA.';
+    }
     if (res.status >= 500) {
       return 'No se pudo generar el Excel.';
+    }
+    try {
+      const body = (await res.json()) as { detail?: string };
+      if (body?.detail) {
+        return body.detail;
+      }
+    } catch {
+      // ignore non-JSON
     }
     return 'No se pudo descargar el Excel.';
   }

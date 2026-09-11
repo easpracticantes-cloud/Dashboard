@@ -1,6 +1,7 @@
 package com.escuelaaves.sig.infrastructure.adapter.in.web;
 
 import com.escuelaaves.sig.application.ai.IntelligenceService;
+import com.escuelaaves.sig.application.ai.QuoteDocumentService;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionExecuteRequest;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionExecuteResponse;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionStepDto;
@@ -13,6 +14,8 @@ import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.DashboardSummaryReque
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.DashboardSummaryResponse;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ProviderRecommendationDto;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ProviderRecommendationRequest;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.QuoteDocumentResponse;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.QuoteDraftDto;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.QuotationRequest;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.QuotationResponse;
 import com.escuelaaves.sig.domain.ai.model.ConversationClassification;
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -52,6 +56,7 @@ public class GenerativeAiController {
 
     private final AIUseCase aiUseCase;
     private final IntelligenceService intelligenceService;
+    private final QuoteDocumentService quoteDocumentService;
 
     @PostMapping("/chat")
     @Operation(summary = "Chat libre con el proveedor IA activo")
@@ -193,6 +198,15 @@ public class GenerativeAiController {
                 outcome.plan().stream().map(p -> p.tool().name()).toList(),
                 outcome.confirmationId()
         ));
+    }
+
+    @PostMapping("/quotes/document")
+    @Operation(summary = "Valida y recalcula una cotización estructurada (sin HTML). ?save=true exige cliente e ítems.")
+    public ResponseEntity<QuoteDocumentResponse> quoteDocument(
+            @RequestBody QuoteDraftDto body,
+            @RequestParam(defaultValue = "false") boolean save
+    ) {
+        return ResponseEntity.ok(quoteDocumentService.process(body, save));
     }
 
     @PostMapping("/copilot")

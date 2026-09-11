@@ -5,7 +5,6 @@ import {
   fillQuoteTemplate,
   formatCop,
   formatQuoteDate,
-  overlayValues,
   splitIvaIncluded
 } from './quote-template';
 
@@ -42,9 +41,14 @@ describe('quote-template', () => {
     expect(filled.clientCity).toBe('Salento');
     expect(filled.items[0].quantity).toBe('4');
     expect(filled.items[0].description).toContain('Acaime y Valle de Cócora');
-    expect(filled.items[1].description).toContain('No incluye');
     expect(filled.rawTotal).toBe(1000000);
-    expect(filled.items).toHaveLength(5);
+    expect(filled.clientName).toBe('Ana Pérez');
+  });
+
+  it('deja un guion discreto cuando el cliente está vacío', () => {
+    const filled = fillQuoteTemplate({ name: 'Tour' });
+    expect(filled.clientName).toBe('—');
+    expect(filled.clientEmail).toBe('—');
   });
 
   it('formatea dinero y fechas de calendario', () => {
@@ -54,13 +58,16 @@ describe('quote-template', () => {
     expect(buildQuoteNumber('rafting_eje', new Date(2026, 0, 5))).toBe('RAFTINGE-20260105');
   });
 
-  it('expone los placeholders que se pintan sobre la plantilla', () => {
-    const values = overlayValues(
-      fillQuoteTemplate({ name: 'Tour', people: 2, total: 200000, clientName: 'Carlos' })
-    );
-    expect(values['clientName']).toBe('Carlos');
-    expect(values['item1Qty']).toBe('2');
-    expect(values['total']).toMatch(/\$/);
-    expect(values['footerEmail']).toContain('@');
+  it('acepta ítems estructurados de la IA o del editor', () => {
+    const filled = fillQuoteTemplate({
+      clientName: 'Juan Pérez',
+      items: [
+        { description: 'Transporte Armenia', quantity: 20, unit: 'pax', unitPrice: 50000, discount: 0 },
+        { description: 'Alojamiento 3 noches', quantity: 20, unit: 'pax', unitPrice: 120000, discount: 0 }
+      ]
+    });
+    expect(filled.items).toHaveLength(2);
+    expect(filled.rawTotal).toBe(3400000);
+    expect(filled.total).toBe('$ 3.400.000');
   });
 });

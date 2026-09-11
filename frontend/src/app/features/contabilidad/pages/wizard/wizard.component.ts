@@ -125,6 +125,22 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.documentos().filter((d) => d.requiere_revision)
   );
 
+  readonly facturasEnProceso = computed(() =>
+    this.documentos().some((d) =>
+      ['RECIBIDO', 'PROCESANDO'].includes((d.estado || '').toUpperCase())
+    )
+  );
+
+  readonly puedeGenerarExcel = computed(() => {
+    if (this.generandoExcel() || this.subiendoCruce()) {
+      return false;
+    }
+    if (!this.autobits() && !this.documentos().length) {
+      return false;
+    }
+    return !this.facturasEnProceso();
+  });
+
   readonly kpis = computed(() => {
     const cmp = this.comparacion();
     const incompletas = cmp.filter((r) => r.faltas?.length).length;
@@ -227,14 +243,17 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   async generarExcel(): Promise<void> {
-    if (this.generandoExcel()) return;
+    if (this.generandoExcel() || !this.puedeGenerarExcel()) return;
     this.generandoExcel.set(true);
     this.error.set('');
     this.aviso.set('Generando Excel estándar de Cruce de Cuentas…');
     try {
       const today = new Date().toISOString().slice(0, 10);
+      const documentIds = this.documentos()
+        .map((d) => d.id)
+        .filter((id): id is number => Number.isFinite(id));
       await this.download.download(
-        this.cruceApi.exportExcelUrl(this.autobits()?.batch?.id),
+        this.cruceApi.exportExcelUrl(this.autobits()?.batch?.id, documentIds),
         `Cruce_Cuentas_${today}.xlsx`,
       );
       this.aviso.set('Excel de Cruce de Cuentas descargado.');

@@ -1,187 +1,194 @@
-import { CurrencyPipe } from '@angular/common';
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { QuoteDraft } from '../../../core/services/enterprise-ai.service';
-import { downloadQuotePdf } from './quote-pdf';
-import {
-  QUOTE_TEMPLATE_BOXES,
-  QUOTE_TEMPLATE_IMAGE,
-  fillQuoteTemplate,
-  overlayValues
-} from './quote-template';
+import { EnterpriseAiService } from '../../../core/services/enterprise-ai.service';
 import { AveUiContextService } from './ave-ui-context.service';
+import { QuoteSheetComponent } from './quote-sheet.component';
+import {
+  QUOTE_STATUSES,
+  type QuoteSheetDocument,
+  type QuoteSheetStatus,
+  documentToDraft,
+  draftToDocument
+} from './quote-sheet.model';
+import { downloadQuotePdf } from './quote-pdf';
+
+const DRAFT_STORE = 'sig.ave.quote-document';
 
 @Component({
   selector: 'eas-ave-quote-review',
   standalone: true,
-  imports: [FormsModule, MatIconModule, CurrencyPipe],
+  imports: [FormsModule, MatIconModule, QuoteSheetComponent],
   templateUrl: './ave-quote-review.component.html',
   styleUrl: './ave-quote-review.component.scss'
 })
 export class AveQuoteReviewComponent {
   private readonly uiCtx = inject(AveUiContextService);
+  private readonly ai = inject(EnterpriseAiService);
   readonly draft = input.required<QuoteDraft>();
   readonly closed = output<void>();
   readonly confirmed = output<QuoteDraft>();
-  readonly templateImage = QUOTE_TEMPLATE_IMAGE;
 
-  readonly code = signal('');
-  readonly name = signal('');
-  readonly modality = signal('PRIVADO');
-  readonly people = signal(2);
-  readonly unitPrice = signal(0);
-  readonly total = signal(0);
-  readonly currency = signal('COP');
-  readonly date = signal('');
-  readonly pickup = signal('');
-  readonly clientName = signal('');
-  readonly clientNit = signal('');
-  readonly clientPhone = signal('');
-  readonly clientEmail = signal('');
-  readonly clientCity = signal('');
-  readonly notes = signal('');
-  readonly includes = signal('');
-  readonly excludes = signal('');
+  readonly doc = signal<QuoteSheetDocument>(draftToDocument({}));
+  readonly editing = signal(true);
   readonly reviewFlag = signal(false);
   readonly reviewed = signal(false);
-  readonly manualTotal = signal(false);
-  readonly scale = signal<Record<string, number>>({});
+  readonly saving = signal(false);
   readonly downloading = signal(false);
-  readonly downloadError = signal<string | null>(null);
-
-  readonly displayTotal = computed(() => this.total() || 0);
-  readonly overlayFields = computed(() => {
-    const values = overlayValues(fillQuoteTemplate(this.currentDraft()));
-    return QUOTE_TEMPLATE_BOXES.map((box) => ({
-      ...box,
-      text: values[box.id] || ''
-    }));
-  });
+  readonly formError = signal<string | null>(null);
+  readonly statuses = QUOTE_STATUSES;
 
   constructor() {
     effect(() => {
-      const d = this.draft();
-      this.hydrate(d);
+      this.hydrate(this.draft());
     });
   }
 
   hydrate(d: QuoteDraft): void {
-    this.code.set(d.code || '');
-    this.name.set(d.name || '');
-    this.modality.set(d.modality || 'PRIVADO');
-    this.people.set(d.people || 2);
-    this.unitPrice.set(Number(d.unitPrice) || 0);
-    this.total.set(Number(d.total) || 0);
-    this.currency.set(d.currency || 'COP');
-    this.date.set(d.date || '');
-    this.pickup.set(d.pickup || '');
     const screen = this.uiCtx.entity()?.allowed || {};
-    this.clientName.set(d.clientName || screen['cliente'] || '');
-    this.clientNit.set(d.clientNit || '');
-    this.clientPhone.set(d.clientPhone || screen['celular'] || '');
-    this.clientEmail.set(d.clientEmail || '');
-    this.clientCity.set(d.clientCity || d.pickup || '');
-    this.notes.set(d.notes || '');
-    this.includes.set(d.includes || '');
-    this.excludes.set(d.excludes || '');
-    this.reviewFlag.set(!!d.reviewFlag);
-    this.scale.set(d.priceScaleByPax || {});
-    this.manualTotal.set(false);
+    const stored = readStoredDraft();
+    const merged: QuoteDraft = {
+      ...stored,
+      ...d,
+      items: d.items?.length ? d.items : stored?.items,
+      clientName: d.clientName || stored?.clientName || screen['cliente'] || '',
+      clientPhone: d.clientPhone || stored?.clientPhone || screen['celular'] || '',
+      clientEmail: d.clientEmail || stored?.clientEmail || '',
+      clientCity: d.clientCity || stored?.clientCity || d.pickup || stored?.pickup || ''
+    };
+    this.doc.set(draftToDocument(merged));
+    this.reviewFlag.set(!!merged.reviewFlag);
     this.reviewed.set(false);
-    this.downloadError.set(null);
+    this.formError.set(null);
+    this.editing.set(true);
   }
 
-  onPeopleChange(value: number | string): void {
-    const pax = Math.max(1, Number(value) || 1);
-    this.people.set(pax);
-    this.manualTotal.set(false);
-    this.applyScale(pax);
+  onDocumentChange(next: QuoteSheetDocument): void {
+    this.doc.set(next);
+    this.reviewed.set(false);
   }
 
-  onUnitChange(value: number | string): void {
-    const unit = Math.max(0, Number(value) || 0);
-    this.unitPrice.set(unit);
-    if (!this.manualTotal()) {
-      this.total.set(Math.round(unit * this.people()));
-    }
-  }
-
-  onTotalChange(value: number | string): void {
-    this.manualTotal.set(true);
-    this.total.set(Math.max(0, Number(value) || 0));
-  }
-
-  private applyScale(pax: number): void {
-    const scale = this.scale();
-    const keys = Object.keys(scale)
-      .map((k) => Number(k))
-      .filter((n) => !Number.isNaN(n))
-      .sort((a, b) => a - b);
-    let unit = this.unitPrice();
-    if (keys.length) {
-      if (scale[String(pax)] != null) {
-        unit = Number(scale[String(pax)]);
-      } else {
-        const max = keys[keys.length - 1];
-        if (pax > max) {
-          unit = Number(scale[String(max)]);
-        } else {
-          const nearest = keys.reduce((best, k) =>
-            Math.abs(k - pax) < Math.abs(best - pax) ? k : best
-          );
-          unit = Number(scale[String(nearest)]);
-        }
-      }
-    }
-    this.unitPrice.set(unit);
-    this.total.set(Math.round(unit * pax));
+  setStatus(status: QuoteSheetStatus): void {
+    this.doc.set({ ...this.doc(), status });
   }
 
   currentDraft(): QuoteDraft {
-    return {
-      code: this.code().trim(),
-      name: this.name().trim(),
-      modality: this.modality(),
-      people: this.people(),
-      unitPrice: this.unitPrice(),
-      total: this.total(),
-      currency: this.currency(),
-      date: this.date() || undefined,
-      pickup: this.pickup() || undefined,
-      clientName: this.clientName() || undefined,
-      clientNit: this.clientNit() || undefined,
-      clientPhone: this.clientPhone() || undefined,
-      clientEmail: this.clientEmail() || undefined,
-      clientCity: this.clientCity() || undefined,
-      notes: this.notes() || undefined,
-      includes: this.includes() || undefined,
-      excludes: this.excludes() || undefined,
-      reviewFlag: this.reviewFlag(),
-      priceScaleByPax: this.scale()
-    };
+    return documentToDraft(this.doc());
+  }
+
+  edit(): void {
+    this.editing.set(true);
+  }
+
+  preview(): void {
+    this.editing.set(false);
+  }
+
+  async save(): Promise<void> {
+    if (this.saving()) {
+      return;
+    }
+    this.formError.set(null);
+    this.saving.set(true);
+    const draft = this.currentDraft();
+    try {
+      const res = await new Promise<{ document: QuoteDraft; errors: string[]; valid: boolean }>(
+        (resolve, reject) => {
+          this.ai.validateQuoteDocument(draft, true).subscribe({
+            next: resolve,
+            error: reject
+          });
+        }
+      );
+      if (!res.valid) {
+        this.formError.set(res.errors.join(' '));
+        this.editing.set(true);
+        return;
+      }
+      this.doc.set(draftToDocument({ ...draft, ...res.document }));
+      persistDraft(this.currentDraft());
+      this.reviewed.set(true);
+      this.confirmed.emit(this.currentDraft());
+      this.editing.set(false);
+    } catch (err) {
+      const local = this.localValidate(draft);
+      if (local) {
+        this.formError.set(local);
+        this.editing.set(true);
+        return;
+      }
+      persistDraft(draft);
+      this.reviewed.set(true);
+      this.confirmed.emit(draft);
+      this.editing.set(false);
+      if (err) {
+        this.formError.set('Guardada en esta sesión. El servidor no pudo revalidar los totales.');
+      }
+    } finally {
+      this.saving.set(false);
+    }
   }
 
   markReviewed(): void {
-    this.reviewed.set(true);
-    this.confirmed.emit(this.currentDraft());
+    void this.save();
   }
 
   async downloadPdf(): Promise<void> {
-    if (this.downloading()) return;
-    this.downloadError.set(null);
+    if (this.downloading()) {
+      return;
+    }
+    this.formError.set(null);
     this.downloading.set(true);
     try {
-      await downloadQuotePdf(this.currentDraft());
-    } catch (err) {
-      console.error('PDF download failed', err);
-      this.downloadError.set('No se pudo generar el PDF. Intenta de nuevo.');
+      await downloadQuotePdf(this.doc());
+    } catch {
+      this.formError.set('No se pudo generar el PDF. Intenta de nuevo.');
     } finally {
       this.downloading.set(false);
     }
   }
 
   close(): void {
+    persistDraft(this.currentDraft());
     this.closed.emit();
+  }
+
+  private localValidate(draft: QuoteDraft): string | null {
+    if (!draft.clientName?.trim()) {
+      return 'El cliente es obligatorio.';
+    }
+    const items = draft.items || [];
+    const usable = items.filter((item) => (item.description || '').trim());
+    if (!usable.length) {
+      return 'Agrega al menos un producto o servicio.';
+    }
+    if (usable.some((item) => !item.quantity || item.quantity <= 0)) {
+      return 'Las cantidades deben ser mayores a cero.';
+    }
+    if (usable.some((item) => (item.unitPrice || 0) < 0 || (item.discount || 0) < 0)) {
+      return 'Los valores monetarios no pueden ser negativos.';
+    }
+    if (draft.issuedAt && draft.validUntil && draft.validUntil < draft.issuedAt) {
+      return 'La vigencia debe ser posterior a la fecha de emisión.';
+    }
+    return null;
+  }
+}
+
+function persistDraft(draft: QuoteDraft): void {
+  try {
+    sessionStorage.setItem(DRAFT_STORE, JSON.stringify(draft));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
+function readStoredDraft(): QuoteDraft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_STORE);
+    return raw ? (JSON.parse(raw) as QuoteDraft) : null;
+  } catch {
+    return null;
   }
 }

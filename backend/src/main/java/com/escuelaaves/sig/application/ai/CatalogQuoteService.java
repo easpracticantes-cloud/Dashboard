@@ -2,6 +2,7 @@ package com.escuelaaves.sig.application.ai;
 
 import com.escuelaaves.sig.application.ai.CommercialCatalogService.CatalogProduct;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.QuoteDraftDto;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.QuoteLineItemDto;
 import com.escuelaaves.sig.domain.ai.model.QuoteInterpretation;
 import com.escuelaaves.sig.shared.exception.BadRequestException;
 import com.escuelaaves.sig.shared.exception.ResourceNotFoundException;
@@ -13,6 +14,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -130,6 +132,19 @@ public class CatalogQuoteService {
     }
 
     public QuoteDraftDto toDraft(QuoteResult q) {
+        String description = q.name() != null ? q.name() : "";
+        if (q.modality() != null && !q.modality().isBlank()) {
+            description = description + " · Modalidad " + q.modality().toLowerCase(Locale.ROOT);
+        }
+        QuoteLineItemDto item = new QuoteLineItemDto(
+                description,
+                q.people(),
+                "pax",
+                q.unitPrice(),
+                BigDecimal.ZERO,
+                null,
+                q.total()
+        );
         return new QuoteDraftDto(
                 q.code(),
                 q.name(),
@@ -145,7 +160,21 @@ public class CatalogQuoteService {
                 q.includes(),
                 q.excludes(),
                 q.reviewFlag(),
-                q.priceScaleByPax()
+                q.priceScaleByPax(),
+                List.of(item),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                q.date(),
+                null,
+                q.notes(),
+                null,
+                "DRAFT"
         );
     }
 
@@ -159,13 +188,22 @@ public class CatalogQuoteService {
         String code = hint.tour() != null ? hint.tour() : "";
         String name = humanizeCode(code);
         int people = hint.people() != null && hint.people() > 0 ? hint.people() : 2;
+        QuoteLineItemDto item = new QuoteLineItemDto(
+                name,
+                people,
+                "pax",
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                null,
+                BigDecimal.ZERO
+        );
         return new QuoteDraftDto(
                 code,
                 name,
                 "PRIVADO",
                 people,
-                java.math.BigDecimal.ZERO,
-                java.math.BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
                 "COP",
                 hint.date(),
                 hint.pickup(),
@@ -174,7 +212,21 @@ public class CatalogQuoteService {
                 null,
                 null,
                 false,
-                Map.of()
+                Map.of(),
+                List.of(item),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                hint.date(),
+                null,
+                null,
+                null,
+                "DRAFT"
         );
     }
 

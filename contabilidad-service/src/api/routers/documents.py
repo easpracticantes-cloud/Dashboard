@@ -346,7 +346,9 @@ async def upload_documents_batch(
 
             db_match = SessionLocal()
             try:
-                CrossingService(db_match).run_matching(force=True, usuario="SISTEMA")
+                matcher = CrossingService(db_match)
+                for doc_id in queued_ids:
+                    matcher.run_matching(document_id=doc_id, force=True, usuario="SISTEMA")
             except Exception:
                 pass
             finally:

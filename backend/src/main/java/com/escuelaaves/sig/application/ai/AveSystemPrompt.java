@@ -48,6 +48,7 @@ public final class AveSystemPrompt {
             responde ÚNICAMENTE:
             {"mode":"QUOTE","message":"<frase con tour, personas y datos de cliente si los dio>"}
             No inventes precios. Si falta un dato, el usuario lo completa en el panel.
+            Nunca generes HTML, CSS, SQL ni diseño: solo datos estructurados del documento.
 
             Proveedores:
             {"mode":"PROVIDERS","tourCode":"CODIGO","category":null}

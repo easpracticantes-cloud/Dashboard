@@ -414,3 +414,126 @@ def test_upload_historico_sigue_existiendo(client):
         data={"aplicar": "true"},
     )
     assert res.status_code == 200, res.text
+
+
+def test_export_usa_plantilla_maestra_sin_datos_historicos():
+    builder = CruceWorkbookBuilder()
+    content = builder.build(
+        [
+            CruceExportRow(
+                proveedor="Hotel Nuevo SAS",
+                numero_compra="COM-NUEVO-1",
+                numero_reserva="EAS-NUEVO",
+                fecha_ejecucion="2026-03-15",
+                valor=Decimal("250000"),
+                factura_cdc="FE-4589",
+            )
+        ],
+        year=2026,
+    )
+    wb = load_workbook(io.BytesIO(content))
+    assert tuple(wb.sheetnames) == standard_sheet_names(2026)
+    dumped = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows(values_only=True):
+            dumped.extend(str(v) for v in row if v is not None)
+    joined = " | ".join(dumped)
+    assert "COM-NUEVO-1" in joined
+    assert "FE-4589" in joined
+    assert "COM005691" not in joined
+    assert "FV POS" not in joined
+    enero = wb["AÑO  2026 ENERO - ABRIL"]
+    assert tuple(enero.cell(2, c).value for c in range(1, 7)) == PERIOD_BLOCK_HEADERS
+
+
+def test_export_document_ids_no_mezcla_facturas(client):
+    from domain.enums import DocumentStatus
+    from infrastructure.persistence.database import SessionLocal
+    from infrastructure.persistence.models import DocumentModel, ProviderModel
+
+    _subir_autobits(
+        client,
+        [["900111", "Hotel Demo SAS", "COM001", "EAS001", "2026-03-10", 150000, ""]],
+    )
+    db = SessionLocal()
+    try:
+        provider = ProviderModel(nombre="EMPRESA XYZ", nit="900123456-7")
+        doc_a = DocumentModel(
+            filename="factura-a.pdf",
+            tipo="FACTURA",
+            origen="CARGA_MANUAL",
+            estado=DocumentStatus.PROCESADO,
+            numero_documento="FE-AAAA",
+            total=1250000,
+            fecha_emision="2026-03-11",
+            provider=provider,
+        )
+        doc_b = DocumentModel(
+            filename="factura-b.pdf",
+            tipo="FACTURA",
+            origen="CARGA_MANUAL",
+            estado=DocumentStatus.PROCESADO,
+            numero_documento="FE-BBBB",
+            total=800000,
+            fecha_emision="2026-03-12",
+            provider=provider,
+        )
+        db.add_all([provider, doc_a, doc_b])
+        db.commit()
+        db.refresh(doc_a)
+        db.refresh(doc_b)
+        id_a, id_b = doc_a.id, doc_b.id
+    finally:
+        db.close()
+
+    excel_a = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
+    assert excel_a.status_code == 200, excel_a.text
+    text_a = _xlsx_text(excel_a.content)
+    assert "FE-AAAA" in text_a
+    assert "FE-BBBB" not in text_a
+
+    excel_b = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_b}")
+    assert excel_b.status_code == 200, excel_b.text
+    text_b = _xlsx_text(excel_b.content)
+    assert "FE-BBBB" in text_b
+    assert "FE-AAAA" not in text_b
+
+    excel_a2 = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
+    assert "FE-AAAA" in _xlsx_text(excel_a2.content)
+    assert "FE-BBBB" not in _xlsx_text(excel_a2.content)
+
+
+def test_export_bloquea_facturas_en_proceso(client):
+    from domain.enums import DocumentStatus
+    from infrastructure.persistence.database import SessionLocal
+    from infrastructure.persistence.models import DocumentModel, ProviderModel
+
+    db = SessionLocal()
+    try:
+        provider = ProviderModel(nombre="Hotel Proceso", nit="900999")
+        doc = DocumentModel(
+            filename="factura-proc.pdf",
+            tipo="FACTURA",
+            origen="CARGA_MANUAL",
+            estado=DocumentStatus.PROCESANDO,
+            numero_documento="FE-PROC",
+            provider=provider,
+        )
+        db.add_all([provider, doc])
+        db.commit()
+        db.refresh(doc)
+        doc_id = doc.id
+    finally:
+        db.close()
+
+    res = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    assert res.status_code == 409
+
+
+def _xlsx_text(content: bytes) -> str:
+    wb = load_workbook(io.BytesIO(content))
+    values = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows(values_only=True):
+            values.extend(str(v) for v in row if v is not None)
+    return " | ".join(values)
