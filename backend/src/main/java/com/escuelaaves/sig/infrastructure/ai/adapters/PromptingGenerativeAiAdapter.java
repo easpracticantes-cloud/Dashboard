@@ -2,12 +2,15 @@ package com.escuelaaves.sig.infrastructure.ai.adapters;
 
 import com.escuelaaves.sig.application.ai.CommercialCatalogService;
 import com.escuelaaves.sig.application.ai.ContextRetriever;
+import com.escuelaaves.sig.application.ai.DiscReplyStyle;
+import com.escuelaaves.sig.application.ai.DiscStyleClassifier;
 import com.escuelaaves.sig.domain.ai.model.ConversationClassification;
 import com.escuelaaves.sig.domain.ai.model.LanguageDetection;
 import com.escuelaaves.sig.domain.ai.model.NaturalLanguageQuotation;
 import com.escuelaaves.sig.domain.ai.model.PricedQuotation;
 import com.escuelaaves.sig.domain.ai.model.QuoteInterpretation;
 import com.escuelaaves.sig.domain.ai.model.ReservationExtraction;
+import com.escuelaaves.sig.domain.ai.model.DiscProfile;
 import com.escuelaaves.sig.domain.ai.model.SeguimientoExtraction;
 import com.escuelaaves.sig.domain.ai.model.SentimentAnalysis;
 import com.escuelaaves.sig.domain.ai.port.GenerativeAiPort;
@@ -210,7 +213,7 @@ public abstract class PromptingGenerativeAiAdapter implements GenerativeAiPort {
                     "canal": {"valor":"WHATSAPP","estado":"CONFIRMADO","confianza":1},
                     "cliente": {"valor":null,"estado":"...","confianza":0.0},
                     "celular": {"valor":null,"estado":"...","confianza":0.0},
-                    "disc": {"valor":"N/A","estado":"...","confianza":0.0},
+                    "disc": {"valor":"D|I|S|C o null","estado":"INFERIDO|AMBIGUO|NO_ENCONTRADO","confianza":0.0},
                     "solicitud": {"valor":null,"estado":"...","confianza":0.0},
                     "respuesta": {"valor":null,"estado":"...","confianza":0.0},
                     "semaforo": {"valor":"FRIO|TIBIO|CALIENTE|VENTA o null","estado":"...","confianza":0.0},
@@ -235,10 +238,22 @@ public abstract class PromptingGenerativeAiAdapter implements GenerativeAiPort {
                   },
                   "historialCotizaciones": [],
                   "posibleDuplicado": null,
-                  "resumen": "texto breve"
+                  "resumen": "texto breve",
+                  "discAnalisis": {
+                    "disc": "D|I|S|C o null",
+                    "confidence": 0.0,
+                    "reason": "una frase sobre el estilo de comunicación observado",
+                    "signals": ["señal1","señal2"]
+                  }
                 }
                 La última cotización NO es el último mensaje: es la última versión de precio/servicio enviada.
                 No inventes. Si no aparece, valor null y estado NO_ENCONTRADO.
+
+                DISC: clasifica SOLO el estilo de comunicación observable del PROSPECTO (líneas PROSPECTO), nunca del ASESOR.
+                Ejes: Rápido+Tareas=D; Rápido+Personas=I; Pausado+Personas=S; Pausado+Tareas=C.
+                Combina varias señales; no clasifiques por un solo emoji, un PDF o un saludo.
+                No afirmes personalidad clínica, edad, género ni profesión.
+                Si no hay evidencia suficiente (p. ej. solo "Hola"), disc=null y estado NO_ENCONTRADO.
                 """;
         String user = PromptAssembly.fenceUntrusted("Chat de WhatsApp (cronológico):", normalizedChat);
         String json = generateText(system, user, true, "extractSeguimiento");
@@ -272,6 +287,15 @@ public abstract class PromptingGenerativeAiAdapter implements GenerativeAiPort {
         if (campos.get("registrado").valor() == null) {
             campos.put("registrado", SeguimientoExtraction.FieldValue.of("WHATSAPP", "CONFIRMADO", 1));
         }
+        DiscProfile discAnalisis = parseDiscAnalisis(node.path("discAnalisis"), campos.get("disc"));
+        String letter = discAnalisis.disc();
+        if (letter != null) {
+            campos.put("disc", new SeguimientoExtraction.FieldValue(
+                    letter, "INFERIDO", discAnalisis.confidence()
+            ));
+        } else {
+            campos.put("disc", SeguimientoExtraction.FieldValue.of(null, "NO_ENCONTRADO", 0));
+        }
         JsonNode u = node.path("ultimaCotizacion");
         SeguimientoExtraction.UltimaCotizacion ultima = new SeguimientoExtraction.UltimaCotizacion(
                 AiStructuredJson.textOrNull(u, "fecha"),
@@ -299,8 +323,32 @@ public abstract class PromptingGenerativeAiAdapter implements GenerativeAiPort {
                 ultima,
                 List.copyOf(hist),
                 AiStructuredJson.textOrNull(node, "posibleDuplicado"),
-                AiStructuredJson.textOrNull(node, "resumen")
+                AiStructuredJson.textOrNull(node, "resumen"),
+                discAnalisis
         );
+    }
+
+    private static DiscProfile parseDiscAnalisis(JsonNode node, SeguimientoExtraction.FieldValue campo) {
+        String letter = DiscProfile.normalize(AiStructuredJson.textOrNull(node, "disc"));
+        if (letter == null && campo != null) {
+            letter = DiscProfile.normalize(campo.valor());
+        }
+        double conf = node.path("confidence").isNumber()
+                ? node.path("confidence").asDouble()
+                : (campo != null ? campo.confianza() : 0);
+        String reason = AiStructuredJson.textOrNull(node, "reason");
+        java.util.ArrayList<String> signals = new java.util.ArrayList<>();
+        if (node.path("signals").isArray()) {
+            for (JsonNode s : node.path("signals")) {
+                if (s.isTextual() && !s.asText().isBlank()) {
+                    signals.add(s.asText().trim());
+                }
+            }
+        }
+        if (letter == null) {
+            return DiscProfile.undetermined();
+        }
+        return DiscProfile.of(letter, conf, reason, signals);
     }
 
     private static String OptionalEstado(String estado) {
@@ -351,12 +399,12 @@ public abstract class PromptingGenerativeAiAdapter implements GenerativeAiPort {
 
     @Override
     public String suggestReply(String conversationText) {
-        return generateText(
-                "Sugiere UNA respuesta breve, cálida y profesional de WhatsApp para el asesor de Escuela Aves Salento. Solo el texto.",
-                conversationText,
-                false,
-                "suggestReply"
-        );
+        DiscProfile disc = DiscStyleClassifier.classifyProspectText(conversationText);
+        String system = "Sugiere UNA respuesta breve, cálida y profesional de WhatsApp para el asesor. Solo el texto.";
+        if (disc.determined()) {
+            system = system + DiscReplyStyle.systemAppendix(disc.disc());
+        }
+        return generateText(system, conversationText, false, "suggestReply");
     }
 
     private QuoteInterpretation parseQuoteInterpretation(String json, String original) {

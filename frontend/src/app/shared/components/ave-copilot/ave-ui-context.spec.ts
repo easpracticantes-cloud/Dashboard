@@ -25,4 +25,16 @@ describe('compactAveUiContext', () => {
     expect(parsed.allowedContext['notas']).toBeUndefined();
     expect(json).not.toContain('secreto');
   });
+
+  it('incluye DISC cuando el registro lo enfoca', () => {
+    const json = compactAveUiContext({
+      module: 'Registro',
+      entity: {
+        type: 'SEGUIMIENTO',
+        allowed: { disc: 'C', cliente: 'Ana' }
+      }
+    });
+    const parsed = JSON.parse(json) as { allowedContext: Record<string, string> };
+    expect(parsed.allowedContext['disc']).toBe('C');
+  });
 });

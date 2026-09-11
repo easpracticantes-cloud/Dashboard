@@ -70,4 +70,16 @@ class WhatsAppChatParserTest {
         var parsed = WhatsAppChatParser.parse("chat.txt", CHAT);
         assertTrue(parsed.messages().getLast().text().toLowerCase().contains("caro"));
     }
+
+    @Test
+    void separaProspectoDeAsesor() {
+        var parsed = WhatsAppChatParser.parse("WhatsApp Chat - Juan.txt", CHAT);
+        var texts = WhatsAppChatParser.prospectTexts(parsed);
+        assertEquals(3, texts.size());
+        assertTrue(texts.getFirst().contains("Salento"));
+        assertTrue(texts.stream().noneMatch(t -> t.contains("180.000")));
+        String rendered = WhatsAppChatParser.renderForModel(parsed, parsed.messages());
+        assertTrue(rendered.contains("PROSPECTO"));
+        assertTrue(rendered.contains("ASESOR"));
+    }
 }

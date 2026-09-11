@@ -25,7 +25,15 @@ export interface WhatsappCoincidencia {
   hojaOrigen?: string;
   fechaCotizado?: string;
   pendiente?: string;
+  disc?: string;
   motivo?: string;
+}
+
+export interface WhatsappDiscAnalisis {
+  disc?: string | null;
+  confidence?: number;
+  reason?: string;
+  signals?: string[];
 }
 
 export interface WhatsappPreview {
@@ -38,6 +46,7 @@ export interface WhatsappPreview {
   resumen?: string | null;
   posibleDuplicado?: string | null;
   coincidencias?: WhatsappCoincidencia[];
+  discAnalisis?: WhatsappDiscAnalisis | null;
   requiereConfirmacion: boolean;
 }
 

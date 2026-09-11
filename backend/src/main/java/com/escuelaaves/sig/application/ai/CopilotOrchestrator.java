@@ -152,6 +152,13 @@ public class CopilotOrchestrator {
             AvePromptAssembler.Assembled assembled = AvePromptAssembler.assemble(
                     llmMessage, history, businessTurn, catalog, slotsJson
             );
+            String system = assembled.system();
+            if (businessTurn) {
+                String disc = DiscReplyStyle.fromUiContext(uiContext, objectMapper);
+                if (disc != null) {
+                    system = system + DiscReplyStyle.systemAppendix(disc);
+                }
+            }
 
             AiPromptTrace.logRoot(requestId, sessionId, "pending", assembled, false);
 
@@ -160,13 +167,14 @@ public class CopilotOrchestrator {
                 log.error("[AI-ROOT-TRACE] BUG commercial identity in general SYSTEM sources={} → force clean",
                         assembled.systemSources());
                 assembled = AvePromptAssembler.assemble(llmMessage, "(sin historial previo)", false, null, null);
+                system = assembled.system();
                 AiPromptTrace.logRoot(requestId + "-clean", sessionId, "pending", assembled, false);
             }
 
             String operation = businessTurn && CLEAR_QUOTE.matcher(message).find() && message.length() > 400
                     ? "complex_chat" : "chat";
 
-            ChatAttempt attempt = chatWithProviderFailover(assembled.system(), assembled.user(), operation);
+            ChatAttempt attempt = chatWithProviderFailover(system, assembled.user(), operation);
             String provider = attempt.providerId();
             String raw = attempt.text();
 

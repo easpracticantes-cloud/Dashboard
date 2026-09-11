@@ -192,11 +192,13 @@
         <label>
           DISC
           <select [ngModel]="draft().disc" (ngModelChange)="patch('disc', $event)">
-            <option value=""></option>
-            @for (o of opcionesDisc(); track o) {
-              <option [value]="o">{{ o }}</option>
+            @for (o of opcionesDisc; track o.value) {
+              <option [value]="o.value">{{ o.label }}</option>
             }
           </select>
+          @if (discDetectadoPorIa()) {
+            <small class="reg__hint">Detectado por IA</small>
+          }
         </label>
         <label class="reg__wide">
           Solicitud
@@ -369,7 +371,9 @@
               <td>{{ r.canal || '—' }}</td>
               <td>{{ r.cliente || '—' }}</td>
               <td>{{ r.celular || '—' }}</td>
-              <td>{{ r.disc || '—' }}</td>
+              <td>
+                <span class="reg__disc" [attr.data-tone]="discTone(r.disc)">{{ discLabel(r.disc) }}</span>
+              </td>
               <td>{{ r.solicitud || '—' }}</td>
               <td>{{ r.respuesta || '—' }}</td>
               <td>{{ r.semaforo || '—' }}</td>

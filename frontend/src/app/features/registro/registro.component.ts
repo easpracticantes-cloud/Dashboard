@@ -15,7 +15,13 @@ import { AveUiContextService } from '../../shared/components/ave-copilot/ave-ui-
 
 const TIPO_BASE = ['B2B', 'B2C', 'AGENCIA', 'PARTICULAR'];
 const CANAL_BASE = ['RESERVAS', 'WHATSAPP', 'INSTAGRAM', 'WEB', 'EMAIL', 'TELEFONO'];
-const DISC_BASE = ['N/A', 'D', 'I', 'S', 'C'];
+const DISC_OPTIONS = [
+  { value: 'N/A', label: 'N/A', tone: 'na' },
+  { value: 'D', label: 'Rojo (dominante)', tone: 'rojo' },
+  { value: 'I', label: 'Amarillo (influencia)', tone: 'amarillo' },
+  { value: 'S', label: 'Verde (estabilidad)', tone: 'verde' },
+  { value: 'C', label: 'Azul (cumplimiento)', tone: 'azul' },
+] as const;
 const SEMAFORO_BASE = ['FRIO', 'TIBIO', 'CALIENTE', 'VENTA'];
 const PRIORIDAD_BASE = ['ALTA', 'MEDIA', 'BAJA'];
 const SI_NO = ['SI', 'NO'];
@@ -93,7 +99,7 @@ function fromRow(row: SeguimientoWhatsapp): Draft {
     canal: row.canal || '',
     cliente: row.cliente || '',
     celular: row.celular || '',
-    disc: row.disc || '',
+    disc: normalizeDisc(row.disc),
     solicitud: row.solicitud || '',
     respuesta: row.respuesta || '',
     semaforo: row.semaforo || '',
@@ -112,6 +118,30 @@ function fromRow(row: SeguimientoWhatsapp): Draft {
 
 function digits(value: string | undefined): string {
   return (value || '').replace(/\D+/g, '');
+}
+
+function normalizeDisc(raw?: string | null): string {
+  const t = (raw || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (!t) return 'N/A';
+  if (['D', 'ROJO', 'RED', 'DOMINANCIA', 'DOMINANTE'].includes(t)) return 'D';
+  if (['I', 'AMARILLO', 'YELLOW', 'INFLUENCIA'].includes(t)) return 'I';
+  if (['S', 'VERDE', 'GREEN', 'ESTABILIDAD', 'ESTABLE'].includes(t)) return 'S';
+  if (['C', 'AZUL', 'BLUE', 'CUMPLIMIENTO'].includes(t)) return 'C';
+  return 'N/A';
+}
+
+function discLabel(raw?: string | null): string {
+  const value = normalizeDisc(raw);
+  return DISC_OPTIONS.find((o) => o.value === value)?.label || 'N/A';
+}
+
+function discTone(raw?: string | null): string {
+  const value = normalizeDisc(raw);
+  return DISC_OPTIONS.find((o) => o.value === value)?.tone || 'na';
 }
 
 @Component({
@@ -204,13 +234,31 @@ export class RegistroComponent {
 
   readonly opcionesTipo = computed(() => this.mergeOpts(TIPO_BASE, (r) => r.tipo));
   readonly opcionesCanal = computed(() => this.mergeOpts(CANAL_BASE, (r) => r.canal));
-  readonly opcionesDisc = computed(() => this.mergeOpts(DISC_BASE, (r) => r.disc));
+  readonly opcionesDisc = DISC_OPTIONS;
+
+  discLabel(raw?: string | null): string {
+    return discLabel(raw);
+  }
+
+  discTone(raw?: string | null): string {
+    return discTone(raw);
+  }
   readonly opcionesSemaforo = computed(() => this.mergeOpts(SEMAFORO_BASE, (r) => r.semaforo));
   readonly opcionesPrioridad = computed(() => this.mergeOpts(PRIORIDAD_BASE, (r) => r.priorizar));
   readonly opcionesAsignado = computed(() => this.mergeOpts(['ANDREA'], (r) => r.asignado));
   readonly opcionesRegistrada = computed(() => this.mergeOpts(REGISTRADA_BASE, (r) => r.registrado));
   readonly opcionesSiNo = SI_NO;
   readonly opcionesEncuesta = ENCUESTA_BASE;
+  readonly discDetectadoPorIa = computed(() => {
+    const preview = this.waPreview();
+    const disc = normalizeDisc(this.draft().disc);
+    if (!preview || !['D', 'I', 'S', 'C'].includes(disc)) return false;
+    const existing = normalizeDisc(preview.coincidencias?.[0]?.disc);
+    if (['D', 'I', 'S', 'C'].includes(existing) && existing === disc) return false;
+    const campo = preview.campos?.['disc'];
+    const ia = normalizeDisc(campo?.valor || preview.discAnalisis?.disc);
+    return campo?.estado === 'INFERIDO' && ia === disc;
+  });
 
   constructor() {
     this.destroyRef.onDestroy(() => this.aveUi.clearEntity());
@@ -248,6 +296,19 @@ export class RegistroComponent {
       const preview = this.waPreview();
       if (preview) {
         this.waDrafts.update((m) => ({ ...m, [preview.previewId]: next }));
+      }
+      if (preview || this.modo() === 'editar') {
+        this.aveUi.setEntity({
+          type: 'SEGUIMIENTO',
+          allowed: {
+            cliente: next.cliente,
+            celular: next.celular,
+            fecha: next.fecha,
+            hoja: next.hojaOrigen,
+            semaforo: next.semaforo,
+            disc: normalizeDisc(next.disc),
+          },
+        });
       }
       return next;
     });
@@ -401,10 +462,29 @@ export class RegistroComponent {
 
   revisarWhatsapp(preview: WhatsappPreview): void {
     this.waPreview.set(preview);
-    this.draft.set(this.waDrafts()[preview.previewId] || this.draftFromWhatsapp(preview));
+    const draft = this.waDrafts()[preview.previewId] || this.draftFromWhatsapp(preview);
+    this.draft.set(draft);
     this.aviso.set('');
     this.modo.set('nueva');
     this.original.set(null);
+    this.publishAveFocus({
+      fecha: draft.fecha,
+      tipo: draft.tipo,
+      canal: draft.canal,
+      cliente: draft.cliente,
+      celular: draft.celular,
+      solicitud: draft.solicitud,
+      respuesta: draft.respuesta,
+      semaforo: draft.semaforo,
+      cotizado: Boolean(draft.fechaCotizado),
+      notas: draft.notas,
+      fechaServicio: draft.fechaServicio,
+      encuesta: draft.encuesta === 'SI',
+      asignado: draft.asignado,
+      proximoSeguimiento: draft.proximoSeguimiento,
+      hojaOrigen: draft.hojaOrigen,
+      disc: draft.disc,
+    });
   }
 
   confirmarWhatsapp(updateExisting: boolean): void {
@@ -515,6 +595,10 @@ export class RegistroComponent {
       row['matchFecha'] = hit.fecha;
       row['matchCliente'] = hit.cliente;
       row['hojaOrigen'] = hit.hojaOrigen || d.hojaOrigen;
+      const existingDisc = normalizeDisc(hit.disc);
+      if (['D', 'I', 'S', 'C'].includes(existingDisc)) {
+        row['disc'] = existingDisc;
+      }
     }
     return row;
   }
@@ -531,6 +615,13 @@ export class RegistroComponent {
 
   private draftFromWhatsapp(preview: WhatsappPreview): Draft {
     const v = (k: string) => preview.campos?.[k]?.valor || '';
+    const existingDisc = normalizeDisc(preview.coincidencias?.[0]?.disc);
+    const iaDisc = normalizeDisc(v('disc') || preview.discAnalisis?.disc);
+    const disc = ['D', 'I', 'S', 'C'].includes(existingDisc)
+      ? existingDisc
+      : ['D', 'I', 'S', 'C'].includes(iaDisc)
+        ? iaDisc
+        : 'N/A';
     return {
       ...emptyDraft(this.hojaFiltro() || this.hojas()[0] || ''),
       fecha: (v('fecha') || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
@@ -538,7 +629,7 @@ export class RegistroComponent {
       canal: 'WHATSAPP',
       cliente: v('cliente'),
       celular: v('celular'),
-      disc: v('disc') || 'N/A',
+      disc,
       solicitud: v('solicitud'),
       respuesta: v('respuesta'),
       semaforo: v('semaforo') || 'TIBIO',
@@ -732,7 +823,8 @@ export class RegistroComponent {
         celular: row.celular || '',
         fecha: (row.fecha || '').slice(0, 10),
         hoja: row.hojaOrigen || '',
-        semaforo: row.semaforo || ''
+        semaforo: row.semaforo || '',
+        disc: normalizeDisc(row.disc)
       }
     });
   }

@@ -363,6 +363,42 @@
   font-size: 0.78rem;
 }
 
+.reg__disc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+
+.reg__disc::before {
+  content: '';
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: var(--eas-muted);
+}
+
+.reg__disc[data-tone='rojo']::before {
+  background: #c0392b;
+}
+
+.reg__disc[data-tone='amarillo']::before {
+  background: #e1b12c;
+}
+
+.reg__disc[data-tone='verde']::before {
+  background: #27ae60;
+}
+
+.reg__disc[data-tone='azul']::before {
+  background: #2980b9;
+}
+
+.reg__disc[data-tone='na'] {
+  font-weight: 500;
+  color: var(--eas-muted);
+}
+
 .reg__wa-dup {
   font-size: 0.72rem;
   font-weight: 700;

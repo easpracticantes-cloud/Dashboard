@@ -138,14 +138,69 @@ public final class WhatsAppChatParser {
     }
 
     public static String renderForModel(List<WhatsAppMessage> messages) {
+        return renderForModel(null, messages);
+    }
+
+    public static String renderForModel(ParsedWhatsAppChat parsed, List<WhatsAppMessage> messages) {
         StringBuilder sb = new StringBuilder();
         for (WhatsAppMessage m : messages) {
             String when = m.at() == null ? "?" : m.at().toString().replace('T', ' ');
             String flag = m.quoteLike() ? " [COTIZACION?]" : "";
-            sb.append(when).append(" | ").append(nullToEmpty(m.sender())).append(flag)
+            String role = m.system() ? "SISTEMA" : (isAdvisor(parsed, m.sender()) ? "ASESOR" : "PROSPECTO");
+            sb.append(when).append(" | ").append(role).append(" | ").append(nullToEmpty(m.sender())).append(flag)
                     .append(": ").append(nullToEmpty(m.text())).append('\n');
         }
         return sb.toString();
+    }
+
+    public static List<String> prospectTexts(ParsedWhatsAppChat parsed) {
+        if (parsed == null || parsed.messages() == null) {
+            return List.of();
+        }
+        return parsed.messages().stream()
+                .filter(m -> !m.system())
+                .filter(m -> !isAdvisor(parsed, m.sender()))
+                .map(WhatsAppMessage::text)
+                .filter(t -> t != null && !t.isBlank())
+                .toList();
+    }
+
+    static boolean isAdvisor(ParsedWhatsAppChat parsed, String sender) {
+        if (sender == null || sender.isBlank()) {
+            return false;
+        }
+        String s = sender.toLowerCase(Locale.ROOT);
+        if (s.contains("andrea") || s.contains("aves") || s.contains("escuela")
+                || s.contains("asesor") || s.contains("salento")
+                || s.equals("tú") || s.equals("tu") || s.equals("you")) {
+            return true;
+        }
+        String fileHint = prospectHintFromFilename(parsed == null ? null : parsed.title());
+        if (fileHint != null && !fileHint.isBlank()) {
+            String senderFold = s.replaceAll("[^a-z0-9áéíóúñ ]", " ");
+            if (senderFold.contains(fileHint) || fileHint.contains(senderFold.split(" ")[0])) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private static String prospectHintFromFilename(String title) {
+        if (title == null || title.isBlank()) {
+            return null;
+        }
+        String t = title.toLowerCase(Locale.ROOT)
+                .replace("whatsapp chat with", " ")
+                .replace("whatsapp chat -", " ")
+                .replace("chat de whatsapp con", " ")
+                .replace("chat de whatsapp", " ")
+                .replace(".txt", " ")
+                .trim();
+        t = t.replaceAll("[^a-z0-9áéíóúñ ]", " ").trim();
+        if (t.isBlank() || t.matches("\\d+")) {
+            return null;
+        }
+        return t;
     }
 
     private static Matcher matchHeader(String line) {

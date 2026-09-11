@@ -11,7 +11,7 @@ interface AveUiContextPayload {
   hits?: Array<{ id: string; label: string }>;
 }
 
-const ALLOWED_KEYS = ['cliente', 'celular', 'fecha', 'hoja', 'semaforo'] as const;
+const ALLOWED_KEYS = ['cliente', 'celular', 'fecha', 'hoja', 'semaforo', 'disc'] as const;
 
 /** JSON compacto y con allowlist. No incluye notas, objeciones ni la página. */
 export function compactAveUiContext(input: {

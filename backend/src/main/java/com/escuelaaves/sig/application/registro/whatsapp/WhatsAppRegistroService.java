@@ -1,10 +1,12 @@
 package com.escuelaaves.sig.application.registro.whatsapp;
 
+import com.escuelaaves.sig.application.ai.DiscStyleClassifier;
 import com.escuelaaves.sig.application.ai.IntelligenceService;
 import com.escuelaaves.sig.application.dto.dashboard.sheets.SeguimientoWhatsappDto;
 import com.escuelaaves.sig.application.dto.integration.SheetRowWriteResultDto;
 import com.escuelaaves.sig.application.service.SheetsSyncService;
 import com.escuelaaves.sig.application.service.SheetsWriteService;
+import com.escuelaaves.sig.domain.ai.model.DiscProfile;
 import com.escuelaaves.sig.domain.ai.model.SeguimientoExtraction;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity.WhatsAppImportAuditEntity;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.WhatsAppImportAuditJpaRepository;
@@ -223,6 +225,7 @@ public class WhatsAppRegistroService {
             hit.put("hojaOrigen", row.hojaOrigen());
             hit.put("fechaCotizado", row.fechaCotizado());
             hit.put("pendiente", row.pendiente());
+            hit.put("disc", row.disc());
             hit.put("motivo", phoneHit && nameHit ? "celular_y_nombre" : phoneHit ? "celular" : "nombre");
             hits.add(hit);
             if (hits.size() >= 5) {
@@ -239,15 +242,23 @@ public class WhatsAppRegistroService {
         }
         List<WhatsAppChatParser.WhatsAppMessage> compact =
                 WhatsAppChatParser.compactForModel(parsed.messages(), MAX_MESSAGES_FOR_MODEL);
-        String rendered = WhatsAppChatParser.renderForModel(compact);
+        String rendered = WhatsAppChatParser.renderForModel(parsed, compact);
         SeguimientoExtraction extraction = intelligenceService.extractSeguimientoFromChat(rendered);
         if (parsed.inferredPhone() != null && blank(extraction.valor("celular"))) {
-            extraction.campos().put(
-                    "celular",
-                    SeguimientoExtraction.FieldValue.of(parsed.inferredPhone(), "INFERIDO", 0.7)
-            );
+            extraction = copyWithPhone(extraction, parsed.inferredPhone());
         }
+        DiscProfile local = DiscStyleClassifier.classify(WhatsAppChatParser.prospectTexts(parsed));
+        DiscProfile merged = DiscProfile.mergePreferringModel(extraction.discAnalisis(), local);
+        extraction = extraction.withDisc(merged);
         return new AiDraft(chat, parsed, extraction, null);
+    }
+
+    private static SeguimientoExtraction copyWithPhone(SeguimientoExtraction extraction, String phone) {
+        extraction.campos().put(
+                "celular",
+                SeguimientoExtraction.FieldValue.of(phone, "INFERIDO", 0.7)
+        );
+        return extraction;
     }
 
     private Map<String, Object> persistPreview(AiDraft draft) throws Exception {
@@ -275,6 +286,7 @@ public class WhatsAppRegistroService {
         out.put("ultimaCotizacion", extraction.ultimaCotizacion());
         out.put("historialCotizaciones", extraction.historialCotizaciones());
         out.put("resumen", extraction.resumen());
+        out.put("discAnalisis", extraction.discAnalisis());
         out.put("posibleDuplicado", matches.isEmpty() ? extraction.posibleDuplicado() : "REVISAR POSIBLE DUPLICADO");
         out.put("coincidencias", matches);
         out.put("requiereConfirmacion", true);
