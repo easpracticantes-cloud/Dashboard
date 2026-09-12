@@ -22,7 +22,7 @@ export const ROLE_DESCRIPTIONS: Record<RoleCode, string> = {
   GERENCIA: 'Ve el negocio completo y puede gestionar el equipo.',
   SUPERVISOR: 'Opera el día a día y consulta el equipo, sin borrar cuentas.',
   COMERCIAL: 'Registro, analítica y reportes para el pipeline.',
-  CONTABILIDAD: 'Cruce de cuentas, Autobits, facturas y reportes.',
+  CONTABILIDAD: 'Autobits, facturas, Excel de alineación y reportes.',
   OPERACIONES: 'Registro, dashboard y seguimiento operativo.',
   ASESOR: 'Registro y seguimiento de prospectos en Sheets.'
 };

@@ -120,6 +120,62 @@ def _subir_autobits(client, filas):
         )
 
 
+class _SvcRes:
+    def __init__(self, status_code, payload):
+        self.status_code = status_code
+        self._payload = payload
+        self.text = str(payload)
+
+    def json(self):
+        return self._payload
+
+
+def _svc():
+    from application.services.cruce_excel_service import CruceExcelService
+    from infrastructure.persistence.database import SessionLocal
+
+    db = SessionLocal()
+    return db, CruceExcelService(db)
+
+
+def _analizar_sistema(batch_id=None):
+    from application.services.cruce_excel_service import CruceExcelServiceError
+
+    db, service = _svc()
+    try:
+        data = service.analizar_desde_sistema(batch_id=batch_id)
+        db.commit()
+        return _SvcRes(200, data)
+    except CruceExcelServiceError as exc:
+        db.rollback()
+        return _SvcRes(400, {"detail": exc.message})
+    finally:
+        db.close()
+
+
+def _pendientes_sistema(batch_id=None):
+    db, service = _svc()
+    try:
+        return _SvcRes(200, service.pendientes(batch_id))
+    finally:
+        db.close()
+
+
+def _procesar_cruce_bytes(content, filename="historico.xlsx", aplicar=True):
+    from application.services.cruce_excel_service import CruceExcelServiceError
+
+    db, service = _svc()
+    try:
+        data = service.procesar_archivo(content, filename, aplicar=aplicar)
+        db.commit()
+        return _SvcRes(200, data)
+    except CruceExcelServiceError as exc:
+        db.rollback()
+        return _SvcRes(400, {"detail": exc.message})
+    finally:
+        db.close()
+
+
 def test_analizar_sin_excel_de_cruce(client):
     up = _subir_autobits(
         client,
@@ -127,7 +183,7 @@ def test_analizar_sin_excel_de_cruce(client):
     )
     assert up.status_code == 200, up.text
 
-    res = client.post("/api/cruce-excel/analizar")
+    res = _analizar_sistema()
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["archivo"] == "sistema"
@@ -148,16 +204,12 @@ def test_export_xlsx_estructura_estandar(client):
             ["800222", "VENTAS DUSTER", "COM002", "EAS002", "2026-04-01", 80000, ""],
         ],
     )
-    client.post("/api/cruce-excel/analizar")
-    export = client.get("/api/cruce-excel/export.xlsx")
+    export = client.get("/api/documents/export-excel")
     assert export.status_code == 200, export.text
     assert "spreadsheet" in export.headers["content-type"]
-    assert "Cruce_Cuentas_" in export.headers.get("content-disposition", "")
+    assert "Facturas_Autobits_" in export.headers.get("content-disposition", "")
     assert export.content[:2] == b"PK"
     assert len(export.content) > 200
-    alias = client.get("/api/cruce-excel/export")
-    assert alias.status_code == 200, alias.text
-    assert alias.content[:2] == b"PK"
 
     wb = load_workbook(io.BytesIO(export.content))
     year = 2026
@@ -312,18 +364,8 @@ def test_analizar_no_depende_del_excel_historico(client):
     ws.append(["2026-08-20", "COM999", "EAS999", 1, "FV HIST", "2026-08-21"])
     buf = io.BytesIO()
     wb.save(buf)
-    client.post(
-        "/api/cruce-excel/upload",
-        files={
-            "archivo": (
-                "historico.xlsx",
-                buf.getvalue(),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-        },
-        data={"aplicar": "true"},
-    )
-    res = client.post("/api/cruce-excel/analizar")
+    _procesar_cruce_bytes(buf.getvalue())
+    res = _analizar_sistema()
     assert res.status_code == 200, res.text
     compras = [r["lado_autobits"].get("compra") for r in res.json()["comparacion"]]
     assert "COM001" in compras
@@ -342,18 +384,8 @@ def test_pendientes_ignora_snapshot_historico(client):
     ws.append(["2026-08-20", "COM999", "EAS999", 1, "FV HIST", "2026-08-21"])
     buf = io.BytesIO()
     wb.save(buf)
-    client.post(
-        "/api/cruce-excel/upload",
-        files={
-            "archivo": (
-                "historico.xlsx",
-                buf.getvalue(),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-        },
-        data={"aplicar": "true"},
-    )
-    res = client.get("/api/cruce-excel/pendientes")
+    _procesar_cruce_bytes(buf.getvalue())
+    res = _pendientes_sistema()
     assert res.status_code == 200, res.text
     compras = [r["lado_autobits"].get("compra") for r in res.json()["comparacion"]]
     assert "COM001" in compras
@@ -379,8 +411,8 @@ def test_to_money_or_none_no_inventa_cero_en_texto():
     assert to_money_or_none("150000") == Decimal("150000.00")
 
 
-def test_upload_historico_sigue_existiendo(client):
-    """El endpoint de upload no se elimina (compatibilidad); el flujo de producto no lo usa."""
+def test_procesar_archivo_historico_sigue_en_servicio(client):
+    """El adaptador histórico queda en el servicio; ya no hay endpoint de carga."""
     _subir_autobits(
         client,
         [["900111", "Hotel Demo SAS", "COM001", "EAS001", "2026-08-20", 150000, ""]],
@@ -402,17 +434,7 @@ def test_upload_historico_sigue_existiendo(client):
     ws.append(["2026-08-20", "COM001", "EAS001", 150000, "FV 1", "2026-08-21"])
     buf = io.BytesIO()
     wb.save(buf)
-    res = client.post(
-        "/api/cruce-excel/upload",
-        files={
-            "archivo": (
-                "historico.xlsx",
-                buf.getvalue(),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-        },
-        data={"aplicar": "true"},
-    )
+    res = _procesar_cruce_bytes(buf.getvalue())
     assert res.status_code == 200, res.text
 
 
@@ -502,20 +524,20 @@ def test_export_document_ids_no_mezcla_facturas(client):
         filename="factura-b.pdf",
     )
 
-    excel_a = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
+    excel_a = client.get(f"/api/documents/export-excel?document_ids={id_a}")
     assert excel_a.status_code == 200, excel_a.text
     text_a = _xlsx_text(excel_a.content)
     assert "FE-AAAA" in text_a
     assert "FE-BBBB" not in text_a
     assert "COM001" not in text_a
 
-    excel_b = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_b}")
+    excel_b = client.get(f"/api/documents/export-excel?document_ids={id_b}")
     assert excel_b.status_code == 200, excel_b.text
     text_b = _xlsx_text(excel_b.content)
     assert "FE-BBBB" in text_b
     assert "FE-AAAA" not in text_b
 
-    excel_a2 = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
+    excel_a2 = client.get(f"/api/documents/export-excel?document_ids={id_a}")
     assert "FE-AAAA" in _xlsx_text(excel_a2.content)
     assert "FE-BBBB" not in _xlsx_text(excel_a2.content)
 
@@ -547,7 +569,7 @@ def test_export_solo_empresas_con_factura_y_datos_de_la_factura(client):
         filename="factura-d.pdf",
     )
 
-    solo_a = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
+    solo_a = client.get(f"/api/documents/export-excel?document_ids={id_a}")
     assert solo_a.status_code == 200, solo_a.text
     text_a = _xlsx_text(solo_a.content)
     assert "Empresa A" in text_a
@@ -568,7 +590,7 @@ def test_export_solo_empresas_con_factura_y_datos_de_la_factura(client):
     assert enero["D3"].value == 1500000
     assert enero["E3"].value == "FAC-00125"
 
-    ambas = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a},{id_d}")
+    ambas = client.get(f"/api/documents/export-excel?document_ids={id_a},{id_d}")
     text_ad = _xlsx_text(ambas.content)
     assert "Empresa A" in text_ad
     assert "Empresa D" in text_ad
@@ -590,8 +612,7 @@ def test_export_batch_id_sin_document_ids_no_vuelca_autobits(client):
     )
     assert up.status_code == 200, up.text
     batch_id = up.json()["batch"]["id"]
-    client.post(f"/api/cruce-excel/analizar?batch_id={batch_id}")
-    export = client.get(f"/api/cruce-excel/export.xlsx?batch_id={batch_id}")
+    export = client.get("/api/documents/export-excel")
     assert export.status_code == 200, export.text
     dumped = _xlsx_text(export.content)
     assert "COM005691" not in dumped
@@ -616,8 +637,8 @@ def test_export_batch_id_no_reconstruye_document_ids_aunque_haya_facturas(client
         total=1500000,
         filename="factura-a.pdf",
     )
-    client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
-    solo_lote = client.get(f"/api/cruce-excel/export.xlsx?batch_id={batch_id}")
+    client.get(f"/api/documents/export-excel?document_ids={doc_id}")
+    solo_lote = client.get("/api/documents/export-excel")
     assert solo_lote.status_code == 200, solo_lote.text
     dumped = _xlsx_text(solo_lote.content)
     assert "FAC-00125" not in dumped
@@ -638,7 +659,7 @@ def test_export_no_sustituye_factura_por_com_de_autobits(client):
         total=1500000,
         filename="factura-fac.pdf",
     )
-    export = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    export = client.get(f"/api/documents/export-excel?document_ids={doc_id}")
     assert export.status_code == 200, export.text
     dumped = _xlsx_text(export.content)
     assert "FAC-00125" in dumped
@@ -694,7 +715,7 @@ def test_export_cruce_de_otra_factura_no_se_mezcla(client):
     finally:
         db.close()
 
-    excel_a = client.get(f"/api/cruce-excel/export.xlsx?document_ids={id_a}")
+    excel_a = client.get(f"/api/documents/export-excel?document_ids={id_a}")
     assert excel_a.status_code == 200, excel_a.text
     dumped = _xlsx_text(excel_a.content)
     assert "FE-AAAA" in dumped
@@ -752,7 +773,7 @@ def test_export_factura_sin_cruce_usa_datos_de_la_ia(client):
     finally:
         db.close()
 
-    export = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    export = client.get(f"/api/documents/export-excel?document_ids={doc_id}")
     assert export.status_code == 200, export.text
     dumped = _xlsx_text(export.content)
     assert "FPOS-61226" in dumped
@@ -803,7 +824,7 @@ def test_export_usa_extracted_json_cuando_no_hay_proveedor_persistido(client):
     finally:
         db.close()
 
-    export = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    export = client.get(f"/api/documents/export-excel?document_ids={doc_id}")
     assert export.status_code == 200, export.text
     dumped = _xlsx_text(export.content)
     assert "FPOS-61226" in dumped
@@ -839,7 +860,7 @@ def test_export_bloquea_facturas_en_proceso(client):
     finally:
         db.close()
 
-    res = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    res = client.get(f"/api/documents/export-excel?document_ids={doc_id}")
     assert res.status_code == 409
 
 

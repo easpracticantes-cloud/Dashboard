@@ -65,15 +65,15 @@ class ContabilidadSecurityIT {
 
     @Test
     @WithMockUser(username = "asesor", authorities = "ROLE_ASESOR")
-    void asesorForbiddenOnCruceExcelExport() throws Exception {
-        mockMvc.perform(get("/api/v1/contabilidad/cruce-excel/export.xlsx"))
+    void asesorForbiddenOnFacturasExcelExport() throws Exception {
+        mockMvc.perform(get("/api/v1/contabilidad/documents/export-excel"))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser(username = "conta", authorities = "ROLE_CONTABILIDAD")
-    void contabilidadCanReachCruceExcelExport() throws Exception {
-        var result = mockMvc.perform(get("/api/v1/contabilidad/cruce-excel/export.xlsx")).andReturn();
+    void contabilidadCanReachFacturasExcelExport() throws Exception {
+        var result = mockMvc.perform(get("/api/v1/contabilidad/documents/export-excel")).andReturn();
         int code = result.getResponse().getStatus();
         org.junit.jupiter.api.Assertions.assertNotEquals(401, code);
         org.junit.jupiter.api.Assertions.assertNotEquals(403, code);

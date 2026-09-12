@@ -5,7 +5,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { AppConfigService } from '../../../core/services/app-config.service';
 import { ContabilidadDownloadService } from './contabilidad-download.service';
 
-describe('ContabilidadDownloadService Cruce Excel', () => {
+describe('ContabilidadDownloadService Facturas Excel', () => {
   let service: ContabilidadDownloadService;
 
   beforeEach(() => {
@@ -26,12 +26,12 @@ describe('ContabilidadDownloadService Cruce Excel', () => {
     TestBed.resetTestingModule();
   });
 
-  it('resuelve Generar Excel al BFF /api/v1/contabilidad/cruce-excel/export.xlsx', () => {
-    expect(service.resolveUrl('/contabilidad/cruce-excel/export.xlsx')).toBe(
-      '/api/v1/contabilidad/cruce-excel/export.xlsx',
+  it('resuelve Generar Excel al BFF /api/v1/contabilidad/documents/export-excel', () => {
+    expect(service.resolveUrl('/contabilidad/documents/export-excel')).toBe(
+      '/api/v1/contabilidad/documents/export-excel',
     );
-    expect(service.resolveUrl('/contabilidad/cruce-excel/export.xlsx?batch_id=9')).toBe(
-      '/api/v1/contabilidad/cruce-excel/export.xlsx?batch_id=9',
+    expect(service.resolveUrl('/contabilidad/documents/export-excel?document_ids=9')).toBe(
+      '/api/v1/contabilidad/documents/export-excel?document_ids=9',
     );
   });
 
@@ -50,12 +50,12 @@ describe('ContabilidadDownloadService Cruce Excel', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
-      headers: { get: (n: string) => (n === 'Content-Disposition' ? 'attachment; filename="Cruce_Cuentas_2026-09-10.xlsx"' : null) },
+      headers: { get: (n: string) => (n === 'Content-Disposition' ? 'attachment; filename="Facturas_Autobits_2026-09-10.xlsx"' : null) },
       arrayBuffer: async () => new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer,
     });
 
-    await service.download('/contabilidad/cruce-excel/export.xlsx', 'hint.xlsx');
-    expect(fetch).toHaveBeenCalledWith('/api/v1/contabilidad/cruce-excel/export.xlsx', {
+    await service.download('/contabilidad/documents/export-excel', 'hint.xlsx');
+    expect(fetch).toHaveBeenCalledWith('/api/v1/contabilidad/documents/export-excel', {
       headers: { Authorization: 'Bearer jwt-test' },
     });
     expect(click).toHaveBeenCalled();
@@ -68,7 +68,7 @@ describe('ContabilidadDownloadService Cruce Excel', () => {
       headers: { get: () => null },
       arrayBuffer: async () => new TextEncoder().encode('<html>error</html>').buffer,
     });
-    await expect(service.download('/contabilidad/cruce-excel/export.xlsx')).rejects.toThrow(
+    await expect(service.download('/contabilidad/documents/export-excel')).rejects.toThrow(
       'La respuesta no es un Excel válido',
     );
   });
@@ -80,7 +80,7 @@ describe('ContabilidadDownloadService Cruce Excel', () => {
       headers: { get: () => null },
       text: async () => '<html>404</html>',
     });
-    await expect(service.download('/contabilidad/cruce-excel/export.xlsx')).rejects.toThrow(
+    await expect(service.download('/contabilidad/documents/export-excel')).rejects.toThrow(
       'No se pudo generar el Excel.',
     );
   });
@@ -98,21 +98,21 @@ describe('ContabilidadDownloadService Cruce Excel', () => {
 
   it('401 informa sesión expirada', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, status: 401, headers: { get: () => null } });
-    await expect(service.download('/contabilidad/cruce-excel/export.xlsx')).rejects.toThrow(
+    await expect(service.download('/contabilidad/documents/export-excel')).rejects.toThrow(
       'Sesión expirada. Vuelve a iniciar sesión.',
     );
   });
 
   it('403 informa permisos insuficientes', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, status: 403, headers: { get: () => null } });
-    await expect(service.download('/contabilidad/cruce-excel/export.xlsx')).rejects.toThrow(
+    await expect(service.download('/contabilidad/documents/export-excel')).rejects.toThrow(
       'No tienes permiso para este Excel.',
     );
   });
 
   it('500 informa error de generación', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, status: 500, headers: { get: () => null } });
-    await expect(service.download('/contabilidad/cruce-excel/export.xlsx')).rejects.toThrow(
+    await expect(service.download('/contabilidad/documents/export-excel')).rejects.toThrow(
       'No se pudo generar el Excel.',
     );
   });

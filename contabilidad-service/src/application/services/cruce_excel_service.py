@@ -477,7 +477,7 @@ class CruceExcelService:
         year = self._anio_desde_facturas(ids)
         content = self.workbook_builder.build(rows, year=year)
         today = datetime.now(timezone.utc).date().isoformat()
-        filename = f"Cruce_Cuentas_{today}.xlsx"
+        filename = f"Facturas_Autobits_{today}.xlsx"
         self.audit.log(
             "CRUCE_EXCEL_GENERADO",
             "CruceExcel",

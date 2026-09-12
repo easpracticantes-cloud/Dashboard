@@ -59,9 +59,9 @@ export class DashboardComponent implements OnInit {
   }
 
   quickLinks = [
-    { path: '/app/contabilidad/documentos', label: 'Documentos' },
+    { path: '/app/contabilidad', label: 'Facturas' },
     { path: '/app/contabilidad/cola', label: 'Cola operativa' },
-    { path: '/app/contabilidad/cruce', label: 'Cruce' },
+    { path: '/app/contabilidad/autobits', label: 'Autobits' },
     { path: '/app/contabilidad/pagos', label: 'Pagos pendientes' },
     { path: '/app/contabilidad/subsanaciones', label: 'Subsanaciones' },
     { path: '/app/contabilidad/paquetes', label: 'Paquetes' },
@@ -76,18 +76,18 @@ export class DashboardComponent implements OnInit {
       hint: 'Reporte de la semana, sábado a viernes.',
     },
     {
-      path: '/app/contabilidad/documentos',
+      path: '/app/contabilidad',
       icon: 'description',
       step: '02',
       label: 'Cargar facturas y cuentas de cobro',
       hint: 'Las que llegaron por WhatsApp, correo o DIAN.',
     },
     {
-      path: '/app/contabilidad/cruce',
-      icon: 'compare_arrows',
+      path: '/app/contabilidad',
+      icon: 'download',
       step: '03',
-      label: 'Completar el cruce de cuentas',
-      hint: 'Factura/CDC, fecha de pago y aprobación.',
+      label: 'Generar Excel del paquete',
+      hint: 'Hasta 25 facturas alineadas con Autobits.',
     },
     {
       path: '/app/contabilidad/pagos',
@@ -250,8 +250,9 @@ export class DashboardComponent implements OnInit {
   queueLink(key: string): string | null {
     const k = key.toLowerCase();
     if (k.includes('pago') || k.includes('payment')) return '/app/contabilidad/pagos';
-    if (k.includes('cruce') || k.includes('cross')) return '/app/contabilidad/cruce';
-    if (k.includes('document') || k.includes('factura')) return '/app/contabilidad/documentos';
+    if (k.includes('cruce') || k.includes('cross') || k.includes('document') || k.includes('factura')) {
+      return '/app/contabilidad';
+    }
     if (k.includes('paquete') || k.includes('package')) return '/app/contabilidad/paquetes';
     if (k.includes('subsan') || k.includes('remediation')) return '/app/contabilidad/subsanaciones';
     if (k.includes('autobits')) return '/app/contabilidad/autobits';

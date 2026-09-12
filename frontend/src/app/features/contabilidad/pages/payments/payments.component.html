@@ -13,9 +13,9 @@
           <mat-icon>download</mat-icon>
           {{ exportando ? 'Descargando…' : 'Reporte de pagos' }}
         </button>
-        <a routerLink="/app/contabilidad/cruce" class="btn btn-secondary">
-          <mat-icon>compare_arrows</mat-icon>
-          Ver cruce
+        <a routerLink="/app/contabilidad" class="btn btn-secondary">
+          <mat-icon>description</mat-icon>
+          Ver facturas
         </a>
       </div>
     </div>
@@ -59,8 +59,8 @@
     </summary>
     <div class="manual-body">
       <p>
-        Normalmente los pagos se generan en bloque desde la página de
-        <a routerLink="/app/contabilidad/cruce">cruce</a>. Use esto solo para un cruce puntual.
+        Normalmente los pagos se generan en bloque desde
+        <a routerLink="/app/contabilidad">Facturas</a>. Use esto solo para un cruce puntual.
       </p>
       <div class="manual-row">
         <input
@@ -89,8 +89,8 @@
     <div class="sheet empty-state">
       <div class="empty-icon"><mat-icon>payments</mat-icon></div>
       <h2>Sin pagos registrados</h2>
-      <p>Complete factura/CDC en el cruce y pulse «Generar pagos».</p>
-      <a routerLink="/app/contabilidad/cruce" class="btn btn-primary">Ir al cruce</a>
+      <p>Complete factura/CDC en Facturas y pulse «Generar pagos».</p>
+      <a routerLink="/app/contabilidad" class="btn btn-primary">Ir a Facturas</a>
     </div>
   } @else {
     <div class="sheet table-wrap">

@@ -146,8 +146,8 @@ export class AutobitsComponent implements OnInit {
 
   limpiarExcels(): void {
     const ok = window.confirm(
-      '¿Limpiar todos los Excels de Autobits y Cruce ya subidos?\n\n' +
-        'También se borran las facturas importadas y los cruces/pagos derivados.'
+      '¿Limpiar todos los Excels de Autobits ya subidos?\n\n' +
+        'También se borran las facturas importadas y los pagos derivados.'
     );
     if (!ok) return;
     this.limpiando = true;

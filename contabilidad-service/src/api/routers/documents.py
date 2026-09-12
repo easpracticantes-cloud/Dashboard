@@ -10,13 +10,18 @@ from fastapi import (
     Request,
     UploadFile,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from api.deps import resolve_usuario
 from application.services.document_processing_service import get_document_processing_service
 from application.services.document_service import DocumentService, DocumentUploadError
+from application.services.factura_excel_service import (
+    FacturaExcelService,
+    FacturaExcelServiceError,
+)
+from infrastructure.cruce.xlsx_integrity import XlsxIntegrityError
 from domain.enums import DocumentOrigin
 from infrastructure.persistence.database import get_db
 
@@ -453,6 +458,47 @@ def process_documents_batch(
         packs=packs,
         document_ids=valid,
         mensaje=f"{len(valid)} documento(s) en {packs} paquete(s) de hasta {size}.",
+    )
+
+
+def _parse_document_ids(raw: str | None) -> list[int] | None:
+    if not raw:
+        return None
+    ids: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if part.isdigit():
+            ids.append(int(part))
+    return ids or None
+
+
+@router.get("/export-excel")
+def exportar_excel_facturas(
+    request: Request,
+    document_ids: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Excel de alineación del paquete de facturas con Autobits vinculados."""
+    service = FacturaExcelService(db)
+    try:
+        content, filename, _analisis = service.generar_excel(
+            document_ids=_parse_document_ids(document_ids),
+            usuario=resolve_usuario(request),
+        )
+    except FacturaExcelServiceError as exc:
+        raise HTTPException(
+            status_code=getattr(exc, "status_code", 400) or 400,
+            detail=exc.message,
+        ) from exc
+    except XlsxIntegrityError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo generar un Excel válido para Microsoft Excel.",
+        ) from exc
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

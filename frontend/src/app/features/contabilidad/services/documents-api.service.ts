@@ -193,4 +193,17 @@ export class DocumentsApiService {
       `${this.base}?confirm=${confirm ? 'true' : 'false'}`
     );
   }
+
+  /** Excel del paquete: solo estos document_ids. Sin batch_id. */
+  exportExcelUrl(documentIds?: number[]): string {
+    const params = new URLSearchParams();
+    if (documentIds?.length) {
+      params.set(
+        'document_ids',
+        documentIds.filter((id) => Number.isFinite(id)).join(','),
+      );
+    }
+    const q = params.toString();
+    return `${this.base}/export-excel${q ? `?${q}` : ''}`;
+  }
 }

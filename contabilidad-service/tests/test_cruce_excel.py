@@ -143,18 +143,45 @@ def _subir_autobits(client, filas):
         )
 
 
+class _SvcRes:
+    def __init__(self, status_code, payload):
+        self.status_code = status_code
+        self._payload = payload
+        self.text = str(payload)
+
+    def json(self):
+        return self._payload
+
+
+def _procesar_cruce_bytes(content, filename="CRUCE DE CUENTAS 2026.xlsx", aplicar=True):
+    from application.services.cruce_excel_service import CruceExcelService, CruceExcelServiceError
+    from infrastructure.persistence.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        data = CruceExcelService(db).procesar_archivo(content, filename, aplicar=aplicar)
+        db.commit()
+        return _SvcRes(200, data)
+    except CruceExcelServiceError as exc:
+        db.rollback()
+        return _SvcRes(400, {"detail": exc.message})
+    finally:
+        db.close()
+
+
+def _pendientes_sistema():
+    from application.services.cruce_excel_service import CruceExcelService
+    from infrastructure.persistence.database import SessionLocal
+
+    db = SessionLocal()
+    try:
+        return _SvcRes(200, CruceExcelService(db).pendientes())
+    finally:
+        db.close()
+
+
 def _subir_cruce(client, bloques, aplicar=True):
-    return client.post(
-        "/api/cruce-excel/upload",
-        files={
-            "archivo": (
-                "CRUCE DE CUENTAS 2026.xlsx",
-                _cruce_xlsx(bloques),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-        },
-        data={"aplicar": "true" if aplicar else "false"},
-    )
+    return _procesar_cruce_bytes(_cruce_xlsx(bloques), aplicar=aplicar)
 
 
 REAL_CRUCE = Path(r"c:\Users\07sam\Downloads\CRUCE DE CUENTAS 2026.xlsx")
@@ -362,17 +389,13 @@ def test_pendientes_endpoint_sin_archivo(client):
         [["900111", "Hotel Demo SAS", "COM001", "EAS001", "2026-08-20", 150000, ""]],
     ).status_code == 200
 
-    res = client.get("/api/cruce-excel/pendientes")
+    res = _pendientes_sistema()
     assert res.status_code == 200
     data = res.json()
     assert data["has_autobits"] is True
     assert data["pendientes"]["total"] >= 2  # sin factura + sin fecha + sin soporte
     # Sin Excel de cruce aún no hay FALTA_EN_CRUCE persistido
     assert not data["pendientes"]["por_tipo"].get("FALTA_EN_CRUCE")
-
-    csv_res = client.get("/api/cruce-excel/pendientes/export")
-    assert csv_res.status_code == 200
-    assert "TIPO;PENDIENTE" in csv_res.text
 
 
 def test_pendientes_persiste_falta_en_cruce_tras_upload(client):
@@ -401,7 +424,7 @@ def test_pendientes_persiste_falta_en_cruce_tras_upload(client):
         i["numero_compra"] for i in upload.json()["pendientes"]["por_tipo"]["FALTA_EN_CRUCE"]
     }
 
-    get_res = client.get("/api/cruce-excel/pendientes")
+    get_res = _pendientes_sistema()
     assert get_res.status_code == 200
     body = get_res.json()
     pendientes = body["pendientes"]
@@ -411,11 +434,6 @@ def test_pendientes_persiste_falta_en_cruce_tras_upload(client):
     assert "COM001" in compras
     assert "COM003" in compras
     assert body.get("ultimo_cruce") in (None, {})
-
-    csv_res = client.get("/api/cruce-excel/pendientes/export")
-    assert csv_res.status_code == 200
-    assert "COM003" in csv_res.text
-    assert "FALTA_EN_CRUCE" not in csv_res.text
 
 
 def _cruce_tabular_xlsx() -> bytes:
@@ -498,17 +516,7 @@ def test_cruce_lee_tablas_autobits_duster_y_bosque(client):
         ],
     ).status_code == 200
 
-    res = client.post(
-        "/api/cruce-excel/upload",
-        files={
-            "archivo": (
-                "CRUCE DE CUENTAS 2026.xlsx",
-                _cruce_tabular_xlsx(),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-        },
-        data={"aplicar": "true"},
-    )
+    res = _procesar_cruce_bytes(_cruce_tabular_xlsx())
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["lectura"]["filas_leidas"] >= 2
@@ -563,7 +571,7 @@ def test_reupload_cruce_actualiza_snapshot_falta(client):
         ],
     ).status_code == 200
 
-    get_res = client.get("/api/cruce-excel/pendientes")
+    get_res = _pendientes_sistema()
     assert get_res.status_code == 200
     faltan = get_res.json()["pendientes"]["por_tipo"].get("FALTA_EN_CRUCE") or []
     assert not {i["numero_compra"] for i in faltan}

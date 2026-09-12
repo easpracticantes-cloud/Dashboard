@@ -37,13 +37,13 @@ describe('rewriteContabilidadUrl', () => {
     ).toBe('/api/v1/contabilidad/autobits/excels?confirm=true');
   });
 
-  it('manda Generar Excel de Cruce al BFF /api/v1/contabilidad/cruce-excel/export.xlsx', () => {
-    expect(rewriteContabilidadUrl('/contabilidad/cruce-excel/export.xlsx', '/api/v1')).toBe(
-      '/api/v1/contabilidad/cruce-excel/export.xlsx'
+  it('manda Generar Excel de Facturas al BFF /api/v1/contabilidad/documents/export-excel', () => {
+    expect(rewriteContabilidadUrl('/contabilidad/documents/export-excel', '/api/v1')).toBe(
+      '/api/v1/contabilidad/documents/export-excel'
     );
     expect(
-      rewriteContabilidadUrl('/contabilidad/cruce-excel/export.xlsx?batch_id=3', '/api/v1')
-    ).toBe('/api/v1/contabilidad/cruce-excel/export.xlsx?batch_id=3');
+      rewriteContabilidadUrl('/contabilidad/documents/export-excel?document_ids=1,2', '/api/v1')
+    ).toBe('/api/v1/contabilidad/documents/export-excel?document_ids=1,2');
   });
 
   it('no deja un DELETE /excels sin query al reescribir', () => {

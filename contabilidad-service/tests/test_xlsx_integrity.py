@@ -167,7 +167,7 @@ def test_export_endpoint_xlsx_integro_factura_sin_cruce(client):
     finally:
         db.close()
 
-    res = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    res = client.get(f"/api/documents/export-excel?document_ids={doc_id}")
     assert res.status_code == 200, res.text
     assert res.headers["content-type"].startswith(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -199,6 +199,6 @@ def test_export_endpoint_xlsx_integro_factura_sin_cruce(client):
 
 
 def test_export_vacio_sigue_siendo_xlsx_valido(client):
-    res = client.get("/api/cruce-excel/export.xlsx")
+    res = client.get("/api/documents/export-excel")
     assert res.status_code == 200
     validate_xlsx_bytes(res.content)

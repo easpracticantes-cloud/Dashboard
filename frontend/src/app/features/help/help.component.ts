@@ -49,10 +49,10 @@ export class HelpComponent {
     {
       icon: 'account_balance',
       title: 'Contabilidad',
-      body: 'Cruce de Cuentas desde SIG: Autobits, facturas y pagos. No hace falta subir un Excel de cruce.',
+      body: 'Contabilidad AP: Autobits, facturas y pagos. Tras analizar un paquete de hasta 25 facturas se genera el Excel.',
       route: '/app/contabilidad',
       routeLabel: 'Abrir Contabilidad',
-      steps: ['Carga o usa Autobits.', 'Sube facturas si hace falta.', 'Genera el cruce y descárgalo.']
+      steps: ['Carga Autobits.', 'Sube y analiza el paquete de facturas.', 'Pulse Generar Excel.']
     },
     {
       icon: 'monitoring',

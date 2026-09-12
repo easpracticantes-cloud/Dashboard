@@ -89,8 +89,9 @@ export class ColaComponent implements OnInit {
   queueLink(key: string): string | null {
     const k = key.toLowerCase();
     if (k.includes('pago') || k.includes('payment')) return '/app/contabilidad/pagos';
-    if (k.includes('cruce') || k.includes('cross')) return '/app/contabilidad/cruce';
-    if (k.includes('document') || k.includes('factura')) return '/app/contabilidad/documentos';
+    if (k.includes('cruce') || k.includes('cross') || k.includes('document') || k.includes('factura')) {
+      return '/app/contabilidad';
+    }
     if (k.includes('paquete') || k.includes('package')) return '/app/contabilidad/paquetes';
     if (k.includes('subsan') || k.includes('remediation')) return '/app/contabilidad/subsanaciones';
     if (k.includes('autobits')) return '/app/contabilidad/autobits';

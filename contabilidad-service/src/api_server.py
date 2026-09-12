@@ -14,7 +14,6 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api.routers.autobits import router as autobits_router
 from api.routers.crossings import router as crossings_router
-from api.routers.cruce_excel import router as cruce_excel_router
 from api.routers.documents import router as documents_router
 from api.routers.dashboard import router as dashboard_router
 from api.routers.ops import router as ops_router
@@ -50,7 +49,6 @@ app.include_router(dashboard_router)
 app.include_router(documents_router)
 app.include_router(autobits_router)
 app.include_router(crossings_router)
-app.include_router(cruce_excel_router)
 app.include_router(remediations_router)
 app.include_router(payments_router)
 app.include_router(packages_router)

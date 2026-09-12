@@ -1,8 +1,9 @@
-"""Especificación del Excel estándar «CRUCE DE CUENTAS».
+"""Especificación estructural del Excel de resultado Facturas + Autobits.
 
-Fuente de verdad estructural: el libro de trabajo manual (p. ej. CRUCE DE
-CUENTAS 2026.xlsx). No copia datos de ejemplo; solo nombres, orden, columnas
-y fórmulas que el estándar sí define de forma sistemática.
+Referencia visual: el libro operativo «CRUCE DE CUENTAS 2026.xlsx».
+NO es una fuente de datos ni una plantilla de carga. No se copian filas
+históricas (COM005691, FV POS, proveedores de ejemplo). Solo nombres de
+hojas, orden de columnas y fórmulas sistemáticas.
 
 Pestañas del estándar (orden):
   1. AÑO  {yyyy} ENERO - ABRIL   — bloques laterales por proveedor

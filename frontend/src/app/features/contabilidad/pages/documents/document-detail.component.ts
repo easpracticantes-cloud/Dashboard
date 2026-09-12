@@ -134,13 +134,13 @@ export class DocumentDetailComponent implements OnInit, OnDestroy {
       },
       {
         key: 'cruce',
-        label: 'Cruce',
+        label: 'Alineación',
         icon: 'compare_arrows',
         present: !!c?.crossing,
         detail: crossing?.['estado']
           ? labelEstado(String(crossing['estado']), 'crossing')
           : undefined,
-        link: '/app/contabilidad/cruce',
+        link: '/app/contabilidad',
       },
       {
         key: 'pago',

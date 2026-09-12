@@ -5,7 +5,7 @@
     "types": []
   },
   "files": [
-    "src/app/features/contabilidad/pages/wizard/wizard.component.spec.ts",
+    "src/app/features/contabilidad/pages/documents/documents-list.component.spec.ts",
     "src/app/features/contabilidad/services/contabilidad-download.service.spec.ts",
     "src/app/core/interceptors/contabilidad-url.spec.ts",
     "src/app/core/interceptors/contabilidad-interceptor.spec.ts",

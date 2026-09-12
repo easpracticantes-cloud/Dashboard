@@ -155,7 +155,7 @@ def test_aplicar_vinculos_ia_y_excel_usa_com_de_esa_factura(client):
     finally:
         db.close()
 
-    export = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    export = client.get(f"/api/documents/export-excel?document_ids={doc_id}")
     assert export.status_code == 200, export.text
     dumped = []
     wb = load_workbook(io.BytesIO(export.content))

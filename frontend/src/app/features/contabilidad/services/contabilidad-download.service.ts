@@ -93,7 +93,7 @@ export class ContabilidadDownloadService {
     if (res.status === 403) {
       return 'No tienes permiso para este Excel.';
     }
-    const generaAlVuelo = /\/export(\.xlsx)?(\?|$)/i.test(url);
+    const generaAlVuelo = /\/export(-excel|\.xlsx)?(\?|$)/i.test(url);
     if (res.status === 404) {
       return generaAlVuelo
         ? 'No se pudo generar el Excel.'

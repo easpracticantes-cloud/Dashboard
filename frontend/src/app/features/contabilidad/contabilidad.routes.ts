@@ -9,7 +9,48 @@ export const CONTABILIDAD_ROUTES: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./pages/wizard/wizard.component').then((m) => m.WizardComponent),
+          import('./pages/documents/documents-list.component').then(
+            (m) => m.DocumentsListComponent,
+          ),
+      },
+      {
+        path: 'documentos',
+        pathMatch: 'full',
+        redirectTo: '',
+      },
+      {
+        path: 'documentos/:id',
+        loadComponent: () =>
+          import('./pages/documents/document-detail.component').then(
+            (m) => m.DocumentDetailComponent,
+          ),
+      },
+      {
+        path: 'autobits',
+        loadComponent: () =>
+          import('./pages/autobits/autobits.component').then((m) => m.AutobitsComponent),
+      },
+      {
+        path: 'pagos',
+        loadComponent: () =>
+          import('./pages/payments/payments.component').then((m) => m.PaymentsComponent),
+      },
+      {
+        path: 'paquetes',
+        loadComponent: () =>
+          import('./pages/packages/packages.component').then((m) => m.PackagesComponent),
+      },
+      {
+        path: 'subsanaciones',
+        loadComponent: () =>
+          import('./pages/remediations/remediations.component').then(
+            (m) => m.RemediationsComponent,
+          ),
+      },
+      {
+        path: 'cruce',
+        pathMatch: 'full',
+        redirectTo: '',
       },
     ],
   },
