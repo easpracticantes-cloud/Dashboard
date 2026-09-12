@@ -17,7 +17,11 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from domain.cruce.export_row import CruceExportRow
 from domain.cruce.fields import fold, match_block_field
-from infrastructure.cruce.xlsx_integrity import XlsxIntegrityError, validate_xlsx_bytes
+from infrastructure.cruce.xlsx_integrity import (
+    XlsxIntegrityError,
+    strip_ooxml_hazards,
+    validate_xlsx_bytes,
+)
 from domain.cruce.workbook_spec import (
     BLOCK_GAP,
     BLOCK_WIDTH,
@@ -143,7 +147,7 @@ class CruceWorkbookBuilder:
             os.close(fd)
             wb.save(tmp_path)
             wb.close()
-            content = Path(tmp_path).read_bytes()
+            content = strip_ooxml_hazards(Path(tmp_path).read_bytes())
             validate_xlsx_bytes(content)
             return content
         except XlsxIntegrityError:

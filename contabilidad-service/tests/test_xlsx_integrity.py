@@ -15,7 +15,7 @@ from config.settings import get_settings  # noqa: E402
 from domain.cruce.export_row import CruceExportRow  # noqa: E402
 from domain.enums import DocumentStatus  # noqa: E402
 from infrastructure.cruce.workbook_builder import CruceWorkbookBuilder, MASTER_TEMPLATE_PATH  # noqa: E402
-from infrastructure.cruce.xlsx_integrity import validate_xlsx_bytes  # noqa: E402
+from infrastructure.cruce.xlsx_integrity import strip_ooxml_hazards, validate_xlsx_bytes  # noqa: E402
 from infrastructure.persistence.database import SessionLocal, init_db  # noqa: E402
 from infrastructure.persistence.models import DocumentModel, ProviderModel  # noqa: E402
 
@@ -44,6 +44,36 @@ def client():
 
     yield TestClient(app)
     _vaciar()
+
+
+def test_strip_quita_comments_vml_aunque_openpyxl_los_reescriba(tmp_path):
+    """El maestro + save() de openpyxl reproduce el XLSX de 25 partes del usuario."""
+    from openpyxl import load_workbook
+
+    dirty = tmp_path / "dirty.xlsx"
+    wb = load_workbook(MASTER_TEMPLATE_PATH)
+    wb.save(dirty)
+    wb.close()
+    raw = dirty.read_bytes()
+    from zipfile import ZipFile
+
+    with ZipFile(io.BytesIO(raw)) as zf:
+        dirty_names = zf.namelist()
+    assert any("comment" in n.lower() or n.endswith(".vml") for n in dirty_names)
+
+    cleaned = strip_ooxml_hazards(raw)
+    validate_xlsx_bytes(cleaned)
+    with ZipFile(io.BytesIO(cleaned)) as zf:
+        names = zf.namelist()
+        xml = "".join(
+            zf.read(n).decode("utf-8", "ignore")
+            for n in names
+            if n.endswith(".xml") or n.endswith(".rels")
+        )
+    assert not any("comment" in n.lower() or n.endswith(".vml") for n in names)
+    assert "legacyDrawing" not in xml
+    assert "vmlDrawing" not in xml
+    assert "/xl/tables/table1.xml" not in xml
 
 
 def test_maestro_no_se_modifica_al_generar():
@@ -95,10 +125,25 @@ def test_builder_xlsx_zip_xml_roundtrip_sin_legacy_drawing_roto():
     assert "COM005691" not in text
     assert "FV POS" not in text
     from zipfile import ZipFile
+    import xml.etree.ElementTree as ET
 
     with ZipFile(io.BytesIO(content)) as zf:
         names = zf.namelist()
-    assert not any("comment" in n.lower() or n.endswith(".vml") or n.startswith("xl/persons/") for n in names)
+        assert not any(
+            "comment" in n.lower()
+            or n.endswith(".vml")
+            or n.startswith("xl/persons/")
+            or n.startswith("xl/drawings/")
+            or n.startswith("xl/tables/")
+            for n in names
+        )
+        for name in names:
+            if name.endswith(".xml") or name.endswith(".rels"):
+                raw = zf.read(name).decode("utf-8")
+                assert "legacyDrawing" not in raw
+                assert "vmlDrawing" not in raw
+                assert "threadedComments" not in raw
+                ET.fromstring(zf.read(name))
 
 
 def test_export_endpoint_xlsx_integro_factura_sin_cruce(client):
@@ -124,8 +169,22 @@ def test_export_endpoint_xlsx_integro_factura_sin_cruce(client):
 
     res = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
     assert res.status_code == 200, res.text
+    assert res.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
     assert res.content[:2] == b"PK"
     validate_xlsx_bytes(res.content)
+    from zipfile import ZipFile
+
+    with ZipFile(io.BytesIO(res.content)) as zf:
+        blob = " ".join(zf.namelist()).lower()
+        assert "comment" not in blob
+        assert ".vml" not in blob
+        assert "legacyDrawing" not in "".join(
+            zf.read(n).decode("utf-8", "ignore")
+            for n in zf.namelist()
+            if n.endswith(".xml")
+        )
     wb = load_workbook(io.BytesIO(res.content), data_only=False)
     dumped = " | ".join(
         str(v)
