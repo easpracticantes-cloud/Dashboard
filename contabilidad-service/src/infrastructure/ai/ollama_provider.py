@@ -19,6 +19,7 @@ class AIProvider(Protocol):
     def verify(self) -> bool: ...
     def extract_invoice(self, ocr_text: str) -> AIExtractionResult: ...
     def extract_custom(self, ocr_text: str, solicitud: str) -> AIExtractionResult: ...
+    def extract_json(self, contexto: str, instruccion: str) -> AIExtractionResult: ...
 
 
 class OllamaAIProvider:
@@ -46,3 +47,18 @@ class OllamaAIProvider:
             data={"respuesta_ia": resultado.get("respuesta", "")},
             raw_text=resultado.get("respuesta"),
         )
+
+    def extract_json(self, contexto: str, instruccion: str) -> AIExtractionResult:
+        resultado = self.extract_custom(contexto, instruccion + "\nResponde solo JSON.")
+        if not resultado.ok:
+            return resultado
+        raw = resultado.raw_text or resultado.data.get("respuesta_ia") or ""
+        try:
+            import json
+
+            parsed = json.loads(raw)
+            if isinstance(parsed, dict):
+                return AIExtractionResult(ok=True, data=parsed, raw_text=raw)
+        except (TypeError, json.JSONDecodeError):
+            pass
+        return AIExtractionResult(ok=False, data={}, error="Ollama no devolvió JSON de cruce.")

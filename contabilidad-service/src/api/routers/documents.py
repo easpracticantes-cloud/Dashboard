@@ -404,7 +404,11 @@ def ask_documents(body: AskRequest, db: Session = Depends(get_db)):
     else:
         docs, _ = service.list_documents(limit=BATCH_PACK_SIZE, tipo="FACTURA")
     processor = get_document_processing_service()
-    result = processor.ask_about_documents(pregunta, docs)
+    from infrastructure.persistence.repositories import AutobitsRepository
+
+    latest = AutobitsRepository(db).get_latest_batch()
+    autobits = AutobitsRepository(db).list_records_for_batch(latest.id) if latest else []
+    result = processor.ask_about_documents(pregunta, docs, autobits_records=autobits)
     return AskResponse(
         ok=bool(result.get("ok")),
         respuesta=result.get("respuesta") or "",

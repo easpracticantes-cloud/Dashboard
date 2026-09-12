@@ -872,6 +872,93 @@ class CrossingService:
         self.db.refresh(crossing)
         return self.to_dict(crossing, crossing.document)
 
+    def aplicar_vinculos_ia(
+        self,
+        vinculos: list[dict],
+        *,
+        usuario: str = "SISTEMA",
+    ) -> dict:
+        """Aplica pares factura↔Autobits propuestos por Claude. No inventa IDs."""
+        aplicados = 0
+        omitidos = 0
+        for item in vinculos or []:
+            try:
+                doc_id = int(item.get("document_id") or 0)
+                rec_id = int(item.get("autobits_record_id") or 0)
+            except (TypeError, ValueError):
+                omitidos += 1
+                continue
+            if doc_id <= 0 or rec_id <= 0:
+                omitidos += 1
+                continue
+            doc = self.doc_repo.get_by_id(doc_id)
+            record = self.autobits_repo.get_record(rec_id)
+            if not doc or not record:
+                omitidos += 1
+                continue
+            occupied = self.crossing_repo.get_by_autobits_record(rec_id)
+            if occupied and occupied.document_id and occupied.document_id != doc_id:
+                omitidos += 1
+                continue
+            existing = self.crossing_repo.get_for_document(doc_id) or self.crossing_repo.get_active_for_document(doc_id)
+            if existing and existing.autobits_record_id and existing.autobits_record_id != rec_id:
+                omitidos += 1
+                continue
+            razones = ["ia_claude"] + [str(r) for r in (item.get("razones") or [])][:8]
+            try:
+                confianza = float(item.get("confianza") or 0)
+            except (TypeError, ValueError):
+                confianza = 0
+            score = int(max(0.0, min(confianza, 1.0)) * 100)
+            if existing:
+                existing.autobits_record_id = rec_id
+                existing.numero_compra = record.numero_compra
+                existing.numero_reserva = record.numero_reserva
+                existing.fecha_ejecucion = record.fecha
+                existing.valor_autobits = record.valor
+                existing.nit = existing.nit or record.nit
+                existing.proveedor_nombre = existing.proveedor_nombre or record.proveedor
+                existing.match_type = MatchType.MATCH_PROBABLE
+                existing.match_score = score or existing.match_score
+                existing.match_reasons = json.dumps(razones, ensure_ascii=False)
+                if existing.estado != CrossingStatus.PAGADO:
+                    existing.estado = CrossingStatus.EN_REVISION
+            else:
+                self.crossing_repo.create_crossing(
+                    document_id=doc_id,
+                    autobits_record_id=rec_id,
+                    match_type=MatchType.MATCH_PROBABLE,
+                    match_score=score or None,
+                    estado=CrossingStatus.EN_REVISION,
+                    proveedor_nombre=record.proveedor,
+                    numero_compra=record.numero_compra,
+                    numero_reserva=record.numero_reserva,
+                    valor_documento=doc.total,
+                    valor_autobits=record.valor,
+                    diferencia=None,
+                    observaciones="Vínculo propuesto por Claude (fecha/valor/proveedor).",
+                    match_reasons=json.dumps(razones, ensure_ascii=False),
+                    fecha_ejecucion=record.fecha,
+                    nit=record.nit,
+                    concepto=record.concepto,
+                )
+            if (doc.estado or "").upper() not in {
+                DocumentStatus.APROBADO.value,
+                DocumentStatus.PAGADO.value,
+            }:
+                doc.estado = DocumentStatus.CRUZANDO
+            aplicados += 1
+        if aplicados:
+            self.db.flush()
+            self.audit.log(
+                "CRUCE_IA_CLAUDE",
+                "Crossing",
+                "ia",
+                valor_nuevo=f"{aplicados} vínculos Claude",
+                usuario=usuario,
+            )
+        return {"aplicados": aplicados, "omitidos": omitidos}
+
     def manual_link(
         self,
         crossing_id: int,

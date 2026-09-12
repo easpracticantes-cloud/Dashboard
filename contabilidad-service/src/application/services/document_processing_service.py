@@ -729,7 +729,121 @@ class DocumentProcessingService:
             logger.exception("Solicitud IA falló para documento #%s", document_id)
         return result
 
-    def ask_about_documents(self, pregunta: str, documents: list) -> dict:
+    def relacionar_con_autobits(self, documents: list, records: list) -> dict:
+        """Claude relaciona cada factura del paquete con a lo sumo una fila Autobits."""
+        lote = [doc for doc in (documents or []) if getattr(doc, "id", None)][:25]
+        compras = [rec for rec in (records or []) if getattr(rec, "id", None)][:80]
+        if not lote or not compras:
+            return {"ok": True, "vinculos": [], "omitido": "sin_pares"}
+        facturas = []
+        for doc in lote:
+            extracted = {}
+            if getattr(doc, "extracted_json", None):
+                try:
+                    extracted = json.loads(doc.extracted_json)
+                except json.JSONDecodeError:
+                    extracted = {}
+            proveedor = doc.provider.nombre if getattr(doc, "provider", None) else extracted.get("proveedor")
+            if isinstance(proveedor, dict):
+                proveedor = proveedor.get("nombre") or proveedor.get("razon_social")
+            nit = None
+            if getattr(doc, "provider", None):
+                nit = doc.provider.nit
+            nit = nit or extracted.get("nit_o_identificacion") or extracted.get("nit")
+            valores = extracted.get("valores") if isinstance(extracted.get("valores"), dict) else {}
+            facturas.append(
+                {
+                    "document_id": doc.id,
+                    "numero": doc.numero_documento
+                    or (extracted.get("documento") or {}).get("numero")
+                    or extracted.get("numero_factura"),
+                    "proveedor": proveedor,
+                    "nit": nit,
+                    "fecha": doc.fecha_emision
+                    or (extracted.get("documento") or {}).get("fecha_emision"),
+                    "total": doc.total if doc.total is not None else valores.get("total"),
+                    "concepto": doc.concepto or extracted.get("concepto"),
+                }
+            )
+        autobits = [
+            {
+                "autobits_record_id": rec.id,
+                "proveedor": rec.proveedor,
+                "nit": rec.nit,
+                "fecha": rec.fecha,
+                "valor": float(rec.valor) if rec.valor is not None else None,
+                "numero_compra": rec.numero_compra,
+                "numero_reserva": rec.numero_reserva,
+                "concepto": rec.concepto,
+            }
+            for rec in compras
+        ]
+        payload = json.dumps({"facturas": facturas, "autobits": autobits}, ensure_ascii=False, default=str)
+        if len(payload) > 28000:
+            payload = payload[:28000] + "\n…[truncated]…"
+        instruccion = (
+            "Eres la IA contable de SIG-EAS. Relaciona cada factura con A LO SUMO una fila Autobits. "
+            "Criterios, en este orden: (1) mismo NIT o proveedor muy similar; "
+            "(2) total de factura vs valor Autobits, tolerancia 2% o 5000 COP; "
+            "(3) fechas a ±10 días; (4) número de compra/reserva si aparece en la factura. "
+            "Una fila Autobits no puede repetirse. Si no hay pareja clara, omite esa factura. "
+            "No inventes IDs. Responde JSON: "
+            '{"vinculos":[{"document_id":1,"autobits_record_id":2,"confianza":0.0,'
+            '"razones":["mismo total","fecha cercana"]}]}'
+        )
+        extract_json = getattr(self.ai, "extract_json", None)
+        if callable(extract_json):
+            ai_result = extract_json(payload, instruccion)
+        else:
+            ai_result = self.ai.extract_custom(payload, instruccion + " Responde solo JSON.")
+        if not ai_result.ok:
+            return {"ok": False, "vinculos": [], "error": ai_result.error or "Claude no pudo relacionar."}
+        raw = ai_result.data if isinstance(ai_result.data, dict) else {}
+        vinculos = raw.get("vinculos")
+        if vinculos is None and ai_result.raw_text:
+            try:
+                parsed = json.loads(ai_result.raw_text)
+                vinculos = parsed.get("vinculos") if isinstance(parsed, dict) else None
+            except json.JSONDecodeError:
+                vinculos = None
+        if not isinstance(vinculos, list):
+            vinculos = []
+        limpios = []
+        used_docs: set[int] = set()
+        used_recs: set[int] = set()
+        allowed_docs = {doc.id for doc in lote}
+        allowed_recs = {rec.id for rec in compras}
+        for item in vinculos:
+            if not isinstance(item, dict):
+                continue
+            try:
+                doc_id = int(item.get("document_id") or 0)
+                rec_id = int(item.get("autobits_record_id") or 0)
+                confianza = float(item.get("confianza") or 0)
+            except (TypeError, ValueError):
+                continue
+            if (
+                doc_id not in allowed_docs
+                or rec_id not in allowed_recs
+                or doc_id in used_docs
+                or rec_id in used_recs
+                or confianza < 0.7
+            ):
+                continue
+            used_docs.add(doc_id)
+            used_recs.add(rec_id)
+            razones = item.get("razones") if isinstance(item.get("razones"), list) else []
+            limpios.append(
+                {
+                    "document_id": doc_id,
+                    "autobits_record_id": rec_id,
+                    "confianza": confianza,
+                    "razones": [str(r) for r in razones][:8],
+                }
+            )
+        return {"ok": True, "vinculos": limpios}
+
+    def ask_about_documents(self, pregunta: str, documents: list, autobits_records: list | None = None) -> dict:
         """Chat sobre un paquete de facturas ya extraídas (máx. 25)."""
         pregunta = (pregunta or "").strip()
         if not pregunta:
@@ -789,14 +903,28 @@ class DocumentProcessingService:
                     "ocr_preview": (doc.ocr_text or "")[:1500],
                 }
             )
-        payload = json.dumps(bloques, ensure_ascii=False, default=str)
+        autobits = []
+        for rec in (autobits_records or [])[:80]:
+            autobits.append(
+                {
+                    "autobits_record_id": rec.id,
+                    "proveedor": rec.proveedor,
+                    "nit": rec.nit,
+                    "fecha": rec.fecha,
+                    "valor": float(rec.valor) if rec.valor is not None else None,
+                    "numero_compra": rec.numero_compra,
+                    "numero_reserva": rec.numero_reserva,
+                }
+            )
+        payload = json.dumps({"facturas": bloques, "autobits": autobits}, ensure_ascii=False, default=str)
         if len(payload) > 24000:
             payload = payload[:24000] + "\n…[truncated]…"
         instruccion = (
-            "Eres la IA contable de SIG-EAS. Responde SOLO con las facturas del JSON. "
-            "El origen de vinculación es el Excel de CRUCE DE CUENTAS, no Autobits. "
-            "No inventes facturas ni cifras. Si un dato es inferido, ambiguo o faltante, dilo. "
-            "Formato preferido: Factura N — Proveedor / Número / Fecha / Total.\n\n"
+            "Eres la IA contable de SIG-EAS. Analiza las facturas Y las filas Autobits del JSON. "
+            "Relaciona por proveedor/NIT, total vs valor y fechas cercanas. "
+            "Di si una factura ya tiene cruce o si falta vínculo. "
+            "No inventes facturas, COM ni cifras. Si un dato es inferido o ambiguo, dilo. "
+            "Formato preferido: Factura N — Proveedor / Número / Fecha / Total → COM / reserva / match.\n\n"
             f"Pedido del usuario: {pregunta}"
         )
         ai_result = self.ai.extract_custom(payload, instruccion)

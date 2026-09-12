@@ -3,9 +3,9 @@
     <p class="wiz__eyebrow">Contabilidad · semana operativa</p>
     <h2>Paso a paso</h2>
     <p class="wiz__lead">
-      1) Autobits trae compra, fecha, proveedor y valor.
-      2) Sube las facturas de la semana.
-      3) Genera el Cruce de Cuentas desde SIG (sin adjuntar un libro de cruce).
+      1) Autobits de la semana.
+      2) Paquete de facturas: Claude extrae proveedor, NIT, fecha y total.
+      3) Claude relaciona factura↔Autobits (fecha, valor, proveedor) y arma el Cruce de Cuentas.
     </p>
     <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando()">
       {{ limpiando() ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
@@ -176,7 +176,7 @@
   <section class="wiz__card wiz__chat" [class.is-dim]="paso() < 2">
     <h3>Chat con la IA sobre este paquete</h3>
     <p class="wiz__hint">
-      Pregunta sobre las facturas ya subidas (máx. {{ packMax }}), vinculadas al cruce de Autobits y documentos de SIG.
+      Claude responde con las facturas del paquete y las filas Autobits de la semana (máx. {{ packMax }}).
     </p>
     <div class="wiz__chips">
       @for (s of chatSugerencias; track s) {
@@ -215,10 +215,10 @@
   </section>
 
   <section class="wiz__card" [class.is-dim]="paso() < 3">
-    <h3>3. Generar cruce</h3>
+    <h3>3. Cruce de Cuentas</h3>
     <p>
-      Toma Autobits, facturas, proveedores y pagos ya persistidos.
-      No hay que adjuntar un Excel de cruce: el sistema analiza y luego genera el libro estándar.
+      Procesar pide a Claude que cruce cada factura del paquete con Autobits (fecha, precio, proveedor).
+      Generar Excel escribe proveedores, guías y COM en la plantilla maestra. Sin cruce, la factura igual sale.
     </p>
     <div class="wiz__row-actions">
       <button
@@ -235,7 +235,7 @@
         (click)="generarExcel()"
         [disabled]="!puedeGenerarExcel()"
       >
-        {{ generandoExcel() ? 'Generando Excel…' : facturasEnProceso() ? 'Esperando facturas…' : 'Generar Excel' }}
+        {{ generandoExcel() ? 'Generando Excel…' : (!idsListosParaExcel().length && facturasEnProceso()) ? 'Esperando facturas…' : 'Generar Excel' }}
       </button>
     </div>
     @if (cruce(); as cr) {

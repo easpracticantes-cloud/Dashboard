@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -44,6 +45,8 @@ from infrastructure.persistence.repositories import (
     CrossingRepository,
     CruceRepository,
 )
+
+logger = logging.getLogger(__name__)
 
 # Estados que ya no se tocan al aplicar el Excel de cruce
 _ESTADOS_CERRADOS = {CrossingStatus.ARCHIVADO}
@@ -399,6 +402,11 @@ class CruceExcelService:
             except CrossingServiceError as exc:
                 if exc.code not in {"NO_DATOS", "NO_CRUCE", "NO_AUTOBITS"}:
                     raise CruceExcelServiceError(exc.message, exc.code) from exc
+            self._vincular_con_ia(
+                document_ids=None,
+                batch_id=batch.id if batch else None,
+                usuario=usuario,
+            )
 
         crossings = self._crossings_del_contexto(batch.id if batch else None)
         export_rows = self._export_rows(crossings)
@@ -504,6 +512,58 @@ class CruceExcelService:
             except CrossingServiceError as exc:
                 if exc.code not in {"NO_DATOS", "NO_AUTOBITS", "NO_CRUCE"}:
                     raise CruceExcelServiceError(exc.message, exc.code) from exc
+        self._vincular_con_ia(document_ids, batch_id, usuario)
+
+    def _vincular_con_ia(
+        self,
+        document_ids: list[int] | None,
+        batch_id: int | None,
+        usuario: str,
+    ) -> None:
+        """Claude relaciona facturas del paquete con Autobits. Si Claude falla, el Excel sigue."""
+        from application.services.crossing_service import CrossingService
+        from application.services.document_processing_service import get_document_processing_service
+
+        q = self.db.query(DocumentModel)
+        if document_ids:
+            q = q.filter(DocumentModel.id.in_(document_ids))
+        else:
+            q = q.filter(
+                DocumentModel.tipo.in_([DocumentType.FACTURA, DocumentType.CUENTA_DE_COBRO]),
+                DocumentModel.estado.notin_([DocumentStatus.ANULADO, DocumentStatus.DUPLICADO]),
+            ).order_by(DocumentModel.received_at.desc()).limit(25)
+        docs = q.all()
+        pendientes = []
+        for doc in docs:
+            crossing = self._cruce_de_factura(doc.id)
+            if crossing and crossing.autobits_record_id:
+                continue
+            pendientes.append(doc)
+        if not pendientes:
+            return
+        if batch_id:
+            records = self.autobits_repo.list_records_for_batch(batch_id)
+        else:
+            latest = self.autobits_repo.get_latest_batch()
+            records = (
+                self.autobits_repo.list_records_for_batch(latest.id)
+                if latest
+                else self.autobits_repo.list_all_records()
+            )
+        if not records:
+            return
+        try:
+            propuesta = get_document_processing_service().relacionar_con_autobits(pendientes, records)
+        except Exception:
+            logger.exception("Claude no pudo proponer vínculos factura↔Autobits")
+            return
+        if not propuesta.get("ok"):
+            logger.warning("Cruce IA omitido: %s", propuesta.get("error"))
+            return
+        CrossingService(self.db).aplicar_vinculos_ia(
+            propuesta.get("vinculos") or [],
+            usuario=usuario,
+        )
 
     def _filas_desde_facturas(self, document_ids: list[int]) -> list[CruceExportRow]:
         if not document_ids:
@@ -571,10 +631,15 @@ class CruceExcelService:
             except json.JSONDecodeError:
                 reasons = [crossing.match_reasons]
         extras = extras_from_record(record) if record else {}
+        compra = None
+        if record and record.numero_compra:
+            compra = record.numero_compra
+        elif crossing and crossing.numero_compra:
+            compra = crossing.numero_compra
         return CruceExportRow(
             proveedor=proveedor,
             nit=nit,
-            numero_compra=numero,
+            numero_compra=compra or numero,
             numero_reserva=(
                 (crossing.numero_reserva if crossing else None)
                 or (record.numero_reserva if record else None)

@@ -54,9 +54,9 @@ export class WizardComponent implements OnInit, OnDestroy {
   readonly formatCop = formatCop;
   readonly packMax = PACK_MAX;
   readonly steps = [
-    { n: 1, title: 'Excel Autobits', hint: 'De ahí salen compra, fecha, proveedor y valor.' },
-    { n: 2, title: 'Facturas + chat IA', hint: `Hasta ${PACK_MAX} por paquete. Pide lo que necesites.` },
-    { n: 3, title: 'Generar cruce', hint: 'Analiza SIG y genera el Excel estándar.' },
+    { n: 1, title: 'Excel Autobits', hint: 'Compra, fecha, proveedor y valor de la semana.' },
+    { n: 2, title: 'Facturas + Claude', hint: `Hasta ${PACK_MAX} por paquete. Claude extrae y relaciona.` },
+    { n: 3, title: 'Cruce de Cuentas', hint: 'Claude cruza factura↔Autobits y arma el Excel maestro.' },
   ];
   readonly chatSugerencias = [
     'Resume cada factura: proveedor, número, fecha y total.',
@@ -141,6 +141,18 @@ export class WizardComponent implements OnInit, OnDestroy {
       .filter((id): id is number => typeof id === 'number' && Number.isFinite(id));
   });
 
+  readonly idsListosParaExcel = computed(() => {
+    const blocked = new Set(['RECIBIDO', 'PROCESANDO']);
+    const byId = new Map(this.documentos().map((d) => [d.id, d]));
+    return this.idsParaExcel().filter((id) => {
+      const doc = byId.get(id);
+      if (!doc) {
+        return true;
+      }
+      return !blocked.has((doc.estado || '').toUpperCase());
+    });
+  });
+
   readonly facturasEnProceso = computed(() => {
     const ids = new Set(this.idsParaExcel());
     const pool = ids.size
@@ -155,10 +167,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (this.generandoExcel() || this.subiendoCruce()) {
       return false;
     }
-    if (!this.idsParaExcel().length) {
-      return false;
-    }
-    return !this.facturasEnProceso();
+    return this.idsListosParaExcel().length > 0;
   });
 
   readonly kpis = computed(() => {
@@ -247,7 +256,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     }
     this.subiendoCruce.set(true);
     this.error.set('');
-    this.aviso.set('Analizando Autobits, facturas y proveedores ya cargados…');
+    this.aviso.set('Claude está relacionando facturas con Autobits (fecha, valor, proveedor)…');
     this.cruceApi.analizar(this.autobits()?.batch?.id).pipe(
       takeUntilDestroyed(this.destroyRef),
       finalize(() => this.subiendoCruce.set(false)),
@@ -266,12 +275,12 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (this.generandoExcel() || !this.puedeGenerarExcel()) return;
     this.generandoExcel.set(true);
     this.error.set('');
-    this.aviso.set('Generando Excel estándar de Cruce de Cuentas…');
+    this.aviso.set('Armando el Cruce de Cuentas con facturas + Autobits ya relacionados…');
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const documentIds = [...this.idsParaExcel()];
+      const documentIds = [...this.idsListosParaExcel()];
       if (!documentIds.length) {
-        this.error.set('Adjunte y procese facturas antes de generar el Excel.');
+        this.error.set('Espere a que Claude termine de leer las facturas del paquete.');
         return;
       }
       await this.download.download(
@@ -418,6 +427,20 @@ export class WizardComponent implements OnInit, OnDestroy {
     return '';
   }
 
+  private anclarPaqueteSiFalta(items: DocumentSummary[]): void {
+    if (this.idsFacturasOperacion().length || this.facturaItems().length) {
+      return;
+    }
+    const blocked = new Set(['ANULADO', 'DUPLICADO', 'RECIBIDO', 'PROCESANDO']);
+    const ready = items
+      .filter((d) => typeof d.id === 'number' && !blocked.has((d.estado || '').toUpperCase()))
+      .map((d) => d.id)
+      .slice(0, PACK_MAX);
+    if (ready.length) {
+      this.persistirIdsPaquete(ready);
+    }
+  }
+
   private persistirIdsPaquete(ids: number[]): void {
     const clean = ids.filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0);
     this.idsFacturasOperacion.set(clean);
@@ -513,7 +536,11 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   private refrescarFacturas(): void {
     this.docsApi.list({ limit: 200 }).subscribe({
-      next: (res) => this.documentos.set(res.items || []),
+      next: (res) => {
+        const items = res.items || [];
+        this.documentos.set(items);
+        this.anclarPaqueteSiFalta(items);
+      },
       error: () => undefined,
     });
     this.crossingsApi.list({ limit: 200, batch_id: this.autobits()?.batch?.id }).subscribe({
@@ -532,7 +559,12 @@ export class WizardComponent implements OnInit, OnDestroy {
       if (!pending && this.documentos().length) {
         this.poll?.unsubscribe();
         this.crossingsApi.runMatching(this.autobits()?.batch?.id).subscribe({
-          next: () => this.refrescarFacturas(),
+          next: () => {
+            this.refrescarFacturas();
+            this.cruceApi.analizar(this.autobits()?.batch?.id).subscribe({
+              next: (res) => this.aplicarAnalisis(res),
+            });
+          },
         });
       }
     });
