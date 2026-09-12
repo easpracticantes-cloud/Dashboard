@@ -74,6 +74,23 @@ def test_strip_quita_comments_vml_aunque_openpyxl_los_reescriba(tmp_path):
     assert "legacyDrawing" not in xml
     assert "vmlDrawing" not in xml
     assert "/xl/tables/table1.xml" not in xml
+    assert "relationships/styles" in xml
+    assert "relationships/theme" in xml
+    with ZipFile(io.BytesIO(cleaned)) as zf:
+        wbrels = zf.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+    assert 'Target="styles.xml"' in wbrels or 'Target="/xl/styles.xml"' in wbrels
+    assert "theme/theme1.xml" in wbrels
+
+
+def test_rel_target_styles_se_resuelve_desde_xl_no_desde_rels():
+    from infrastructure.cruce.xlsx_integrity import _rel_target_exists
+
+    names = {"xl/styles.xml", "xl/theme/theme1.xml", "xl/worksheets/sheet1.xml"}
+    assert _rel_target_exists("xl/_rels/workbook.xml.rels", "styles.xml", names)
+    assert _rel_target_exists("xl/_rels/workbook.xml.rels", "theme/theme1.xml", names)
+    assert _rel_target_exists(
+        "xl/_rels/workbook.xml.rels", "/xl/worksheets/sheet1.xml", names
+    )
 
 
 def test_maestro_no_se_modifica_al_generar():

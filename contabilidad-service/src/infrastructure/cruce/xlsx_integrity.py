@@ -31,7 +31,7 @@ _HAZARD_PART = re.compile(
     re.I,
 )
 _HAZARD_REL_TYPE = re.compile(
-    r"(comments|vmlDrawing|drawing|table|hyperlink|image|chart|ctrlProp|slicer|persons)",
+    r"(comments|vmlDrawing|/drawing|table|/hyperlink|/image|/chart|ctrlProp|slicer|persons)",
     re.I,
 )
 _LEGACY_DRAWING = re.compile(r"<legacyDrawing\b[^>]*?(?:/>|>.*?</legacyDrawing>)", re.I | re.S)
@@ -112,6 +112,12 @@ def validate_xlsx_bytes(content: bytes) -> None:
                 text = raw.decode("utf-8", errors="replace")
                 if "legacyDrawing" in text:
                     raise XlsxIntegrityError(f"{name} todavía contiene <legacyDrawing>.")
+        if "xl/styles.xml" in names:
+            wbrels = zf.read("xl/_rels/workbook.xml.rels").decode("utf-8", "replace")
+            if "relationships/styles" not in wbrels:
+                raise XlsxIntegrityError(
+                    "workbook.xml.rels perdió el vínculo a styles.xml (Excel lo marca inválido)."
+                )
         _assert_package_relationships(zf, names)
 
     wb = load_workbook(BytesIO(content), data_only=False)
@@ -175,14 +181,29 @@ def _strip_hazard_content_types(text: str) -> str:
     return text
 
 
+def _relationships_base_dir(rel_path: str) -> str:
+    """Directorio de la parte dueña del .rels (no el de la carpeta _rels).
+
+    En OOXML, Target relativo se resuelve desde la parte fuente
+    (p. ej. xl/workbook.xml), no desde xl/_rels/.
+    """
+    rel_path = rel_path.replace("\\", "/")
+    marker = "/_rels/"
+    if marker in rel_path:
+        return rel_path.split(marker, 1)[0]
+    if rel_path.startswith("_rels/"):
+        return ""
+    return posixpath.dirname(rel_path)
+
+
 def _rel_target_exists(rel_path: str, target: str, names: set[str]) -> bool:
     if target.startswith("http://") or target.startswith("https://") or target.startswith("mailto:"):
         return True
-    base = posixpath.dirname(rel_path.replace("\\", "/"))
+    base = _relationships_base_dir(rel_path)
     if target.startswith("/"):
         resolved = target.lstrip("/")
     else:
-        resolved = posixpath.normpath(posixpath.join(base, target))
+        resolved = posixpath.normpath(posixpath.join(base, target) if base else target)
     if resolved.startswith("../"):
         resolved = posixpath.normpath(resolved)
     return resolved in names or resolved + "/" in names
