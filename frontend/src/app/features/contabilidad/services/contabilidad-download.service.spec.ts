@@ -51,7 +51,7 @@ describe('ContabilidadDownloadService Cruce Excel', () => {
       ok: true,
       status: 200,
       headers: { get: (n: string) => (n === 'Content-Disposition' ? 'attachment; filename="Cruce_Cuentas_2026-09-10.xlsx"' : null) },
-      blob: async () => new Blob([new Uint8Array([0x50, 0x4b])], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+      arrayBuffer: async () => new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer,
     });
 
     await service.download('/contabilidad/cruce-excel/export.xlsx', 'hint.xlsx');
@@ -59,6 +59,18 @@ describe('ContabilidadDownloadService Cruce Excel', () => {
       headers: { Authorization: 'Bearer jwt-test' },
     });
     expect(click).toHaveBeenCalled();
+  });
+
+  it('rechaza una respuesta que no es ZIP/XLSX', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      arrayBuffer: async () => new TextEncoder().encode('<html>error</html>').buffer,
+    });
+    await expect(service.download('/contabilidad/cruce-excel/export.xlsx')).rejects.toThrow(
+      'La respuesta no es un Excel válido',
+    );
   });
 
   it('404 en export se informa como error de generación, no como HTML', async () => {

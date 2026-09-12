@@ -13,6 +13,7 @@ from application.services.cruce_excel_service import (
     CruceExcelServiceError,
     TIPOS_PENDIENTE,
 )
+from infrastructure.cruce.xlsx_integrity import XlsxIntegrityError
 from infrastructure.persistence.database import get_db
 
 router = APIRouter(prefix="/api/cruce-excel", tags=["cruce-excel"])
@@ -72,6 +73,11 @@ def exportar_excel(
         raise HTTPException(
             status_code=getattr(exc, "status_code", 400) or 400,
             detail=exc.message,
+        ) from exc
+    except XlsxIntegrityError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo generar un Excel válido para Microsoft Excel.",
         ) from exc
     return Response(
         content=content,

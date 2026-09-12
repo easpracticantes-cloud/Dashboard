@@ -53,7 +53,14 @@ export class ContabilidadDownloadService {
     if (!res.ok) {
       throw new Error(await this.mensajeError(res, url));
     }
-    const blob = await res.blob();
+    const buffer = await res.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
+      throw new Error('La respuesta no es un Excel válido. No se descargó el archivo.');
+    }
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
     const cd = res.headers.get('Content-Disposition') || '';
     const match = /filename\*?=(?:UTF-8''|")?([^\";]+)/i.exec(cd);
     const name = filenameHint || (match ? decodeURIComponent(match[1]) : 'descarga');

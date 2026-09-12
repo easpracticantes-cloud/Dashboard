@@ -5,7 +5,8 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal
-from io import BytesIO
+import os
+import tempfile
 from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
@@ -16,6 +17,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from domain.cruce.export_row import CruceExportRow
 from domain.cruce.fields import fold, match_block_field
+from infrastructure.cruce.xlsx_integrity import XlsxIntegrityError, validate_xlsx_bytes
 from domain.cruce.workbook_spec import (
     BLOCK_GAP,
     BLOCK_WIDTH,
@@ -23,6 +25,7 @@ from domain.cruce.workbook_spec import (
     DUSTER_HEADERS,
     FONT_NAME,
     FONT_NAME_TABLE,
+    GUIA_BLOCK_HEADERS,
     HEADER_FILL_BLUE,
     HEADER_FILL_PEACH,
     HEADER_FILL_TEAL,
@@ -61,6 +64,28 @@ _STRUCTURAL_LABELS = {
     "precompra luger",
     "tour de cafe",
 }
+_HEADER_LABELS = {
+    fold(header)
+    for group in (
+        PERIOD_BLOCK_HEADERS,
+        GUIA_BLOCK_HEADERS,
+        DUSTER_HEADERS,
+        BOSQUE_HEADERS,
+        LUGER_HEADERS,
+    )
+    for header in group
+}
+_CANONICAL_HEADERS = {
+    fold(header): header
+    for group in (
+        PERIOD_BLOCK_HEADERS,
+        GUIA_BLOCK_HEADERS,
+        DUSTER_HEADERS,
+        BOSQUE_HEADERS,
+        LUGER_HEADERS,
+    )
+    for header in group
+}
 
 
 def _fill(rgb: str) -> PatternFill:
@@ -92,7 +117,8 @@ class CruceWorkbookBuilder:
         names = standard_sheet_names(year)
         self._from_template = MASTER_TEMPLATE_PATH.exists()
         if self._from_template:
-            wb = load_workbook(MASTER_TEMPLATE_PATH)
+            wb = load_workbook(MASTER_TEMPLATE_PATH, data_only=False)
+            self._sanitize_template(wb)
             self._align_template_years(wb, year)
             self._clear_sample_values(wb)
             for name in names:
@@ -111,9 +137,60 @@ class CruceWorkbookBuilder:
         self._write_bosque(wb["CDC BOSQUE DE PALMAS"], specials.get("bosque", []))
         self._write_luger(wb[luger_sheet_name(year)], specials.get("luger", []))
 
-        buf = BytesIO()
-        wb.save(buf)
-        return buf.getvalue()
+        tmp_path = None
+        try:
+            fd, tmp_path = tempfile.mkstemp(prefix="Cruce_Cuentas_", suffix=".tmp.xlsx")
+            os.close(fd)
+            wb.save(tmp_path)
+            wb.close()
+            content = Path(tmp_path).read_bytes()
+            validate_xlsx_bytes(content)
+            return content
+        except XlsxIntegrityError:
+            raise
+        finally:
+            if tmp_path:
+                Path(tmp_path).unlink(missing_ok=True)
+
+    def _sanitize_template(self, wb) -> None:
+        """Quita partes que openpyxl reescribe mal (comentarios/VML/hipervínculos/tablas).
+
+        La plantilla real de Excel trae comentarios, drawings y cientos de
+        hipervínculos a Drive. Al guardar, openpyxl deja `<legacyDrawing r:id="anysvml"/>`
+        sin relationship: Microsoft Excel pide reparar el archivo.
+        """
+        for key in list(wb.defined_names):
+            try:
+                if "_FilterDatabase" in str(key):
+                    del wb.defined_names[key]
+            except Exception:
+                continue
+        for ws in wb.worksheets:
+            ws._comments = []
+            ws.legacy_drawing = None
+            if hasattr(ws, "_hyperlinks"):
+                ws._hyperlinks = []
+            if hasattr(ws, "_images"):
+                ws._images = []
+            if hasattr(ws, "_charts"):
+                ws._charts = []
+            if hasattr(ws, "_drawing"):
+                ws._drawing = None
+            tables = getattr(ws, "tables", None)
+            if tables:
+                for table_name in list(tables):
+                    del tables[table_name]
+            if getattr(ws, "auto_filter", None) is not None:
+                try:
+                    ws.auto_filter.ref = None
+                except Exception:
+                    pass
+            for row in ws.iter_rows():
+                for cell in row:
+                    if getattr(cell, "comment", None):
+                        cell.comment = None
+                    if getattr(cell, "hyperlink", None):
+                        cell.hyperlink = None
 
     def _unmerge_overlapping(
         self, ws: Worksheet, min_row: int, min_col: int, max_row: int, max_col: int
@@ -130,10 +207,20 @@ class CruceWorkbookBuilder:
             ws.unmerge_cells(str(rng))
 
     def _set_cell(self, ws: Worksheet, row: int, col: int, value=None):
-        self._unmerge_overlapping(ws, row, col, row, col)
-        if value is None:
-            return ws.cell(row, col)
-        return ws.cell(row, col, value)
+        cell = self._anchor_cell(ws, row, col)
+        if value is not None:
+            cell.value = value
+        return cell
+
+    def _anchor_cell(self, ws: Worksheet, row: int, col: int):
+        """Escribe solo en el origen de un merge. Nunca en una MergedCell."""
+        cell = ws.cell(row, col)
+        if not isinstance(cell, MergedCell):
+            return cell
+        for rng in ws.merged_cells.ranges:
+            if rng.min_row <= row <= rng.max_row and rng.min_col <= col <= rng.max_col:
+                return ws.cell(rng.min_row, rng.min_col)
+        return ws.cell(row, col)
 
     def _merge_block(
         self, ws: Worksheet, start_row: int, start_col: int, end_row: int, end_col: int
@@ -179,16 +266,28 @@ class CruceWorkbookBuilder:
                     if isinstance(cell, MergedCell) or cell.value is None:
                         continue
                     if self._is_structural_cell(cell.value):
+                        self._canonicalize_header(cell)
                         continue
                     cell.value = None
+
+    def _canonicalize_header(self, cell) -> None:
+        if not isinstance(cell.value, str):
+            return
+        canon = _CANONICAL_HEADERS.get(fold(cell.value))
+        if canon and cell.value != canon:
+            cell.value = canon
 
     def _is_structural_cell(self, value) -> bool:
         if not isinstance(value, str):
             return False
         text = value.strip()
-        if not text or text.startswith("="):
+        if not text:
             return False
+        if text.startswith("="):
+            return True
         folded = fold(text)
+        if folded in _HEADER_LABELS:
+            return True
         if folded in _STRUCTURAL_LABELS or any(folded.startswith(label) for label in _STRUCTURAL_LABELS):
             return True
         return match_block_field(text) is not None
@@ -337,6 +436,8 @@ class CruceWorkbookBuilder:
             cell.border = _THIN
 
     def _write_duster(self, ws: Worksheet, rows: list[CruceExportRow]) -> None:
+        if self._from_template and not rows:
+            return
         self._merge_block(ws, 1, 2, 1, 10)
         title = self._set_cell(ws, 1, 2, "VENTAS_DUSTER")
         title.font = _TITLE_FONT
@@ -377,6 +478,8 @@ class CruceWorkbookBuilder:
             self._autosize(ws, 10)
 
     def _write_bosque(self, ws: Worksheet, rows: list[CruceExportRow]) -> None:
+        if self._from_template and not rows:
+            return
         title = self._set_cell(ws, 1, 2, "CDC BOSQUE DE PALMAS")
         title.font = _TITLE_FONT
         self._write_table_headers(ws, 9, BOSQUE_HEADERS)
@@ -411,6 +514,8 @@ class CruceWorkbookBuilder:
             self._autosize(ws, 10)
 
     def _write_luger(self, ws: Worksheet, rows: list[CruceExportRow]) -> None:
+        if self._from_template and not rows:
+            return
         title = self._set_cell(ws, 2, 2, "UNIDADES DISPONIBLES AÑO")
         title.font = _TITLE_FONT
         self._style_header_row(ws, 5, 2, LUGER_HEADERS, HEADER_FILL_TEAL)
