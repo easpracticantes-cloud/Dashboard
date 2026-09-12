@@ -180,7 +180,7 @@
     </p>
     <div class="wiz__chips">
       @for (s of chatSugerencias; track s) {
-        <button type="button" class="wiz__chip-btn" (click)="usarSugerencia(s)" [disabled]="preguntando() || !documentos().length">
+        <button type="button" class="wiz__chip-btn" (click)="usarSugerencia(s)" [disabled]="preguntando() || !idsParaExcel().length">
           {{ s }}
         </button>
       }

@@ -262,6 +262,11 @@ class CruceWorkbookBuilder:
                 col0 = 1 + idx * (BLOCK_WIDTH + BLOCK_GAP)
                 fill = HEADER_FILL_BLUE if idx % 2 == 0 else HEADER_FILL_PEACH
                 title = proveedor if proveedor and proveedor != "(Sin proveedor)" else None
+                nit = (items[0].nit or "").strip() if items else ""
+                if title and nit:
+                    title = f"{title}  {nit}"
+                elif nit and not title:
+                    title = nit
                 title_cell = self._set_cell(ws, start_row, col0, title)
                 title_cell.font = _TITLE_FONT
                 if BLOCK_WIDTH > 1:

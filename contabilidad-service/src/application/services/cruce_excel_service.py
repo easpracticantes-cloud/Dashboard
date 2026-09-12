@@ -560,8 +560,8 @@ class CruceExcelService:
             record = crossing.autobits_record
         numero = self._numero_desde_factura(doc)
         fecha = self._fecha_desde_factura(doc)
-        proveedor = doc.provider.nombre if doc.provider else None
-        nit = doc.provider.nit if doc.provider else None
+        proveedor, nit = self._proveedor_desde_factura(doc)
+        valor = self._total_desde_factura(doc)
         reasons: list[str] = []
         if crossing and crossing.match_reasons:
             try:
@@ -580,7 +580,7 @@ class CruceExcelService:
                 or (record.numero_reserva if record else None)
             ),
             fecha_ejecucion=fecha,
-            valor=to_money_or_none(doc.total),
+            valor=valor,
             factura_cdc=numero,
             fecha_pago=(crossing.fecha_pago or "").strip() or None if crossing else None,
             concepto=doc.concepto,
@@ -599,6 +599,30 @@ class CruceExcelService:
             vendedor=extras.get("vendedor") if record else None,
             cantidad=extras.get("cantidad") if record else None,
         )
+
+    def _proveedor_desde_factura(self, doc: DocumentModel) -> tuple[str | None, str | None]:
+        """Misma fuente que la IA: columns del documento y, si faltan, extracted_json."""
+        nombre = doc.provider.nombre if doc.provider else None
+        nit = doc.provider.nit if doc.provider else None
+        extracted = self._extracted_factura(doc)
+        if not nombre:
+            prov = extracted.get("proveedor")
+            if isinstance(prov, dict):
+                nombre = (prov.get("nombre") or prov.get("razon_social") or "").strip() or None
+                nit = nit or (str(prov.get("nit") or "").strip() or None)
+            elif prov:
+                nombre = str(prov).strip() or None
+        if not nit:
+            raw_nit = extracted.get("nit_o_identificacion") or extracted.get("nit")
+            nit = str(raw_nit).strip() if raw_nit else None
+        return nombre, nit
+
+    def _total_desde_factura(self, doc: DocumentModel):
+        if doc.total is not None:
+            return to_money_or_none(doc.total)
+        extracted = self._extracted_factura(doc)
+        valores = extracted.get("valores") if isinstance(extracted.get("valores"), dict) else {}
+        return to_money_or_none(valores.get("total") or extracted.get("total"))
 
     def _numero_desde_factura(self, doc: DocumentModel) -> str | None:
         if (doc.numero_documento or "").strip():

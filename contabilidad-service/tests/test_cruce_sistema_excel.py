@@ -560,7 +560,7 @@ def test_export_solo_empresas_con_factura_y_datos_de_la_factura(client):
     assert "COM-B" not in text_a
     wb_a = load_workbook(io.BytesIO(solo_a.content))
     enero = wb_a["AÑO  2026 ENERO - ABRIL"]
-    assert enero["A1"].value == "Empresa A"
+    assert enero["A1"].value == "Empresa A  900111"
     assert enero["A3"].value.year == 2026
     assert enero["A3"].value.month == 3
     assert enero["A3"].value.day == 10
@@ -703,12 +703,117 @@ def test_export_cruce_de_otra_factura_no_se_mezcla(client):
     assert "Cruce B" not in dumped
     wb = load_workbook(io.BytesIO(excel_a.content))
     enero = wb["AÑO  2026 ENERO - ABRIL"]
-    assert enero["A1"].value == "Empresa A"
+    assert enero["A1"].value == "Empresa A  900111"
     assert enero["D3"].value == 1000000
     pago = enero["F3"].value
     assert "2026-03-28" not in str(pago)
     if pago is not None:
         assert getattr(pago, "day", 20) == 20 or "2026-03-20" in str(pago)
+
+
+def test_export_factura_sin_cruce_usa_datos_de_la_ia(client):
+    """FPOS-61226 sin cruce/Autobits debe aparecer igual (hoja AGOSTO por la fecha)."""
+    from domain.enums import DocumentStatus
+    from infrastructure.persistence.database import SessionLocal
+    from infrastructure.persistence.models import DocumentModel, ProviderModel
+    import json
+
+    db = SessionLocal()
+    try:
+        provider = ProviderModel(
+            nombre="JORGE HERNANDO CASTAÑO GIRALDO",
+            nit="70905826-6",
+        )
+        doc = DocumentModel(
+            filename="fpos-61226.pdf",
+            tipo="FACTURA",
+            origen="CARGA_MANUAL",
+            estado=DocumentStatus.CRUZANDO,
+            numero_documento="FPOS-61226",
+            fecha_emision="2026-08-04",
+            subtotal=13240.74,
+            iva=1059.26,
+            total=14300,
+            extracted_json=json.dumps(
+                {
+                    "proveedor": "JORGE HERNANDO CASTAÑO GIRALDO",
+                    "nit_o_identificacion": "70905826-6",
+                    "documento": {"numero": "FPOS-61226", "fecha_emision": "2026-08-04"},
+                    "valores": {"subtotal": 13240.74, "iva": 1059.26, "total": 14300},
+                },
+                ensure_ascii=False,
+            ),
+            provider=provider,
+        )
+        db.add_all([provider, doc])
+        db.commit()
+        db.refresh(doc)
+        doc_id = doc.id
+    finally:
+        db.close()
+
+    export = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    assert export.status_code == 200, export.text
+    dumped = _xlsx_text(export.content)
+    assert "FPOS-61226" in dumped
+    assert "JORGE HERNANDO CASTAÑO GIRALDO" in dumped
+    assert "70905826-6" in dumped
+    assert "COM005691" not in dumped
+    assert "FV POS" not in dumped
+    agosto = load_workbook(io.BytesIO(export.content))["AGOSTO"]
+    assert agosto["A1"].value == "JORGE HERNANDO CASTAÑO GIRALDO  70905826-6"
+    assert agosto["A3"].value.year == 2026
+    assert agosto["A3"].value.month == 8
+    assert agosto["A3"].value.day == 4
+    assert agosto["B3"].value == "FPOS-61226"
+    assert agosto["D3"].value == 14300
+    assert agosto["E3"].value == "FPOS-61226"
+    assert agosto["C3"].value in (None, "")
+    assert agosto["F3"].value in (None, "")
+
+
+def test_export_usa_extracted_json_cuando_no_hay_proveedor_persistido(client):
+    """Misma fuente que la IA: extracted_json si documents.provider está vacío."""
+    from domain.enums import DocumentStatus
+    from infrastructure.persistence.database import SessionLocal
+    from infrastructure.persistence.models import DocumentModel
+    import json
+
+    db = SessionLocal()
+    try:
+        doc = DocumentModel(
+            filename="fpos-solo-ia.pdf",
+            tipo="FACTURA",
+            origen="CARGA_MANUAL",
+            estado=DocumentStatus.CRUZANDO,
+            extracted_json=json.dumps(
+                {
+                    "proveedor": "JORGE HERNANDO CASTAÑO GIRALDO",
+                    "nit_o_identificacion": "70905826-6",
+                    "documento": {"numero": "FPOS-61226", "fecha_emision": "2026-08-04"},
+                    "valores": {"total": 14300},
+                },
+                ensure_ascii=False,
+            ),
+        )
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+        doc_id = doc.id
+    finally:
+        db.close()
+
+    export = client.get(f"/api/cruce-excel/export.xlsx?document_ids={doc_id}")
+    assert export.status_code == 200, export.text
+    dumped = _xlsx_text(export.content)
+    assert "FPOS-61226" in dumped
+    assert "JORGE HERNANDO CASTAÑO GIRALDO" in dumped
+    assert "70905826-6" in dumped
+    agosto = load_workbook(io.BytesIO(export.content))["AGOSTO"]
+    assert agosto["A1"].value == "JORGE HERNANDO CASTAÑO GIRALDO  70905826-6"
+    assert agosto["B3"].value == "FPOS-61226"
+    assert agosto["D3"].value == 14300
+    assert agosto["E3"].value == "FPOS-61226"
 
 
 def test_export_bloquea_facturas_en_proceso(client):

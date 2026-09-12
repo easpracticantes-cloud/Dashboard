@@ -65,8 +65,16 @@ describe('WizardComponent Autobits Excel flow', () => {
     listRecords: ReturnType<typeof vi.fn>;
     purgeExcels: ReturnType<typeof vi.fn>;
   };
+  let cruceApi: {
+    upload: ReturnType<typeof vi.fn>;
+    analizar: ReturnType<typeof vi.fn>;
+    getPendientes: ReturnType<typeof vi.fn>;
+    exportExcelUrl: ReturnType<typeof vi.fn>;
+  };
+  let download: { download: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    sessionStorage.clear();
     autobitsApi = {
       uploadDirect: vi.fn(),
       getLatestBatch: vi.fn(() => throwError(() => ({ status: 404 }))),
@@ -81,7 +89,7 @@ describe('WizardComponent Autobits Excel flow', () => {
         { provide: AutobitsApiService, useValue: autobitsApi },
         {
           provide: CruceExcelApiService,
-          useValue: {
+          useValue: (cruceApi = {
             upload: vi.fn(),
             analizar: vi.fn(() => of({
               aplicado: true,
@@ -93,8 +101,10 @@ describe('WizardComponent Autobits Excel flow', () => {
               pendientes: { total: 0, por_tipo: {}, resumen: [] },
             })),
             getPendientes: vi.fn(() => of({ has_autobits: false, batch: null, pendientes: { total: 0, por_tipo: {}, resumen: [] }, comparacion: [] })),
-            exportExcelUrl: vi.fn(() => '/contabilidad/cruce-excel/export.xlsx'),
-          },
+            exportExcelUrl: vi.fn((_batch?: number, ids?: number[]) =>
+              `/contabilidad/cruce-excel/export.xlsx${ids?.length ? `?document_ids=${ids.join(',')}` : ''}`,
+            ),
+          }),
         },
         {
           provide: DocumentsApiService,
@@ -113,13 +123,14 @@ describe('WizardComponent Autobits Excel flow', () => {
         },
         {
           provide: ContabilidadDownloadService,
-          useValue: { download: vi.fn(async () => undefined) },
+          useValue: (download = { download: vi.fn(async () => undefined) }),
         },
       ],
     }).compileComponents();
   });
 
   afterEach(() => {
+    sessionStorage.clear();
     TestBed.resetTestingModule();
   });
 
@@ -412,8 +423,41 @@ describe('WizardComponent Autobits Excel flow', () => {
         received_at: '2026-09-11T00:00:00',
       },
     ]);
+    cmp.idsFacturasOperacion.set([44]);
     fixture.detectChanges();
     expect(cmp.puedeGenerarExcel()).toBe(true);
+  });
+
+  it('Generar Excel no usa el listado global de facturas', () => {
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.documentos.set([
+      {
+        id: 99,
+        filename: 'otra.pdf',
+        tipo: 'FACTURA',
+        origen: 'CARGA_MANUAL',
+        estado: 'PROCESADO',
+        requiere_revision: false,
+        received_at: '2026-09-11T00:00:00',
+      },
+    ]);
+    fixture.detectChanges();
+    expect(cmp.idsParaExcel()).toEqual([]);
+    expect(cmp.puedeGenerarExcel()).toBe(false);
+  });
+
+  it('generarExcel envía document_ids del paquete y no batch_id', async () => {
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    cmp.idsFacturasOperacion.set([44]);
+    fixture.detectChanges();
+    await cmp.generarExcel();
+    expect(cruceApi.exportExcelUrl).toHaveBeenCalledWith(undefined, [44]);
+    expect(download.download).toHaveBeenCalledWith(
+      '/contabilidad/cruce-excel/export.xlsx?document_ids=44',
+      expect.stringMatching(/^Cruce_Cuentas_\d{4}-\d{2}-\d{2}\.xlsx$/),
+    );
   });
 
   it('Procesar analiza SIG sin upload y habilita Generar Excel', () => {

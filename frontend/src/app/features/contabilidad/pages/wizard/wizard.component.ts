@@ -25,6 +25,7 @@ import { ContabilidadDownloadService } from '../../services/contabilidad-downloa
 import { formatCop } from '../../utils/contabilidad-labels';
 
 const SESSION_KEY = 'contab-wizard-session';
+const PACK_IDS_KEY = 'contab-wizard-pack-ids';
 const PACK_MAX = 25;
 
 interface ChatMsg {
@@ -82,6 +83,8 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   subiendoFacturas = signal(false);
   facturaItems = signal<BatchUploadItem[]>([]);
+  /** IDs del paquete actual / última consulta IA. El Excel no usa el listado global. */
+  idsFacturasOperacion = signal<number[]>([]);
   documentos = signal<DocumentSummary[]>([]);
   crossings = signal<CrossingSummary[]>([]);
   packMsg = signal('');
@@ -97,6 +100,7 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     sessionStorage.setItem(SESSION_KEY, '1');
+    this.restaurarIdsPaquete();
     this.restaurar();
   }
 
@@ -125,17 +129,33 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.documentos().filter((d) => d.requiere_revision)
   );
 
-  readonly facturasEnProceso = computed(() =>
-    this.documentos().some((d) =>
+  readonly idsParaExcel = computed(() => {
+    const operacion = this.idsFacturasOperacion().filter(
+      (id): id is number => typeof id === 'number' && Number.isFinite(id),
+    );
+    if (operacion.length) {
+      return operacion;
+    }
+    return this.facturaItems()
+      .map((item) => item.document?.id)
+      .filter((id): id is number => typeof id === 'number' && Number.isFinite(id));
+  });
+
+  readonly facturasEnProceso = computed(() => {
+    const ids = new Set(this.idsParaExcel());
+    const pool = ids.size
+      ? this.documentos().filter((d) => ids.has(d.id))
+      : this.documentos();
+    return pool.some((d) =>
       ['RECIBIDO', 'PROCESANDO'].includes((d.estado || '').toUpperCase())
-    )
-  );
+    );
+  });
 
   readonly puedeGenerarExcel = computed(() => {
     if (this.generandoExcel() || this.subiendoCruce()) {
       return false;
     }
-    if (!this.documentos().length) {
+    if (!this.idsParaExcel().length) {
       return false;
     }
     return !this.facturasEnProceso();
@@ -249,9 +269,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.aviso.set('Generando Excel estándar de Cruce de Cuentas…');
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const documentIds = this.documentos()
-        .map((d) => d.id)
-        .filter((id): id is number => Number.isFinite(id));
+      const documentIds = [...this.idsParaExcel()];
       if (!documentIds.length) {
         this.error.set('Adjunte y procese facturas antes de generar el Excel.');
         return;
@@ -294,6 +312,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: (res) => {
         this.facturaItems.set([...(res.items || [])]);
+        this.persistirIdsPaquete(this.idsDePaquete(res.queued_ids, res.items));
         this.packMsg.set(res.mensaje);
         if (res.total_duplicados) {
           this.aviso.set(
@@ -330,16 +349,15 @@ export class WizardComponent implements OnInit, OnDestroy {
   preguntar(): void {
     const pregunta = this.chatInput.trim();
     if (!pregunta || this.preguntando()) return;
-    if (!this.documentos().length) {
-      this.error.set('Sube al menos una factura del paquete para preguntar a la IA.');
+    const ids = this.idsParaExcel().slice(0, PACK_MAX);
+    if (!ids.length) {
+      this.error.set('Sube el paquete de facturas para preguntar a la IA. El chat no usa el listado global.');
       return;
     }
     this.preguntando.set(true);
     this.chatInput = '';
     this.chatMsgs.update((msgs) => [...msgs, { role: 'user', text: pregunta }]);
-    const ids = this.documentos()
-      .map((d) => d.id)
-      .slice(0, PACK_MAX);
+    this.persistirIdsPaquete(ids);
     this.docsApi.ask(pregunta, ids).subscribe({
       next: (res) => {
         this.preguntando.set(false);
@@ -400,6 +418,51 @@ export class WizardComponent implements OnInit, OnDestroy {
     return '';
   }
 
+  private persistirIdsPaquete(ids: number[]): void {
+    const clean = ids.filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0);
+    this.idsFacturasOperacion.set(clean);
+    try {
+      if (clean.length) {
+        sessionStorage.setItem(PACK_IDS_KEY, JSON.stringify(clean));
+      } else {
+        sessionStorage.removeItem(PACK_IDS_KEY);
+      }
+    } catch {
+      /* sessionStorage puede estar bloqueado en tests o modo privado */
+    }
+  }
+
+  private restaurarIdsPaquete(): void {
+    try {
+      const raw = sessionStorage.getItem(PACK_IDS_KEY);
+      if (!raw) {
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+      this.idsFacturasOperacion.set(
+        parsed.filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0),
+      );
+    } catch {
+      /* JSON inválido o storage no disponible */
+    }
+  }
+
+  private idsDePaquete(
+    queued: number[] | undefined,
+    items: BatchUploadItem[] | undefined,
+  ): number[] {
+    const fromQueued = (queued || []).filter((id) => Number.isFinite(id) && id > 0);
+    if (fromQueued.length) {
+      return fromQueued;
+    }
+    return (items || [])
+      .map((item) => item.document?.id)
+      .filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0);
+  }
+
   private aplicarAutobits(res: ImportResult): void {
     this.autobits.set({ ...res, records: [...(res.records || [])] });
     const fromRes = [...(res.records || [])];
@@ -423,6 +486,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.cruce.set(null);
     this.comparacion.set([]);
     this.facturaItems.set([]);
+    this.persistirIdsPaquete([]);
     this.documentos.set([]);
     this.crossings.set([]);
     this.chatMsgs.set([]);
