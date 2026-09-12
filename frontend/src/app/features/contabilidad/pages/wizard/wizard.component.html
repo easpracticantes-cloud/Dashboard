@@ -1,0 +1,295 @@
+<div class="wiz">
+  <header class="wiz__hero">
+    <p class="wiz__eyebrow">Contabilidad · semana operativa</p>
+    <h2>Paso a paso</h2>
+    <p class="wiz__lead">
+      1) Autobits de la semana.
+      2) Paquete de facturas: Claude extrae proveedor, NIT, fecha y total.
+      Luego genera el Excel de cruce del paquete.
+    </p>
+    <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando()">
+      {{ limpiando() ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
+    </button>
+  </header>
+
+  @if (error()) {
+    <p class="wiz__alert wiz__alert--bad">{{ error() }}</p>
+  }
+  @if (aviso()) {
+    <p class="wiz__alert">{{ aviso() }}</p>
+  }
+
+  <ol class="wiz__steps">
+    @for (s of steps; track s.n) {
+      <li [class.is-on]="paso() === s.n" [class.is-done]="paso() > s.n">
+        <span class="wiz__num">{{ s.n }}</span>
+        <div>
+          <strong>{{ s.title }}</strong>
+          <small>{{ s.hint }}</small>
+        </div>
+      </li>
+    }
+  </ol>
+
+  @if (autobits() || documentos().length) {
+    <ul class="wiz__kpis">
+      <li><strong>{{ kpis().autobits }}</strong><span>Autobits</span></li>
+      <li><strong>{{ kpis().facturas }}</strong><span>Facturas</span></li>
+      <li><strong>{{ kpis().pack }}</strong><span>En paquete</span></li>
+      <li><strong>{{ kpis().revision }}</strong><span>A revisar</span></li>
+    </ul>
+  }
+
+  <section class="wiz__card" [class.is-dim]="paso() < 1">
+    <h3>1. Excel de Autobits</h3>
+    <p>Reporte de la semana. De aquí salen orden de compra, reserva, fecha, cliente y valor. La tabla se actualiza al terminar la lectura — no hace falta vaciar.</p>
+    <label class="wiz__drop">
+      <input type="file" accept=".xlsx,.xls,.xlsm,.csv" (change)="onAutobits($event)" [disabled]="subiendoAutobits() || limpiando()" />
+      <mat-icon>upload_file</mat-icon>
+      <span>{{ subiendoAutobits() ? 'Leyendo Autobits…' : 'Soltar o elegir Excel de Autobits' }}</span>
+    </label>
+    @if (autobits(); as ab) {
+      <div class="wiz__meta">
+        <span>{{ ab.batch.filename }}</span>
+        <span>{{ ab.imported_rows }} filas</span>
+        <span>{{ ab.batch.period_start }} → {{ ab.batch.period_end }}</span>
+        @if (ab.reused) {
+          <span>Reutilizado (mismo archivo)</span>
+        }
+        @if (ab.skipped_duplicates) {
+          <span>Duplicados actualizados: {{ ab.skipped_duplicates }}</span>
+        }
+        @if (ab.sheet_name) {
+          <span>Hoja {{ ab.sheet_name }}</span>
+        }
+      </div>
+    }
+    @if (records().length) {
+      <div class="wiz__table-wrap">
+        <table class="wiz__table">
+          <thead>
+            <tr>
+              <th>Proveedor</th>
+              <th>Compra</th>
+              <th>Reserva</th>
+              <th>Fecha</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of recordsVista(); track r.id) {
+              <tr>
+                <td>{{ r.proveedor || '—' }}</td>
+                <td>{{ r.numero_compra || '—' }}</td>
+                <td>{{ r.numero_reserva || '—' }}</td>
+                <td>{{ r.fecha || '—' }}</td>
+                <td>{{ formatCop(r.valor) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (records().length > 12) {
+        <button type="button" class="wiz__copy" (click)="verTodosRecords.set(!verTodosRecords())">
+          {{ verTodosRecords() ? 'Ver menos' : 'Mostrar las ' + records().length + ' filas' }}
+        </button>
+      }
+    }
+  </section>
+
+  <section class="wiz__card" [class.is-dim]="paso() < 2">
+    <div class="wiz__row">
+      <div>
+        <h3>2. Facturas de la semana</h3>
+        <p>
+          Paquetes de máximo {{ packMax }} archivos (PDF, foto o escaneo).
+          El OCR + visión lee facturas físicas, electrónicas o borrosas; si algo es dudoso lo marca para revisión.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="wiz__copy wiz__excel-btn"
+        (click)="generarExcel()"
+        [disabled]="!puedeGenerarExcel()"
+        title="Descarga el Excel de cruce del paquete actual"
+      >
+        @if (generandoExcel()) {
+          Generando…
+        } @else if (!idsListosParaExcel().length && facturasEnProceso()) {
+          Esperando…
+        } @else {
+          Generar Excel de cruce
+        }
+      </button>
+    </div>
+    <label class="wiz__label" for="solicitud-ia">Qué quieres que saque o revise (opcional)</label>
+    <textarea
+      id="solicitud-ia"
+      class="wiz__prompt"
+      rows="3"
+      [(ngModel)]="solicitud"
+      placeholder="Ej. Extrae NIT, número, total y compra. Si el total no cuadra o el sello tapó un dígito, asume y marca revisión."
+    ></textarea>
+    <label class="wiz__drop">
+      <input
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png"
+        multiple
+        (change)="onFacturas($event)"
+        [disabled]="subiendoFacturas() || !autobits()"
+      />
+      <mat-icon>photo_library</mat-icon>
+      <span>{{ subiendoFacturas() ? 'Subiendo y encolando OCR…' : 'Soltar hasta ' + packMax + ' facturas (PDF o foto)' }}</span>
+    </label>
+    @if (packMsg()) {
+      <p class="wiz__hint">{{ packMsg() }}</p>
+    }
+    @if (facturaItems().length) {
+      <ul class="wiz__files">
+        @for (it of facturaItems(); track it.filename) {
+          <li [class.is-bad]="!it.ok">
+            <strong>{{ it.filename }}</strong>
+            <small>{{ it.ok ? (it.document?.estado || 'en cola') : it.error }}</small>
+          </li>
+        }
+      </ul>
+    }
+    @if (documentos().length) {
+      <h4 class="wiz__sub">Ya importadas</h4>
+      <div class="wiz__table-wrap">
+        <table class="wiz__table">
+          <thead>
+            <tr>
+              <th>Archivo</th>
+              <th>N° factura</th>
+              <th>Proveedor</th>
+              <th>Total</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (d of documentos(); track d.id) {
+              <tr [class.is-miss]="d.requiere_revision">
+                <td>{{ d.filename }}</td>
+                <td>{{ d.numero_documento || '—' }}</td>
+                <td>{{ d.proveedor_nombre || '—' }}</td>
+                <td>{{ formatCop(d.total) }}</td>
+                <td>
+                  <span class="wiz__chip" [class]="'is-' + tonoEstado(d.estado)">
+                    {{ d.estado }}
+                    @if (d.requiere_revision) {
+                      · revisar
+                    }
+                  </span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  <section class="wiz__card wiz__chat" [class.is-dim]="paso() < 2">
+    <h3>Chat con la IA sobre este paquete</h3>
+    <p class="wiz__hint">
+      Claude responde con las facturas del paquete y las filas Autobits de la semana (máx. {{ packMax }}).
+    </p>
+    <div class="wiz__chips">
+      @for (s of chatSugerencias; track s) {
+        <button type="button" class="wiz__chip-btn" (click)="usarSugerencia(s)" [disabled]="preguntando() || !idsParaExcel().length">
+          {{ s }}
+        </button>
+      }
+    </div>
+    <div class="wiz__msgs" aria-live="polite">
+      @if (!chatMsgs().length) {
+        <p class="wiz__hint">Aún no hay mensajes. Sube el paquete y pregunta.</p>
+      }
+      @for (m of chatMsgs(); track $index) {
+        <article class="wiz__msg" [class.is-user]="m.role === 'user'">
+          <strong>{{ m.role === 'user' ? 'Tú' : 'IA contable' }}</strong>
+          <p>{{ m.text }}</p>
+        </article>
+      }
+      @if (preguntando()) {
+        <article class="wiz__msg"><strong>IA contable</strong><p>Pensando…</p></article>
+      }
+    </div>
+    <div class="wiz__ask">
+      <input
+        type="text"
+        class="wiz__prompt"
+        [(ngModel)]="chatInput"
+        (keydown.enter)="preguntar()"
+        placeholder="Escribe el pedido y pulsa Preguntar"
+        [disabled]="preguntando()"
+      />
+      <button type="button" class="wiz__copy wiz__copy--primary" (click)="preguntar()" [disabled]="preguntando() || !chatInput.trim()">
+        Preguntar
+      </button>
+    </div>
+  </section>
+
+  @if (crossings().length) {
+    <section class="wiz__card">
+      <h3>Relación factura ↔ Autobits</h3>
+      <p class="wiz__hint">Cada factura se ancla a la fila de Autobits cuando hay coincidencia.</p>
+      <div class="wiz__table-wrap">
+        <table class="wiz__table">
+          <thead>
+            <tr>
+              <th>Proveedor</th>
+              <th>Compra / reserva</th>
+              <th>Fecha</th>
+              <th>Valor</th>
+              <th>Factura / CDC</th>
+              <th>Match</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of crossings(); track c.id) {
+              <tr>
+                <td>{{ c.proveedor || '—' }}</td>
+                <td>{{ c.numero_compra || '—' }} · {{ c.numero_reserva || '—' }}</td>
+                <td>{{ c.fecha_ejecucion || '—' }}</td>
+                <td>{{ formatCop(c.valor_autobits) }}</td>
+                <td>{{ c.factura_cdc || c.document_numero || '—' }}</td>
+                <td>{{ c.match_type }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+</div>
+
+@if (confirmandoVaciar()) {
+  <div class="wiz__modal">
+    <div class="wiz__modal-backdrop" (click)="cancelarVaciar()"></div>
+    <div
+      class="wiz__modal-card"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="wiz-vaciar-title"
+      aria-describedby="wiz-vaciar-desc"
+    >
+      <h3 id="wiz-vaciar-title">¿Vaciar registros?</h3>
+      <p id="wiz-vaciar-desc">
+        Los registros cargados se eliminarán: Autobits y las facturas importadas. El módulo Autobits no se desactiva.
+      </p>
+      <div class="wiz__modal-actions">
+        <button type="button" class="wiz__ghost" (click)="cancelarVaciar(); $event.stopPropagation()">Cancelar</button>
+        <button
+          type="button"
+          class="wiz__copy wiz__copy--primary"
+          (click)="confirmarVaciar(); $event.stopPropagation()"
+          [disabled]="limpiando()"
+        >
+          Vaciar
+        </button>
+      </div>
+    </div>
+  </div>
+}

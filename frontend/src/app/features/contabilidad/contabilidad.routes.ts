@@ -9,9 +9,7 @@ export const CONTABILIDAD_ROUTES: Routes = [
       {
         path: '',
         loadComponent: () =>
-          import('./pages/documents/documents-list.component').then(
-            (m) => m.DocumentsListComponent,
-          ),
+          import('./pages/wizard/wizard.component').then((m) => m.WizardComponent),
       },
       {
         path: 'documentos',
