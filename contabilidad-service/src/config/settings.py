@@ -72,7 +72,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("ANTHROPIC_MAX_TOKENS", "AI_MAX_TOKENS"),
     )
     anthropic_timeout: int = Field(
-        default=25,
+        default=40,
         validation_alias=AliasChoices("ANTHROPIC_TIMEOUT", "AI_TIMEOUT"),
     )
     anthropic_max_retries: int = Field(

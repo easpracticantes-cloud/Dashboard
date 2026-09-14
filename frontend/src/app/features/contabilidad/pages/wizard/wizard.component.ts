@@ -15,6 +15,7 @@ import {
   DocumentSummary,
   DocumentsApiService,
 } from '../../services/documents-api.service';
+import { FacturasApiService } from '../../services/facturas-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
 import { formatCop } from '../../utils/contabilidad-labels';
 
@@ -39,6 +40,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   private readonly docsApi = inject(DocumentsApiService);
   private readonly crossingsApi = inject(CrossingsApiService);
   private readonly download = inject(ContabilidadDownloadService);
+  private readonly facturasApi = inject(FacturasApiService);
   private readonly destroyRef = inject(DestroyRef);
 
   /** Invalida restauraciones HTTP que lleguen después de una acción del usuario. */
@@ -62,6 +64,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   confirmandoVaciar = signal(false);
   error = signal('');
   aviso = signal('');
+  aiWarn = signal('');
 
   subiendoAutobits = signal(false);
   autobits = signal<ImportResult | null>(null);
@@ -89,6 +92,26 @@ export class WizardComponent implements OnInit, OnDestroy {
     sessionStorage.setItem(SESSION_KEY, '1');
     this.restaurarIdsPaquete();
     this.restaurar();
+    this.facturasApi
+      .health()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (h) => {
+          if (h.ai_key_configured === false || h.ai === false) {
+            this.aiWarn.set(
+              h.hint ||
+                'Claude no está configurado (falta ANTHROPIC_API_KEY). Las facturas no mostrarán datos hasta reiniciar Contabilidad con la clave.'
+            );
+          } else {
+            this.aiWarn.set('');
+          }
+        },
+        error: () => {
+          this.aiWarn.set(
+            'No se pudo verificar Claude/OCR. Revisa que Contabilidad esté arriba y con ANTHROPIC_API_KEY.'
+          );
+        },
+      });
   }
 
   ngOnDestroy(): void {
