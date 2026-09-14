@@ -1,14 +1,10 @@
 /**
- * PDF de cotización Escuela Aves Salento.
- * Dibuja la plantilla con formas + texto + assets (logo/foto decorativa).
- * Multipágina: mismos colores, tipografía, header y footer; totales solo al final.
+ * PDF = plantilla JPG oficial + valores dinámicos encima.
+ * No redibuja el diseño: usa la imagen de marca tal cual.
  */
 import { documentToDraft } from './quote-sheet.model';
 import type { QuoteSheetDocument } from './quote-sheet.model';
 import {
-  ESCUELA_AVES_COMPANY,
-  QUOTE_HERO_BIRD,
-  QUOTE_LOGO,
   QUOTE_TEMPLATE_IMAGE,
   fillQuoteTemplate,
   type FilledQuoteTemplate,
@@ -18,9 +14,7 @@ import {
 
 export type QuotePdfData = QuoteTemplateInput | QuoteSheetDocument;
 
-const PAGE_W = 794;
-const PAGE_H = 1123;
-const ROWS_PER_PAGE = 6;
+const MAX_ROWS = 5;
 
 export async function downloadQuotePdf(data: QuotePdfData): Promise<void> {
   const blob = await buildQuotePdfBlob(data);
@@ -33,53 +27,9 @@ export async function downloadQuotePdf(data: QuotePdfData): Promise<void> {
 export async function buildQuotePdfBlob(data: QuotePdfData): Promise<Blob> {
   const input = toInput(data);
   const filled = fillQuoteTemplate(input);
-  const items = filled.items.length
-    ? filled.items
-    : [
-        {
-          description: '',
-          quantity: '',
-          unit: '',
-          unitPrice: '',
-          discount: '',
-          total: '',
-          rawQuantity: 0,
-          rawUnitPrice: 0,
-          rawDiscount: 0,
-          rawTotal: 0
-        } as QuoteLineItem
-      ];
-
-  const chunks: QuoteLineItem[][] = [];
-  for (let i = 0; i < items.length; i += ROWS_PER_PAGE) {
-    chunks.push(items.slice(i, i + ROWS_PER_PAGE));
-  }
-  if (!chunks.length) {
-    chunks.push([]);
-  }
-
-  const [plantilla, logo, bird] = await Promise.all([
-    loadImage(QUOTE_TEMPLATE_IMAGE).catch(() => null),
-    loadImage(QUOTE_LOGO).catch(() => null),
-    loadImage(QUOTE_HERO_BIRD).catch(() => null)
-  ]);
-
-  const pages: Array<{ bytes: Uint8Array; width: number; height: number }> = [];
-  for (let p = 0; p < chunks.length; p++) {
-    pages.push(
-      await renderPage({
-        filled,
-        rows: chunks[p],
-        pageIndex: p,
-        pageCount: chunks.length,
-        itemOffset: p * ROWS_PER_PAGE,
-        plantilla,
-        logo,
-        bird
-      })
-    );
-  }
-  return jpegPagesToPdf(pages);
+  const plantilla = await loadImage(QUOTE_TEMPLATE_IMAGE);
+  const page = await renderOnPlantilla(filled, plantilla);
+  return jpegPagesToPdf([page]);
 }
 
 function toInput(data: QuotePdfData): QuoteTemplateInput {
@@ -90,19 +40,12 @@ function toInput(data: QuotePdfData): QuoteTemplateInput {
   return data as QuoteTemplateInput;
 }
 
-async function renderPage(opts: {
-  filled: FilledQuoteTemplate;
-  rows: QuoteLineItem[];
-  pageIndex: number;
-  pageCount: number;
-  itemOffset: number;
-  plantilla: HTMLImageElement | null;
-  logo: HTMLImageElement | null;
-  bird: HTMLImageElement | null;
-}): Promise<{ bytes: Uint8Array; width: number; height: number }> {
-  const { filled, rows, pageIndex, pageCount, itemOffset, plantilla, logo, bird } = opts;
-  const width = PAGE_W;
-  const height = PAGE_H;
+async function renderOnPlantilla(
+  filled: FilledQuoteTemplate,
+  plantilla: HTMLImageElement
+): Promise<{ bytes: Uint8Array; width: number; height: number }> {
+  const width = plantilla.naturalWidth || plantilla.width;
+  const height = plantilla.naturalHeight || plantilla.height;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -110,286 +53,144 @@ async function renderPage(opts: {
   if (!ctx) {
     throw new Error('No se pudo dibujar la cotización');
   }
-  const company = ESCUELA_AVES_COMPANY;
-  const isLast = pageIndex === pageCount - 1;
 
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(plantilla, 0, 0, width, height);
 
-  // Header (identidad protegida)
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, width, 188);
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillRect(width * 0.62, 0, width * 0.38, 188);
-  if (bird) {
-    drawCover(ctx, bird, width * 0.38, 0, width * 0.36, 188);
-  } else if (plantilla) {
-    ctx.drawImage(plantilla, 290, 40, 360, 280, width * 0.38, 0, width * 0.36, 188);
-  }
-  if (logo) {
-    ctx.drawImage(logo, 36, 36, 176, 92);
-  } else {
-    ctx.fillStyle = '#0b3d28';
-    ctx.font = '700 22px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillText('escuelaaves', 40, 80);
-  }
-  ctx.fillStyle = '#5a6b60';
-  ctx.font = 'italic 13px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText('Naturaleza que inspira', 40, 148);
+  const px = (pct: number) => (pct / 100) * width;
+  const py = (pct: number) => (pct / 100) * height;
 
-  const gold = ctx.createLinearGradient(0, 188, width, 196);
-  gold.addColorStop(0, '#b8922a');
-  gold.addColorStop(0.5, '#c9a227');
-  gold.addColorStop(1, '#e0c36a');
-  ctx.fillStyle = gold;
-  ctx.fillRect(0, 188, width, 8);
+  // Cubrir datos de ejemplo de la JPG y pintar valores reales
+  const cover = (x: number, y: number, w: number, h: number, color: string) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+  };
 
-  ctx.fillStyle = '#0b3d28';
-  ctx.font = '800 28px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText(pageIndex === 0 ? 'COTIZACIÓN' : 'COTIZACIÓN (continuación)', 48, 236);
-  ctx.fillStyle = '#5a6b60';
-  ctx.font = '400 13px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText(company.tagline, 48, 256);
-  if (pageCount > 1) {
-    ctx.fillText(`Página ${pageIndex + 1} de ${pageCount}`, 48, 274);
-  }
+  const panel = '#eef3ef';
+  const ink = '#1a2c22';
 
-  ctx.textAlign = 'left';
-  drawMeta(ctx, width - 280, 220, 'N.º Cotización:', filled.quoteNumber);
-  drawMeta(ctx, width - 280, 242, 'Fecha de emisión:', filled.issuedAt);
-  drawMeta(ctx, width - 280, 264, 'Válida hasta:', filled.validUntil);
+  // Meta values
+  cover(px(68.5), py(20.2), px(26), py(6.2), panel);
+  drawText(ctx, filled.quoteNumber, px(69), py(21.5), px(24), 13, ink, 'left');
+  drawText(ctx, filled.issuedAt, px(69), py(23.6), px(24), 13, ink, 'left');
+  drawText(ctx, filled.validUntil, px(69), py(25.7), px(24), 13, ink, 'left');
 
-  let tableTop = 300;
-  if (pageIndex === 0) {
-    ctx.font = '800 15px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillStyle = '#0b3d28';
-    ctx.fillText('Datos del cliente', 48, 300);
-    ctx.fillText('Nuestra información', width / 2 + 10, 300);
-    const clientY = 322;
-    if (filled.clientName) drawKv(ctx, 48, clientY, 'Nombre:', filled.clientName);
-    if (filled.clientNit) drawKv(ctx, 48, clientY + 22, 'NIT / C.C.:', filled.clientNit);
-    if (filled.clientPhone) drawKv(ctx, 48, clientY + 44, 'Teléfono:', filled.clientPhone);
-    if (filled.clientEmail) drawKv(ctx, 48, clientY + 66, 'Correo:', filled.clientEmail);
-    if (filled.clientCity) drawKv(ctx, 48, clientY + 88, 'Ciudad:', filled.clientCity);
-
-    ctx.font = '800 13px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillStyle = '#0b3d28';
-    ctx.fillText(company.legalName, width / 2 + 10, clientY);
-    ctx.font = '400 12px "Segoe UI", Calibri, Arial, sans-serif';
-    drawKv(ctx, width / 2 + 10, clientY + 22, 'NIT:', company.nit);
-    drawKv(ctx, width / 2 + 10, clientY + 44, 'Dirección:', company.address);
-    drawKv(ctx, width / 2 + 10, clientY + 66, 'Teléfono:', company.phone);
-    drawKv(ctx, width / 2 + 10, clientY + 88, 'Correo:', company.email);
-    tableTop = 450;
-  }
-
-  ctx.fillStyle = '#0b3d28';
-  ctx.font = '800 15px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText('Detalle de la cotización', 48, tableTop);
-  const cols = [
-    { x: 48, title: 'Ítem' },
-    { x: 98, title: 'Descripción' },
-    { x: 398, title: 'Cantidad' },
-    { x: 488, title: 'Valor unitario' },
-    { x: 608, title: 'Valor total' }
+  // Cliente
+  cover(px(13.5), py(31.6), px(30), py(11.5), panel);
+  const clientLines = [
+    filled.clientName,
+    filled.clientNit,
+    filled.clientPhone,
+    filled.clientEmail,
+    filled.clientCity
   ];
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillRect(48, tableTop + 10, width - 96, 28);
-  ctx.fillStyle = '#f6efe2';
-  ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
-  cols.forEach((col) => ctx.fillText(col.title, col.x + 8, tableTop + 28));
-
-  const displayRows = [...rows];
-  while (displayRows.length < Math.min(ROWS_PER_PAGE, 5) && pageIndex === 0 && pageCount === 1) {
-    displayRows.push({
-      description: '',
-      quantity: '',
-      unit: '',
-      unitPrice: '',
-      discount: '',
-      total: '',
-      rawQuantity: 0,
-      rawUnitPrice: 0,
-      rawDiscount: 0,
-      rawTotal: 0
-    });
-  }
-
-  displayRows.forEach((item, i) => {
-    const y = tableTop + 38 + i * 42;
-    ctx.fillStyle = i % 2 ? '#f4f7f4' : '#ffffff';
-    ctx.fillRect(48, y, width - 96, 42);
-    ctx.fillStyle = '#c9a227';
-    ctx.beginPath();
-    ctx.arc(73, y + 21, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(String(itemOffset + i + 1), 73, y + 25);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#1a2c22';
-    ctx.font = '400 11px "Segoe UI", Calibri, Arial, sans-serif';
-    fillWrapped(ctx, item.description || '—', 106, y + 16, 280, 13, 'left');
-    ctx.textAlign = 'center';
-    ctx.fillText(item.quantity || '—', 443, y + 25);
-    ctx.textAlign = 'right';
-    ctx.fillText(item.unitPrice || '—', 600, y + 25);
-    ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillText(item.total || '—', 738, y + 25);
-    ctx.textAlign = 'left';
+  clientLines.forEach((line, i) => {
+    drawText(ctx, dash(line), px(14), py(32.8 + i * 2.15), px(28), 12, ink, 'left');
   });
 
-  let cursorY = tableTop + 38 + displayRows.length * 42 + 24;
-
-  if (isLast) {
-    const trust = [
-      'Guías expertos en aviturismo',
-      'Seguridad en todo el recorrido',
-      'Experiencias sostenibles',
-      'Atención personalizada'
-    ];
-    ctx.fillStyle = '#0b3d28';
-    ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
-    trust.forEach((text, i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      ctx.fillText(text, 48 + col * 200, cursorY + row * 20);
-    });
-
-    ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillStyle = '#5a6b60';
-    ctx.textAlign = 'right';
-    ctx.fillText('Subtotal', 620, cursorY);
-    ctx.fillText('IVA (19%)', 620, cursorY + 20);
-    ctx.fillStyle = '#1a2c22';
-    ctx.fillText(filled.subtotal, 738, cursorY);
-    ctx.fillText(filled.iva, 738, cursorY + 20);
-    ctx.strokeStyle = '#0b3d28';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(560, cursorY + 28);
-    ctx.lineTo(738, cursorY + 28);
-    ctx.stroke();
-    ctx.fillStyle = '#0b3d28';
-    ctx.font = '800 16px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillText('Total', 620, cursorY + 48);
-    ctx.fillText(filled.total, 738, cursorY + 48);
-    ctx.textAlign = 'left';
-
-    const payY = cursorY + 78;
-    ctx.fillStyle = '#0b3d28';
-    ctx.font = '800 14px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillText('Condiciones y forma de pago', 48, payY);
-    ctx.font = '400 11px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillStyle = '#1a2c22';
-    const paymentLines = [...company.payment];
-    paymentLines.slice(0, 6).forEach((line, i) => {
-      ctx.fillText(`• ${line.replace(/^•\s*/, '')}`, 48, payY + 20 + i * 16);
-    });
-  }
-
-  // Footer protegido
-  ctx.fillStyle = '#07261a';
-  ctx.fillRect(0, height - 128, width, 36);
-  ctx.fillStyle = '#f4efe4';
-  ctx.font = '400 11px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText(company.phone, 48, height - 106);
-  ctx.fillText(company.email, 250, height - 106);
-  ctx.fillText(company.address, 520, height - 106);
-  if (plantilla) {
-    ctx.drawImage(plantilla, 0, 860, 682, 160, 0, height - 92, width, 92);
-  } else {
-    ctx.fillStyle = '#0b3d28';
-    ctx.fillRect(0, height - 92, width, 92);
-  }
-  ctx.fillStyle = '#f6efe2';
-  ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(company.footerLine, width - 24, height - 18);
-  ctx.textAlign = 'left';
-
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (out) => (out ? resolve(out) : reject(new Error('No se pudo exportar la cotización'))),
-      'image/jpeg',
-      0.94
-    );
+  // Filas
+  cover(px(5.8), py(53.2), px(88.5), py(16.5), '#ffffff');
+  const rows = filled.items.slice(0, MAX_ROWS);
+  rows.forEach((row, i) => {
+    const y = py(53.4 + i * 3.25);
+    if (i % 2 === 1) {
+      cover(px(5.8), y - py(0.3), px(88.5), py(3.2), '#f2f7f3');
+    }
+    drawText(ctx, row.description || '', px(12.5), y, px(40), 11, ink, 'left');
+    drawText(ctx, qty(row), px(54), y, px(10), 11, ink, 'right');
+    drawText(ctx, row.unitPrice || '', px(65), y, px(12), 11, ink, 'right');
+    drawText(ctx, row.total || '', px(79), y, px(13), 11, ink, 'right');
   });
-  return { bytes: new Uint8Array(await blob.arrayBuffer()), width, height };
+
+  // Totales
+  cover(px(70), py(70.8), px(24), py(7.2), panel);
+  cover(px(70), py(75.6), px(24), py(2.4), '#0b3d28');
+  drawText(ctx, filled.subtotal, px(71), py(71.8), px(22), 12, ink, 'right');
+  drawText(ctx, filled.iva, px(71), py(73.7), px(22), 12, ink, 'right');
+  drawText(ctx, filled.total, px(71), py(76.4), px(22), 13, '#f6efe2', 'right');
+
+  const bytes = await canvasToJpeg(canvas);
+  return { bytes, width, height };
 }
 
-function drawMeta(ctx: CanvasRenderingContext2D, x: number, y: number, label: string, value: string): void {
-  ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillText(label, x, y);
-  ctx.font = '400 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#1a2c22';
-  ctx.fillText(value || '—', x + 118, y);
+function qty(row: QuoteLineItem): string {
+  if (!row.quantity) {
+    return '';
+  }
+  return row.unit ? `${row.quantity} ${row.unit}` : row.quantity;
 }
 
-function drawKv(ctx: CanvasRenderingContext2D, x: number, y: number, label: string, value: string): void {
-  ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillText(label, x, y);
-  ctx.font = '400 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#1a2c22';
-  ctx.fillText(value || '—', x + 78, y);
+function dash(value: string): string {
+  const v = (value || '').trim();
+  return !v || v === '—' ? '' : v;
 }
 
-function fillWrapped(
+function drawText(
   ctx: CanvasRenderingContext2D,
   text: string,
   x: number,
   y: number,
   maxWidth: number,
-  lineHeight: number,
-  align: 'left' | 'right' | 'center'
+  size: number,
+  color: string,
+  align: CanvasTextAlign
 ): void {
-  const words = (text || '—').split(/\s+/);
-  const lines: string[] = [];
-  let row = '';
-  for (const word of words) {
-    const next = row ? `${row} ${word}` : word;
-    if (ctx.measureText(next).width > maxWidth && row) {
-      lines.push(row);
-      row = word;
-    } else {
-      row = next;
+  ctx.fillStyle = color;
+  ctx.font = `600 ${size}px "Segoe UI", Calibri, Arial, sans-serif`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'top';
+  const drawX = align === 'right' ? x + maxWidth : x;
+  const value = String(text || '');
+  if (!value) {
+    return;
+  }
+  // wrap description a 2 líneas
+  if (align === 'left' && ctx.measureText(value).width > maxWidth) {
+    const words = value.split(/\s+/);
+    let line = '';
+    let row = 0;
+    for (const word of words) {
+      const next = line ? `${line} ${word}` : word;
+      if (ctx.measureText(next).width > maxWidth && line) {
+        ctx.fillText(line, drawX, y + row * (size + 2), maxWidth);
+        line = word;
+        row += 1;
+        if (row >= 2) {
+          return;
+        }
+      } else {
+        line = next;
+      }
     }
+    if (line && row < 2) {
+      ctx.fillText(line, drawX, y + row * (size + 2), maxWidth);
+    }
+    return;
   }
-  if (row) {
-    lines.push(row);
-  }
-  lines.slice(0, 3).forEach((line, i) => {
-    ctx.textAlign = align;
-    ctx.fillText(line, x, y + i * lineHeight, maxWidth);
-  });
-  ctx.textAlign = 'left';
-}
-
-function drawCover(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  dx: number,
-  dy: number,
-  dw: number,
-  dh: number
-): void {
-  const scale = Math.max(dw / img.width, dh / img.height);
-  const sw = dw / scale;
-  const sh = dh / scale;
-  const sx = Math.max(0, (img.width - sw) / 2);
-  const sy = Math.max(0, (img.height - sh) * 0.35);
-  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+  ctx.fillText(value, drawX, y, maxWidth);
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('No se encontró un recurso de la plantilla'));
+    img.onerror = () => reject(new Error('No se encontró la plantilla de cotización'));
     img.src = src;
+  });
+}
+
+function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) {
+          reject(new Error('No se pudo generar la imagen PDF'));
+          return;
+        }
+        resolve(new Uint8Array(await blob.arrayBuffer()));
+      },
+      'image/jpeg',
+      0.92
+    );
   });
 }
 
@@ -402,17 +203,22 @@ function jpegPagesToPdf(pages: Array<{ bytes: Uint8Array; width: number; height:
   let nextId = 3;
   for (let i = 0; i < pages.length; i++) {
     pageObjIds.push(nextId);
-    nextId += 3; // page, image, content
+    nextId += 3;
   }
-  const kids = pageObjIds.map((id) => `${id} 0 R`).join(' ');
-  objects.push(ascii(`2 0 obj\n<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>\nendobj\n`));
+
+  let kids = '';
+  for (const id of pageObjIds) {
+    kids += `${id} 0 R `;
+  }
+  objects.push(ascii(`2 0 obj\n<< /Type /Pages /Kids [ ${kids}] /Count ${pages.length} >>\nendobj\n`));
 
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
-    const pageH = Math.round((pageW * page.height) / page.width);
     const pageId = pageObjIds[i];
     const imgId = pageId + 1;
     const contentId = pageId + 2;
+    const pageH = Math.round((page.height / page.width) * pageW);
+    const content = `q\n${pageW} 0 0 ${pageH} 0 0 cm\n/Im${i} Do\nQ\n`;
     objects.push(
       ascii(
         `${pageId} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im${i} ${imgId} 0 R >> >> /Contents ${contentId} 0 R >>\nendobj\n`
@@ -427,23 +233,25 @@ function jpegPagesToPdf(pages: Array<{ bytes: Uint8Array; width: number; height:
         ascii('\nendstream\nendobj\n')
       )
     );
-    const content = `q ${pageW} 0 0 ${pageH} 0 0 cm /Im${i} Do Q`;
-    objects.push(ascii(`${contentId} 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`));
+    objects.push(
+      ascii(`${contentId} 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`)
+    );
   }
 
-  let body = ascii('%PDF-1.4\n');
+  let body = new Uint8Array(0);
   const offsets = [0];
   for (const obj of objects) {
     offsets.push(body.length);
-    body = concat(body, obj);
+    body = concat(body, obj) as Uint8Array<ArrayBuffer>;
   }
   const xrefStart = body.length;
   let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (let i = 1; i < offsets.length; i++) {
+  for (let i = 1; i <= objects.length; i++) {
     xref += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
   }
-  xref += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-  return new Blob([concat(body, ascii(xref)) as BlobPart], { type: 'application/pdf' });
+  const trailer = `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
+  const pdfBytes = concat(body, ascii(xref), ascii(trailer)) as Uint8Array<ArrayBuffer>;
+  return new Blob([pdfBytes], { type: 'application/pdf' });
 }
 
 function ascii(text: string): Uint8Array {
@@ -455,12 +263,12 @@ function ascii(text: string): Uint8Array {
 }
 
 function concat(...parts: Uint8Array[]): Uint8Array {
-  const total = parts.reduce((n, p) => n + p.length, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
+  const len = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(len);
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    o += p.length;
   }
   return out;
 }
@@ -476,10 +284,6 @@ function triggerDownload(blob: Blob, filename: string): void {
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
-  a.rel = 'noopener';
-  a.style.display = 'none';
-  document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  URL.revokeObjectURL(url);
 }

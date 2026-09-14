@@ -3,8 +3,6 @@
 import { documentTotals, IVA_RATE as SHEET_IVA, splitIvaIncluded } from './quote-sheet.math';
 
 export const QUOTE_TEMPLATE_IMAGE = 'assets/brand/plantilla-cotizacion.jpg';
-/** Foto del ave del encabezado (recortada de la plantilla; no es la hoja completa). */
-export const QUOTE_HERO_BIRD = 'assets/brand/quote-hero-bird.jpg';
 export const QUOTE_LOGO = 'assets/brand/logo-escuela-aves-salento.png';
 export const QUOTE_MARK = 'assets/brand/logo-escuela-aves-mark.png';
 

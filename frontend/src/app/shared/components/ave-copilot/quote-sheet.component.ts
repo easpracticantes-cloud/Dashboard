@@ -6,10 +6,11 @@ import {
   type QuoteSheetItem,
   displayDash,
   emptyQuoteItem,
-  previewItems,
   recalcItem
 } from './quote-sheet.model';
-import { ESCUELA_AVES_COMPANY, formatCop, formatQuoteDate, QUOTE_HERO_BIRD, QUOTE_LOGO, QUOTE_TEMPLATE_IMAGE } from './quote-template';
+import { formatCop, formatQuoteDate, QUOTE_TEMPLATE_IMAGE } from './quote-template';
+
+const MAX_TEMPLATE_ROWS = 5;
 
 @Component({
   selector: 'eas-quote-sheet',
@@ -23,12 +24,29 @@ export class QuoteSheetComponent {
   readonly editing = input(false);
   readonly documentChange = output<QuoteSheetDocument>();
 
-  readonly company = ESCUELA_AVES_COMPANY;
-  readonly logo = QUOTE_LOGO;
-  readonly bird = QUOTE_HERO_BIRD;
   readonly plantilla = QUOTE_TEMPLATE_IMAGE;
 
-  readonly rows = computed(() => previewItems(this.document().items, this.editing()));
+  /** Filas visibles sobre la plantilla (máx. 5). */
+  readonly sheetRows = computed(() => {
+    const items = (this.document().items || []).map(recalcItem);
+    if (this.editing()) {
+      return items.slice(0, MAX_TEMPLATE_ROWS);
+    }
+    const padded = [...items.slice(0, MAX_TEMPLATE_ROWS)];
+    while (padded.length < Math.min(MAX_TEMPLATE_ROWS, Math.max(items.length, 1))) {
+      padded.push({
+        id: `pad-${padded.length}`,
+        description: '',
+        quantity: 0,
+        unit: '',
+        unitPrice: 0,
+        discount: 0,
+        total: 0
+      });
+    }
+    return padded.length ? padded : items.slice(0, 1);
+  });
+
   readonly money = computed(() => documentTotals(this.document().items));
   readonly subtotalText = computed(() => formatCop(this.money().subtotal, this.document().currency));
   readonly ivaText = computed(() => formatCop(this.money().iva, this.document().currency));
@@ -49,6 +67,9 @@ export class QuoteSheetComponent {
   }
 
   addItem(): void {
+    if (this.document().items.length >= MAX_TEMPLATE_ROWS) {
+      return;
+    }
     this.documentChange.emit({
       ...this.document(),
       items: [...this.document().items, emptyQuoteItem()]
@@ -81,6 +102,6 @@ export class QuoteSheetComponent {
   }
 
   moneyOrDash(amount: number): string {
-    return amount > 0 ? formatCop(amount, this.document().currency) : '—';
+    return amount > 0 ? formatCop(amount, this.document().currency) : '';
   }
 }
