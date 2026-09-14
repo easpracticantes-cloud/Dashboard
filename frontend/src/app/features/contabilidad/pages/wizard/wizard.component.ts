@@ -67,6 +67,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   aiWarn = signal('');
 
   subiendoAutobits = signal(false);
+  arrastrandoAutobits = signal(false);
   autobits = signal<ImportResult | null>(null);
   records = signal<AutobitsRecord[]>([]);
   verTodosRecords = signal(false);
@@ -74,6 +75,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   generandoExcel = signal(false);
 
   subiendoFacturas = signal(false);
+  arrastrandoFacturas = signal(false);
   facturaItems = signal<BatchUploadItem[]>([]);
   /** IDs del paquete actual / última consulta IA. El Excel no usa el listado global. */
   idsFacturasOperacion = signal<number[]>([]);
@@ -281,6 +283,46 @@ export class WizardComponent implements OnInit, OnDestroy {
   onFacturas(ev: Event): void {
     const files = Array.from((ev.target as HTMLInputElement).files || []);
     (ev.target as HTMLInputElement).value = '';
+    this.subirFacturas(files);
+  }
+
+  onFacturasDragOver(ev: DragEvent): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (this.subiendoFacturas() || !this.autobits()) return;
+    this.arrastrandoFacturas.set(true);
+    if (ev.dataTransfer) {
+      ev.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  onFacturasDragLeave(ev: DragEvent): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.arrastrandoFacturas.set(false);
+  }
+
+  onFacturasDrop(ev: DragEvent): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.arrastrandoFacturas.set(false);
+    if (this.subiendoFacturas() || !this.autobits()) {
+      if (!this.autobits()) {
+        this.error.set('Carga Autobits antes de subir facturas.');
+      }
+      return;
+    }
+    const files = Array.from(ev.dataTransfer?.files ?? []).filter((f) =>
+      /\.(jpe?g|png|pdf|webp)$/i.test(f.name)
+    );
+    if (!files.length) {
+      this.error.set('Suelta facturas en PDF, JPG o PNG.');
+      return;
+    }
+    this.subirFacturas(files);
+  }
+
+  private subirFacturas(files: File[]): void {
     if (!files.length) return;
     if (!this.autobits()) {
       this.error.set('Carga Autobits antes de subir facturas.');

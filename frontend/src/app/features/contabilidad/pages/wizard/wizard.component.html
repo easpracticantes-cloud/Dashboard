@@ -42,11 +42,34 @@
   <section class="wiz__card">
     <h3>1. Excel de Autobits</h3>
     <p>Reporte de la semana. De aquí salen orden de compra, reserva, fecha, cliente y valor. La tabla se actualiza al terminar la lectura — no hace falta vaciar.</p>
-    <label class="wiz__drop">
-      <input type="file" accept=".xlsx,.xls,.xlsm,.csv" (change)="onAutobits($event)" [disabled]="subiendoAutobits() || limpiando()" />
-      <mat-icon>upload_file</mat-icon>
-      <span>{{ subiendoAutobits() ? 'Leyendo Autobits…' : 'Soltar o elegir Excel de Autobits' }}</span>
-    </label>
+    <div
+      class="wiz__drop"
+      [class.is-drag]="arrastrandoAutobits()"
+      [class.is-disabled]="subiendoAutobits() || limpiando()"
+      (dragover)="onAutobitsDragOver($event)"
+      (dragenter)="onAutobitsDragOver($event)"
+      (dragleave)="onAutobitsDragLeave($event)"
+      (drop)="onAutobitsDrop($event)"
+    >
+      <label class="wiz__drop-inner">
+        <input
+          type="file"
+          accept=".xlsx,.xls,.xlsm,.csv"
+          (change)="onAutobits($event)"
+          [disabled]="subiendoAutobits() || limpiando()"
+        />
+        <mat-icon>upload_file</mat-icon>
+        <span>
+          @if (subiendoAutobits()) {
+            Leyendo Autobits…
+          } @else if (arrastrandoAutobits()) {
+            Suelta aquí el Excel
+          } @else {
+            Arrastra o elige el Excel de Autobits
+          }
+        </span>
+      </label>
+    </div>
     @if (autobits(); as ab) {
       <div class="wiz__meta">
         <span>{{ ab.batch.filename }}</span>
@@ -129,18 +152,35 @@
       [(ngModel)]="solicitud"
       placeholder="Ej. Extrae NIT, número, total y compra. Si el total no cuadra o el sello tapó un dígito, asume y marca revisión."
     ></textarea>
-    <label class="wiz__drop">
-      <input
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png"
-        multiple
-        (change)="onFacturas($event)"
-        [disabled]="subiendoFacturas() || !autobits()"
-      />
-      <mat-icon>photo_library</mat-icon>
-      <span>{{ subiendoFacturas() ? 'Subiendo y encolando OCR…' : 'Soltar hasta ' + packMax + ' facturas (PDF o foto)' }}</span>
-    </label>
-    @if (packMsg()) {
+    <div
+      class="wiz__drop"
+      [class.is-drag]="arrastrandoFacturas()"
+      [class.is-disabled]="subiendoFacturas() || !autobits()"
+      (dragover)="onFacturasDragOver($event)"
+      (dragenter)="onFacturasDragOver($event)"
+      (dragleave)="onFacturasDragLeave($event)"
+      (drop)="onFacturasDrop($event)"
+    >
+      <label class="wiz__drop-inner">
+        <input
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.webp"
+          multiple
+          (change)="onFacturas($event)"
+          [disabled]="subiendoFacturas() || !autobits()"
+        />
+        <mat-icon>photo_library</mat-icon>
+        <span>
+          @if (subiendoFacturas()) {
+            Subiendo y encolando OCR…
+          } @else if (arrastrandoFacturas()) {
+            Suelta aquí las facturas
+          } @else {
+            Arrastra o elige hasta {{ packMax }} facturas (PDF o foto)
+          }
+        </span>
+      </label>
+    </div>    @if (packMsg()) {
       <p class="wiz__hint">{{ packMsg() }}</p>
     }
     @if (facturaItems().length) {

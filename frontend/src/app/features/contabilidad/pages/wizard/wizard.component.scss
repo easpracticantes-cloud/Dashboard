@@ -145,26 +145,52 @@
 }
 
 .wiz__drop {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.7rem;
+  display: block;
   width: 100%;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  min-height: 72px;
-  padding: 0.9rem 1rem;
-  border: 1px dashed var(--eas-line);
+  min-height: 88px;
+  padding: 0;
+  border: 1.5px dashed var(--eas-line);
   border-radius: 14px;
   background: var(--eas-surface-sunken);
   color: var(--eas-ink);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wiz__drop-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 88px;
+  padding: 1rem 1.1rem;
+  box-sizing: border-box;
   cursor: pointer;
   font-weight: 650;
+  text-align: center;
 }
 
 .wiz__drop input {
   display: none;
+}
+
+.wiz__drop.is-drag {
+  border-color: #1f4a33;
+  background: rgba(31, 74, 51, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(31, 74, 51, 0.2);
+}
+
+.wiz__drop.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.wiz__drop.is-disabled .wiz__drop-inner {
+  cursor: not-allowed;
 }
 
 .wiz__meta {
