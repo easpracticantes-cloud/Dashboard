@@ -7,6 +7,7 @@ import { documentToDraft } from './quote-sheet.model';
 import type { QuoteSheetDocument } from './quote-sheet.model';
 import {
   ESCUELA_AVES_COMPANY,
+  QUOTE_HERO_BIRD,
   QUOTE_LOGO,
   QUOTE_TEMPLATE_IMAGE,
   fillQuoteTemplate,
@@ -57,9 +58,10 @@ export async function buildQuotePdfBlob(data: QuotePdfData): Promise<Blob> {
     chunks.push([]);
   }
 
-  const [plantilla, logo] = await Promise.all([
+  const [plantilla, logo, bird] = await Promise.all([
     loadImage(QUOTE_TEMPLATE_IMAGE).catch(() => null),
-    loadImage(QUOTE_LOGO).catch(() => null)
+    loadImage(QUOTE_LOGO).catch(() => null),
+    loadImage(QUOTE_HERO_BIRD).catch(() => null)
   ]);
 
   const pages: Array<{ bytes: Uint8Array; width: number; height: number }> = [];
@@ -72,7 +74,8 @@ export async function buildQuotePdfBlob(data: QuotePdfData): Promise<Blob> {
         pageCount: chunks.length,
         itemOffset: p * ROWS_PER_PAGE,
         plantilla,
-        logo
+        logo,
+        bird
       })
     );
   }
@@ -95,8 +98,9 @@ async function renderPage(opts: {
   itemOffset: number;
   plantilla: HTMLImageElement | null;
   logo: HTMLImageElement | null;
+  bird: HTMLImageElement | null;
 }): Promise<{ bytes: Uint8Array; width: number; height: number }> {
-  const { filled, rows, pageIndex, pageCount, itemOffset, plantilla, logo } = opts;
+  const { filled, rows, pageIndex, pageCount, itemOffset, plantilla, logo, bird } = opts;
   const width = PAGE_W;
   const height = PAGE_H;
   const canvas = document.createElement('canvas');
@@ -117,7 +121,9 @@ async function renderPage(opts: {
   ctx.fillRect(0, 0, width, 188);
   ctx.fillStyle = '#0b3d28';
   ctx.fillRect(width * 0.62, 0, width * 0.38, 188);
-  if (plantilla) {
+  if (bird) {
+    drawCover(ctx, bird, width * 0.38, 0, width * 0.36, 188);
+  } else if (plantilla) {
     ctx.drawImage(plantilla, 290, 40, 360, 280, width * 0.38, 0, width * 0.36, 188);
   }
   if (logo) {
@@ -360,6 +366,22 @@ function fillWrapped(
     ctx.fillText(line, x, y + i * lineHeight, maxWidth);
   });
   ctx.textAlign = 'left';
+}
+
+function drawCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number
+): void {
+  const scale = Math.max(dw / img.width, dh / img.height);
+  const sw = dw / scale;
+  const sh = dh / scale;
+  const sx = Math.max(0, (img.width - sw) / 2);
+  const sy = Math.max(0, (img.height - sh) * 0.35);
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {

@@ -9,7 +9,7 @@ import {
   previewItems,
   recalcItem
 } from './quote-sheet.model';
-import { ESCUELA_AVES_COMPANY, formatCop, formatQuoteDate, QUOTE_LOGO, QUOTE_TEMPLATE_IMAGE } from './quote-template';
+import { ESCUELA_AVES_COMPANY, formatCop, formatQuoteDate, QUOTE_HERO_BIRD, QUOTE_LOGO, QUOTE_TEMPLATE_IMAGE } from './quote-template';
 
 @Component({
   selector: 'eas-quote-sheet',
@@ -25,6 +25,7 @@ export class QuoteSheetComponent {
 
   readonly company = ESCUELA_AVES_COMPANY;
   readonly logo = QUOTE_LOGO;
+  readonly bird = QUOTE_HERO_BIRD;
   readonly plantilla = QUOTE_TEMPLATE_IMAGE;
 
   readonly rows = computed(() => previewItems(this.document().items, this.editing()));
