@@ -28,38 +28,13 @@
 .sb__brand {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 1.25rem 0.75rem 1.1rem 1rem;
+  padding: 1.25rem 1rem 1.1rem;
   border-bottom: 1px solid var(--eas-sidebar-line);
 }
 
 .sb__brand .brand-lockup {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.sb__collapse {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--eas-sidebar-line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--eas-sidebar-ink);
-  cursor: pointer;
-}
-
-.sb__collapse:hover {
-  background: var(--eas-sidebar-hover);
-}
-
-.sb__collapse mat-icon {
-  font-size: 20px;
-  width: 20px;
-  height: 20px;
 }
 
 .sb__section {

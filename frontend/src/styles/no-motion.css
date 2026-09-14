@@ -16,14 +16,15 @@ html {
   scroll-behavior: auto !important;
 }
 
-*:hover,
-*:focus,
-*:active,
-*:focus-visible,
-.is-active,
-.is-active:hover,
-.activo,
-.activo:hover {
+/* No anular transform en el drawer: Material lo usa para abrir/cerrar. */
+*:hover:not(.mat-drawer):not(.mat-sidenav):not(.mat-drawer-inner-container),
+*:focus:not(.mat-drawer):not(.mat-sidenav):not(.mat-drawer-inner-container),
+*:active:not(.mat-drawer):not(.mat-sidenav):not(.mat-drawer-inner-container),
+*:focus-visible:not(.mat-drawer):not(.mat-sidenav):not(.mat-drawer-inner-container),
+.is-active:not(.mat-drawer):not(.mat-sidenav),
+.is-active:hover:not(.mat-drawer):not(.mat-sidenav),
+.activo:not(.mat-drawer):not(.mat-sidenav),
+.activo:hover:not(.mat-drawer):not(.mat-sidenav) {
   transform: none !important;
   translate: none !important;
   scale: none !important;
@@ -34,6 +35,11 @@ html {
 *::before,
 *::after {
   transition-property: color, background-color, background, border-color, outline-color, fill, stroke, opacity !important;
+}
+
+.mat-drawer,
+.mat-sidenav {
+  transition-property: transform, visibility, width, margin, box-shadow !important;
 }
 
 /* Hover plano: sin sombra flotante ni elevación */
