@@ -1,26 +1,40 @@
 /**
  * PDF de cotización Escuela Aves Salento.
- * Dibuja la plantilla con formas + texto + assets (logo/foto decorativa).
- * Multipágina: mismos colores, tipografía, header y footer; totales solo al final.
+ *
+ * Dibuja la plantilla oficial `plantilla-cotizacion.jpg` a tamaño completo y
+ * después tapa **solo** las zonas de `[placeholder]` que tienen valor, pintando
+ * el texto encima con la misma tipografía y tinta que la vista editable.
+ * No se reconstruye ningún layout: la imagen es el documento.
  */
+import {
+  CLIENT_FIELDS,
+  META_FIELDS,
+  PAY_FIELDS,
+  QUOTE_MAX_ROWS,
+  ROW_CELLS,
+  SHEET_H,
+  SHEET_INK,
+  SHEET_W,
+  TOTAL_FIELDS,
+  rowCellBox,
+  rowTint,
+  type FieldAlign,
+  type FieldBox
+} from './quote-layout';
 import { documentToDraft } from './quote-sheet.model';
 import type { QuoteSheetDocument } from './quote-sheet.model';
 import {
-  ESCUELA_AVES_COMPANY,
-  QUOTE_HERO_BIRD,
-  QUOTE_LOGO,
   QUOTE_TEMPLATE_IMAGE,
   fillQuoteTemplate,
-  type FilledQuoteTemplate,
-  type QuoteLineItem,
   type QuoteTemplateInput
 } from './quote-template';
 
 export type QuotePdfData = QuoteTemplateInput | QuoteSheetDocument;
 
-const PAGE_W = 794;
-const PAGE_H = 1123;
-const ROWS_PER_PAGE = 6;
+/** Se renderiza a 2× la plantilla para que el texto salga nítido. */
+const SCALE = 2;
+const FONT_STACK = '"Segoe UI", Calibri, Candara, Arial, sans-serif';
+const PAD = 2;
 
 export async function downloadQuotePdf(data: QuotePdfData): Promise<void> {
   const blob = await buildQuotePdfBlob(data);
@@ -31,55 +45,58 @@ export async function downloadQuotePdf(data: QuotePdfData): Promise<void> {
 }
 
 export async function buildQuotePdfBlob(data: QuotePdfData): Promise<Blob> {
+  const values = resolveValues(data);
+  const plantilla = await loadImage(QUOTE_TEMPLATE_IMAGE);
+  const page = await renderSheet(values, plantilla);
+  return jpegPagesToPdf([page]);
+}
+
+interface SheetRowValues {
+  description: string;
+  quantity: string;
+  unitPrice: string;
+  total: string;
+}
+
+interface SheetValues {
+  text: Record<string, string>;
+  rows: SheetRowValues[];
+  subtotal: string;
+  iva: string;
+  grand: string;
+  hasMoney: boolean;
+}
+
+function resolveValues(data: QuotePdfData): SheetValues {
   const input = toInput(data);
   const filled = fillQuoteTemplate(input);
-  const items = filled.items.length
-    ? filled.items
-    : [
-        {
-          description: '',
-          quantity: '',
-          unit: '',
-          unitPrice: '',
-          discount: '',
-          total: '',
-          rawQuantity: 0,
-          rawUnitPrice: 0,
-          rawDiscount: 0,
-          rawTotal: 0
-        } as QuoteLineItem
-      ];
-
-  const chunks: QuoteLineItem[][] = [];
-  for (let i = 0; i < items.length; i += ROWS_PER_PAGE) {
-    chunks.push(items.slice(i, i + ROWS_PER_PAGE));
+  const rows = filled.items.slice(0, QUOTE_MAX_ROWS).map((item) => ({
+    description: item.description || '',
+    quantity: item.quantity ? [item.quantity, item.unit].filter(Boolean).join(' ') : '',
+    unitPrice: item.unitPrice || '',
+    total: item.total || ''
+  }));
+  while (rows.length < QUOTE_MAX_ROWS) {
+    rows.push({ description: '', quantity: '', unitPrice: '', total: '' });
   }
-  if (!chunks.length) {
-    chunks.push([]);
-  }
-
-  const [plantilla, logo, bird] = await Promise.all([
-    loadImage(QUOTE_TEMPLATE_IMAGE).catch(() => null),
-    loadImage(QUOTE_LOGO).catch(() => null),
-    loadImage(QUOTE_HERO_BIRD).catch(() => null)
-  ]);
-
-  const pages: Array<{ bytes: Uint8Array; width: number; height: number }> = [];
-  for (let p = 0; p < chunks.length; p++) {
-    pages.push(
-      await renderPage({
-        filled,
-        rows: chunks[p],
-        pageIndex: p,
-        pageCount: chunks.length,
-        itemOffset: p * ROWS_PER_PAGE,
-        plantilla,
-        logo,
-        bird
-      })
-    );
-  }
-  return jpegPagesToPdf(pages);
+  return {
+    text: {
+      quoteNumber: undash(filled.quoteNumber),
+      issuedAt: undash(filled.issuedAt),
+      validUntil: undash(filled.validUntil),
+      clientName: undash(filled.clientName),
+      clientNit: undash(filled.clientNit),
+      clientPhone: undash(filled.clientPhone),
+      clientEmail: undash(filled.clientEmail),
+      clientCity: undash(filled.clientCity),
+      commercialConditions: undash(input.commercialConditions)
+    },
+    rows,
+    subtotal: filled.subtotal,
+    iva: filled.iva,
+    grand: filled.total,
+    hasMoney: filled.rawTotal > 0
+  };
 }
 
 function toInput(data: QuotePdfData): QuoteTemplateInput {
@@ -90,19 +107,12 @@ function toInput(data: QuotePdfData): QuoteTemplateInput {
   return data as QuoteTemplateInput;
 }
 
-async function renderPage(opts: {
-  filled: FilledQuoteTemplate;
-  rows: QuoteLineItem[];
-  pageIndex: number;
-  pageCount: number;
-  itemOffset: number;
-  plantilla: HTMLImageElement | null;
-  logo: HTMLImageElement | null;
-  bird: HTMLImageElement | null;
-}): Promise<{ bytes: Uint8Array; width: number; height: number }> {
-  const { filled, rows, pageIndex, pageCount, itemOffset, plantilla, logo, bird } = opts;
-  const width = PAGE_W;
-  const height = PAGE_H;
+async function renderSheet(
+  values: SheetValues,
+  plantilla: HTMLImageElement
+): Promise<{ bytes: Uint8Array; width: number; height: number }> {
+  const width = SHEET_W * SCALE;
+  const height = SHEET_H * SCALE;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -110,243 +120,167 @@ async function renderPage(opts: {
   if (!ctx) {
     throw new Error('No se pudo dibujar la cotización');
   }
-  const company = ESCUELA_AVES_COMPANY;
-  const isLast = pageIndex === pageCount - 1;
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(plantilla, 0, 0, width, height);
+  ctx.textBaseline = 'middle';
 
-  // Header (identidad protegida)
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, width, 188);
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillRect(width * 0.62, 0, width * 0.38, 188);
-  if (bird) {
-    drawCover(ctx, bird, width * 0.38, 0, width * 0.36, 188);
-  } else if (plantilla) {
-    ctx.drawImage(plantilla, 305, 8, 195, 165, width * 0.38, 0, width * 0.36, 188);
-  }
-  if (logo) {
-    ctx.drawImage(logo, 36, 36, 176, 92);
-  } else {
-    ctx.fillStyle = '#0b3d28';
-    ctx.font = '700 22px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillText('escuelaaves', 40, 80);
-  }
-  ctx.fillStyle = '#5a6b60';
-  ctx.font = 'italic 13px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText('Naturaleza que inspira', 40, 148);
-
-  const gold = ctx.createLinearGradient(0, 188, width, 196);
-  gold.addColorStop(0, '#b8922a');
-  gold.addColorStop(0.5, '#c9a227');
-  gold.addColorStop(1, '#e0c36a');
-  ctx.fillStyle = gold;
-  ctx.fillRect(0, 188, width, 8);
-
-  ctx.fillStyle = '#0b3d28';
-  ctx.font = '800 28px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText(pageIndex === 0 ? 'COTIZACIÓN' : 'COTIZACIÓN (continuación)', 48, 236);
-  ctx.fillStyle = '#5a6b60';
-  ctx.font = '400 13px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText(company.tagline, 48, 256);
-  if (pageCount > 1) {
-    ctx.fillText(`Página ${pageIndex + 1} de ${pageCount}`, 48, 274);
-  }
-
-  ctx.textAlign = 'left';
-  drawMeta(ctx, width - 280, 220, 'N.º Cotización:', filled.quoteNumber);
-  drawMeta(ctx, width - 280, 242, 'Fecha de emisión:', filled.issuedAt);
-  drawMeta(ctx, width - 280, 264, 'Válida hasta:', filled.validUntil);
-
-  let tableTop = 300;
-  if (pageIndex === 0) {
-    ctx.font = '800 15px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillStyle = '#0b3d28';
-    ctx.fillText('Datos del cliente', 48, 300);
-    ctx.fillText('Nuestra información', width / 2 + 10, 300);
-    const clientY = 322;
-    if (filled.clientName) drawKv(ctx, 48, clientY, 'Nombre:', filled.clientName);
-    if (filled.clientNit) drawKv(ctx, 48, clientY + 22, 'NIT / C.C.:', filled.clientNit);
-    if (filled.clientPhone) drawKv(ctx, 48, clientY + 44, 'Teléfono:', filled.clientPhone);
-    if (filled.clientEmail) drawKv(ctx, 48, clientY + 66, 'Correo:', filled.clientEmail);
-    if (filled.clientCity) drawKv(ctx, 48, clientY + 88, 'Ciudad:', filled.clientCity);
-
-    ctx.font = '800 13px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillStyle = '#0b3d28';
-    ctx.fillText(company.legalName, width / 2 + 10, clientY);
-    ctx.font = '400 12px "Segoe UI", Calibri, Arial, sans-serif';
-    drawKv(ctx, width / 2 + 10, clientY + 22, 'NIT:', company.nit);
-    drawKv(ctx, width / 2 + 10, clientY + 44, 'Dirección:', company.address);
-    drawKv(ctx, width / 2 + 10, clientY + 66, 'Teléfono:', company.phone);
-    drawKv(ctx, width / 2 + 10, clientY + 88, 'Correo:', company.email);
-    tableTop = 450;
-  }
-
-  ctx.fillStyle = '#0b3d28';
-  ctx.font = '800 15px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText('Detalle de la cotización', 48, tableTop);
-  const cols = [
-    { x: 48, title: 'Ítem' },
-    { x: 98, title: 'Descripción' },
-    { x: 398, title: 'Cantidad' },
-    { x: 488, title: 'Valor unitario' },
-    { x: 608, title: 'Valor total' }
-  ];
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillRect(48, tableTop + 10, width - 96, 28);
-  ctx.fillStyle = '#f6efe2';
-  ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
-  cols.forEach((col) => ctx.fillText(col.title, col.x + 8, tableTop + 28));
-
-  const displayRows = [...rows];
-  while (displayRows.length < Math.min(ROWS_PER_PAGE, 5) && pageIndex === 0 && pageCount === 1) {
-    displayRows.push({
-      description: '',
-      quantity: '',
-      unit: '',
-      unitPrice: '',
-      discount: '',
-      total: '',
-      rawQuantity: 0,
-      rawUnitPrice: 0,
-      rawDiscount: 0,
-      rawTotal: 0
+  for (const spec of [...META_FIELDS, ...CLIENT_FIELDS, ...PAY_FIELDS]) {
+    const text = values.text[spec.key];
+    if (!text) {
+      continue;
+    }
+    cover(ctx, spec.box, spec.tint);
+    paint(ctx, text, spec.box, {
+      align: spec.align,
+      fs: spec.fs,
+      weight: 600,
+      ink: SHEET_INK.body
     });
   }
 
-  displayRows.forEach((item, i) => {
-    const y = tableTop + 38 + i * 42;
-    ctx.fillStyle = i % 2 ? '#f4f7f4' : '#ffffff';
-    ctx.fillRect(48, y, width - 96, 42);
-    ctx.fillStyle = '#c9a227';
-    ctx.beginPath();
-    ctx.arc(73, y + 21, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(String(itemOffset + i + 1), 73, y + 25);
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#1a2c22';
-    ctx.font = '400 11px "Segoe UI", Calibri, Arial, sans-serif';
-    fillWrapped(ctx, item.description || '—', 106, y + 16, 280, 13, 'left');
-    ctx.textAlign = 'center';
-    ctx.fillText(item.quantity || '—', 443, y + 25);
-    ctx.textAlign = 'right';
-    ctx.fillText(item.unitPrice || '—', 600, y + 25);
-    ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillText(item.total || '—', 738, y + 25);
-    ctx.textAlign = 'left';
-  });
-
-  let cursorY = tableTop + 38 + displayRows.length * 42 + 24;
-
-  if (isLast) {
-    const trust = [
-      'Guías expertos en aviturismo',
-      'Seguridad en todo el recorrido',
-      'Experiencias sostenibles',
-      'Atención personalizada'
-    ];
-    ctx.fillStyle = '#0b3d28';
-    ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
-    trust.forEach((text, i) => {
-      const col = i % 2;
-      const row = Math.floor(i / 2);
-      ctx.fillText(text, 48 + col * 200, cursorY + row * 20);
-    });
-
-    ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillStyle = '#5a6b60';
-    ctx.textAlign = 'right';
-    ctx.fillText('Subtotal', 620, cursorY);
-    ctx.fillText('IVA (19%)', 620, cursorY + 20);
-    ctx.fillStyle = '#1a2c22';
-    ctx.fillText(filled.subtotal, 738, cursorY);
-    ctx.fillText(filled.iva, 738, cursorY + 20);
-    ctx.strokeStyle = '#0b3d28';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(560, cursorY + 28);
-    ctx.lineTo(738, cursorY + 28);
-    ctx.stroke();
-    ctx.fillStyle = '#0b3d28';
-    ctx.font = '800 16px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillText('Total', 620, cursorY + 48);
-    ctx.fillText(filled.total, 738, cursorY + 48);
-    ctx.textAlign = 'left';
-
-    const payY = cursorY + 78;
-    ctx.fillStyle = '#0b3d28';
-    ctx.font = '800 14px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillText('Condiciones y forma de pago', 48, payY);
-    ctx.font = '400 11px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillStyle = '#1a2c22';
-    const paymentLines = [...company.payment];
-    paymentLines.slice(0, 6).forEach((line, i) => {
-      ctx.fillText(`• ${line.replace(/^•\s*/, '')}`, 48, payY + 20 + i * 16);
+  // La tabla se tapa completa o no se toca: dejar "[Descripción del servicio…]"
+  // en los renglones sobrantes se vería roto junto a un ítem real.
+  if (values.rows.some((row) => row.description || row.unitPrice || row.total)) {
+    values.rows.forEach((row, index) => {
+      const tint = rowTint(index);
+      const descBox = rowCellBox(index, 'description');
+      cover(ctx, descBox, tint);
+      if (row.description) {
+        paintDescription(ctx, row.description, descBox);
+      }
+      paintCell(ctx, row.quantity, index, 'quantity', tint, 600);
+      paintCell(ctx, row.unitPrice, index, 'unitPrice', tint, 600);
+      paintCell(ctx, row.total, index, 'total', tint, 700);
     });
   }
 
-  // Footer protegido
-  ctx.fillStyle = '#07261a';
-  ctx.fillRect(0, height - 128, width, 36);
-  ctx.fillStyle = '#f4efe4';
-  ctx.font = '400 11px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText(company.phone, 48, height - 106);
-  ctx.fillText(company.email, 250, height - 106);
-  ctx.fillText(company.address, 520, height - 106);
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillRect(0, height - 92, width, 92);
-  if (plantilla) {
-    // Solo la franja de paisaje de la plantilla, sin el texto dorado ya impreso al costado.
-    ctx.drawImage(plantilla, 0, 935, 520, 89, 0, height - 92, width * 0.76, 92);
+  if (values.hasMoney) {
+    const money: Record<string, string> = {
+      subtotal: values.subtotal,
+      iva: values.iva,
+      grand: values.grand
+    };
+    for (const spec of TOTAL_FIELDS) {
+      cover(ctx, spec.box, spec.tint);
+      paint(ctx, money[spec.key], spec.box, {
+        align: 'right',
+        fs: spec.fs,
+        weight: spec.bold ? 800 : 600,
+        ink: spec.ink
+      });
+    }
   }
-  ctx.fillStyle = '#f6efe2';
-  ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(company.footerLine, width - 24, height - 18);
-  ctx.textAlign = 'left';
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       (out) => (out ? resolve(out) : reject(new Error('No se pudo exportar la cotización'))),
       'image/jpeg',
-      0.94
+      0.95
     );
   });
   return { bytes: new Uint8Array(await blob.arrayBuffer()), width, height };
 }
 
-function drawMeta(ctx: CanvasRenderingContext2D, x: number, y: number, label: string, value: string): void {
-  ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillText(label, x, y);
-  ctx.font = '400 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#1a2c22';
-  ctx.fillText(value || '—', x + 118, y);
-}
-
-function drawKv(ctx: CanvasRenderingContext2D, x: number, y: number, label: string, value: string): void {
-  ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillText(label, x, y);
-  ctx.font = '400 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#1a2c22';
-  ctx.fillText(value || '—', x + 78, y);
-}
-
-function fillWrapped(
+function paintCell(
   ctx: CanvasRenderingContext2D,
   text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-  align: 'left' | 'right' | 'center'
+  index: number,
+  key: 'quantity' | 'unitPrice' | 'total',
+  tint: string,
+  weight: number
 ): void {
-  const words = (text || '—').split(/\s+/);
+  const spec = ROW_CELLS[key];
+  const box = rowCellBox(index, key);
+  cover(ctx, box, tint);
+  if (text) {
+    paint(ctx, text, box, { align: spec.align, fs: spec.fs, weight, ink: SHEET_INK.body });
+  }
+}
+
+/** Tapa la zona del placeholder con el color de fondo local de la plantilla. */
+function cover(ctx: CanvasRenderingContext2D, box: FieldBox, tint: string): void {
+  ctx.fillStyle = tint;
+  ctx.fillRect(box.x * SCALE, box.y * SCALE, box.w * SCALE, box.h * SCALE);
+}
+
+interface PaintOpts {
+  align: FieldAlign;
+  fs: number;
+  weight: number;
+  ink: string;
+}
+
+function paint(ctx: CanvasRenderingContext2D, text: string, box: FieldBox, opts: PaintOpts): void {
+  const maxWidth = (box.w - PAD * 2) * SCALE;
+  const size = fitFont(ctx, text, maxWidth, opts.fs, opts.weight);
+  ctx.fillStyle = opts.ink;
+  ctx.font = font(size, opts.weight);
+  ctx.textAlign = opts.align === 'left' ? 'left' : opts.align === 'right' ? 'right' : 'center';
+  const x =
+    opts.align === 'left'
+      ? (box.x + PAD) * SCALE
+      : opts.align === 'right'
+        ? (box.x + box.w - PAD) * SCALE
+        : (box.x + box.w / 2) * SCALE;
+  ctx.fillText(ellipsize(ctx, text, maxWidth), x, (box.y + box.h / 2) * SCALE, maxWidth);
+  ctx.textAlign = 'left';
+}
+
+/** La descripción usa los dos renglones que la plantilla ya tiene impresos. */
+function paintDescription(ctx: CanvasRenderingContext2D, text: string, box: FieldBox): void {
+  const spec = ROW_CELLS.description;
+  const maxWidth = (box.w - PAD * 2) * SCALE;
+  const size = spec.fs;
+  ctx.font = font(size, 500);
+  const lines = wrap(ctx, text.replace(/\s*\n\s*/g, ' '), maxWidth, 2);
+  ctx.fillStyle = SHEET_INK.body;
+  ctx.textAlign = 'left';
+  const x = (box.x + PAD) * SCALE;
+  // Los dos renglones caen exactamente donde la plantilla los tiene impresos.
+  const centers = [box.y + 8.5, box.y + 8.5 + spec.lh];
+  lines.forEach((line, i) => {
+    ctx.fillText(i === lines.length - 1 ? ellipsize(ctx, line, maxWidth) : line, x, centers[i] * SCALE, maxWidth);
+  });
+}
+
+function font(sizePx: number, weight: number): string {
+  return `${weight} ${(sizePx * SCALE).toFixed(2)}px ${FONT_STACK}`;
+}
+
+/** Reduce un poco la fuente antes de recortar, como haría el navegador. */
+function fitFont(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  base: number,
+  weight: number
+): number {
+  let size = base;
+  for (let i = 0; i < 6; i++) {
+    ctx.font = font(size, weight);
+    if (ctx.measureText(text).width <= maxWidth) {
+      return size;
+    }
+    size -= base * 0.06;
+  }
+  return size;
+}
+
+function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  if (ctx.measureText(text).width <= maxWidth) {
+    return text;
+  }
+  let out = text;
+  while (out.length > 1 && ctx.measureText(`${out}…`).width > maxWidth) {
+    out = out.slice(0, -1);
+  }
+  return `${out.trimEnd()}…`;
+}
+
+function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let row = '';
   for (const word of words) {
@@ -354,41 +288,29 @@ function fillWrapped(
     if (ctx.measureText(next).width > maxWidth && row) {
       lines.push(row);
       row = word;
+      if (lines.length === maxLines) {
+        break;
+      }
     } else {
       row = next;
     }
   }
-  if (row) {
+  if (lines.length < maxLines && row) {
     lines.push(row);
   }
-  lines.slice(0, 3).forEach((line, i) => {
-    ctx.textAlign = align;
-    ctx.fillText(line, x, y + i * lineHeight, maxWidth);
-  });
-  ctx.textAlign = 'left';
+  return lines.length ? lines : [''];
 }
 
-function drawCover(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  dx: number,
-  dy: number,
-  dw: number,
-  dh: number
-): void {
-  const scale = Math.max(dw / img.width, dh / img.height);
-  const sw = dw / scale;
-  const sh = dh / scale;
-  const sx = Math.max(0, (img.width - sw) / 2);
-  const sy = Math.max(0, (img.height - sh) * 0.35);
-  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+function undash(value?: string): string {
+  const text = (value || '').trim();
+  return text === '—' ? '' : text;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('No se encontró un recurso de la plantilla'));
+    img.onerror = () => reject(new Error('No se encontró la plantilla de cotización'));
     img.src = src;
   });
 }
