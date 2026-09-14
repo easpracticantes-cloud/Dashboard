@@ -177,7 +177,7 @@ def extract_invoice_hints(ocr_text: str) -> dict[str, Any]:
 
 
 def merge_hints_into_extraction(extracted: dict[str, Any], hints: dict[str, Any]) -> dict[str, Any]:
-    """Rellena solo campos vacíos/nulos del JSON IA con heurísticas OCR."""
+    """Rellena vacíos y corrige totales IA ×10 típicos al mal parsear 14,300.00."""
     out = dict(extracted or {})
     for key, value in hints.items():
         current = out.get(key)
@@ -194,6 +194,27 @@ def merge_hints_into_extraction(extracted: dict[str, Any], hints: dict[str, Any]
             if not prov.get("nit"):
                 prov["nit"] = value
                 out["proveedor"] = prov
+        if key in {"total", "subtotal", "impuesto"} and isinstance(value, (int, float)):
+            corrected = _prefer_ocr_amount(current, value)
+            if corrected is not None:
+                out[key] = corrected
     if hints:
         out["_ocr_hints"] = hints
     return out
+
+
+def _prefer_ocr_amount(ai_val: Any, ocr_val: float) -> float | None:
+    """Si la IA está a ×10/×100 del OCR (bug 14300.0→143000), quédate con OCR."""
+    try:
+        ai = float(ai_val)
+        ocr = float(ocr_val)
+    except (TypeError, ValueError):
+        return None
+    if ocr <= 0:
+        return None
+    if abs(ai - ocr) <= max(1.0, ocr * 0.02):
+        return ocr
+    for factor in (10, 100, 1000):
+        if abs(ai - ocr * factor) <= max(1.0, ocr * factor * 0.02):
+            return ocr
+    return None

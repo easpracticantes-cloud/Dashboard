@@ -152,16 +152,17 @@ def _math_consistent(extracted: dict) -> bool | None:
 
 
 def _to_float(value) -> float | None:
+    """Convierte montos IA/OCR sin destruir decimales de floats (14300.0 ≠ 143000)."""
+    from domain.utils.money import money_to_float, to_money_or_none
+
     if value is None or value == "":
         return None
-    raw = str(value).replace("$", "").replace(" ", "")
-    try:
-        return float(raw.replace(",", ""))
-    except ValueError:
-        try:
-            return float(raw.replace(".", "").replace(",", "."))
-        except ValueError:
-            return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    parsed = to_money_or_none(value)
+    return money_to_float(parsed) if parsed is not None else None
 
 
 def _looks_numeric(value) -> bool:

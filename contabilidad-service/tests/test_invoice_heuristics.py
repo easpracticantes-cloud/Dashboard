@@ -61,4 +61,20 @@ def test_extract_invoice_en_ingles_y_oc():
     hints = extract_invoice_hints(texto)
     assert "8891" in hints.get("numero_factura", "")
     assert hints.get("compra")
-    assert hints.get("total") in (2500.0, 250000.0) or (hints.get("total") or 0) >= 2500
+    assert hints.get("total") == 2500.0
+
+
+def test_us_total_fourteen_thousand_three_hundred():
+    """14,300.00 (US) debe ser 14300, nunca 143000."""
+    from domain.services.invoice_heuristics import _parse_money, merge_hints_into_extraction
+    from infrastructure.persistence.repositories import _to_float
+
+    assert _parse_money("14,300.00") == 14300.0
+    assert _parse_money("14.300,00") == 14300.0
+    assert _parse_money("14.300") == 14300.0
+    assert _to_float(14300.0) == 14300.0
+    assert _to_float("14,300.00") == 14300.0
+    assert _to_float("14300.0") == 14300.0
+
+    merged = merge_hints_into_extraction({"total": 143000.0}, {"total": 14300.0})
+    assert merged["total"] == 14300.0
