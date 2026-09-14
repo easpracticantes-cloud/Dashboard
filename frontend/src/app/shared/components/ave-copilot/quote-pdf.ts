@@ -1,6 +1,5 @@
 /**
- * PDF = plantilla JPG oficial + valores dinámicos encima.
- * No redibuja el diseño: usa la imagen de marca tal cual.
+ * PDF = JPG oficial + valores en coordenadas calibradas (682×1024).
  */
 import { documentToDraft } from './quote-sheet.model';
 import type { QuoteSheetDocument } from './quote-sheet.model';
@@ -15,6 +14,8 @@ import {
 export type QuotePdfData = QuoteTemplateInput | QuoteSheetDocument;
 
 const MAX_ROWS = 5;
+const PANEL = '#eef3ec';
+const INK = '#1a2c22';
 
 export async function downloadQuotePdf(data: QuotePdfData): Promise<void> {
   const blob = await buildQuotePdfBlob(data);
@@ -25,8 +26,7 @@ export async function downloadQuotePdf(data: QuotePdfData): Promise<void> {
 }
 
 export async function buildQuotePdfBlob(data: QuotePdfData): Promise<Blob> {
-  const input = toInput(data);
-  const filled = fillQuoteTemplate(input);
+  const filled = fillQuoteTemplate(toInput(data));
   const plantilla = await loadImage(QUOTE_TEMPLATE_IMAGE);
   const page = await renderOnPlantilla(filled, plantilla);
   return jpegPagesToPdf([page]);
@@ -56,60 +56,59 @@ async function renderOnPlantilla(
 
   ctx.drawImage(plantilla, 0, 0, width, height);
 
-  const px = (pct: number) => (pct / 100) * width;
-  const py = (pct: number) => (pct / 100) * height;
+  const x = (pct: number) => (pct / 100) * width;
+  const y = (pct: number) => (pct / 100) * height;
 
-  // Cubrir datos de ejemplo de la JPG y pintar valores reales
-  const cover = (x: number, y: number, w: number, h: number, color: string) => {
+  const cover = (px: number, py: number, pw: number, ph: number, color: string) => {
     ctx.fillStyle = color;
-    ctx.fillRect(x, y, w, h);
+    ctx.fillRect(px, py, pw, ph);
   };
 
-  const panel = '#eef3ef';
-  const ink = '#1a2c22';
-
-  // Meta values
-  cover(px(68.5), py(20.2), px(26), py(6.2), panel);
-  drawText(ctx, filled.quoteNumber, px(69), py(21.5), px(24), 13, ink, 'left');
-  drawText(ctx, filled.issuedAt, px(69), py(23.6), px(24), 13, ink, 'left');
-  drawText(ctx, filled.validUntil, px(69), py(25.7), px(24), 13, ink, 'left');
+  // Meta
+  cover(x(74.5), y(21.5), x(21.5), y(6.2), PANEL);
+  write(ctx, clean(filled.quoteNumber), x(74.7), y(21.7), x(21), 12, INK, 'left');
+  write(ctx, clean(filled.issuedAt), x(74.7), y(23.7), x(21), 12, INK, 'left');
+  write(ctx, clean(filled.validUntil), x(74.7), y(25.7), x(21), 12, INK, 'left');
 
   // Cliente
-  cover(px(13.5), py(31.6), px(30), py(11.5), panel);
-  const clientLines = [
-    filled.clientName,
-    filled.clientNit,
-    filled.clientPhone,
-    filled.clientEmail,
-    filled.clientCity
+  cover(x(15.8), y(32.6), x(28.5), y(11.8), PANEL);
+  const client = [
+    clean(filled.clientName),
+    clean(filled.clientNit),
+    clean(filled.clientPhone),
+    clean(filled.clientEmail),
+    clean(filled.clientCity)
   ];
-  clientLines.forEach((line, i) => {
-    drawText(ctx, dash(line), px(14), py(32.8 + i * 2.15), px(28), 12, ink, 'left');
-  });
+  client.forEach((line, i) => write(ctx, line, x(16), y(33 + i * 2.15), x(27.5), 12, INK, 'left'));
 
   // Filas
-  cover(px(5.8), py(53.2), px(88.5), py(16.5), '#ffffff');
+  const rowTops = [50.1, 54.5, 58.9, 63.3, 67.8];
   const rows = filled.items.slice(0, MAX_ROWS);
-  rows.forEach((row, i) => {
-    const y = py(53.4 + i * 3.25);
-    if (i % 2 === 1) {
-      cover(px(5.8), y - py(0.3), px(88.5), py(3.2), '#f2f7f3');
+  rowTops.forEach((top, i) => {
+    const row = rows[i];
+    const band = y(top);
+    const h = y(3.6);
+    const bg = i % 2 === 1 ? '#f2f7f3' : '#ffffff';
+    cover(x(14.7), band, x(81.7), h, bg);
+    if (!row) {
+      return;
     }
-    drawText(ctx, row.description || '', px(12.5), y, px(40), 11, ink, 'left');
-    drawText(ctx, qty(row), px(54), y, px(10), 11, ink, 'right');
-    drawText(ctx, row.unitPrice || '', px(65), y, px(12), 11, ink, 'right');
-    drawText(ctx, row.total || '', px(79), y, px(13), 11, ink, 'right');
+    write(ctx, clean(row.description), x(14.9), band + y(0.35), x(39.5), 11, INK, 'left', true);
+    write(ctx, qty(row), x(56.5), band + y(0.6), x(11.5), 11, INK, 'right');
+    write(ctx, clean(row.unitPrice), x(69.2), band + y(0.6), x(14.5), 11, INK, 'right');
+    write(ctx, clean(row.total), x(84.9), band + y(0.6), x(11.5), 11, INK, 'right');
   });
 
   // Totales
-  cover(px(70), py(70.8), px(24), py(7.2), panel);
-  cover(px(70), py(75.6), px(24), py(2.4), '#0b3d28');
-  drawText(ctx, filled.subtotal, px(71), py(71.8), px(22), 12, ink, 'right');
-  drawText(ctx, filled.iva, px(71), py(73.7), px(22), 12, ink, 'right');
-  drawText(ctx, filled.total, px(71), py(76.4), px(22), 13, '#f6efe2', 'right');
+  cover(x(78), y(72.2), x(17.5), y(5.8), PANEL);
+  cover(x(78), y(76.6), x(17.5), y(2.1), '#0b3d28');
+  if (filled.rawTotal > 0) {
+    write(ctx, filled.subtotal, x(78.2), y(72.5), x(17), 12, INK, 'right');
+    write(ctx, filled.iva, x(78.2), y(74.4), x(17), 12, INK, 'right');
+    write(ctx, filled.total, x(78.2), y(76.9), x(17), 13, '#f6efe2', 'right');
+  }
 
-  const bytes = await canvasToJpeg(canvas);
-  return { bytes, width, height };
+  return { bytes: await canvasToJpeg(canvas), width, height };
 }
 
 function qty(row: QuoteLineItem): string {
@@ -119,54 +118,53 @@ function qty(row: QuoteLineItem): string {
   return row.unit ? `${row.quantity} ${row.unit}` : row.quantity;
 }
 
-function dash(value: string): string {
+function clean(value?: string): string {
   const v = (value || '').trim();
   return !v || v === '—' ? '' : v;
 }
 
-function drawText(
+function write(
   ctx: CanvasRenderingContext2D,
   text: string,
-  x: number,
-  y: number,
+  left: number,
+  top: number,
   maxWidth: number,
   size: number,
   color: string,
-  align: CanvasTextAlign
+  align: CanvasTextAlign,
+  wrap = false
 ): void {
+  if (!text) {
+    return;
+  }
   ctx.fillStyle = color;
   ctx.font = `600 ${size}px "Segoe UI", Calibri, Arial, sans-serif`;
   ctx.textAlign = align;
   ctx.textBaseline = 'top';
-  const drawX = align === 'right' ? x + maxWidth : x;
-  const value = String(text || '');
-  if (!value) {
+  const drawX = align === 'right' ? left + maxWidth : left;
+  if (!wrap || ctx.measureText(text).width <= maxWidth) {
+    ctx.fillText(text, drawX, top, maxWidth);
     return;
   }
-  // wrap description a 2 líneas
-  if (align === 'left' && ctx.measureText(value).width > maxWidth) {
-    const words = value.split(/\s+/);
-    let line = '';
-    let row = 0;
-    for (const word of words) {
-      const next = line ? `${line} ${word}` : word;
-      if (ctx.measureText(next).width > maxWidth && line) {
-        ctx.fillText(line, drawX, y + row * (size + 2), maxWidth);
-        line = word;
-        row += 1;
-        if (row >= 2) {
-          return;
-        }
-      } else {
-        line = next;
+  const words = text.split(/\s+/);
+  let line = '';
+  let row = 0;
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word;
+    if (ctx.measureText(next).width > maxWidth && line) {
+      ctx.fillText(line, drawX, top + row * (size + 2), maxWidth);
+      line = word;
+      row += 1;
+      if (row >= 2) {
+        return;
       }
+    } else {
+      line = next;
     }
-    if (line && row < 2) {
-      ctx.fillText(line, drawX, y + row * (size + 2), maxWidth);
-    }
-    return;
   }
-  ctx.fillText(value, drawX, y, maxWidth);
+  if (line && row < 2) {
+    ctx.fillText(line, drawX, top + row * (size + 2), maxWidth);
+  }
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -189,7 +187,7 @@ function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Uint8Array> {
         resolve(new Uint8Array(await blob.arrayBuffer()));
       },
       'image/jpeg',
-      0.92
+      0.94
     );
   });
 }
@@ -198,20 +196,17 @@ function jpegPagesToPdf(pages: Array<{ bytes: Uint8Array; width: number; height:
   const pageW = 595;
   const objects: Uint8Array[] = [];
   objects.push(ascii('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'));
-
   const pageObjIds: number[] = [];
   let nextId = 3;
   for (let i = 0; i < pages.length; i++) {
     pageObjIds.push(nextId);
     nextId += 3;
   }
-
   let kids = '';
   for (const id of pageObjIds) {
     kids += `${id} 0 R `;
   }
   objects.push(ascii(`2 0 obj\n<< /Type /Pages /Kids [ ${kids}] /Count ${pages.length} >>\nendobj\n`));
-
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
     const pageId = pageObjIds[i];
@@ -237,7 +232,6 @@ function jpegPagesToPdf(pages: Array<{ bytes: Uint8Array; width: number; height:
       ascii(`${contentId} 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`)
     );
   }
-
   let body = new Uint8Array(0);
   const offsets = [0];
   for (const obj of objects) {

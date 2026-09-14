@@ -1,125 +1,72 @@
 <article class="qs" [class.qs--edit]="editing()" aria-label="Cotización Escuela Aves Salento">
   <div class="qs-stage">
-    <img class="qs-stage__bg" [src]="plantilla" alt="Plantilla Escuela Aves Salento" draggable="false" />
+    <img class="qs-stage__bg" [src]="plantilla" width="682" height="1024" alt="" draggable="false" />
 
-    <!-- Meta -->
-    <div class="qs-f qs-f--meta">
-      <label>
-        @if (editing()) {
-          <input class="qs-in" type="text" [ngModel]="document().quoteNumber" (ngModelChange)="patch({ quoteNumber: $event })" placeholder="N.º" />
-        } @else {
-          <span>{{ dash(document().quoteNumber) }}</span>
-        }
-      </label>
-      <label>
-        @if (editing()) {
-          <input class="qs-in" type="date" [ngModel]="document().issuedAt" (ngModelChange)="patch({ issuedAt: $event })" />
-        } @else {
-          <span>{{ document().issuedAt ? dateText(document().issuedAt) : '—' }}</span>
-        }
-      </label>
-      <label>
-        @if (editing()) {
-          <input class="qs-in" type="date" [ngModel]="document().validUntil" (ngModelChange)="patch({ validUntil: $event })" />
-        } @else {
-          <span>{{ document().validUntil ? dateText(document().validUntil) : '—' }}</span>
-        }
-      </label>
-    </div>
-
-    <!-- Cliente -->
-    <div class="qs-f qs-f--client">
-      <label>
-        @if (editing()) {
-          <input class="qs-in" type="text" [ngModel]="document().clientName" (ngModelChange)="patch({ clientName: $event })" placeholder="Nombre" />
-        } @else {
-          <span>{{ dash(document().clientName) }}</span>
-        }
-      </label>
-      <label>
-        @if (editing()) {
-          <input class="qs-in" type="text" [ngModel]="document().clientNit" (ngModelChange)="patch({ clientNit: $event })" placeholder="NIT / C.C." />
-        } @else {
-          <span>{{ dash(document().clientNit) }}</span>
-        }
-      </label>
-      <label>
-        @if (editing()) {
-          <input class="qs-in" type="text" [ngModel]="document().clientPhone" (ngModelChange)="patch({ clientPhone: $event })" placeholder="Teléfono" />
-        } @else {
-          <span>{{ dash(document().clientPhone) }}</span>
-        }
-      </label>
-      <label>
-        @if (editing()) {
-          <input class="qs-in" type="email" [ngModel]="document().clientEmail" (ngModelChange)="patch({ clientEmail: $event })" placeholder="Correo" />
-        } @else {
-          <span>{{ dash(document().clientEmail) }}</span>
-        }
-      </label>
-      <label>
-        @if (editing()) {
-          <input class="qs-in" type="text" [ngModel]="document().clientCity" (ngModelChange)="patch({ clientCity: $event })" placeholder="Ciudad" />
-        } @else {
-          <span>{{ dash(document().clientCity) }}</span>
-        }
-      </label>
-    </div>
-
-    <!-- Líneas (hasta 5, como la plantilla) -->
-    <div class="qs-f qs-f--rows">
-      @for (item of sheetRows(); track item.id; let i = $index) {
-        <div class="qs-row">
-          <div class="qs-row__desc">
-            @if (editing()) {
-              <textarea
-                class="qs-in qs-in--area"
-                rows="2"
-                [ngModel]="item.description"
-                (ngModelChange)="patchItem(i, { description: $event })"
-                placeholder="Descripción"
-              ></textarea>
-            } @else {
-              <span>{{ dash(item.description) }}</span>
-            }
-          </div>
-          <div class="qs-row__qty">
-            @if (editing()) {
-              <input class="qs-in qs-in--num" type="number" min="0" [ngModel]="item.quantity" (ngModelChange)="patchItem(i, { quantity: +$event })" />
-            } @else {
-              <span>{{ item.quantity > 0 ? qtyLabel(item) : '' }}</span>
-            }
-          </div>
-          <div class="qs-row__price">
-            @if (editing()) {
-              <input class="qs-in qs-in--num" type="number" min="0" step="1000" [ngModel]="item.unitPrice" (ngModelChange)="patchItem(i, { unitPrice: +$event })" />
-            } @else {
-              <span>{{ moneyOrDash(item.unitPrice) }}</span>
-            }
-          </div>
-          <div class="qs-row__total">
-            <span>{{ moneyOrDash(item.total) }}</span>
-          </div>
-          @if (editing()) {
-            <div class="qs-row__tools">
-              <button type="button" class="qs-tiny" (click)="moveItem(i, -1)" [disabled]="i === 0" aria-label="Subir">↑</button>
-              <button type="button" class="qs-tiny" (click)="moveItem(i, 1)" [disabled]="i === sheetRows().length - 1" aria-label="Bajar">↓</button>
-              <button type="button" class="qs-tiny qs-tiny--danger" (click)="removeItem(i)" aria-label="Eliminar">×</button>
-            </div>
-          }
-        </div>
+    <!-- Meta (solo valores, labels ya están en la JPG) -->
+    <div class="qs-pad qs-pad--meta">
+      @if (editing()) {
+        <input class="qs-in" type="text" [ngModel]="document().quoteNumber" (ngModelChange)="patch({ quoteNumber: $event })" placeholder="—" />
+        <input class="qs-in" type="date" [ngModel]="document().issuedAt" (ngModelChange)="patch({ issuedAt: $event })" />
+        <input class="qs-in" type="date" [ngModel]="document().validUntil" (ngModelChange)="patch({ validUntil: $event })" />
+      } @else {
+        <span>{{ display(document().quoteNumber) }}</span>
+        <span>{{ document().issuedAt ? dateText(document().issuedAt) : '' }}</span>
+        <span>{{ document().validUntil ? dateText(document().validUntil) : '' }}</span>
       }
     </div>
 
-    @if (editing()) {
-      <button type="button" class="qs-add" (click)="addItem()" [disabled]="document().items.length >= 5">+ Agregar línea</button>
+    <!-- Cliente (solo valores) -->
+    <div class="qs-pad qs-pad--client">
+      @if (editing()) {
+        <input class="qs-in" type="text" [ngModel]="document().clientName" (ngModelChange)="patch({ clientName: $event })" placeholder="—" />
+        <input class="qs-in" type="text" [ngModel]="document().clientNit" (ngModelChange)="patch({ clientNit: $event })" placeholder="—" />
+        <input class="qs-in" type="text" [ngModel]="document().clientPhone" (ngModelChange)="patch({ clientPhone: $event })" placeholder="—" />
+        <input class="qs-in" type="email" [ngModel]="document().clientEmail" (ngModelChange)="patch({ clientEmail: $event })" placeholder="—" />
+        <input class="qs-in" type="text" [ngModel]="document().clientCity" (ngModelChange)="patch({ clientCity: $event })" placeholder="—" />
+      } @else {
+        <span>{{ display(document().clientName) }}</span>
+        <span>{{ display(document().clientNit) }}</span>
+        <span>{{ display(document().clientPhone) }}</span>
+        <span>{{ display(document().clientEmail) }}</span>
+        <span>{{ display(document().clientCity) }}</span>
+      }
+    </div>
+
+    <!-- Tabla: 5 filas fijas de plantilla -->
+    @for (item of sheetRows(); track item.id; let i = $index) {
+      <div class="qs-line" [attr.data-i]="i">
+        <div class="qs-line__desc">
+          @if (editing()) {
+            <textarea class="qs-in qs-in--area" rows="2" [ngModel]="item.description" (ngModelChange)="patchItem(i, { description: $event })" placeholder="—"></textarea>
+          } @else {
+            <span>{{ display(item.description) }}</span>
+          }
+        </div>
+        <div class="qs-line__qty">
+          @if (editing()) {
+            <input class="qs-in qs-in--num" type="number" min="0" [ngModel]="item.quantity || null" (ngModelChange)="patchItem(i, { quantity: +$event || 0 })" />
+          } @else {
+            <span>{{ item.quantity > 0 ? qtyLabel(item) : '' }}</span>
+          }
+        </div>
+        <div class="qs-line__price">
+          @if (editing()) {
+            <input class="qs-in qs-in--num" type="number" min="0" step="1000" [ngModel]="item.unitPrice || null" (ngModelChange)="patchItem(i, { unitPrice: +$event || 0 })" />
+          } @else {
+            <span>{{ moneyOrEmpty(item.unitPrice) }}</span>
+          }
+        </div>
+        <div class="qs-line__total">
+          <span>{{ moneyOrEmpty(item.total) }}</span>
+        </div>
+      </div>
     }
 
     <!-- Totales -->
-    <div class="qs-f qs-f--totals">
-      <span>{{ subtotalText() }}</span>
-      <span>{{ ivaText() }}</span>
-      <span class="qs-f--totals__grand">{{ totalText() }}</span>
+    <div class="qs-pad qs-pad--totals">
+      <span>{{ hasMoney() ? subtotalText() : '' }}</span>
+      <span>{{ hasMoney() ? ivaText() : '' }}</span>
+      <span class="qs-pad--totals__grand">{{ hasMoney() ? totalText() : '' }}</span>
     </div>
   </div>
 </article>

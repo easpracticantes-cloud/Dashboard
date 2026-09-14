@@ -4,13 +4,13 @@ import { documentTotals } from './quote-sheet.math';
 import {
   type QuoteSheetDocument,
   type QuoteSheetItem,
-  displayDash,
   emptyQuoteItem,
+  newItemId,
   recalcItem
 } from './quote-sheet.model';
 import { formatCop, formatQuoteDate, QUOTE_TEMPLATE_IMAGE } from './quote-template';
 
-const MAX_TEMPLATE_ROWS = 5;
+const MAX_ROWS = 5;
 
 @Component({
   selector: 'eas-quote-sheet',
@@ -26,72 +26,52 @@ export class QuoteSheetComponent {
 
   readonly plantilla = QUOTE_TEMPLATE_IMAGE;
 
-  /** Filas visibles sobre la plantilla (máx. 5). */
+  /** Siempre 5 filas alineadas a la plantilla. */
   readonly sheetRows = computed(() => {
-    const items = (this.document().items || []).map(recalcItem);
-    if (this.editing()) {
-      return items.slice(0, MAX_TEMPLATE_ROWS);
-    }
-    const padded = [...items.slice(0, MAX_TEMPLATE_ROWS)];
-    while (padded.length < Math.min(MAX_TEMPLATE_ROWS, Math.max(items.length, 1))) {
-      padded.push({
-        id: `pad-${padded.length}`,
+    const raw = (this.document().items || []).map(recalcItem).slice(0, MAX_ROWS);
+    const rows = [...raw];
+    while (rows.length < MAX_ROWS) {
+      rows.push({
+        id: `pad-${rows.length}`,
         description: '',
         quantity: 0,
-        unit: '',
+        unit: 'pax',
         unitPrice: 0,
         discount: 0,
         total: 0
       });
     }
-    return padded.length ? padded : items.slice(0, 1);
+    return rows;
   });
 
   readonly money = computed(() => documentTotals(this.document().items));
   readonly subtotalText = computed(() => formatCop(this.money().subtotal, this.document().currency));
   readonly ivaText = computed(() => formatCop(this.money().iva, this.document().currency));
   readonly totalText = computed(() => formatCop(this.money().total, this.document().currency));
+  readonly hasMoney = computed(() => this.money().total > 0);
 
-  dash = displayDash;
   dateText = formatQuoteDate;
+
+  display(value?: string | null): string {
+    const v = (value || '').trim();
+    return v && v !== '—' ? v : '';
+  }
 
   patch(partial: Partial<QuoteSheetDocument>): void {
     this.documentChange.emit({ ...this.document(), ...partial });
   }
 
   patchItem(index: number, partial: Partial<QuoteSheetItem>): void {
-    const items = this.document().items.map((item, i) =>
-      i === index ? recalcItem({ ...item, ...partial }) : item
-    );
-    this.documentChange.emit({ ...this.document(), items });
-  }
-
-  addItem(): void {
-    if (this.document().items.length >= MAX_TEMPLATE_ROWS) {
-      return;
+    const current = [...(this.document().items || [])];
+    while (current.length <= index) {
+      current.push(emptyQuoteItem());
     }
-    this.documentChange.emit({
-      ...this.document(),
-      items: [...this.document().items, emptyQuoteItem()]
-    });
-  }
-
-  removeItem(index: number): void {
-    const items = this.document().items.filter((_, i) => i !== index);
-    this.documentChange.emit({
-      ...this.document(),
-      items: items.length ? items : [emptyQuoteItem()]
-    });
-  }
-
-  moveItem(index: number, dir: -1 | 1): void {
-    const items = [...this.document().items];
-    const next = index + dir;
-    if (next < 0 || next >= items.length) {
-      return;
-    }
-    [items[index], items[next]] = [items[next], items[index]];
-    this.documentChange.emit({ ...this.document(), items });
+    // ensure real ids for previously padded slots
+    const base = current[index].id?.startsWith('pad-')
+      ? { ...emptyQuoteItem(), ...current[index], id: newItemId() }
+      : current[index];
+    current[index] = recalcItem({ ...base, ...partial });
+    this.documentChange.emit({ ...this.document(), items: current.filter((item, i) => i < MAX_ROWS) });
   }
 
   qtyLabel(item: QuoteSheetItem): string {
@@ -101,7 +81,7 @@ export class QuoteSheetComponent {
     return item.unit ? `${item.quantity} ${item.unit}` : String(item.quantity);
   }
 
-  moneyOrDash(amount: number): string {
+  moneyOrEmpty(amount: number): string {
     return amount > 0 ? formatCop(amount, this.document().currency) : '';
   }
 }
