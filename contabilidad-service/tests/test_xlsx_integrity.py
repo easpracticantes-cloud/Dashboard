@@ -133,19 +133,19 @@ def test_builder_xlsx_zip_xml_roundtrip_sin_legacy_drawing_roto():
     )
     validate_xlsx_bytes(content)
     wb = load_workbook(io.BytesIO(content), data_only=False)
-    agosto = wb["AGOSTO"]
+    assert wb.sheetnames == ["Cruce de cuentas"]
+    ws = wb["Cruce de cuentas"]
     dumped = []
-    for ws in wb.worksheets:
-        for row in ws.iter_rows(values_only=True):
+    for sheet in wb.worksheets:
+        for row in sheet.iter_rows(values_only=True):
             dumped.extend(str(v) for v in row if v is not None)
     text = " | ".join(dumped)
     assert "FPOS-61226" in text
     assert "JORGE HERNANDO CASTAÑO GIRALDO" in text
     assert "70905826-6" in text
-    assert agosto["B3"].value == "FPOS-61226"
-    assert agosto["D3"].value == 14300
+    assert ws["D2"].value == "FPOS-61226"
+    assert ws["F2"].value == 14300
     assert "COM005691" not in text
-    assert "FV POS" not in text
     from zipfile import ZipFile
     import xml.etree.ElementTree as ET
 

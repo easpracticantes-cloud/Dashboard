@@ -29,9 +29,10 @@ Cruce de Cuentas **no pide un Excel de entrada**. En el SIG el flujo es:
 - Plantilla maestra: `CRUCE_DE_CUENTAS_MAESTRO.xlsx` se regenera desde el Excel operativo
   con `scripts/rebuild_maestro_estructura.py` — **solo organización** (hojas, anchos,
   encabezados). Nunca copia COM*/FV POS históricos.
-- Al generar, las hojas de periodo se resetean a lienzo vacío y se rellenan con el
-  paquete (`document_ids`): FECHA DE EJECUCIÓN/OC/REF desde Autobits si hay vínculo;
-  FACTURA/CDC, proveedor, valor desde la factura.
+- Al generar, el export es **una sola hoja** «Cruce de cuentas» con columnas:
+  PROVEEDOR, NIT, FECHA DE EJECUCIÓN, ORDEN DE COMPRA, REF., VALOR, FACTURA/CDC,
+  FECHA DE PAGO. Filas = paquete (`document_ids`): FECHA/OC/REF desde Autobits si hay
+  vínculo; FACTURA/CDC, proveedor, valor desde la factura.
 - `GET /api/documents/export-excel?document_ids=1,2,...` — clona la plantilla maestra
   `src/infrastructure/cruce/templates/CRUCE_DE_CUENTAS_MAESTRO.xlsx`
   (solo estructura/formato). Las filas salen de las **facturas** pedidas

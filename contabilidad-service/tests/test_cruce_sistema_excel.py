@@ -16,10 +16,9 @@ sys.path.insert(0, str(SRC))
 from config.settings import get_settings  # noqa: E402
 from domain.cruce.export_row import CruceExportRow  # noqa: E402
 from domain.cruce.workbook_spec import (  # noqa: E402
-    BOSQUE_HEADERS,
-    DUSTER_HEADERS,
-    LUGER_HEADERS,
     PERIOD_BLOCK_HEADERS,
+    SINGLE_SHEET_HEADERS,
+    SINGLE_SHEET_NAME,
     standard_sheet_names,
 )
 from infrastructure.ai.excel_ai_analyzer import ExcelAIAnalysis  # noqa: E402
@@ -212,27 +211,19 @@ def test_export_xlsx_estructura_estandar(client):
     assert len(export.content) > 200
 
     wb = load_workbook(io.BytesIO(export.content))
-    year = 2026
-    assert tuple(wb.sheetnames) == standard_sheet_names(year)
-    enero = wb[standard_sheet_names(year)[0]]
-    headers = [(enero.cell(2, c).value or "").strip() for c in range(1, 7)]
-    assert tuple(headers) == PERIOD_BLOCK_HEADERS
+    assert wb.sheetnames == [SINGLE_SHEET_NAME]
+    ws = wb[SINGLE_SHEET_NAME]
+    headers = [(ws.cell(1, c).value or "").strip() for c in range(1, 9)]
+    assert tuple(headers) == SINGLE_SHEET_HEADERS
     dumped = _xlsx_text(export.content)
     assert "COM001" not in dumped
     assert "COM002" not in dumped
     assert "Hotel Demo SAS" not in dumped
-    duster = wb["VENTAS_DUSTER"]
-    assert [duster.cell(2, c).value for c in range(1, 11)] == list(DUSTER_HEADERS)
-    assert duster["C3"].value in (None, "")
-    assert duster["J3"].value is None
-    bosque = wb["CDC BOSQUE DE PALMAS"]
-    assert [bosque.cell(9, c).value for c in range(1, 11)] == list(BOSQUE_HEADERS)
-    luger = wb["PRECOMPRA LUGER 2026"]
-    assert [luger.cell(5, c).value for c in range(2, 7)] == list(LUGER_HEADERS)
+    assert ws["A2"].value in (None, "")
 
 
 def test_workbook_builder_escribe_datos_sin_fantasmas_del_maestro():
-    """Tras el reset de lienzo, el paquete se ve en A1:F y no quedan bloques históricos."""
+    """Una sola hoja tabular con el paquete; sin filas históricas del maestro."""
     builder = CruceWorkbookBuilder()
     content = builder.build(
         [
@@ -259,18 +250,19 @@ def test_workbook_builder_escribe_datos_sin_fantasmas_del_maestro():
         year=2026,
     )
     wb = load_workbook(io.BytesIO(content))
-    enero = wb[standard_sheet_names(2026)[0]]
-    assert enero["A1"].value and "Hotel Nuevo SAS" in str(enero["A1"].value)
-    assert enero["B3"].value == "COM777001"
-    assert enero["C3"].value == "EAS777001"
-    assert enero["D3"].value == 155000
-    assert enero["E3"].value == "FV POS 77701"
-    assert enero["H2"].value in (None, "")
+    assert wb.sheetnames == [SINGLE_SHEET_NAME]
+    ws = wb[SINGLE_SHEET_NAME]
+    assert tuple(ws.cell(1, c).value for c in range(1, 9)) == SINGLE_SHEET_HEADERS
+    # Orden alfabético por proveedor
+    assert ws["A2"].value == "Hotel Nuevo SAS"
+    assert ws["D2"].value == "COM777001"
+    assert ws["E2"].value == "EAS777001"
+    assert ws["F2"].value == 155000
+    assert ws["G2"].value == "FV POS 77701"
+    assert ws["A3"].value == "VENTAS DUSTER"
+    assert ws["D3"].value == "COM777002"
     assert "MARIA CAMPOS" not in _xlsx_text(content)
     assert "COM005691" not in _xlsx_text(content)
-    duster = wb["VENTAS_DUSTER"]
-    assert duster["C3"].value == "COM777002"
-    assert duster["E3"].value == "EAS777002"
 
 
 def test_workbook_builder_no_inventa_ceros():
@@ -290,13 +282,13 @@ def test_workbook_builder_no_inventa_ceros():
         year=2026,
     )
     wb = load_workbook(io.BytesIO(content))
-    mayo = wb["MAYO - JULIO"]
-    assert mayo["D3"].value is None
-    assert mayo["E3"].value is None
-    assert mayo["F3"].value is None
+    ws = wb[SINGLE_SHEET_NAME]
+    assert ws["F2"].value is None
+    assert ws["G2"].value is None
+    assert ws["H2"].value is None
 
 
-def test_workbook_builder_formula_sum_y_especiales():
+def test_workbook_builder_incluye_especiales_en_misma_hoja():
     builder = CruceWorkbookBuilder()
     content = builder.build(
         [
@@ -319,15 +311,12 @@ def test_workbook_builder_formula_sum_y_especiales():
         year=2026,
     )
     wb = load_workbook(io.BytesIO(content))
-    enero = wb["AÑO  2026 ENERO - ABRIL"]
-    assert any(
-        isinstance(cell.value, str) and "SUMIF" in cell.value
-        for row in enero.iter_rows(min_row=1, max_row=20, max_col=10)
-        for cell in row
-    )
-    duster = wb["VENTAS_DUSTER"]
-    assert duster["I3"].value == 1000
-    assert duster["I4"].value == "=SUM(I3:I3)"
+    assert wb.sheetnames == [SINGLE_SHEET_NAME]
+    ws = wb[SINGLE_SHEET_NAME]
+    compras = {ws.cell(r, 4).value for r in range(2, 4)}
+    assert compras == {"COM9", "COM8"}
+    valores = {ws.cell(r, 6).value for r in range(2, 4)}
+    assert valores == {1000, 2000}
 
 
 def test_matching_ambiguo_no_es_exacto():
@@ -355,13 +344,12 @@ def test_workbook_no_trunca_filas_largas():
         for i in range(90)
     ]
     wb = load_workbook(io.BytesIO(builder.build(rows, year=2026)))
-    enero = wb["AÑO  2026 ENERO - ABRIL"]
-    assert enero["B3"].value == "COM0000"
-    assert enero["B92"].value == "COM0089"
-    assert "SUMIF" in str(enero["D93"].value)
+    ws = wb[SINGLE_SHEET_NAME]
+    assert ws["D2"].value == "COM0000"
+    assert ws["D91"].value == "COM0089"
 
 
-def test_raw_json_llena_columnas_especiales_si_existen():
+def test_raw_json_campos_extra_no_rompen_hoja_unica():
     builder = CruceWorkbookBuilder()
     content = builder.build(
         [
@@ -379,9 +367,10 @@ def test_raw_json_llena_columnas_especiales_si_existen():
         ],
         year=2026,
     )
-    duster = load_workbook(io.BytesIO(content))["VENTAS_DUSTER"]
-    assert duster["D3"].value == "REF-OC"
-    assert duster["J3"].value == 800
+    ws = load_workbook(io.BytesIO(content))[SINGLE_SHEET_NAME]
+    assert ws["D2"].value == "COM9"
+    assert ws["E2"].value == "EAS9"
+    assert ws["F2"].value == 1000
 
 
 def test_analizar_no_depende_del_excel_historico(client):
@@ -506,8 +495,10 @@ def test_export_usa_plantilla_maestra_sin_datos_historicos():
     assert "FE-4589" in joined
     assert "COM005691" not in joined
     assert "FV POS" not in joined
-    enero = wb["AÑO  2026 ENERO - ABRIL"]
-    assert tuple(enero.cell(2, c).value for c in range(1, 7)) == PERIOD_BLOCK_HEADERS
+    ws = wb[SINGLE_SHEET_NAME]
+    assert tuple(ws.cell(1, c).value for c in range(1, 9)) == SINGLE_SHEET_HEADERS
+    assert ws["D2"].value == "COM-NUEVO-1"
+    assert ws["G2"].value == "FE-4589"
 
 
 def _crear_factura(
@@ -623,14 +614,14 @@ def test_export_solo_empresas_con_factura_y_datos_de_la_factura(client):
     assert "COM-A" not in text_a
     assert "COM-B" not in text_a
     wb_a = load_workbook(io.BytesIO(solo_a.content))
-    enero = wb_a["AÑO  2026 ENERO - ABRIL"]
-    assert enero["A1"].value == "Empresa A  900111"
-    assert enero["A3"].value.year == 2026
-    assert enero["A3"].value.month == 3
-    assert enero["A3"].value.day == 10
-    assert enero["B3"].value == "FAC-00125"
-    assert enero["D3"].value == 1500000
-    assert enero["E3"].value == "FAC-00125"
+    ws = wb_a[SINGLE_SHEET_NAME]
+    assert ws["A2"].value == "Empresa A"
+    assert ws["C2"].value.year == 2026
+    assert ws["C2"].value.month == 3
+    assert ws["C2"].value.day == 10
+    assert ws["D2"].value == "FAC-00125"
+    assert ws["F2"].value == 1500000
+    assert ws["G2"].value == "FAC-00125"
 
     ambas = client.get(f"/api/documents/export-excel?document_ids={id_a},{id_d}")
     text_ad = _xlsx_text(ambas.content)
@@ -708,10 +699,10 @@ def test_export_no_sustituye_factura_por_com_de_autobits(client):
     assert "COM005691" not in dumped
     assert "2026-01-01" not in dumped
     wb = load_workbook(io.BytesIO(export.content))
-    enero = wb["AÑO  2026 ENERO - ABRIL"]
-    assert enero["B3"].value == "FAC-00125"
-    assert enero["D3"].value == 1500000
-    assert enero["E3"].value == "FAC-00125"
+    ws = wb[SINGLE_SHEET_NAME]
+    assert ws["D2"].value == "FAC-00125"
+    assert ws["F2"].value == 1500000
+    assert ws["G2"].value == "FAC-00125"
 
 
 def test_export_cruce_de_otra_factura_no_se_mezcla(client):
@@ -765,17 +756,18 @@ def test_export_cruce_de_otra_factura_no_se_mezcla(client):
     assert "Empresa B" not in dumped
     assert "Cruce B" not in dumped
     wb = load_workbook(io.BytesIO(excel_a.content))
-    enero = wb["AÑO  2026 ENERO - ABRIL"]
-    assert enero["A1"].value == "Empresa A  900111"
-    assert enero["D3"].value == 1000000
-    pago = enero["F3"].value
+    ws = wb[SINGLE_SHEET_NAME]
+    assert ws["A2"].value == "Empresa A"
+    assert ws["B2"].value == "900111"
+    assert ws["F2"].value == 1000000
+    pago = ws["H2"].value
     assert "2026-03-28" not in str(pago)
     if pago is not None:
         assert getattr(pago, "day", 20) == 20 or "2026-03-20" in str(pago)
 
 
 def test_export_factura_sin_cruce_usa_datos_de_la_ia(client):
-    """FPOS-61226 sin cruce/Autobits debe aparecer igual (hoja AGOSTO por la fecha)."""
+    """FPOS-61226 sin cruce/Autobits debe aparecer igual en la hoja única."""
     from domain.enums import DocumentStatus
     from infrastructure.persistence.database import SessionLocal
     from infrastructure.persistence.models import DocumentModel, ProviderModel
@@ -823,16 +815,17 @@ def test_export_factura_sin_cruce_usa_datos_de_la_ia(client):
     assert "70905826-6" in dumped
     assert "COM005691" not in dumped
     assert "FV POS" not in dumped
-    agosto = load_workbook(io.BytesIO(export.content))["AGOSTO"]
-    assert agosto["A1"].value == "JORGE HERNANDO CASTAÑO GIRALDO  70905826-6"
-    assert agosto["A3"].value.year == 2026
-    assert agosto["A3"].value.month == 8
-    assert agosto["A3"].value.day == 4
-    assert agosto["B3"].value == "FPOS-61226"
-    assert agosto["D3"].value == 14300
-    assert agosto["E3"].value == "FPOS-61226"
-    assert agosto["C3"].value in (None, "")
-    assert agosto["F3"].value in (None, "")
+    ws = load_workbook(io.BytesIO(export.content))[SINGLE_SHEET_NAME]
+    assert ws["A2"].value == "JORGE HERNANDO CASTAÑO GIRALDO"
+    assert ws["B2"].value == "70905826-6"
+    assert ws["C2"].value.year == 2026
+    assert ws["C2"].value.month == 8
+    assert ws["C2"].value.day == 4
+    assert ws["D2"].value == "FPOS-61226"
+    assert ws["F2"].value == 14300
+    assert ws["G2"].value == "FPOS-61226"
+    assert ws["E2"].value in (None, "")
+    assert ws["H2"].value in (None, "")
 
 
 def test_export_usa_extracted_json_cuando_no_hay_proveedor_persistido(client):
@@ -872,11 +865,12 @@ def test_export_usa_extracted_json_cuando_no_hay_proveedor_persistido(client):
     assert "FPOS-61226" in dumped
     assert "JORGE HERNANDO CASTAÑO GIRALDO" in dumped
     assert "70905826-6" in dumped
-    agosto = load_workbook(io.BytesIO(export.content))["AGOSTO"]
-    assert agosto["A1"].value == "JORGE HERNANDO CASTAÑO GIRALDO  70905826-6"
-    assert agosto["B3"].value == "FPOS-61226"
-    assert agosto["D3"].value == 14300
-    assert agosto["E3"].value == "FPOS-61226"
+    agosto = load_workbook(io.BytesIO(export.content))[SINGLE_SHEET_NAME]
+    assert agosto["A2"].value == "JORGE HERNANDO CASTAÑO GIRALDO"
+    assert agosto["B2"].value == "70905826-6"
+    assert agosto["D2"].value == "FPOS-61226"
+    assert agosto["F2"].value == 14300
+    assert agosto["G2"].value == "FPOS-61226"
 
 
 def test_export_bloquea_facturas_en_proceso(client):

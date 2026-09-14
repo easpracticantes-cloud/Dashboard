@@ -101,6 +101,18 @@ export class WizardComponent implements OnInit, OnDestroy {
     return this.verTodosRecords() ? all : all.slice(0, 12);
   });
 
+  /** Solo cruces con factura del paquete + Autobits vinculado (no el lote completo). */
+  readonly relaciones = computed(() => {
+    const pack = new Set(this.idsFacturasOperacion());
+    const docs = new Set(this.documentos().map((d) => d.id));
+    const scope = pack.size ? pack : docs;
+    return this.crossings().filter((c) => {
+      if (!c.document_id || !c.autobits_record_id) return false;
+      if (!scope.size) return true;
+      return scope.has(c.document_id);
+    });
+  });
+
   readonly facturasRevision = computed(() =>
     this.documentos().filter((d) => d.requiere_revision)
   );

@@ -1,25 +1,11 @@
 """Especificación estructural del Excel de resultado Facturas + Autobits.
 
-Referencia visual: el libro operativo «CRUCE DE CUENTAS 2026.xlsx».
-NO es una fuente de datos ni una plantilla de carga. No se copian filas
-históricas (COM005691, FV POS, proveedores de ejemplo). Solo nombres de
-hojas, orden de columnas y fórmulas sistemáticas.
+El export SIG es **una sola hoja** tabular («Cruce de cuentas») con las
+columnas del bloque estándar (proveedor, NIT, fecha, OC, REF, valor,
+factura/CDC, fecha de pago).
 
-Pestañas del estándar (orden):
-  1. AÑO  {yyyy} ENERO - ABRIL   — bloques laterales por proveedor
-  2. MAYO - JULIO                — igual
-  3. AGOSTO                      — igual (Sep–Dic caen aquí: el estándar no
-                                   tiene hoja posterior)
-  4. VENTAS_DUSTER               — tabla estilo Autobits
-  5. CDC BOSQUE DE PALMAS        — tabla Autobits + saldos de precompra
-  6. PRECOMPRA LUGER {yyyy}      — kardex de unidades/valor
-
-Campos del estándar SIN fuente en SIG (no se inventan):
-  - DINERO ENTREGADOS / A DESCONTAR / A PAGAR EAS / A JUSTIFICAR
-  - N° RECIBOS, BITÁCORA, RECIBOS, FOTOGRAFÍAS, TIEMPO DE DEMORA
-  - PRECIO TERCEROS, Comprador, Vendedor, Cantidad, Referencia OC
-  - SALDO ANTERIOR, PRE COMPRA ENTRADAS, ENTRADAS A FAVOR, INGRESO
-  - Clientes de SIG (clients.name) — el Excel no tiene columna de cliente
+La plantilla maestra multi-hoja se conserva solo como referencia / parser
+histórico; el generador no copia filas históricas.
 """
 
 from __future__ import annotations
@@ -33,6 +19,19 @@ PRECIO_EAS_FILL = "00FF00"
 PRECIO_TERC_FILL = "00FFFF"
 FONT_NAME = "Ubuntu"
 FONT_NAME_TABLE = "Calibri"
+
+# Exporto de resultado: UNA sola hoja tabular (organización del estándar).
+SINGLE_SHEET_NAME = "Cruce de cuentas"
+SINGLE_SHEET_HEADERS: tuple[str, ...] = (
+    "PROVEEDOR",
+    "NIT",
+    "FECHA DE EJECUCIÓN",
+    "ORDEN DE COMPRA",
+    "REF.",
+    "VALOR",
+    "FACTURA/CDC",
+    "FECHA DE PAGO",
+)
 
 PERIOD_BLOCK_HEADERS: tuple[str, ...] = (
     "FECHA DE EJECUCIÓN",
@@ -133,15 +132,10 @@ def luger_sheet_name(year: int) -> str:
 
 
 def standard_sheet_names(year: int) -> tuple[str, ...]:
-    p1, p2, p3 = period_sheets(year)
-    return (
-        p1.name,
-        p2.name,
-        p3.name,
-        "VENTAS_DUSTER",
-        "CDC BOSQUE DE PALMAS",
-        luger_sheet_name(year),
-    )
+    """Compat: el export actual es una sola hoja."""
+    _ = year
+    return (SINGLE_SHEET_NAME,)
+
 
 
 # Mapa Excel → fuente SIG (solo lo respaldado por el modelo).

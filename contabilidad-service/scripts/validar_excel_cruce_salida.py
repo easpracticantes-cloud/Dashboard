@@ -1,4 +1,4 @@
-"""Compara estructura del Excel generado vs el estándar (sin copiar datos)."""
+"""Valida el Excel generado: una sola hoja tabular Cruce de cuentas."""
 from __future__ import annotations
 
 import sys
@@ -11,18 +11,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from domain.cruce.export_row import CruceExportRow
-from domain.cruce.workbook_spec import PERIOD_BLOCK_HEADERS, standard_sheet_names
+from domain.cruce.workbook_spec import SINGLE_SHEET_HEADERS, SINGLE_SHEET_NAME
 from infrastructure.cruce.workbook_builder import CruceWorkbookBuilder
 
-STANDARD = Path(r"C:\Users\07sam\Downloads\CRUCE DE CUENTAS 2026.xlsx")
 OUT = ROOT / "dataset" / "demo" / "Cruce_Cuentas_validacion_estructura.xlsx"
 
 
 def main() -> int:
-    std = load_workbook(STANDARD, read_only=True, data_only=False)
-    std_names = list(std.sheetnames)
-    std.close()
-
     sample = [
         CruceExportRow(
             proveedor="RESTAURANTE DEMO",
@@ -43,46 +38,18 @@ def main() -> int:
             concepto="Servicio",
             estado_compra="Activa",
         ),
-        CruceExportRow(
-            proveedor="PARQUE NATURAL Y CULTURAL BOSQUE DE PALMAS SAS",
-            nit="800000",
-            numero_compra="COM0003",
-            numero_reserva="EAS0003",
-            fecha_ejecucion="2026-04-01",
-            valor=Decimal("25000"),
-        ),
-        CruceExportRow(
-            proveedor="PRECOMPRA LUGER",
-            numero_compra="COM0004",
-            fecha_ejecucion="2026-01-22",
-            valor=Decimal("84000"),
-        ),
     ]
     content = CruceWorkbookBuilder().build(sample, year=2026)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_bytes(content)
 
     gen = load_workbook(OUT)
-    expected = list(standard_sheet_names(2026))
-    print("ESTANDAR hojas:", std_names)
-    print("GENERADO hojas:", gen.sheetnames)
-    assert gen.sheetnames == expected, (gen.sheetnames, expected)
-    # El estándar usa el mismo orden funcional; el nombre de la 1ª hoja incluye el año.
-    assert len(std_names) == 6
-    assert std_names[1] == "MAYO - JULIO"
-    assert std_names[2] == "AGOSTO"
-    assert std_names[3] == "VENTAS_DUSTER"
-    assert std_names[4] == "CDC BOSQUE DE PALMAS"
-    assert std_names[5].startswith("PRECOMPRA LUGER")
-
-    enero = gen[expected[0]]
-    headers = [enero.cell(2, c).value for c in range(1, 7)]
-    assert tuple(headers) == PERIOD_BLOCK_HEADERS
-    assert enero["B3"].value == "COM0001"
-    assert enero["E3"].value == "FV POS 1"
-    assert "SUMIF" in str(enero["D4"].value)
-    gen.close()
-    print("OK estructura equivalente. Archivo:", OUT)
+    assert gen.sheetnames == [SINGLE_SHEET_NAME], gen.sheetnames
+    ws = gen[SINGLE_SHEET_NAME]
+    headers = [ws.cell(1, c).value for c in range(1, 9)]
+    assert tuple(headers) == SINGLE_SHEET_HEADERS
+    assert ws["D2"].value in {"COM0001", "COM0002"}
+    print("OK", OUT, "hoja unica", SINGLE_SHEET_NAME)
     return 0
 
 

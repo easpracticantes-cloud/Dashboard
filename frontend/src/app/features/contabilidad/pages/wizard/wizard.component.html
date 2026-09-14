@@ -231,30 +231,34 @@
     </div>
   </section>
 
-  @if (crossings().length) {
+  @if (relaciones().length) {
     <section class="wiz__card">
       <h3>Relación factura ↔ Autobits</h3>
-      <p class="wiz__hint">Cada factura se ancla a la fila de Autobits cuando hay coincidencia.</p>
+      <p class="wiz__hint">
+        Solo el Autobits vinculado a cada factura del paquete (no el lote completo).
+      </p>
       <div class="wiz__table-wrap">
         <table class="wiz__table">
           <thead>
             <tr>
-              <th>Proveedor</th>
-              <th>Compra / reserva</th>
-              <th>Fecha</th>
-              <th>Valor</th>
               <th>Factura / CDC</th>
+              <th>Proveedor</th>
+              <th>Autobits (compra)</th>
+              <th>Autobits (reserva)</th>
+              <th>Fecha Autobits</th>
+              <th>Valor Autobits</th>
               <th>Match</th>
             </tr>
           </thead>
           <tbody>
-            @for (c of crossings(); track c.id) {
+            @for (c of relaciones(); track c.id) {
               <tr>
+                <td>{{ c.factura_cdc || c.document_numero || '—' }}</td>
                 <td>{{ c.proveedor || '—' }}</td>
-                <td>{{ c.numero_compra || '—' }} · {{ c.numero_reserva || '—' }}</td>
+                <td>{{ c.numero_compra || '—' }}</td>
+                <td>{{ c.numero_reserva || '—' }}</td>
                 <td>{{ c.fecha_ejecucion || '—' }}</td>
                 <td>{{ formatCop(c.valor_autobits) }}</td>
-                <td>{{ c.factura_cdc || c.document_numero || '—' }}</td>
                 <td>{{ c.match_type }}</td>
               </tr>
             }
