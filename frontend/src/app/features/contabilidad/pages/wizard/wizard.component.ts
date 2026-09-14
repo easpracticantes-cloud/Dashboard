@@ -472,7 +472,7 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   private startPoll(): void {
     this.poll?.unsubscribe();
-    this.poll = interval(4000).subscribe(() => {
+    this.poll = interval(2000).subscribe(() => {
       this.refrescarFacturas();
       const pending = this.documentos().some((d) =>
         ['RECIBIDO', 'PROCESANDO'].includes((d.estado || '').toUpperCase())

@@ -32,7 +32,7 @@ interface ResultadoLote {
 }
 
 const PACK_SIZE = 25;
-const POLL_MS = 4000;
+const POLL_MS = 2000;
 
 @Component({
   selector: 'eas-contabilidad-processing',

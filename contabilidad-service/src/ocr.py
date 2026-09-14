@@ -1,13 +1,16 @@
-"""Funciones simples para extraer texto con OCR."""
+"""Funciones simples para extraer texto con OCR (hot path rápido)."""
 
 import os
 from pathlib import Path
 
 
-TIMEOUT_OCR = 10
+TIMEOUT_OCR = 8
 MIN_CARACTERES_OCR_DEBIL = 100
 MIN_MEJORA_CARACTERES = 100
 MIN_MEJORA_PORCENTAJE = 0.10
+# Un solo PSM: suficiente para facturas y evita ~6× el tiempo anterior.
+OCR_PSM_CONFIG = "--oem 3 --psm 6"
+MAX_SIDE_PX = 1400
 
 PALABRAS_CLAVE_FACTURA = [
     "Invoice",
@@ -22,7 +25,6 @@ PALABRAS_CLAVE_FACTURA = [
     "Gross worth",
     "Amount due",
     "Bill to",
-    # Español / DIAN / cuentas de cobro físicas
     "Factura",
     "NIT",
     "IVA",
@@ -55,21 +57,16 @@ def configurar_tesseract():
     try:
         import pytesseract
 
-        # Si el usuario define esta variable, usamos esa ruta.
         ruta_desde_variable = os.environ.get("TESSERACT_CMD")
-
         posibles_rutas = [
             ruta_desde_variable,
             r"C:\Program Files\Tesseract-OCR\tesseract.exe",
             r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
         ]
-
         for ruta in posibles_rutas:
             if ruta and Path(ruta).exists():
                 pytesseract.pytesseract.tesseract_cmd = ruta
                 return True
-
-        # Si esta en el PATH, pytesseract lo encontrara sin ruta manual.
         return True
     except Exception:
         return False
@@ -92,7 +89,7 @@ def verificar_tesseract():
 
 
 def extraer_texto_imagen(ruta_imagen):
-    """Extrae texto de una imagen usando pytesseract (multi-PSM)."""
+    """Extrae texto con un solo PSM (objetivo ≤8s por imagen)."""
     try:
         import pytesseract
         from PIL import Image
@@ -104,48 +101,37 @@ def extraer_texto_imagen(ruta_imagen):
 
         ruta = Path(ruta_imagen)
         if is_pdf(ruta):
-            raster = ensure_raster_image(ruta)
-            ruta = raster
+            ruta = ensure_raster_image(ruta)
 
         imagen = Image.open(ruta)
         if imagen.mode not in ("RGB", "L"):
             imagen = imagen.convert("RGB")
 
-        # Fotos de celular / facturas físicas: subir a 1800px mínimo
         w, h = imagen.size
-        if max(w, h) < 1800:
-            scale = 1800 / max(w, h)
+        longest = max(w, h)
+        if longest > MAX_SIDE_PX:
+            scale = MAX_SIDE_PX / longest
+            imagen = imagen.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
+        elif longest < 900:
+            scale = 900 / longest
             imagen = imagen.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
         lang = (get_settings().tesseract_lang or "spa+eng").strip() or "spa+eng"
         if "eng" not in lang and "spa" in lang:
             lang = "spa+eng"
-        configs = [
-            "--oem 3 --psm 6",
-            "--oem 3 --psm 4",
-            "--oem 3 --psm 3",
-            "--oem 3 --psm 11",
-            "--oem 3 --psm 1",
-            "--oem 3 --psm 12",
-        ]
-        mejores = []
-        for cfg in configs:
+
+        try:
+            texto = pytesseract.image_to_string(
+                imagen, lang=lang, config=OCR_PSM_CONFIG, timeout=TIMEOUT_OCR
+            )
+        except Exception:
             try:
                 texto = pytesseract.image_to_string(
-                    imagen, lang=lang, config=cfg, timeout=max(TIMEOUT_OCR, 45)
+                    imagen, lang="spa", config=OCR_PSM_CONFIG, timeout=TIMEOUT_OCR
                 )
             except Exception:
-                try:
-                    texto = pytesseract.image_to_string(
-                        imagen, lang="spa", config=cfg, timeout=max(TIMEOUT_OCR, 45)
-                    )
-                except Exception:
-                    texto = ""
-            if texto:
-                mejores.append(texto)
-        if not mejores:
-            return ""
-        return max(mejores, key=lambda t: calcular_puntaje_ocr(t)["puntaje"])
+                texto = ""
+        return texto or ""
     except Exception as error:
         print(f"ERROR en OCR: {error}")
         return ""
@@ -161,14 +147,10 @@ def calcular_puntaje_ocr(texto):
     texto_normalizado = texto.lower()
     caracteres = contar_caracteres_utiles(texto)
     palabras_encontradas = 0
-
     for palabra in PALABRAS_CLAVE_FACTURA:
         if palabra.lower() in texto_normalizado:
             palabras_encontradas += 1
-
-    # Cada palabra clave vale bastante porque indica que el OCR entiende la factura.
     puntaje = caracteres + (palabras_encontradas * 100)
-
     return {
         "caracteres": caracteres,
         "palabras_clave": palabras_encontradas,
@@ -177,7 +159,7 @@ def calcular_puntaje_ocr(texto):
 
 
 def extraer_texto_con_fallback(ruta_original, ruta_preprocesada=None):
-    """Prueba OCR original y preprocesado, prefiriendo original por defecto."""
+    """OCR rápido: original primero; preprocesada solo si existe y mejora."""
     texto_original = extraer_texto_imagen(ruta_original)
     puntaje_original = calcular_puntaje_ocr(texto_original)
     caracteres_original = puntaje_original["caracteres"]
@@ -186,48 +168,24 @@ def extraer_texto_con_fallback(ruta_original, ruta_preprocesada=None):
     puntaje_preprocesado = calcular_puntaje_ocr(texto_preprocesado)
     caracteres_preprocesada = 0
 
+    # Solo la variante principal (sin otsu/inv) para no multiplicar el tiempo.
     if ruta_preprocesada and Path(ruta_preprocesada).exists():
-        from preprocesamiento import variantes_preprocesadas
-
-        candidatos = []
-        for variante in variantes_preprocesadas(ruta_preprocesada) or [Path(ruta_preprocesada)]:
-            texto_v = extraer_texto_imagen(variante)
-            if texto_v:
-                candidatos.append((calcular_puntaje_ocr(texto_v), texto_v))
-        if candidatos:
-            puntaje_preprocesado, texto_preprocesado = max(
-                candidatos, key=lambda item: item[0]["puntaje"]
-            )
-            caracteres_preprocesada = puntaje_preprocesado["caracteres"]
+        texto_preprocesado = extraer_texto_imagen(ruta_preprocesada)
+        puntaje_preprocesado = calcular_puntaje_ocr(texto_preprocesado)
+        caracteres_preprocesada = puntaje_preprocesado["caracteres"]
 
     mejora_caracteres = caracteres_preprocesada - caracteres_original
-    mejora_porcentaje = 0
-
-    if caracteres_original > 0:
-        mejora_porcentaje = mejora_caracteres / caracteres_original
-
+    mejora_porcentaje = (
+        mejora_caracteres / caracteres_original if caracteres_original > 0 else 0
+    )
     mejora_clara = (
         mejora_caracteres >= MIN_MEJORA_CARACTERES
         or mejora_porcentaje >= MIN_MEJORA_PORCENTAJE
     )
-
     mantiene_palabras_clave = (
-        puntaje_preprocesado["palabras_clave"]
-        >= puntaje_original["palabras_clave"]
+        puntaje_preprocesado["palabras_clave"] >= puntaje_original["palabras_clave"]
     )
 
-    # Preferimos ORIGINAL. Solo usamos PREPROCESADA si mejora claramente
-    # y no pierde palabras clave importantes de la factura.
-    if mejora_clara and mantiene_palabras_clave:
-        texto_final = texto_preprocesado
-        metodo_usado = "PREPROCESADA"
-    else:
-        texto_final = texto_original
-        metodo_usado = "ORIGINAL"
-
-    return (
-        texto_final,
-        metodo_usado,
-        caracteres_original,
-        caracteres_preprocesada,
-    )
+    if mejora_clara and mantiene_palabras_clave and texto_preprocesado:
+        return texto_preprocesado, "PREPROCESADA", caracteres_original, caracteres_preprocesada
+    return texto_original, "ORIGINAL", caracteres_original, caracteres_preprocesada

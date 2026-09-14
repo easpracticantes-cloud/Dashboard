@@ -42,6 +42,16 @@ class Settings(BaseSettings):
             "claude_vision_on_weak_ocr",
         ),
     )
+    # Preferir visión Haiku (o PDF texto) y saltar OCR multi-paso.
+    invoice_fast_path: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("INVOICE_FAST_PATH", "invoice_fast_path"),
+    )
+    # Segundo pase Sonnet solo si se activa explícitamente (lento).
+    anthropic_dual_pass: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("ANTHROPIC_DUAL_PASS", "anthropic_dual_pass"),
+    )
 
     # Anthropic Claude (A4)
     anthropic_api_key: str = Field(
@@ -58,15 +68,15 @@ class Settings(BaseSettings):
     )
     anthropic_api_version: str = "2023-06-01"
     anthropic_max_tokens: int = Field(
-        default=4096,
+        default=2048,
         validation_alias=AliasChoices("ANTHROPIC_MAX_TOKENS", "AI_MAX_TOKENS"),
     )
     anthropic_timeout: int = Field(
-        default=90,
+        default=25,
         validation_alias=AliasChoices("ANTHROPIC_TIMEOUT", "AI_TIMEOUT"),
     )
     anthropic_max_retries: int = Field(
-        default=2,
+        default=1,
         validation_alias=AliasChoices("ANTHROPIC_MAX_RETRIES", "AI_MAX_RETRIES"),
     )
     ai_model_fast: str = Field(

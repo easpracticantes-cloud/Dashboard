@@ -84,10 +84,7 @@ class AnthropicClient:
         json_mode: bool = True,
         tier: str = "FAST",
     ) -> tuple[str, dict[str, Any]]:
-        data = Path(image_path).read_bytes()
-        mime, _ = mimetypes.guess_type(str(image_path))
-        if not mime or not mime.startswith("image/"):
-            mime = "image/jpeg"
+        data, mime = _prepare_vision_payload(Path(image_path))
         b64 = base64.standard_b64encode(data).decode("ascii")
         model = self.model_for(tier)
         system = ""
@@ -95,7 +92,7 @@ class AnthropicClient:
             system = "Responde ÚNICAMENTE con JSON válido. Sin markdown."
         body: dict[str, Any] = {
             "model": model,
-            "max_tokens": self.max_tokens,
+            "max_tokens": min(self.max_tokens, 2048),
             "system": system,
             "messages": [
                 {
@@ -197,6 +194,35 @@ def _extract_text(payload: dict[str, Any]) -> str:
             if t:
                 parts.append(t)
     return "\n".join(parts).strip()
+
+
+def _prepare_vision_payload(image_path: Path, *, max_side: int = 1568, quality: int = 78) -> tuple[bytes, str]:
+    """Reduce peso de la imagen antes de base64 (acelera Claude vision a ~segundos)."""
+    path = Path(image_path)
+    try:
+        from io import BytesIO
+
+        from PIL import Image
+
+        with Image.open(path) as img:
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+            elif img.mode == "L":
+                img = img.convert("RGB")
+            w, h = img.size
+            longest = max(w, h)
+            if longest > max_side:
+                scale = max_side / longest
+                img = img.resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.Resampling.LANCZOS)
+            buf = BytesIO()
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            return buf.getvalue(), "image/jpeg"
+    except Exception:
+        data = path.read_bytes()
+        mime, _ = mimetypes.guess_type(str(path))
+        if not mime or not mime.startswith("image/"):
+            mime = "image/jpeg"
+        return data, mime
 
 
 def _parse_json(raw: str) -> dict[str, Any]:

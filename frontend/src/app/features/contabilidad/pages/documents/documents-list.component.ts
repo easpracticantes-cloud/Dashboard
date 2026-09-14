@@ -20,7 +20,7 @@ import {
 } from '../../utils/contabilidad-labels';
 
 const PACK_SIZE = 25;
-const POLL_MS = 4000;
+const POLL_MS = 2000;
 const PACK_IDS_KEY = 'contab-facturas-pack-ids';
 
 interface ChatMsg {

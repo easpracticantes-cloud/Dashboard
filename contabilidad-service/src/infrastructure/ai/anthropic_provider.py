@@ -20,14 +20,18 @@ class AnthropicAIProvider:
 
     def extract_invoice(self, ocr_text: str) -> AIExtractionResult:
         try:
+            from config.settings import get_settings
+
             datos = self.client.generate_json(build_invoice_text_prompt(ocr_text), tier="FAST")
-            if self._needs_reasoning(datos):
+            if get_settings().anthropic_dual_pass and self._needs_reasoning(datos):
                 datos = self.client.generate_json(
                     build_invoice_text_prompt(ocr_text)
                     + "\n\nRevisión: el primer pase marcó ambigüedad o inconsistencia. "
                     "Corrige solo con evidencia del OCR.",
                     tier="REASONING",
                 )
+            elif self._needs_reasoning(datos):
+                datos["requiere_revision"] = True
             meta = datos.pop("_ai_meta", None)
             if meta:
                 datos["_usage"] = meta
@@ -41,16 +45,20 @@ class AnthropicAIProvider:
 
     def extract_invoice_from_image(self, image_path: Path) -> AIExtractionResult:
         try:
+            from config.settings import get_settings
+
             datos = self.client.generate_json_from_image(
                 Path(image_path), INVOICE_VISION_PROMPT, tier="FAST"
             )
-            if self._needs_reasoning(datos):
+            if get_settings().anthropic_dual_pass and self._needs_reasoning(datos):
                 datos = self.client.generate_json_from_image(
                     Path(image_path),
                     INVOICE_VISION_PROMPT
                     + "\n\nRevisión Sonnet: corrige ambigüedades solo con lo visible.",
                     tier="REASONING",
                 )
+            elif self._needs_reasoning(datos):
+                datos["requiere_revision"] = True
             meta = datos.pop("_ai_meta", None)
             if meta:
                 datos["_usage"] = meta

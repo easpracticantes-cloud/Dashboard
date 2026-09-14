@@ -346,7 +346,7 @@ class DocumentProcessingService:
         }
 
     def process_structured_by_id(self, document_id: int) -> dict:
-        """Path de producto: OCR + extract_invoice JSON + reglas (no texto libre)."""
+        """Path de producto rápido: PDF texto o visión Haiku (≤~10s)."""
         init_db()
         db = SessionLocal()
         try:
@@ -368,116 +368,90 @@ class DocumentProcessingService:
 
             self._ensure_output_dirs()
             stem = path.stem
-            native_text = extract_pdf_native_text(path) if is_pdf(path) else ""
-            image_path = self._prepare_image_for_ocr(path)
-            extra_pages = []
-            if is_pdf(path):
-                extra_pages = rasterize_pdf_pages(path, self.carpeta_preprocesadas, max_pages=3)
-                if extra_pages:
-                    image_path = extra_pages[0]
-            ruta_pre = self.carpeta_preprocesadas / f"{stem}.png"
-            if not self.ocr.preprocess(image_path, ruta_pre):
-                ruta_pre = None
-
-            ocr_chunks = []
-            ocr_result = self.ocr.extract_with_fallback(
-                image_path,
-                ruta_pre if ruta_pre and ruta_pre.exists() else None,
-            )
-            if ocr_result.text:
-                ocr_chunks.append(ocr_result.text)
-            for extra in extra_pages[1:]:
-                extra_ocr = self.ocr.extract_with_fallback(extra, None)
-                if extra_ocr.text:
-                    ocr_chunks.append(extra_ocr.text)
-            ocr_combined = "\n\n".join(ocr_chunks).strip()
-            if native_text and len(native_text) >= 80:
-                ocr_text = native_text
-                if ocr_combined and ocr_combined not in native_text:
-                    ocr_text = native_text + "\n\n--- OCR ---\n" + ocr_combined
-                metodo = f"{ocr_result.method}+PDF_TEXT"
-            else:
-                ocr_text = ocr_combined or ocr_result.text
-                metodo = ocr_result.method
-            guardar_texto(self.carpeta_textos / f"{stem}.txt", ocr_text)
-
-            ai_result = None
-            ocr_debil = self._ocr_parece_basura(ocr_text) and len(native_text) < 80
+            native_text = extract_pdf_native_text(path, max_pages=2) if is_pdf(path) else ""
+            fast = bool(getattr(settings, "invoice_fast_path", True))
             vision_fn = getattr(self.ai, "extract_invoice_from_image", None)
+            ai_result = None
+            ocr_text = ""
+            metodo = "ORIGINAL"
+            image_path: Path | None = None
 
-            if ocr_debil and self._vision_enabled():
-                vision_target = image_path if image_path.exists() else path
-                provider = resolve_ai_provider_name()
-                logger.info(
-                    "OCR debil/basura — vision (%s) sobre doc #%s (%s)",
-                    provider,
-                    document.id,
-                    vision_target.name,
-                )
-                ai_result = vision_fn(vision_target)
-                metodo = f"{provider.upper()}_VISION"
-                if not ai_result.ok and is_pdf(path) and vision_target != path:
-                    # reintento sobre PNG si el path original falló
-                    ai_result = vision_fn(image_path)
-                if not ai_result.ok:
-                    hints = extract_invoice_hints(ocr_text)
-                    if any(hints.get(k) for k in ("total", "numero_factura", "nit_o_identificacion", "proveedor")):
-                        ai_result = AIExtractionResult(ok=True, data=hints, raw_text=ocr_text)
-                        metodo = f"{metodo}+OCR_JSON"
-                    else:
-                        error = f"Vision IA fallo: {ai_result.error}"
-                        document.estado = DocumentStatus.REQUIERE_REVISION
-                        job_repo.mark_requires_review(job)
-                        audit.log("OCR_VISION_FAIL", "Document", str(document.id), valor_nuevo=error)
-                        db.commit()
-                        return {
-                            "ok": False,
-                            "error": error,
-                            "document_id": document.id,
-                            "estado": DocumentStatus.REQUIERE_REVISION,
-                        }
-            elif ocr_debil:
-                error = (
-                    f"OCR debil ({len((ocr_text or '').strip())} caracteres) y "
-                    "no hay proveedor de vision disponible. "
-                    "Sube JPG/PNG nitido o configura ANTHROPIC_API_KEY."
-                )
-                document.estado = DocumentStatus.REQUIERE_REVISION
-                job_repo.mark_requires_review(job)
-                audit.log("OCR_DEBIL", "Document", str(document.id), valor_nuevo=error)
-                db.commit()
-                return {
-                    "ok": False,
-                    "error": error,
-                    "document_id": document.id,
-                    "estado": DocumentStatus.REQUIERE_REVISION,
-                }
-            else:
-                # Texto OCR + visión de refuerzo si faltan campos clave o hay poca señal
+            # 1) PDF digital con texto embebido → solo Haiku texto (sin OCR ni raster).
+            if len(native_text.strip()) >= 80:
+                ocr_text = native_text
+                metodo = "PDF_TEXT"
+                guardar_texto(self.carpeta_textos / f"{stem}.txt", ocr_text)
                 ai_result = self.ai.extract_invoice(ocr_text)
-                faltan_clave = self._faltan_campos_clave(ai_result.data if ai_result and ai_result.ok else {})
-                if (faltan_clave or ocr_debil) and self._vision_enabled():
-                    logger.info("Extracción incompleta — refuerzo vision doc #%s", document.id)
-                    vision_result = vision_fn(image_path if image_path.exists() else path)
-                    if vision_result.ok:
-                        merged = merge_hints_into_extraction(
-                            dict(vision_result.data or {}),
-                            extract_invoice_hints(ocr_text),
-                        )
-                        merged = merge_hints_into_extraction(
-                            merged,
-                            {
-                                k: v
-                                for k, v in (ai_result.data or {}).items()
-                                if v not in (None, "", [], {})
-                            },
-                        )
-                        ai_result = AIExtractionResult(
-                            ok=True,
-                            data=merged,
-                            raw_text=vision_result.raw_text,
-                        )
-                        metodo = f"{resolve_ai_provider_name().upper()}_VISION+OCR"
+            # 2) Hot path: una sola visión Haiku sobre página 1 (foto/escaneo/PDF).
+            elif fast and self._vision_enabled() and callable(vision_fn):
+                self.carpeta_preprocesadas.mkdir(parents=True, exist_ok=True)
+                if is_pdf(path):
+                    pages = rasterize_pdf_pages(path, self.carpeta_preprocesadas, dpi=160, max_pages=1)
+                    image_path = pages[0] if pages else self._prepare_image_for_ocr(path)
+                else:
+                    image_path = path
+                provider = resolve_ai_provider_name()
+                logger.info("Fast-path vision (%s) doc #%s (%s)", provider, document.id, image_path.name)
+                ai_result = vision_fn(image_path)
+                metodo = f"{provider.upper()}_VISION"
+                ocr_text = (ai_result.raw_text if ai_result and ai_result.ok else "") or ""
+                if not ocr_text:
+                    # Hints mínimos: no bloqueamos con OCR pesado; heurística vacía ok.
+                    ocr_text = native_text
+                guardar_texto(self.carpeta_textos / f"{stem}.txt", ocr_text or f"[vision:{image_path.name}]")
+                if not ai_result or not ai_result.ok:
+                    # Respaldo OCR ligero (1 PSM) + texto Haiku
+                    logger.info("Vision falló — OCR ligero doc #%s", document.id)
+                    ruta_pre = self.carpeta_preprocesadas / f"{stem}.png"
+                    if not self.ocr.preprocess(image_path, ruta_pre):
+                        ruta_pre = None
+                    ocr_result = self.ocr.extract_with_fallback(
+                        image_path,
+                        ruta_pre if ruta_pre and ruta_pre.exists() else None,
+                    )
+                    ocr_text = ocr_result.text or native_text
+                    metodo = f"{ocr_result.method}+VISION_FALLBACK"
+                    guardar_texto(self.carpeta_textos / f"{stem}.txt", ocr_text)
+                    if ocr_text.strip():
+                        ai_result = self.ai.extract_invoice(ocr_text)
+            else:
+                # 3) Sin visión: OCR ligero + extract texto.
+                image_path = self._prepare_image_for_ocr(path)
+                ruta_pre = self.carpeta_preprocesadas / f"{stem}.png"
+                if not self.ocr.preprocess(image_path, ruta_pre):
+                    ruta_pre = None
+                ocr_result = self.ocr.extract_with_fallback(
+                    image_path,
+                    ruta_pre if ruta_pre and ruta_pre.exists() else None,
+                )
+                ocr_text = ocr_result.text or native_text
+                metodo = ocr_result.method
+                if native_text and len(native_text) >= 80:
+                    ocr_text = native_text
+                    metodo = f"{metodo}+PDF_TEXT"
+                guardar_texto(self.carpeta_textos / f"{stem}.txt", ocr_text)
+                ocr_debil = self._ocr_parece_basura(ocr_text) and len(native_text) < 80
+                if ocr_debil and self._vision_enabled() and callable(vision_fn):
+                    ai_result = vision_fn(image_path if image_path.exists() else path)
+                    metodo = f"{resolve_ai_provider_name().upper()}_VISION"
+                elif ocr_debil:
+                    error = (
+                        f"OCR debil ({len((ocr_text or '').strip())} caracteres) y "
+                        "no hay proveedor de vision disponible. "
+                        "Sube JPG/PNG nitido o configura ANTHROPIC_API_KEY."
+                    )
+                    document.estado = DocumentStatus.REQUIERE_REVISION
+                    job_repo.mark_requires_review(job)
+                    audit.log("OCR_DEBIL", "Document", str(document.id), valor_nuevo=error)
+                    db.commit()
+                    return {
+                        "ok": False,
+                        "error": error,
+                        "document_id": document.id,
+                        "estado": DocumentStatus.REQUIERE_REVISION,
+                    }
+                else:
+                    ai_result = self.ai.extract_invoice(ocr_text)
 
             if not ai_result or not ai_result.ok:
                 hints = extract_invoice_hints(ocr_text)

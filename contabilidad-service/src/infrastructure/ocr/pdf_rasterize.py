@@ -37,7 +37,7 @@ def extract_pdf_native_text(path: Path | str, *, max_pages: int = 5) -> str:
         return ""
 
 
-def rasterize_pdf_first_page(path: Path | str, dest: Path | str, *, dpi: int = 300) -> Path | None:
+def rasterize_pdf_first_page(path: Path | str, dest: Path | str, *, dpi: int = 160) -> Path | None:
     """Renderiza la primera página del PDF a PNG. Devuelve dest o None si falla."""
     pages = rasterize_pdf_pages(path, Path(dest).parent, dpi=dpi, max_pages=1)
     if not pages:
@@ -53,10 +53,10 @@ def rasterize_pdf_pages(
     path: Path | str,
     work_dir: Path | str,
     *,
-    dpi: int = 300,
-    max_pages: int = 3,
+    dpi: int = 160,
+    max_pages: int = 1,
 ) -> list[Path]:
-    """Renderiza hasta `max_pages` páginas a PNG."""
+    """Renderiza hasta `max_pages` páginas a PNG (dpi bajo = más rápido)."""
     src = Path(path)
     out_dir = Path(work_dir)
     if not src.exists() or not is_pdf(src):
@@ -100,5 +100,5 @@ def ensure_raster_image(path: Path | str, work_dir: Path | str | None = None) ->
         return src
     base = Path(work_dir) if work_dir else src.parent
     dest = base / f"{src.stem}_page1.png"
-    rendered = rasterize_pdf_first_page(src, dest)
+    rendered = rasterize_pdf_first_page(src, dest, dpi=160)
     return rendered if rendered else src

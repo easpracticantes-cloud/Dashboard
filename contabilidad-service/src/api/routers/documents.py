@@ -205,7 +205,7 @@ class ProcessBatchResponse(BaseModel):
 
 
 BATCH_PACK_SIZE = 25
-BATCH_MAX_WORKERS = 8
+BATCH_MAX_WORKERS = 4
 
 
 def _process_document_ids_in_packs(
@@ -213,7 +213,7 @@ def _process_document_ids_in_packs(
     pack_size: int = BATCH_PACK_SIZE,
     solicitud: str | None = None,
 ) -> None:
-    """Procesa IDs en paquetes de 25; dentro del paquete hasta 8 en paralelo."""
+    """Procesa IDs en paquetes de 25; dentro del paquete hasta 4 en paralelo (visión/CPU)."""
     import logging
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
