@@ -235,10 +235,44 @@ export class WizardComponent implements OnInit, OnDestroy {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    this.subirAutobits(file);
+  }
+
+  onAutobitsDragOver(ev: DragEvent): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (this.subiendoAutobits() || this.limpiando()) return;
+    this.arrastrandoAutobits.set(true);
+    if (ev.dataTransfer) {
+      ev.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  onAutobitsDragLeave(ev: DragEvent): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.arrastrandoAutobits.set(false);
+  }
+
+  onAutobitsDrop(ev: DragEvent): void {
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.arrastrandoAutobits.set(false);
+    if (this.subiendoAutobits() || this.limpiando()) return;
+    const file = Array.from(ev.dataTransfer?.files ?? []).find((f) =>
+      /\.(xlsx|xls|xlsm|csv)$/i.test(f.name)
+    );
+    if (!file) {
+      this.error.set('Suelta un Excel de Autobits (.xlsx, .xls, .csv).');
+      return;
+    }
+    this.subirAutobits(file);
+  }
+
+  private subirAutobits(file: File): void {
     this.restoreSeq += 1;
     this.error.set('');
     this.aviso.set('Leyendo el Excel de Autobits…');
-    // Cancelar primero: el finalize del upload anterior no debe apagar el loading del nuevo.
     this.autobitsUpload?.unsubscribe();
     this.subiendoAutobits.set(true);
     this.autobitsUpload = this.autobitsApi.uploadDirect(file, true).pipe(
