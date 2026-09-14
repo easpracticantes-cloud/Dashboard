@@ -294,7 +294,7 @@ export class DocumentsListComponent implements OnInit, OnDestroy {
       const today = new Date().toISOString().slice(0, 10);
       await this.download.download(
         this.api.exportExcelUrl(documentIds),
-        `Facturas_Autobits_${today}.xlsx`,
+        `Cruce_Cuentas_${today}.xlsx`,
       );
       this.excelEstado = 'generado';
     } catch (err) {

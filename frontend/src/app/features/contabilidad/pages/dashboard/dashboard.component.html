@@ -5,16 +5,16 @@
         <span class="label-caps">Contabilidad AP · Panel operativo</span>
         <h1 class="page-title">Resumen de cuentas por pagar</h1>
         <p class="page-lead">
-          Visión del ciclo Autobits → factura → cruce → pago → comprobante → paquete
+          Visión del ciclo Autobits → facturas → Excel de cruce → pago → paquete
           @if (kpis) {
             · periodo <strong>{{ kpis.periodo.etiqueta }}</strong>
           }
         </p>
       </div>
       <div class="hero-actions">
-        <a routerLink="/app/contabilidad/cola" class="btn btn-secondary">
-          <mat-icon>pending_actions</mat-icon>
-          Abrir cola
+        <a routerLink="/app/contabilidad/documentos" class="btn btn-secondary">
+          <mat-icon>folder_open</mat-icon>
+          Ver documentos
         </a>
         <a routerLink="/app/contabilidad/pagos" class="btn btn-primary">
           <mat-icon>payments</mat-icon>
@@ -189,7 +189,7 @@
       <section class="sheet sheet-pad alerts-panel">
         <div class="section-head-row">
           <h2 class="section-head">Alertas operativas</h2>
-          <a routerLink="/app/contabilidad/cola" class="link-more">Ver cola</a>
+          <a routerLink="/app/contabilidad/documentos" class="link-more">Ver documentos</a>
         </div>
         @if (!alerts.length) {
           <div class="empty-state" style="padding: 1.25rem !important">
@@ -219,8 +219,8 @@
 
       <section class="sheet sheet-pad queue-panel">
         <div class="section-head-row">
-          <h2 class="section-head">Bandeja / cola</h2>
-          <a routerLink="/app/contabilidad/cola" class="link-more">Ver todo</a>
+          <h2 class="section-head">Documentos / bandeja</h2>
+          <a routerLink="/app/contabilidad/documentos" class="link-more">Ver todo</a>
         </div>
         @if (!queueGroups.length) {
           <p class="muted">No hay grupos pendientes en cola.</p>
@@ -276,7 +276,7 @@
             Subsanaciones
           </button>
           <button type="button" class="btn btn-ghost" (click)="exportReport('ops-queue')" [disabled]="exportando">
-            Cola operativa
+            Documentos pendientes
           </button>
         </div>
       </section>

@@ -474,10 +474,11 @@ class CruceExcelService:
             self._vincular_facturas(ids, batch_id, usuario)
         rows = self._filas_desde_facturas(ids)
         self._marcar_duplicados(rows)
-        year = self._anio_desde_facturas(ids)
+        years = [r.year() for r in rows if r.year()]
+        year = max(years) if years else self._anio_desde_facturas(ids)
         content = self.workbook_builder.build(rows, year=year)
         today = datetime.now(timezone.utc).date().isoformat()
-        filename = f"Facturas_Autobits_{today}.xlsx"
+        filename = f"Cruce_Cuentas_{today}.xlsx"
         self.audit.log(
             "CRUCE_EXCEL_GENERADO",
             "CruceExcel",
@@ -612,14 +613,14 @@ class CruceExcelService:
     def _fila_desde_factura(
         self, doc: DocumentModel, crossing: AccountCrossingModel | None
     ) -> CruceExportRow:
-        """La factura manda número, fecha, proveedor, NIT y valores."""
+        """Factura = FACTURA/CDC, proveedor, NIT, valor. Autobits = OC/REF/fecha ejecución."""
         if crossing is not None and crossing.document_id != doc.id:
             crossing = None
         record = None
         if crossing and crossing.autobits_record_id and crossing.document_id == doc.id:
             record = crossing.autobits_record
         numero = self._numero_desde_factura(doc)
-        fecha = self._fecha_desde_factura(doc)
+        fecha_factura = self._fecha_desde_factura(doc)
         proveedor, nit = self._proveedor_desde_factura(doc)
         valor = self._total_desde_factura(doc)
         reasons: list[str] = []
@@ -636,19 +637,40 @@ class CruceExcelService:
             compra = record.numero_compra
         elif crossing and crossing.numero_compra:
             compra = crossing.numero_compra
+        # FECHA DE EJECUCIÓN del estándar = reserva Autobits; si no hay match, factura.
+        fecha_ejecucion = None
+        if record and (record.fecha or "").strip():
+            fecha_ejecucion = str(record.fecha).strip()[:10]
+        elif crossing and (crossing.fecha_ejecucion or "").strip():
+            fecha_ejecucion = str(crossing.fecha_ejecucion).strip()[:10]
+        else:
+            fecha_ejecucion = fecha_factura
+        reserva = None
+        if record and (record.numero_reserva or "").strip():
+            reserva = record.numero_reserva.strip()
+        elif crossing and (crossing.numero_reserva or "").strip():
+            reserva = crossing.numero_reserva.strip()
+        if not proveedor and crossing and (crossing.proveedor_nombre or "").strip():
+            proveedor = crossing.proveedor_nombre.strip()
+        if not nit and crossing and (crossing.nit or "").strip():
+            nit = crossing.nit.strip()
+        if valor is None and record is not None and record.valor is not None:
+            valor = to_money_or_none(record.valor)
+        elif valor is None and crossing is not None and crossing.valor_autobits is not None:
+            valor = to_money_or_none(crossing.valor_autobits)
+        concepto = doc.concepto or (record.concepto if record else None) or (
+            crossing.concepto if crossing else None
+        )
         return CruceExportRow(
             proveedor=proveedor,
             nit=nit,
             numero_compra=compra or numero,
-            numero_reserva=(
-                (crossing.numero_reserva if crossing else None)
-                or (record.numero_reserva if record else None)
-            ),
-            fecha_ejecucion=fecha,
+            numero_reserva=reserva,
+            fecha_ejecucion=fecha_ejecucion,
             valor=valor,
             factura_cdc=numero,
             fecha_pago=(crossing.fecha_pago or "").strip() or None if crossing else None,
-            concepto=doc.concepto,
+            concepto=concepto,
             estado_compra=record.estado_compra if record else (crossing.estado if crossing else None),
             observaciones=doc.observaciones,
             match_type=crossing.match_type if crossing else "SIN_MATCH",
@@ -1688,7 +1710,7 @@ class CruceExcelService:
                     + (f" · {row.celda_pago}" if row and row.celda_pago else "")
                 )
             if crossing.document_id is None:
-                faltas.append("Soporte de factura (PDF/foto) en el paso 3")
+                faltas.append("Soporte de factura (PDF/foto) en el paquete de facturas")
             if row is None:
                 if emparejados or (falta_ids is not None and crossing.id in falta_ids):
                     faltas.append("Esta fila de Autobits no está en el Excel de cruce")

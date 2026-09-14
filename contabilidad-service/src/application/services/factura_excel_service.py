@@ -1,4 +1,8 @@
-"""Excel de resultado Facturas + Autobits. La alineación vive en CrossingService."""
+"""Excel de cruce (Facturas + Autobits). La alineación vive en CrossingService.
+
+Nombre de producto en UI: «Generar Excel de cruce».
+Implementación: delega en CruceExcelService.generar_excel (universo = document_ids).
+"""
 
 from __future__ import annotations
 

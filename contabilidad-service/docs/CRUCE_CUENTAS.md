@@ -15,29 +15,35 @@ Las facturas del paso 3 no se podían subir hasta que existiera ese segundo Exce
 
 Autobits **no se elimina**. Sigue siendo la carga operativa semanal.
 
-## Después
+## Después (flujo SIG actual)
 
-Cruce de Cuentas **no pide un Excel de entrada**.
+Cruce de Cuentas **no pide un Excel de entrada**. En el SIG el flujo es:
 
 ```
-Autobits (ya importado)
-Facturas / documentos
-Proveedores (NIT/nombre)  -->  analizar_desde_sistema  -->  Excel estándar de salida
-Pagos / fecha_pago
+1. Autobits (carga semanal)
+2. Paquete de facturas (hasta 25)
+3. Botón «Generar Excel de cruce»  →  XLSX de 6 hojas
 ```
 
-- `POST /api/cruce-excel/analizar` — consolida SIG y reporta pendientes.
-- `GET /api/cruce-excel/export.xlsx` — clona la plantilla maestra
+- UI: `/app/contabilidad` (wizard de 2 pasos). No hay pantalla «Cruce» ni upload del libro histórico.
+- Plantilla maestra: `CRUCE_DE_CUENTAS_MAESTRO.xlsx` se regenera desde el Excel operativo
+  con `scripts/rebuild_maestro_estructura.py` — **solo organización** (hojas, anchos,
+  encabezados). Nunca copia COM*/FV POS históricos.
+- Al generar, las hojas de periodo se resetean a lienzo vacío y se rellenan con el
+  paquete (`document_ids`): FECHA DE EJECUCIÓN/OC/REF desde Autobits si hay vínculo;
+  FACTURA/CDC, proveedor, valor desde la factura.
+- `GET /api/documents/export-excel?document_ids=1,2,...` — clona la plantilla maestra
   `src/infrastructure/cruce/templates/CRUCE_DE_CUENTAS_MAESTRO.xlsx`
   (solo estructura/formato). Las filas salen de las **facturas** pedidas
   (`document_ids`). Sin `document_ids` el libro sale solo con estructura.
   Autobits/lote no definen filas. Autobits solo aporta REF/estado si ya
   está ligado a esa factura. Una empresa sin factura adjunta no aparece.
-  El archivo original del usuario no se modifica. Nombre: `Cruce_Cuentas_YYYY-MM-DD.xlsx`.
-- `GET /api/cruce-excel/pendientes` — bandeja SIG; no relee un Excel de cruce
-  histórico aunque exista un snapshot de upload.
-- `POST /api/cruce-excel/upload` **se conserva** por compatibilidad; la UI de
-  Contabilidad ya no lo usa.
+  Nombre de descarga: `Cruce_Cuentas_YYYY-MM-DD.xlsx`.
+- BFF: `/api/v1/contabilidad/documents/export-excel` (mismos roles Contabilidad).
+- Orquestación: `FacturaExcelService` → `CruceExcelService.generar_excel` (matching interno).
+- `procesar_archivo` / upload histórico del libro CRUCE: solo servicio/tests; **sin router ni UI**.
+
+Las rutas `/api/cruce-excel/*` fueron retiradas.
 
 ## Fuentes SIG (solo lo que el modelo respalda)
 
@@ -103,9 +109,13 @@ No se reproducen fórmulas ad-hoc del archivo de trabajo (restas con literales,
 
 ## UI
 
-Contabilidad → Cruce / Pendientes / Wizard paso 2:
+Contabilidad → Flujo semanal (2 pasos) o Documentos:
 
-- **Procesar** — analiza SIG
-- **Generar Excel** — descarga el estándar
+- **1. Autobits** — carga el Excel semanal
+- **2. Facturas** — paquete hasta 25 + Claude
+- **Generar Excel de cruce** — descarga `Cruce_Cuentas_YYYY-MM-DD.xlsx` vía
+  `GET /api/documents/export-excel?document_ids=…`
+
+No hay pantalla «Cruce» ni upload del libro histórico en la UI.
 
 Se mantiene el upload de Autobits, facturas, documentos y OCR.

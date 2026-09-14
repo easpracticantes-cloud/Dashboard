@@ -207,7 +207,7 @@ def test_export_xlsx_estructura_estandar(client):
     export = client.get("/api/documents/export-excel")
     assert export.status_code == 200, export.text
     assert "spreadsheet" in export.headers["content-type"]
-    assert "Facturas_Autobits_" in export.headers.get("content-disposition", "")
+    assert "Cruce_Cuentas_" in export.headers.get("content-disposition", "")
     assert export.content[:2] == b"PK"
     assert len(export.content) > 200
 
@@ -229,6 +229,48 @@ def test_export_xlsx_estructura_estandar(client):
     assert [bosque.cell(9, c).value for c in range(1, 11)] == list(BOSQUE_HEADERS)
     luger = wb["PRECOMPRA LUGER 2026"]
     assert [luger.cell(5, c).value for c in range(2, 7)] == list(LUGER_HEADERS)
+
+
+def test_workbook_builder_escribe_datos_sin_fantasmas_del_maestro():
+    """Tras el reset de lienzo, el paquete se ve en A1:F y no quedan bloques históricos."""
+    builder = CruceWorkbookBuilder()
+    content = builder.build(
+        [
+            CruceExportRow(
+                proveedor="Hotel Nuevo SAS",
+                nit="900999888",
+                numero_compra="COM777001",
+                numero_reserva="EAS777001",
+                fecha_ejecucion="2026-03-12",
+                valor=Decimal("155000"),
+                factura_cdc="FV POS 77701",
+                fecha_pago="2026-03-18",
+            ),
+            CruceExportRow(
+                proveedor="VENTAS DUSTER",
+                nit="901814243",
+                numero_compra="COM777002",
+                numero_reserva="EAS777002",
+                fecha_ejecucion="2026-01-08",
+                valor=Decimal("99000"),
+                concepto="Traslado duster",
+            ),
+        ],
+        year=2026,
+    )
+    wb = load_workbook(io.BytesIO(content))
+    enero = wb[standard_sheet_names(2026)[0]]
+    assert enero["A1"].value and "Hotel Nuevo SAS" in str(enero["A1"].value)
+    assert enero["B3"].value == "COM777001"
+    assert enero["C3"].value == "EAS777001"
+    assert enero["D3"].value == 155000
+    assert enero["E3"].value == "FV POS 77701"
+    assert enero["H2"].value in (None, "")
+    assert "MARIA CAMPOS" not in _xlsx_text(content)
+    assert "COM005691" not in _xlsx_text(content)
+    duster = wb["VENTAS_DUSTER"]
+    assert duster["C3"].value == "COM777002"
+    assert duster["E3"].value == "EAS777002"
 
 
 def test_workbook_builder_no_inventa_ceros():

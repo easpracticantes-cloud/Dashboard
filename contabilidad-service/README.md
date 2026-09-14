@@ -100,7 +100,7 @@ frontend/ (Angular 19)  →  api_server.py (FastAPI v1.8)
 | `/api/documents` | Upload y CRUD documentos |
 | `/api/autobits` | Preview/import Excel |
 | `/api/crossings` | Cruce y aprobación |
-| `GET /api/documents/export-excel` | Excel de alineación Facturas + Autobits (`document_ids`) |
+| `GET /api/documents/export-excel` | Excel de cruce del paquete (`document_ids`) |
 | `/api/remediations` | Subsanaciones |
 | `/api/payments` | Pagos y comprobantes |
 | `/api/packages` | Paquetes digitales |

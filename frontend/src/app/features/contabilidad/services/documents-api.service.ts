@@ -194,7 +194,7 @@ export class DocumentsApiService {
     );
   }
 
-  /** Excel del paquete: solo estos document_ids. Sin batch_id. */
+  /** Excel de cruce del paquete: solo estos document_ids. Sin batch_id. */
   exportExcelUrl(documentIds?: number[]): string {
     const params = new URLSearchParams();
     if (documentIds?.length) {

@@ -50,7 +50,7 @@ describe('ContabilidadDownloadService Facturas Excel', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       status: 200,
-      headers: { get: (n: string) => (n === 'Content-Disposition' ? 'attachment; filename="Facturas_Autobits_2026-09-10.xlsx"' : null) },
+      headers: { get: (n: string) => (n === 'Content-Disposition' ? 'attachment; filename="Cruce_Cuentas_2026-09-10.xlsx"' : null) },
       arrayBuffer: async () => new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer,
     });
 

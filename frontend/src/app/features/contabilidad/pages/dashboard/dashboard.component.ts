@@ -59,8 +59,8 @@ export class DashboardComponent implements OnInit {
   }
 
   quickLinks = [
-    { path: '/app/contabilidad', label: 'Facturas' },
-    { path: '/app/contabilidad/cola', label: 'Cola operativa' },
+    { path: '/app/contabilidad', label: 'Flujo semanal' },
+    { path: '/app/contabilidad/documentos', label: 'Documentos' },
     { path: '/app/contabilidad/autobits', label: 'Autobits' },
     { path: '/app/contabilidad/pagos', label: 'Pagos pendientes' },
     { path: '/app/contabilidad/subsanaciones', label: 'Subsanaciones' },
@@ -86,7 +86,7 @@ export class DashboardComponent implements OnInit {
       path: '/app/contabilidad',
       icon: 'download',
       step: '03',
-      label: 'Generar Excel del paquete',
+      label: 'Generar Excel de cruce',
       hint: 'Hasta 25 facturas alineadas con Autobits.',
     },
     {
@@ -250,8 +250,9 @@ export class DashboardComponent implements OnInit {
   queueLink(key: string): string | null {
     const k = key.toLowerCase();
     if (k.includes('pago') || k.includes('payment')) return '/app/contabilidad/pagos';
-    if (k.includes('cruce') || k.includes('cross') || k.includes('document') || k.includes('factura')) {
-      return '/app/contabilidad';
+    if (k.includes('cruce') || k.includes('cross')) return '/app/contabilidad';
+    if (k.includes('document') || k.includes('factura') || k.includes('cola')) {
+      return '/app/contabilidad/documentos';
     }
     if (k.includes('paquete') || k.includes('package')) return '/app/contabilidad/paquetes';
     if (k.includes('subsan') || k.includes('remediation')) return '/app/contabilidad/subsanaciones';

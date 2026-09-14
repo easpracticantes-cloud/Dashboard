@@ -67,11 +67,11 @@ describe('DocumentsListComponent paquete + Excel', () => {
     return fixture.componentInstance;
   }
 
-  it('no pide adjuntar Excel de cruce y ofrece Generar Excel', () => {
+  it('no pide adjuntar Excel de cruce y ofrece Generar Excel de cruce', () => {
     const fixture = TestBed.createComponent(DocumentsListComponent);
     fixture.detectChanges();
     const html = (fixture.nativeElement as HTMLElement).textContent || '';
-    expect(html).toContain('Generar Excel');
+    expect(html).toContain('Generar Excel de cruce');
     expect(html).not.toContain('Soltar o elegir CRUCE DE CUENTAS');
     const fileLabels = Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll('input[type="file"]'),
@@ -108,7 +108,7 @@ describe('DocumentsListComponent paquete + Excel', () => {
     expect(api.exportExcelUrl).toHaveBeenCalledWith([44]);
     expect(download.download).toHaveBeenCalledWith(
       '/contabilidad/documents/export-excel?document_ids=44',
-      expect.stringMatching(/^Facturas_Autobits_\d{4}-\d{2}-\d{2}\.xlsx$/),
+      expect.stringMatching(/^Cruce_Cuentas_\d{4}-\d{2}-\d{2}\.xlsx$/),
     );
     expect(cmp.excelEstado).toBe('generado');
   });

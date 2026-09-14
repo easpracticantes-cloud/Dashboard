@@ -15,7 +15,7 @@ public final class SigCapabilityBrief {
                 - Cotizaciones de tours desde catálogo (precios reales vía QUOTE / catálogo de este turno).
                 - Dashboard operativo, analítica y reportes.
                 - Roles: ADMINISTRADOR, GERENCIA, COMERCIAL, CONTABILIDAD, OPERACIONES.
-                - Contabilidad (documentos, OCR, cruces).
+                - Contabilidad (Autobits, facturas, Excel de cruce, pagos).
                 - Integraciones: Google Sheets, login, IA.
                 Si piden una cifra del negocio y no está en este turno, dilo y sugiere dónde mirarla.
                 No inventes esos datos.

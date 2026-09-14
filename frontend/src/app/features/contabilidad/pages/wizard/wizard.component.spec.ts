@@ -242,7 +242,7 @@ describe('WizardComponent Autobits Excel flow', () => {
     expect(docsApi.exportExcelUrl).toHaveBeenCalledWith([44]);
     expect(download.download).toHaveBeenCalledWith(
       '/contabilidad/documents/export-excel?document_ids=44',
-      expect.stringMatching(/^Facturas_Autobits_\d{4}-\d{2}-\d{2}\.xlsx$/),
+      expect.stringMatching(/^Cruce_Cuentas_\d{4}-\d{2}-\d{2}\.xlsx$/),
     );
   });
 

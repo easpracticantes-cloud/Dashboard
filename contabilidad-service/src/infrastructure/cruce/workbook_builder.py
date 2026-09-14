@@ -136,6 +136,12 @@ class CruceWorkbookBuilder:
                 wb.create_sheet(name)
 
         specials, period_rows = self._split(rows)
+        if self._from_template:
+            # El maestro trae layout histórico (merges/bloques). Sin reset, los
+            # datos nuevos quedan ocultos o desalineados entre columnas fantasma.
+            for sheet in period_sheets(year):
+                if sheet.name in wb.sheetnames:
+                    self._reset_period_canvas(wb[sheet.name])
         self._write_period_sheets(wb, period_rows, year)
         self._write_duster(wb["VENTAS_DUSTER"], specials.get("duster", []))
         self._write_bosque(wb["CDC BOSQUE DE PALMAS"], specials.get("bosque", []))
@@ -258,7 +264,7 @@ class CruceWorkbookBuilder:
                 wb[old].title = new
 
     def _clear_sample_values(self, wb) -> None:
-        """Quita datos históricos del maestro. Conserva estilos, anchos, merges y encabezados."""
+        """Quita datos históricos del maestro. Conserva estilos, anchos y encabezados."""
         for name in wb.sheetnames:
             ws = wb[name]
             for row in ws.iter_rows(
@@ -273,6 +279,31 @@ class CruceWorkbookBuilder:
                         self._canonicalize_header(cell)
                         continue
                     cell.value = None
+
+    def _reset_period_canvas(self, ws: Worksheet) -> None:
+        """Lienzo vacío por hoja de periodo: sin merges ni valores históricos.
+
+        Conserva anchos de columna y propiedades de hoja. El builder vuelve a
+        pintar bloques por proveedor (organización del estándar).
+        """
+        for rng in list(ws.merged_cells.ranges):
+            try:
+                ws.unmerge_cells(str(rng))
+            except Exception:
+                continue
+        max_row = ws.max_row or 1
+        max_col = ws.max_column or 1
+        for row in ws.iter_rows(min_row=1, max_row=max_row, max_col=max_col):
+            for cell in row:
+                if isinstance(cell, MergedCell):
+                    continue
+                if cell.value is not None:
+                    cell.value = None
+        if getattr(ws, "auto_filter", None) is not None:
+            try:
+                ws.auto_filter.ref = None
+            except Exception:
+                pass
 
     def _canonicalize_header(self, cell) -> None:
         if not isinstance(cell.value, str):
@@ -352,9 +383,12 @@ class CruceWorkbookBuilder:
         self, ws: Worksheet, groups: list[tuple[str, list[CruceExportRow]]]
     ) -> None:
         if not groups:
+            # Sin facturas: deja el esqueleto del bloque estándar (no el layout histórico).
+            self._style_header_row(ws, 2, 1, PERIOD_BLOCK_HEADERS, HEADER_FILL_BLUE)
             if not self._from_template:
-                self._style_header_row(ws, 2, 1, PERIOD_BLOCK_HEADERS, HEADER_FILL_BLUE)
                 self._autosize(ws, BLOCK_WIDTH)
+            if not ws.freeze_panes:
+                ws.freeze_panes = "A3"
             return
 
         start_row = 1

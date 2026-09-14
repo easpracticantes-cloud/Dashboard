@@ -112,6 +112,7 @@ def health():
         "ai_key_configured": key_set,
         "ai_model": settings.ai_model_fast,
         "vision_fallback": bool(settings.claude_vision_on_weak_ocr) and key_set,
+        # Alias legacy: antes el health hablaba de Ollama; hoy es Claude.
         "ollama": ai_ok,
         "hint": (
             None

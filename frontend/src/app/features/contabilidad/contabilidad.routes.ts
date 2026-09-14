@@ -14,7 +14,10 @@ export const CONTABILIDAD_ROUTES: Routes = [
       {
         path: 'documentos',
         pathMatch: 'full',
-        redirectTo: '',
+        loadComponent: () =>
+          import('./pages/documents/documents-list.component').then(
+            (m) => m.DocumentsListComponent,
+          ),
       },
       {
         path: 'documentos/:id',
@@ -49,6 +52,21 @@ export const CONTABILIDAD_ROUTES: Routes = [
         path: 'cruce',
         pathMatch: 'full',
         redirectTo: '',
+      },
+      {
+        path: 'cola',
+        pathMatch: 'full',
+        redirectTo: 'documentos',
+      },
+      {
+        path: 'dashboard',
+        pathMatch: 'full',
+        redirectTo: '',
+      },
+      {
+        path: 'pendientes',
+        pathMatch: 'full',
+        redirectTo: 'pagos',
       },
     ],
   },

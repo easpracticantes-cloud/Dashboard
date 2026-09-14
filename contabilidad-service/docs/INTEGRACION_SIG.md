@@ -29,16 +29,17 @@ Paquete completo del **Sistema Contable IA** (Facturas IA) para montarlo dentro 
 ## 2. Flujo contable implementado
 
 ```text
-1. Excel Autobits (semana sáb–vie)     →  /autobits
-2. Facturas / cuentas de cobro (OCR)   →  /documentos
-3. Excel CRUCE DE CUENTAS              →  /cruce  (paso 2 en pantalla)
-4. Comparación Autobits ↔ Cruce        →  reporte «Qué falta por llenar»
-5. Completar factura/CDC y fecha pago  →  tabla de cruce
-6. Generar pagos                       →  /pagos
-7. Paquete digital                     →  /paquetes
+1. Excel Autobits (semana sáb–vie)     →  /app/contabilidad  (paso 1) o /autobits
+2. Paquete de facturas (OCR + Claude)  →  /app/contabilidad  (paso 2) o /documentos
+3. Generar Excel de cruce              →  GET /api/documents/export-excel?document_ids=
+4. Completar pagos / fecha pago        →  /app/contabilidad/pagos
+5. Paquete digital                     →  /app/contabilidad/paquetes
+6. Remediaciones                       →  /app/contabilidad/subsanaciones
 ```
 
-El parser del **CRUCE DE CUENTAS** entiende el formato real (bloques por proveedor, columnas FACTURA/CDC, FECHA DE PAGO, etc.) y lo cruza con el último Excel de Autobits por orden de compra / reserva.
+El Excel de salida clona la plantilla maestra CRUCE DE CUENTAS (solo formato).
+Las filas salen de las facturas del paquete (`document_ids`); Autobits aporta REF/estado
+si ya está ligado. No hay upload del libro histórico ni módulo `/api/cruce-excel`.
 
 ---
 
@@ -123,15 +124,15 @@ Consuma los endpoints REST documentados en `/docs`. Los más usados:
 | Método | Ruta | Uso |
 |--------|------|-----|
 | POST | `/api/autobits/upload` | Subir Excel Autobits |
-| POST | `/api/cruce-excel/analizar` | Analizar cruce desde SIG (sin Excel) |
-| GET | `/api/cruce-excel/export.xlsx` | Generar Excel estándar de salida |
-| POST | `/api/cruce-excel/upload` | Compatibilidad: subir CRUCE DE CUENTAS histórico |
-| GET | `/api/cruce-excel/pendientes` | Qué falta por llenar |
-| GET | `/api/crossings` | Listado de cruces |
+| GET | `/api/documents/export-excel` | Excel de cruce del paquete (`document_ids`) |
+| POST | `/api/documents/upload-batch` | Subir paquete de facturas (hasta 25) |
+| GET | `/api/crossings` | Listado de cruces (alineación interna) |
 | PATCH | `/api/crossings/{id}/complete` | Factura/CDC + fecha pago |
-| POST | `/api/crossings/seed` | Sincronizar desde Autobits |
-| POST | `/api/documents/upload` | Subir facturas |
+| POST | `/api/crossings/run` | Matching Autobits↔facturas |
+| POST | `/api/documents/upload` | Subir una factura |
 | GET | `/api/dashboard/kpis` | KPIs semana contable |
+
+> El módulo HTTP `/api/cruce-excel/*` ya no existe. El Excel de salida vive en Facturas (`export-excel`).
 
 ---
 

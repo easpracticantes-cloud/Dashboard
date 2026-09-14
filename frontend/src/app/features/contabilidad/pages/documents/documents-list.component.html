@@ -3,13 +3,18 @@
     <div class="hero-row">
       <div>
         <span class="label-caps">Archivo documental AP</span>
-        <h1 class="page-title">Facturas</h1>
+        <h1 class="page-title">Documentos</h1>
         <p class="page-lead">
-          {{ total }} documento{{ total === 1 ? '' : 's' }} · paquete de hasta
-          {{ packSize }} · alinear con Autobits y generar el Excel
+          {{ total }} documento{{ total === 1 ? '' : 's' }} · archivo y reproceso.
+          El Excel de cruce se genera en el
+          <a routerLink="/app/contabilidad">flujo semanal</a>.
         </p>
       </div>
       <div class="hero-actions">
+        <a routerLink="/app/contabilidad" class="btn btn-secondary">
+          <mat-icon>route</mat-icon>
+          Flujo semanal
+        </a>
         <button
           type="button"
           class="btn btn-primary"
@@ -22,7 +27,7 @@
           } @else if (excelEstado === 'generado') {
             Generado
           } @else {
-            Generar Excel
+            Generar Excel de cruce
           }
         </button>
         <button
@@ -102,7 +107,7 @@
         } @else if (puedeGenerarExcel) {
           <button type="button" class="btn btn-primary" (click)="generarExcel()">
             <mat-icon>download</mat-icon>
-            {{ excelEstado === 'generado' ? 'Generado' : 'Generar Excel' }}
+            {{ excelEstado === 'generado' ? 'Generado' : 'Generar Excel de cruce' }}
           </button>
         }
       </div>

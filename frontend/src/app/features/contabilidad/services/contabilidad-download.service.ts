@@ -29,8 +29,6 @@ export class ContabilidadDownloadService {
       path = path.replace('/api/packages/', '/contabilidad/packages/');
     } else if (path.startsWith('/api/autobits/')) {
       path = path.replace('/api/autobits/', '/contabilidad/autobits/');
-    } else if (path.startsWith('/api/cruce/')) {
-      path = path.replace('/api/cruce/', '/contabilidad/cruce/');
     } else if (!path.startsWith('/contabilidad/') && !path.startsWith('/api/v1/contabilidad/')) {
       if (path.startsWith('/api/')) {
         path = path.replace('/api/', '/contabilidad/');

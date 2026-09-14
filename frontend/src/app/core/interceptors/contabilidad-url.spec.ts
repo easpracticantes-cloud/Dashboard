@@ -37,7 +37,7 @@ describe('rewriteContabilidadUrl', () => {
     ).toBe('/api/v1/contabilidad/autobits/excels?confirm=true');
   });
 
-  it('manda Generar Excel de Facturas al BFF /api/v1/contabilidad/documents/export-excel', () => {
+  it('manda Generar Excel de cruce al BFF /api/v1/contabilidad/documents/export-excel', () => {
     expect(rewriteContabilidadUrl('/contabilidad/documents/export-excel', '/api/v1')).toBe(
       '/api/v1/contabilidad/documents/export-excel'
     );

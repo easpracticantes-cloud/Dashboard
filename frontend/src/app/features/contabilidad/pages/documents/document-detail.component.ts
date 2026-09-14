@@ -134,7 +134,7 @@ export class DocumentDetailComponent implements OnInit, OnDestroy {
       },
       {
         key: 'cruce',
-        label: 'Alineación',
+        label: 'Cruce',
         icon: 'compare_arrows',
         present: !!c?.crossing,
         detail: crossing?.['estado']

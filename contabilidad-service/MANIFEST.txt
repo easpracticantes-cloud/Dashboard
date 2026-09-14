@@ -1,6 +1,11 @@
-MANIFEST — Sistema Contable IA
+MANIFEST — Sistema Contable IA (paquete histórico)
 Fecha: 2026-08-28
 Archivos: 234
+
+NOTA (2026-09): El SIG embebido ya no usa `cruce-excel-api`, ni pantallas
+`crossings`/`pending` del SPA del paquete. El Excel de salida es
+`GET /api/documents/export-excel` (UI: «Generar Excel de cruce»).
+Este listado conserva rutas del empaquetado original.
 
 .env.example
 .gitignore

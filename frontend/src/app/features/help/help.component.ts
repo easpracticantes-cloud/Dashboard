@@ -49,10 +49,14 @@ export class HelpComponent {
     {
       icon: 'account_balance',
       title: 'Contabilidad',
-      body: 'Contabilidad AP: Autobits, facturas y pagos. Tras analizar un paquete de hasta 25 facturas se genera el Excel.',
+      body: 'Flujo semanal de Contabilidad: Autobits → paquete de facturas (hasta 25) → Generar Excel de cruce. Pagos y paquetes son pasos siguientes.',
       route: '/app/contabilidad',
       routeLabel: 'Abrir Contabilidad',
-      steps: ['Carga Autobits.', 'Sube y analiza el paquete de facturas.', 'Pulse Generar Excel.']
+      steps: [
+        'Carga el Excel de Autobits.',
+        'Sube y analiza el paquete de facturas.',
+        'Pulse Generar Excel de cruce.',
+      ]
     },
     {
       icon: 'monitoring',

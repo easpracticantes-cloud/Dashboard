@@ -47,11 +47,16 @@ def client():
 
 
 def test_strip_quita_comments_vml_aunque_openpyxl_los_reescriba(tmp_path):
-    """El maestro + save() de openpyxl reproduce el XLSX de 25 partes del usuario."""
+    """openpyxl puede reintroducir VML/comentarios; strip_ooxml_hazards los limpia."""
     from openpyxl import load_workbook
+    from openpyxl.comments import Comment
 
     dirty = tmp_path / "dirty.xlsx"
     wb = load_workbook(MASTER_TEMPLATE_PATH)
+    # El maestro estructura-only ya no trae comments/VML; se inyectan para probar el strip.
+    ws = wb[wb.sheetnames[0]]
+    ws["Z1"] = "probe"
+    ws["Z1"].comment = Comment("comentario de prueba", "tester")
     wb.save(dirty)
     wb.close()
     raw = dirty.read_bytes()

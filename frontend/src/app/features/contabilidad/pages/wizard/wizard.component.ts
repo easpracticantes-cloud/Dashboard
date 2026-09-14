@@ -233,7 +233,7 @@ export class WizardComponent implements OnInit, OnDestroy {
       }
       await this.download.download(
         this.docsApi.exportExcelUrl(documentIds),
-        `Facturas_Autobits_${today}.xlsx`,
+        `Cruce_Cuentas_${today}.xlsx`,
       );
       this.aviso.set('Excel de cruce descargado.');
     } catch (err) {

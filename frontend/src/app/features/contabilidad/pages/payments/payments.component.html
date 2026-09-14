@@ -15,7 +15,7 @@
         </button>
         <a routerLink="/app/contabilidad" class="btn btn-secondary">
           <mat-icon>description</mat-icon>
-          Ver facturas
+          Ir al flujo semanal
         </a>
       </div>
     </div>
@@ -59,8 +59,8 @@
     </summary>
     <div class="manual-body">
       <p>
-        Normalmente los pagos se generan en bloque desde
-        <a routerLink="/app/contabilidad">Facturas</a>. Use esto solo para un cruce puntual.
+        Los pagos se crean aquí desde un cruce ya aprobado (ID), o tras
+        <a routerLink="/app/contabilidad">generar el Excel de cruce</a> en el flujo semanal.
       </p>
       <div class="manual-row">
         <input
@@ -89,8 +89,11 @@
     <div class="sheet empty-state">
       <div class="empty-icon"><mat-icon>payments</mat-icon></div>
       <h2>Sin pagos registrados</h2>
-      <p>Complete factura/CDC en Facturas y pulse «Generar pagos».</p>
-      <a routerLink="/app/contabilidad" class="btn btn-primary">Ir a Facturas</a>
+      <p>
+        Cree un pago con el ID de un cruce aprobado, o vuelva al flujo semanal para
+        cruzar facturas y Autobits.
+      </p>
+      <a routerLink="/app/contabilidad" class="btn btn-primary">Ir al flujo semanal</a>
     </div>
   } @else {
     <div class="sheet table-wrap">
