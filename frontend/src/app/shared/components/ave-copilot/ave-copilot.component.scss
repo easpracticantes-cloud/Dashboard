@@ -409,6 +409,10 @@
   padding: 0 0.75rem 0.35rem;
 }
 
+.ave-panel__hints--quote {
+  padding-top: 0;
+}
+
 .ave-chip {
   flex: 0 0 auto;
   border: 1px solid rgba(20, 38, 28, 0.12);
@@ -422,6 +426,23 @@
   max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ave-chip--quote {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: none;
+  border-color: rgba(201, 162, 39, 0.45);
+  background: linear-gradient(90deg, rgba(11, 61, 40, 0.1), rgba(201, 162, 39, 0.14));
+  color: #0b3d28;
+  font-weight: 700;
+}
+
+.ave-chip--quote mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
 }
 
 .ave-panel__foot {

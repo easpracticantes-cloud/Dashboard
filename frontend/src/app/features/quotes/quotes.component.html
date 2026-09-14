@@ -1,19 +1,15 @@
 <eas-page-header
-  eyebrow="Pipeline comercial"
+  eyebrow="Pipeline Sheets"
   title="Cotizaciones"
-  subtitle="Cotizaciones inteligentes con Claude + catálogo SIG y plantilla Escuela Aves Salento. Independiente de WhatsApp."
+  subtitle="Listado comercial. Para cotizar con Claude y la plantilla Escuela Aves, usa Ave."
 >
   <button type="button" class="eas-btn-secondary" (click)="exportCsv()" [disabled]="exporting()">
     <mat-icon>download</mat-icon>
     {{ exporting() ? 'Exportando…' : 'Exportar CSV' }}
   </button>
-  <a routerLink="/app/quotes/nueva" class="eas-btn-primary">
-    <mat-icon>auto_awesome</mat-icon>
-    Cotización inteligente
-  </a>
-  <button type="button" class="eas-btn-secondary" (click)="showForm.set(!showForm())">
+  <button type="button" class="eas-btn-primary" (click)="showForm.set(!showForm())">
     <mat-icon>add</mat-icon>
-    Manual rápida
+    Nueva cotización
   </button>
 </eas-page-header>
 

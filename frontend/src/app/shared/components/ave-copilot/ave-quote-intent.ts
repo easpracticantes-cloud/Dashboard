@@ -103,5 +103,12 @@ function guessTourName(message: string): string {
   if (text.includes('cócora') || text.includes('cocora')) return 'Valle de Cócora';
   if (text.includes('parapente')) return 'Parapente';
   if (text.includes('cabalgata')) return 'Cabalgata ecológica';
+  if (text.includes('avistamiento') || text.includes('birding') || /\baves\b/.test(text)) {
+    return 'Avistamiento de aves';
+  }
+  if (text.includes('café') || text.includes('cafe') || text.includes('finca')) {
+    return 'Ruta de aves y café';
+  }
+  if (text.includes('salento')) return 'Experiencia Escuela Aves Salento';
   return '';
 }

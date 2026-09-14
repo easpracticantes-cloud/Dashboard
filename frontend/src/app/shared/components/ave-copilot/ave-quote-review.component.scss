@@ -64,6 +64,26 @@
   font-weight: 700;
 }
 
+.aqr__sub {
+  margin: 0.35rem 0 0;
+  max-width: 36rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  opacity: 0.82;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.aqr__hint {
+  margin: 0;
+  padding: 0.55rem 1.15rem;
+  font-size: 0.78rem;
+  color: #3d5a4a;
+  background: rgba(31, 122, 76, 0.08);
+  border-bottom: 1px solid rgba(20, 38, 28, 0.08);
+}
+
 .aqr__head-tools {
   display: flex;
   align-items: center;

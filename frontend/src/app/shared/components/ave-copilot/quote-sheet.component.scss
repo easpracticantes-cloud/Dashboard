@@ -19,6 +19,17 @@
   box-shadow: 0 12px 28px rgba(12, 24, 18, 0.12);
 }
 
+.qs-edit-banner {
+  margin: 0;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f6efe2;
+  background: linear-gradient(90deg, #0b3d28, #1a4d34 55%, #c9a227);
+}
+
 .qs h1,
 .qs h2,
 .qs p,
@@ -56,10 +67,28 @@
 }
 
 .qs-hero__bird {
+  position: relative;
   background-color: #0d3b24;
-  background-position: 72% 8%;
-  background-size: 280% auto;
+  background-position: 68% 12%;
+  background-size: cover;
   background-repeat: no-repeat;
+  min-height: 168px;
+}
+
+.qs-brand-lock {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f6efe2;
+  background: rgba(7, 38, 26, 0.72);
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  pointer-events: none;
 }
 
 .qs-hero__pills {
@@ -453,8 +482,14 @@
 }
 
 .qs--edit .qs-in {
-  background: rgba(201, 162, 39, 0.05);
-  border-bottom-color: rgba(11, 61, 40, 0.12);
+  background: rgba(246, 239, 226, 0.65);
+  border-radius: 4px;
+  border: 1px solid rgba(11, 61, 40, 0.16);
+  padding: 3px 6px;
+}
+
+.qs--edit .qs-in:hover {
+  border-color: rgba(201, 162, 39, 0.55);
 }
 
 .qs-in--area {

@@ -1,56 +1,21 @@
-# Cotizaciones inteligentes (SIG)
+# Cotizaciones en SIG (solo Ave)
 
-## Separación obligatoria
+No hay módulo aparte de “Cotizaciones inteligentes”. Todo el flujo comercial con Claude vive en **Ave**.
 
-| Módulo | Usa WhatsApp |
-|--------|--------------|
-| Registro / CRM | Sí (importación / captura) |
-| **Cotizaciones** | **No** |
+## Cómo cotizar
 
-La cotización se construye con: **cliente SIG + instrucción del asesor + Claude + catálogo + plantilla**.
+1. Abre Ave y pide cotizar (personas, experiencia, fecha, cliente…).
+2. Claude + catálogo SIG arman el borrador.
+3. Se abre la **plantilla editable** Escuela Aves Salento.
+4. Editas campos en la hoja (cliente, líneas, cantidades) → Guardar / Generar PDF.
 
-## Flujo
+## Plantilla imagen vs editable
 
-```
-Asesor elige cliente (opcional) + escribe instrucción
-        ↓
-InstructionQuoteExtractor (Claude JSON estructurado)
-        ↓
-CatalogQuoteService (precios reales ai/catalogo/)
-        ↓
-QuoteDocumentCalculator (BigDecimal / IVA)
-        ↓
-Snapshot sig.intelligent_quotes
-        ↓
-Preview eas-quote-sheet (plantilla protegida)
-        ↓
-Edición humana + recalculate
-        ↓
-PDF multipágina (quote-pdf.ts) + approve → sig.quotes
-```
+`plantilla-cotizacion.jpg` es la referencia estética de marca (logo, foto, colores).  
+**No se edita el JPG como documento.** Ave usa una hoja HTML/CSS alineada a esa estética:
 
-## Roles
+| Fijo (marca) | Editable |
+|--------------|----------|
+| Logo, fotografía, colores, tipografía, condiciones base | Cliente, fechas, Nº, líneas, cantidades, precios, observaciones |
 
-- **Claude:** interpretar, redactar, detectar faltantes. Nunca precios ni consecutivos.
-- **SIG catálogo:** tarifas.
-- **Backend:** cálculos, número `COT-…`, persistencia.
-- **HTML/CSS `quote-sheet`:** identidad visual EAS (no rediseñar).
-- **Frontend estudio:** `/app/quotes/nueva`.
-
-## API
-
-- `POST /api/v1/ai/intelligent-quotes`
-- `GET /api/v1/ai/intelligent-quotes/{id}`
-- `POST /api/v1/ai/intelligent-quotes/{id}/recalculate`
-- `POST /api/v1/ai/intelligent-quotes/{id}/approve`
-- Reutiliza `POST /api/v1/ai/quotes/document` para validación Ave.
-
-## Checklist PDF
-
-- [ ] Logo y colores EAS
-- [ ] Datos empresa fijos
-- [ ] Precios de catálogo
-- [ ] Totales backend
-- [ ] Sin placeholders `{{…}}`
-- [ ] Multipágina con mismo header/footer
-- [ ] Campos cliente vacíos ocultos en PDF
+WhatsApp / Registro no alimentan este flujo.

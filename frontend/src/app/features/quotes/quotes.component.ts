@@ -1,7 +1,7 @@
 import { Component, effect, inject, signal } from '@angular/core';
 import { DatePipe, CurrencyPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { CommercialService, CommercialStatus, QuoteDto } from '../../core/services/commercial.service';
 import { ClientsService } from '../../core/services/clients.service';
@@ -14,7 +14,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 @Component({
   selector: 'eas-quotes',
   standalone: true,
-  imports: [DatePipe, CurrencyPipe, FormsModule, MatIconModule, RouterLink, PageHeaderComponent, EmptyStateComponent],
+  imports: [DatePipe, CurrencyPipe, FormsModule, MatIconModule, PageHeaderComponent, EmptyStateComponent],
   templateUrl: './quotes.component.html',
   styleUrl: './commercial-page.scss'
 })

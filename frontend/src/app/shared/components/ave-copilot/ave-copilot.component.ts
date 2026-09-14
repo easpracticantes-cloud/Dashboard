@@ -222,11 +222,16 @@ export class AveCopilotComponent {
 
   /** Solo ejemplos de arranque — no limitan lo que se puede escribir */
   readonly suggestions = [
-    'Explícame qué puedo hacer en este sistema',
-    'Ayúdame a cotizar un tour',
-    'Hazme un resumen claro de algo',
-    '¿Qué es inteligencia artificial?'
+    'Cotiza avistamiento de aves para 4 personas',
+    'Cotización Valle de Cócora, 2 pax, privado',
+    'Prepara presupuesto Acaime para 6 personas',
+    'Explícame qué puedo hacer en este sistema'
   ];
+
+  /** Última cotización cerrada: permite reabrir la plantilla editable. */
+  hasReusableQuote(): boolean {
+    return !!this.lastQuote && !this.quoteDraft();
+  }
 
   toggle(): void {
     this.open.update((v) => !v);

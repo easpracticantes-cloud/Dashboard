@@ -25,4 +25,10 @@ describe('ave-quote-intent', () => {
     expect(draft.items?.[0].quantity).toBe(4);
     expect(draft.items?.[0].description).toMatch(/Rafting/i);
   });
+
+  it('reconoce experiencias Escuela Aves en el borrador', () => {
+    const draft = seedQuoteDraft('Cotiza avistamiento de aves para 3 personas');
+    expect(draft.people).toBe(3);
+    expect(draft.name).toMatch(/Avistamiento/i);
+  });
 });

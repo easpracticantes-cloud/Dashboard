@@ -1,10 +1,19 @@
 <article class="qs" [class.qs--edit]="editing()" aria-label="Cotización Escuela Aves Salento">
+  @if (editing()) {
+    <p class="qs-edit-banner" aria-live="polite">
+      Modo edición · plantilla Escuela Aves (campos editables · imagen de marca fija)
+    </p>
+  }
   <header class="qs-hero">
     <div class="qs-hero__brand">
       <img class="qs-hero__logo" [src]="logo" alt="escuelaaves Salento" />
       <p class="qs-hero__inspire">Naturaleza que inspira</p>
     </div>
-    <div class="qs-hero__bird" [style.background-image]="'url(' + plantilla + ')'" role="img" aria-label="Ave"></div>
+    <div class="qs-hero__bird" [style.background-image]="'url(' + plantilla + ')'" role="img" aria-label="Fotografía de marca Escuela Aves">
+      @if (editing()) {
+        <span class="qs-brand-lock" title="Parte fija de la plantilla de marca">Marca fija</span>
+      }
+    </div>
     <ul class="qs-hero__pills">
       <li>
         <span class="qs-ico qs-ico--leaf" aria-hidden="true"></span>
