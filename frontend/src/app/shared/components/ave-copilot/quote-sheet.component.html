@@ -5,32 +5,53 @@
   aria-label="Cotización Escuela Aves Salento"
 >
   <header class="qs-hero">
-    <div class="qs-hero__glow" aria-hidden="true"></div>
-    <div class="qs-hero__brand">
-      <img class="qs-hero__logo" [src]="logo" alt="escuelaaves Salento" />
-      <p class="qs-hero__inspire">Naturaleza que inspira</p>
+    <div class="qs-hero__stage">
+      <div class="qs-hero__brand">
+        <img class="qs-hero__logo" [src]="logo" alt="escuelaaves Salento" />
+        <p class="qs-hero__inspire">Naturaleza que inspira</p>
+      </div>
+
+      <div
+        class="qs-hero__photo"
+        [style.background-image]="'url(' + bird + ')'"
+        role="img"
+        aria-label="Ave Escuela Aves Salento"
+      ></div>
+
+      <div class="qs-hero__services">
+        <ul class="qs-hero__pills">
+          <li>
+            <span class="qs-pill-ico qs-pill-ico--bird" aria-hidden="true"></span>
+            <span>Avistamiento de aves</span>
+          </li>
+          <li>
+            <span class="qs-pill-ico qs-pill-ico--leaf" aria-hidden="true"></span>
+            <span>Experiencias naturales</span>
+          </li>
+          <li>
+            <span class="qs-pill-ico qs-pill-ico--mount" aria-hidden="true"></span>
+            <span>Conexión con la biodiversidad</span>
+          </li>
+        </ul>
+      </div>
     </div>
-    <div class="qs-hero__bird" [style.background-image]="'url(' + bird + ')'" role="img" aria-label="Ave"></div>
-    <ul class="qs-hero__pills">
-      <li>
-        <span class="qs-ico qs-ico--bird" aria-hidden="true"></span>
-        Avistamiento de aves
-      </li>
-      <li>
-        <span class="qs-ico qs-ico--leaf" aria-hidden="true"></span>
-        Experiencias naturales
-      </li>
-      <li>
-        <span class="qs-ico qs-ico--mount" aria-hidden="true"></span>
-        Conexión con la biodiversidad
-      </li>
-    </ul>
-    <div class="qs-hero__wave" aria-hidden="true"></div>
+
+    <svg class="qs-hero__wave" viewBox="0 0 780 34" preserveAspectRatio="none" aria-hidden="true">
+      <path
+        d="M0 22 C70 6 140 30 210 14 C280 0 350 28 420 12 C490 0 560 26 630 10 C700 0 740 16 780 12 L780 34 L0 34 Z"
+        fill="#e8a31a"
+      />
+      <path
+        d="M0 24 C80 10 150 32 230 16 C310 2 380 30 460 14 C540 2 610 28 690 12 C740 4 765 14 780 16 L780 34 L0 34 Z"
+        fill="#f0bc3a"
+        opacity="0.92"
+      />
+    </svg>
   </header>
 
   <section class="qs-title">
     <div class="qs-title__left">
-      <span class="qs-badge-doc" aria-hidden="true"></span>
+      <span class="qs-doc" aria-hidden="true"></span>
       <div>
         <h1>COTIZACIÓN</h1>
         <p>{{ company.tagline }}</p>
@@ -41,7 +62,7 @@
         <dt>N.º Cotización:</dt>
         <dd>
           @if (editing()) {
-            <input class="qs-in" type="text" [ngModel]="document().quoteNumber" (ngModelChange)="patch({ quoteNumber: $event })" placeholder="Número" />
+            <input class="qs-in" type="text" [ngModel]="document().quoteNumber" (ngModelChange)="patch({ quoteNumber: $event })" placeholder="—" />
           } @else {
             {{ dash(document().quoteNumber) }}
           }
@@ -132,39 +153,37 @@
 
     <div class="qs-card qs-card--company">
       <h2>
-        <span class="qs-ico qs-ico--grid" aria-hidden="true"></span>
+        <span class="qs-ico qs-ico--building" aria-hidden="true"></span>
         Nuestra información
       </h2>
-      <div class="qs-company">
-        <p class="qs-company__name">{{ company.legalName }}</p>
-        <dl class="qs-kv qs-kv--plain">
-          <div><dt>NIT:</dt><dd>{{ company.nit }}</dd></div>
-          <div><dt>Dirección:</dt><dd>{{ company.address }}</dd></div>
-          <div><dt>Teléfono:</dt><dd>{{ company.phone }}</dd></div>
-          <div><dt>Correo:</dt><dd>{{ company.email }}</dd></div>
-          @if (editing() || document().advisorName) {
-            <div>
-              <dt>Asesor:</dt>
-              <dd>
-                @if (editing()) {
-                  <input class="qs-in" type="text" [ngModel]="document().advisorName" (ngModelChange)="patch({ advisorName: $event })" placeholder="Asesor" />
-                } @else {
-                  {{ dash(document().advisorName) }}
-                }
-              </dd>
-            </div>
-          }
-        </dl>
-        <p class="qs-company__slogan">¡La naturaleza también se vive!</p>
-      </div>
+      <p class="qs-company__name">{{ company.legalName }}</p>
+      <dl class="qs-kv qs-kv--plain">
+        <div><dt>NIT:</dt><dd>{{ company.nit }}</dd></div>
+        <div><dt>Dirección:</dt><dd>{{ company.address }}</dd></div>
+        <div><dt>Teléfono:</dt><dd>{{ company.phone }}</dd></div>
+        <div><dt>Correo:</dt><dd>{{ company.email }}</dd></div>
+        @if (editing() || document().advisorName) {
+          <div>
+            <dt>Asesor:</dt>
+            <dd>
+              @if (editing()) {
+                <input class="qs-in" type="text" [ngModel]="document().advisorName" (ngModelChange)="patch({ advisorName: $event })" placeholder="Asesor" />
+              } @else {
+                {{ dash(document().advisorName) }}
+              }
+            </dd>
+          </div>
+        }
+      </dl>
+      <p class="qs-script qs-script--side">¡La naturaleza también se vive!</p>
     </div>
   </section>
 
   <section class="qs-detail">
-    <h2>
-      <span class="qs-ico qs-ico--leaf" aria-hidden="true"></span>
-      Detalle de la cotización
-    </h2>
+    <div class="qs-detail__head">
+      <span class="qs-ico qs-ico--leaf qs-ico--on-dark" aria-hidden="true"></span>
+      <h2>Detalle de la cotización</h2>
+    </div>
     <div class="qs-table-wrap">
       <table class="qs-table">
         <thead>
@@ -196,10 +215,10 @@
                     rows="2"
                     [ngModel]="item.description"
                     (ngModelChange)="patchItem(i, { description: $event })"
-                    placeholder="Descripción del servicio o paquete"
+                    placeholder="Descripción del servicio o paquete&#10;Incluye detalles, actividades, duración…"
                   ></textarea>
                 } @else {
-                  {{ dash(item.description) }}
+                  <span class="qs-desc">{{ dash(item.description) }}</span>
                 }
               </td>
               <td class="qs-table__qty">
@@ -234,10 +253,22 @@
 
   <section class="qs-mid">
     <ul class="qs-trust">
-      <li><span class="qs-ico qs-ico--binoc" aria-hidden="true"></span>Guías expertos en aviturismo</li>
-      <li><span class="qs-ico qs-ico--shield" aria-hidden="true"></span>Seguridad en todo el recorrido</li>
-      <li><span class="qs-ico qs-ico--leaf" aria-hidden="true"></span>Experiencias sostenibles</li>
-      <li><span class="qs-ico qs-ico--star" aria-hidden="true"></span>Atención personalizada</li>
+      <li>
+        <span class="qs-trust__ico" aria-hidden="true"><i class="qs-ico qs-ico--binoc"></i></span>
+        <span>Guías expertos en aviturismo</span>
+      </li>
+      <li>
+        <span class="qs-trust__ico" aria-hidden="true"><i class="qs-ico qs-ico--shield"></i></span>
+        <span>Seguridad en todo el recorrido</span>
+      </li>
+      <li>
+        <span class="qs-trust__ico" aria-hidden="true"><i class="qs-ico qs-ico--leaf"></i></span>
+        <span>Experiencias sostenibles</span>
+      </li>
+      <li>
+        <span class="qs-trust__ico" aria-hidden="true"><i class="qs-ico qs-ico--star"></i></span>
+        <span>Atención personalizada</span>
+      </li>
     </ul>
     <dl class="qs-totals">
       <div><dt>Subtotal</dt><dd>{{ subtotalText() }}</dd></div>
@@ -266,10 +297,10 @@
           placeholder="Condiciones adicionales"
         ></textarea>
       } @else if (document().commercialConditions) {
-        <p>{{ document().commercialConditions }}</p>
+        <p class="qs-pay__extra">{{ document().commercialConditions }}</p>
       }
     </div>
-    <p class="qs-magic">{{ company.magic }}</p>
+    <p class="qs-script qs-script--magic">{{ company.magic }}</p>
   </section>
 
   @if (editing() || document().observations) {
@@ -291,15 +322,26 @@
 
   <footer class="qs-foot">
     <div class="qs-foot__bar">
-      <span><i class="qs-ico qs-ico--phone" aria-hidden="true"></i>{{ company.phone }}</span>
-      <span><i class="qs-ico qs-ico--pin" aria-hidden="true"></i>{{ company.address }}</span>
-      <span><i class="qs-ico qs-ico--mail" aria-hidden="true"></i>{{ company.email }}</span>
+      <span><i class="qs-ico qs-ico--phone qs-ico--on-dark" aria-hidden="true"></i>{{ company.phone }}</span>
+      <span><i class="qs-ico qs-ico--pin qs-ico--on-dark" aria-hidden="true"></i>{{ company.address }}</span>
+      <span><i class="qs-ico qs-ico--mail qs-ico--on-dark" aria-hidden="true"></i>{{ company.email }}</span>
     </div>
-    <div class="qs-foot__land" [style.background-image]="'url(' + landscape + ')'">
-      <div class="qs-foot__social" aria-hidden="true">
-        <span></span><span></span><span></span>
+    <div class="qs-foot__scene">
+      <div
+        class="qs-foot__photo"
+        [style.background-image]="'url(' + landscape + ')'"
+        role="img"
+        aria-label="Paisaje de Salento"
+      ></div>
+      <div class="qs-foot__veil" aria-hidden="true"></div>
+      <div class="qs-foot__content">
+        <div class="qs-foot__social" aria-label="Redes sociales">
+          <span class="qs-soc qs-soc--ig" title="Instagram"></span>
+          <span class="qs-soc qs-soc--fb" title="Facebook"></span>
+          <span class="qs-soc qs-soc--tt" title="TikTok"></span>
+        </div>
+        <p class="qs-script qs-script--foot">{{ company.footerLine }}</p>
       </div>
-      <p>{{ company.footerLine }}</p>
     </div>
   </footer>
 </article>

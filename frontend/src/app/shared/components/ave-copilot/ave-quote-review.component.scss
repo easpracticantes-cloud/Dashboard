@@ -18,13 +18,13 @@
 .aqr__panel {
   position: relative;
   z-index: 1;
-  width: min(860px, 100%);
+  width: min(920px, 100%);
   max-height: min(94dvh, 1080px);
   display: flex;
   flex-direction: column;
   border-radius: 20px;
   overflow: hidden;
-  background: #fffdf8;
+  background: #f7faf7;
   border: 1px solid rgba(20, 38, 28, 0.14);
   box-shadow: 0 28px 60px rgba(12, 24, 18, 0.35);
   animation: aqr-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -132,11 +132,12 @@
 .aqr__sheet-wrap {
   overflow: auto;
   min-height: 0;
-  padding: 0 1rem 1rem;
+  background: #f2f6f3;
+  padding: 1rem 1.15rem 1.25rem;
 }
 
 .aqr__sheet-wrap--preview {
-  background: #eef3ef;
+  background: linear-gradient(180deg, #e7efe9, #f2f6f3);
 }
 
 .aqr__ok {
