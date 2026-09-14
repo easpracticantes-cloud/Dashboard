@@ -214,3 +214,58 @@
     justify-content: center;
   }
 }
+
+:host-context(html[data-theme='dark']) {
+  .aqr__backdrop {
+    background: rgba(4, 8, 6, 0.72);
+  }
+
+  .aqr__panel {
+    background: #17221d;
+    border-color: rgba(245, 250, 247, 0.12);
+    box-shadow: 0 28px 60px rgba(0, 0, 0, 0.55);
+    color: #f2f8f4;
+  }
+
+  .aqr__head {
+    background: linear-gradient(120deg, #0a1610, #14261c 55%, #1a3d2c);
+    border-bottom: 1px solid rgba(240, 188, 72, 0.18);
+  }
+
+  .aqr__warn {
+    background: rgba(240, 188, 72, 0.12);
+    color: #f0bc48;
+    border-bottom-color: rgba(240, 188, 72, 0.28);
+  }
+
+  .aqr__toolbar {
+    background: #131d19;
+    border-bottom: 1px solid rgba(245, 250, 247, 0.08);
+  }
+
+  .aqr__sheet-wrap--preview {
+    background: #0f1814;
+  }
+
+  .aqr__ok {
+    color: #5ec993;
+  }
+
+  .aqr__btn {
+    color: #b8c9bf;
+  }
+
+  .aqr__btn--soft {
+    background: rgba(94, 201, 147, 0.16);
+    color: #6fd5a1;
+  }
+
+  .aqr__btn--primary {
+    background: #2f6b4a;
+    color: #f6efe2;
+  }
+
+  .aqr__dl-error {
+    color: #f0958c;
+  }
+}
