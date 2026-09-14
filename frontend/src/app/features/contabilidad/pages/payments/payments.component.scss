@@ -38,7 +38,7 @@
 
   &.warn .pay-num { color: var(--gold-warm); }
   &.ok .pay-num { color: var(--positive); }
-  &.bad .pay-num { color: var(--danger, #c0392b); }
+  &.bad .pay-num { color: var(--eas-danger); }
   &.total {
     border-color: rgba(232, 200, 138, 0.28);
 
@@ -199,7 +199,7 @@
 }
 
 .btn-danger {
-  color: var(--negative, #c0392b) !important;
+  color: var(--eas-danger) !important;
   border-color: rgba(192, 57, 43, 0.35) !important;
 
   &:hover:not(:disabled) {

@@ -31,8 +31,9 @@
   --eas-shadow-md: 0 14px 34px rgba(20, 38, 28, 0.08), 0 4px 10px rgba(20, 38, 28, 0.04);
   --eas-shadow-lg: 0 32px 64px rgba(20, 38, 28, 0.14);
 
-  --eas-sidebar-w: 272px;
-  --eas-topbar-h: 64px;
+  /* Alineado con tokens.css (fuente de verdad del layout) */
+  --eas-sidebar-w: 286px;
+  --eas-topbar-h: 68px;
 
   --eas-surface: #ffffff;
   --eas-surface-2: #f7faf8;
@@ -663,7 +664,20 @@ textarea.eas-input {
 
 html {
   --mat-sys-primary: var(--eas-leaf);
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-secondary: var(--eas-amber-deep);
   --mdc-theme-primary: var(--eas-leaf);
+  --mdc-theme-secondary: var(--eas-amber-deep);
+  --mdc-filled-button-container-color: var(--eas-leaf);
+  --mdc-filled-button-label-text-color: #ffffff;
+  --mdc-protected-button-container-color: var(--eas-leaf);
+  --mdc-protected-button-label-text-color: #ffffff;
+  --mat-minimal-fab-container-color: var(--eas-leaf);
+  --mat-fab-small-container-color: var(--eas-leaf);
+  --mat-checkbox-selected-icon-color: var(--eas-leaf);
+  --mat-radio-checked-ripple-color: var(--eas-leaf);
+  --mat-slider-active-track-color: var(--eas-leaf);
+  --mat-option-selected-state-layer-color: color-mix(in srgb, var(--eas-leaf) 14%, transparent);
 }
 
 .mat-mdc-button,

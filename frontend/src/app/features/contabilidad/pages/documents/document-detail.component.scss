@@ -280,7 +280,7 @@
   flex-shrink: 0;
 
   &.ok {
-    background: var(--positive, #1f7a4c);
+    background: var(--eas-leaf);
   }
 }
 
@@ -350,7 +350,7 @@
 }
 
 .ap-timeline li.done::before {
-  background: #1f7a4c;
+  background: var(--eas-leaf);
 }
 
 .tl-dot {
@@ -367,15 +367,15 @@
 }
 
 .ap-timeline li.done .tl-dot {
-  background: #1f7a4c;
-  border-color: #1f7a4c;
+  background: var(--eas-leaf);
+  border-color: var(--eas-leaf);
   color: #fff;
 }
 
 .ap-timeline li.current .tl-dot {
-  border-color: #1f7a4c;
-  color: #1f7a4c;
-  box-shadow: 0 0 0 4px color-mix(in srgb, #1f7a4c 18%, transparent);
+  border-color: var(--eas-leaf);
+  color: var(--eas-leaf);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--eas-leaf) 18%, transparent);
 }
 
 .tl-label {

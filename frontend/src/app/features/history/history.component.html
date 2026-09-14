@@ -43,7 +43,7 @@
     ></eas-empty-state>
   } @else {
     @for (c of filtered(); track c.id) {
-      <a class="history-item" [routerLink]="['/app/conversations', c.id]">
+      <a class="history-item" routerLink="/app/registro">
         <div class="history-item__when">
           <strong>{{ c.lastMessageAt | date: 'dd MMM y' }}</strong>
           <span>{{ c.lastMessageAt | date: 'HH:mm' }}</span>

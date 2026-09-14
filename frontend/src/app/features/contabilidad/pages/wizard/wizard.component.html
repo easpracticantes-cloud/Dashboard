@@ -1,11 +1,7 @@
 <div class="wiz">
   <header class="wiz__hero">
-    <p class="wiz__eyebrow">Contabilidad · semana operativa</p>
-    <h2>Paso a paso</h2>
     <p class="wiz__lead">
-      1) Autobits de la semana.
-      2) Paquete de facturas: Claude extrae proveedor, NIT, fecha y total.
-      Luego genera el Excel de cruce del paquete.
+      Carga Autobits, arma el paquete de facturas y genera el Excel de cruce.
     </p>
     <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando()">
       {{ limpiando() ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
@@ -13,10 +9,10 @@
   </header>
 
   @if (error()) {
-    <p class="wiz__alert wiz__alert--bad">{{ error() }}</p>
+    <p class="wiz__alert wiz__alert--bad" role="alert">{{ error() }}</p>
   }
   @if (aviso()) {
-    <p class="wiz__alert">{{ aviso() }}</p>
+    <p class="wiz__alert" role="status">{{ aviso() }}</p>
   }
 
   <ol class="wiz__steps">
@@ -40,7 +36,7 @@
     </ul>
   }
 
-  <section class="wiz__card" [class.is-dim]="paso() < 1">
+  <section class="wiz__card">
     <h3>1. Excel de Autobits</h3>
     <p>Reporte de la semana. De aquí salen orden de compra, reserva, fecha, cliente y valor. La tabla se actualiza al terminar la lectura — no hace falta vaciar.</p>
     <label class="wiz__drop">

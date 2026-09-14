@@ -23,7 +23,7 @@
 }
 
 .batch-card.current {
-  border-color: color-mix(in srgb, #1f7a4c 35%, transparent);
+  border-color: color-mix(in srgb, var(--eas-leaf) 35%, transparent);
 }
 
 .batch-top {
@@ -79,5 +79,5 @@
 
 .ap-kpi.bad .kpi-icon {
   background: var(--eas-tint-danger);
-  color: #c0392b;
+  color: var(--eas-danger);
 }

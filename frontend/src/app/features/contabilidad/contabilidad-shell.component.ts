@@ -9,9 +9,9 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
   template: `
     <section class="contab">
       <eas-page-header
-        eyebrow="Contabilidad"
+        eyebrow="Escuela Aves Salento"
         title="Contabilidad"
-        subtitle="Flujo semanal: Autobits → facturas → Generar Excel de cruce."
+        subtitle="Autobits → facturas → Excel de cruce."
       />
       <nav class="contab__nav" aria-label="Secciones de Contabilidad">
         <a
@@ -25,7 +25,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
         <a routerLink="/app/contabilidad/documentos" routerLinkActive="is-on">Documentos</a>
         <a routerLink="/app/contabilidad/pagos" routerLinkActive="is-on">Pagos</a>
         <a routerLink="/app/contabilidad/paquetes" routerLinkActive="is-on">Paquetes</a>
-        <a routerLink="/app/contabilidad/subsanaciones" routerLinkActive="is-on">Remediaciones</a>
+        <a routerLink="/app/contabilidad/subsanaciones" routerLinkActive="is-on">Subsanaciones</a>
       </nav>
       <div class="contab__body">
         <router-outlet />
@@ -58,17 +58,32 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       .contab__nav a {
         display: inline-flex;
         align-items: center;
-        padding: 0.4rem 0.75rem;
+        padding: 0.45rem 0.85rem;
         border-radius: 999px;
-        font-size: 0.85rem;
-        font-weight: 600;
+        border: 1px solid var(--eas-line-soft);
+        font-size: 0.82rem;
+        font-weight: 650;
         text-decoration: none;
-        color: inherit;
-        background: color-mix(in srgb, currentColor 8%, transparent);
+        color: var(--eas-muted);
+        background: var(--eas-surface);
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+
+      .contab__nav a:hover {
+        color: var(--eas-ink);
+        border-color: color-mix(in srgb, var(--eas-leaf) 35%, transparent);
+        background: color-mix(in srgb, var(--eas-leaf) 8%, transparent);
       }
 
       .contab__nav a.is-on {
-        background: color-mix(in srgb, currentColor 16%, transparent);
+        color: var(--eas-forest);
+        border-color: color-mix(in srgb, var(--eas-amber) 45%, var(--eas-leaf));
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--eas-amber) 18%, transparent),
+          color-mix(in srgb, var(--eas-leaf) 14%, transparent)
+        );
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--eas-amber) 22%, transparent);
       }
 
       .contab__body {
