@@ -1,4 +1,4 @@
-/* Escuela Aves Salento — cotización HTML pulida (lenguaje visual de la plantilla oficial) */
+/* Escuela Aves Salento — cotización HTML con identidad de marca */
 
 .qs {
   --forest: #0a3d2e;
@@ -34,33 +34,26 @@
   margin: 0;
 }
 
-/* ——— Hero: una sola composición (logo | foto fundida | servicios) ——— */
+/* ——— Hero con ave ilustrada fundida ——— */
 .qs-hero {
   position: relative;
-  background: #fff;
-  overflow: hidden;
-}
-
-.qs-hero__stage {
-  position: relative;
   display: grid;
-  grid-template-columns: minmax(200px, 0.95fr) minmax(220px, 1.35fr) minmax(180px, 0.9fr);
-  min-height: 198px;
-  isolation: isolate;
+  grid-template-columns: 1.05fr 1.15fr 0.95fr;
+  min-height: 200px;
+  background:
+    radial-gradient(ellipse 80% 90% at 58% 40%, rgba(20, 100, 70, 0.18), transparent 55%),
+    linear-gradient(105deg, #fbfaf6 0%, #f3f7f2 38%, #0c4635 38.2%, #0a3d2e 100%);
+  overflow: visible;
 }
 
 .qs-hero__brand {
   position: relative;
   z-index: 3;
-  padding: 28px 12px 40px 28px;
+  padding: 28px 8px 42px 26px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 10px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.97) 55%, rgba(255, 255, 255, 0.55) 82%, rgba(255, 255, 255, 0) 100%),
-    linear-gradient(180deg, #fbfaf7 0%, #f4f7f2 100%),
-    url('/assets/brand/quote-header-foliage.jpg') left center / cover no-repeat;
 }
 
 .qs-hero__logo {
@@ -75,56 +68,43 @@
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--forest);
-  letter-spacing: 0.01em;
   line-height: 1;
 }
 
-.qs-hero__photo {
+.qs-hero__creature {
   position: relative;
-  z-index: 2;
-  margin-left: -48px;
-  margin-right: -36px;
-  background-color: var(--forest);
-  background-position: 52% 42%;
-  background-size: cover;
-  background-repeat: no-repeat;
-  /* Funde la foto hacia logo (izq) y panel verde (der), sin caja flotante */
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 0, 0, 0.35) 10%,
-    #000 22%,
-    #000 72%,
-    rgba(0, 0, 0, 0.55) 88%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 0, 0, 0.35) 10%,
-    #000 22%,
-    #000 72%,
-    rgba(0, 0, 0, 0.55) 88%,
-    transparent 100%
-  );
+  z-index: 4;
+  display: grid;
+  place-items: end center;
+  padding: 4px 0 0;
+  pointer-events: none;
 }
 
-.qs-hero__photo::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0%, transparent 18%, transparent 70%, rgba(10, 61, 46, 0.55) 100%),
-    linear-gradient(180deg, transparent 62%, rgba(10, 61, 46, 0.28) 100%);
-  pointer-events: none;
+.qs-hero__bird {
+  width: min(100%, 300px);
+  height: auto;
+  margin-bottom: -18px;
+  filter: drop-shadow(0 16px 28px rgba(4, 30, 20, 0.35));
+  transform: translateX(8%);
+  animation: qs-bird-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes qs-bird-in {
+  from {
+    opacity: 0;
+    transform: translateX(8%) translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(8%) translateY(0) scale(1);
+  }
 }
 
 .qs-hero__services {
   position: relative;
   z-index: 3;
-  background: linear-gradient(160deg, #0f4a38 0%, var(--forest) 42%, var(--forest-deep) 100%);
   color: #f7f1e4;
-  padding: 30px 20px 44px 8px;
+  padding: 30px 18px 44px 4px;
   display: flex;
   align-items: center;
 }
@@ -134,7 +114,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 16px;
+  gap: 15px;
   width: 100%;
 }
 
@@ -145,7 +125,6 @@
   align-items: center;
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
 }
 
 .qs-pill-ico {
@@ -178,19 +157,18 @@
   right: 0;
   bottom: -1px;
   width: 100%;
-  height: 30px;
+  height: 32px;
   z-index: 5;
   display: block;
-  filter: drop-shadow(0 -2px 6px rgba(232, 163, 26, 0.25));
 }
 
-/* ——— Title + meta ——— */
+/* ——— Title ——— */
 .qs-title {
   display: flex;
   justify-content: space-between;
   gap: 1.25rem;
   align-items: flex-start;
-  padding: 1.35rem 1.4rem 0.95rem;
+  padding: 1.25rem 1.4rem 0.85rem;
 }
 
 .qs-title__left {
@@ -232,7 +210,6 @@
   padding: 0.75rem 0.9rem;
   display: grid;
   gap: 0.42rem;
-  box-shadow: 0 4px 12px rgba(10, 61, 46, 0.04);
 }
 
 .qs-meta > div {
@@ -256,12 +233,65 @@
   min-width: 0;
 }
 
+.qs-meta__badge dd {
+  color: #9a6700;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
+/* ——— Quick tools ——— */
+.qs-tools {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0 1.4rem 0.85rem;
+}
+
+.qs-tools__label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--forest);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+
+.qs-tools__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.qs-chip {
+  border: 1px solid rgba(10, 61, 46, 0.16);
+  background: linear-gradient(180deg, #fff, var(--mist));
+  color: var(--forest);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.38rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.qs-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(10, 61, 46, 0.1);
+}
+
+.qs-chip--ghost {
+  background: transparent;
+  border-style: dashed;
+}
+
 /* ——— Cards ——— */
-.qs-split {
+.qs-split,
+.qs-include {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.95rem;
-  padding: 0.2rem 1.4rem 1rem;
+  padding: 0.15rem 1.4rem 1rem;
 }
 
 .qs-card {
@@ -270,6 +300,10 @@
   border-radius: 16px;
   padding: 0.85rem 0.95rem 0.95rem;
   box-shadow: 0 8px 22px rgba(10, 61, 46, 0.05);
+}
+
+.qs-card--soft {
+  background: linear-gradient(180deg, #fff, #f7fbf8);
 }
 
 .qs-card h2 {
@@ -321,7 +355,6 @@
   font-size: 0.84rem;
   color: var(--forest);
   margin-bottom: 0.4rem;
-  letter-spacing: 0.01em;
 }
 
 .qs-script {
@@ -346,6 +379,15 @@
   margin-left: auto;
 }
 
+.qs-script--foot {
+  font-size: 1.28rem;
+  color: #fff8e8;
+  text-align: right;
+  max-width: 16rem;
+  line-height: 1.15;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
 /* ——— Table ——— */
 .qs-detail {
   padding: 0.15rem 1.4rem 0.85rem;
@@ -364,7 +406,6 @@
 .qs-detail__head h2 {
   font-size: 0.88rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
 }
 
 .qs-table-wrap {
@@ -383,18 +424,17 @@
 .qs-table th {
   background: #125239;
   color: #f7f1e4;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 700;
   text-align: left;
-  padding: 0.5rem 0.6rem;
-  letter-spacing: 0.02em;
+  padding: 0.5rem 0.45rem;
 }
 
 .qs-table td {
-  padding: 0.55rem 0.6rem;
+  padding: 0.5rem 0.45rem;
   border-bottom: 1px solid #e5ece7;
   vertical-align: top;
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   word-break: break-word;
 }
 
@@ -407,7 +447,7 @@
 }
 
 .qs-table__item {
-  width: 3.6rem;
+  width: 3.4rem;
   text-align: center;
 }
 
@@ -421,7 +461,6 @@
   color: #fff;
   font-size: 0.7rem;
   font-weight: 800;
-  box-shadow: 0 2px 6px rgba(10, 61, 46, 0.2);
 }
 
 .qs-desc {
@@ -431,11 +470,11 @@
 }
 
 .qs-table__qty {
-  width: 5.6rem;
+  width: 4.8rem;
 }
 
 .qs-table__money {
-  width: 6.4rem;
+  width: 5.4rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
@@ -453,6 +492,7 @@
 .qs-row-tools {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
   gap: 2px;
   margin-top: 0.3rem;
 }
@@ -491,14 +531,13 @@
   border-radius: 10px;
   cursor: pointer;
   width: 100%;
-  transition: background 0.15s ease;
 }
 
 .qs-add:hover {
   background: rgba(10, 61, 46, 0.07);
 }
 
-/* ——— Mid: trust + totals ——— */
+/* ——— Mid ——— */
 .qs-mid {
   display: grid;
   grid-template-columns: 1.4fr 0.9fr;
@@ -543,7 +582,6 @@
   padding: 0.65rem 0.75rem;
   display: grid;
   gap: 0.35rem;
-  box-shadow: 0 6px 16px rgba(10, 61, 46, 0.05);
 }
 
 .qs-totals > div {
@@ -562,6 +600,10 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
+}
+
+.qs-totals__disc dd {
+  color: #9a3412;
 }
 
 .qs-totals__grand {
@@ -632,7 +674,28 @@
   font-weight: 800;
 }
 
-/* ——— Footer: foto limpia + overlays HTML (sin restos de plantilla) ——— */
+/* ——— Signatures ——— */
+.qs-sign {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding: 0.4rem 1.8rem 1.2rem;
+}
+
+.qs-sign__line {
+  border-bottom: 1.5px solid rgba(10, 61, 46, 0.28);
+  height: 36px;
+  margin-bottom: 0.35rem;
+}
+
+.qs-sign__label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ——— Footer sin foto: identidad tipográfica ——— */
 .qs-foot__bar {
   display: grid;
   grid-template-columns: 1fr 1.3fr 1.2fr;
@@ -651,43 +714,35 @@
   min-width: 0;
 }
 
-.qs-foot__scene {
+.qs-foot__brand {
   position: relative;
-  min-height: 118px;
-  overflow: hidden;
-  background: #1a120c;
-}
-
-.qs-foot__photo {
-  position: absolute;
-  inset: 0;
-  background-position: center 42%;
-  background-size: cover;
-  background-repeat: no-repeat;
-  transform: scale(1.04);
-}
-
-.qs-foot__veil {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(6, 38, 28, 0.55) 0%, rgba(6, 38, 28, 0.12) 38%, rgba(6, 20, 14, 0.45) 100%),
-    linear-gradient(90deg, rgba(6, 38, 28, 0.35) 0%, transparent 35%, rgba(6, 38, 28, 0.55) 100%);
-  pointer-events: none;
-}
-
-.qs-foot__content {
-  position: relative;
-  z-index: 1;
-  min-height: 118px;
+  min-height: 88px;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem 1.2rem 0.95rem;
+  background:
+    radial-gradient(circle at 12% 80%, rgba(232, 163, 26, 0.22), transparent 28%),
+    radial-gradient(circle at 88% 20%, rgba(52, 211, 153, 0.12), transparent 32%),
+    linear-gradient(135deg, #0a3d2e 0%, #06261c 55%, #0d4a38 100%);
+  overflow: hidden;
+}
+
+.qs-foot__mark {
+  position: absolute;
+  right: -10px;
+  top: -24px;
+  width: 140px;
+  height: 140px;
+  opacity: 0.14;
+  background: url('/assets/brand/mark-bird.svg') center / contain no-repeat;
+  pointer-events: none;
 }
 
 .qs-foot__social {
+  position: relative;
+  z-index: 1;
   display: flex;
   gap: 0.5rem;
 }
@@ -700,7 +755,6 @@
   background: rgba(8, 30, 22, 0.28);
   display: grid;
   place-items: center;
-  backdrop-filter: blur(2px);
 }
 
 .qs-soc::before {
@@ -727,13 +781,9 @@
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M14 3h2.2a5.4 5.4 0 0 0 3.3 2.9V9a7.4 7.4 0 0 1-3.5-1v7.2A5.2 5.2 0 1 1 10.8 10v2.2a3 3 0 1 0 2.1 2.9V3z'/%3E%3C/svg%3E");
 }
 
-.qs-script--foot {
-  font-size: 1.32rem;
-  color: #fff8e8;
-  text-align: right;
-  max-width: 16rem;
-  line-height: 1.15;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+.qs-foot__brand .qs-script--foot {
+  position: relative;
+  z-index: 1;
 }
 
 /* ——— Inputs ——— */
@@ -856,39 +906,35 @@
 }
 
 @media (max-width: 680px) {
-  .qs-hero__stage {
+  .qs-hero {
     grid-template-columns: 1fr;
-    min-height: 0;
+    background: linear-gradient(180deg, #fbfaf6 0%, #f3f7f2 42%, #0a3d2e 42.2%, #0a3d2e 100%);
   }
 
-  .qs-hero__brand {
-    padding-bottom: 1rem;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.88)),
-      url('/assets/brand/quote-header-foliage.jpg') left center / cover no-repeat;
+  .qs-hero__creature {
+    order: 2;
+    min-height: 150px;
   }
 
-  .qs-hero__photo {
-    margin: 0;
-    min-height: 168px;
-    -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 100%);
-    mask-image: linear-gradient(180deg, #000 70%, transparent 100%);
-  }
-
-  .qs-hero__photo::after {
-    background: linear-gradient(180deg, transparent 50%, rgba(10, 61, 46, 0.55) 100%);
+  .qs-hero__bird {
+    margin-bottom: -28px;
+    transform: none;
+    width: min(240px, 70%);
   }
 
   .qs-hero__services {
-    padding: 1rem 1.2rem 2.2rem;
+    order: 3;
+    padding: 0.75rem 1.2rem 2.2rem;
   }
 
   .qs-title,
   .qs-split,
+  .qs-include,
   .qs-mid,
-  .qs-pay {
-    display: grid;
+  .qs-pay,
+  .qs-sign {
     grid-template-columns: 1fr;
+    display: grid;
   }
 
   .qs-script--magic {
@@ -901,7 +947,7 @@
     grid-template-columns: 1fr;
   }
 
-  .qs-foot__content {
+  .qs-foot__brand {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -909,5 +955,20 @@
   .qs-script--foot {
     text-align: left;
     max-width: none;
+  }
+}
+
+@media print {
+  .qs {
+    box-shadow: none;
+    width: 100%;
+  }
+
+  .qs-tools {
+    display: none !important;
+  }
+
+  .qs-hero__bird {
+    animation: none;
   }
 }

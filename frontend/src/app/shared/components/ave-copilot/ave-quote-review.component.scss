@@ -182,9 +182,25 @@
   color: #f6efe2;
 }
 
+.aqr__btn--ghost {
+  background: transparent;
+  color: #5c6d63;
+  border: 1px dashed rgba(31, 74, 51, 0.28);
+}
+
 .aqr__btn:disabled {
   opacity: 0.65;
   cursor: wait;
+}
+
+.aqr__toast {
+  margin: 0 1.15rem 0.55rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  background: #e7f1eb;
+  color: #1f4a33;
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
 .aqr__dl-error {

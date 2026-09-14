@@ -5,47 +5,35 @@
   aria-label="Cotización Escuela Aves Salento"
 >
   <header class="qs-hero">
-    <div class="qs-hero__stage">
-      <div class="qs-hero__brand">
-        <img class="qs-hero__logo" [src]="logo" alt="escuelaaves Salento" />
-        <p class="qs-hero__inspire">Naturaleza que inspira</p>
-      </div>
-
-      <div
-        class="qs-hero__photo"
-        [style.background-image]="'url(' + bird + ')'"
-        role="img"
-        aria-label="Ave Escuela Aves Salento"
-      ></div>
-
-      <div class="qs-hero__services">
-        <ul class="qs-hero__pills">
-          <li>
-            <span class="qs-pill-ico qs-pill-ico--bird" aria-hidden="true"></span>
-            <span>Avistamiento de aves</span>
-          </li>
-          <li>
-            <span class="qs-pill-ico qs-pill-ico--leaf" aria-hidden="true"></span>
-            <span>Experiencias naturales</span>
-          </li>
-          <li>
-            <span class="qs-pill-ico qs-pill-ico--mount" aria-hidden="true"></span>
-            <span>Conexión con la biodiversidad</span>
-          </li>
-        </ul>
-      </div>
+    <div class="qs-hero__brand">
+      <img class="qs-hero__logo" [src]="logo" alt="escuelaaves Salento" />
+      <p class="qs-hero__inspire">Naturaleza que inspira</p>
     </div>
 
-    <svg class="qs-hero__wave" viewBox="0 0 780 34" preserveAspectRatio="none" aria-hidden="true">
-      <path
-        d="M0 22 C70 6 140 30 210 14 C280 0 350 28 420 12 C490 0 560 26 630 10 C700 0 740 16 780 12 L780 34 L0 34 Z"
-        fill="#e8a31a"
-      />
-      <path
-        d="M0 24 C80 10 150 32 230 16 C310 2 380 30 460 14 C540 2 610 28 690 12 C740 4 765 14 780 16 L780 34 L0 34 Z"
-        fill="#f0bc3a"
-        opacity="0.92"
-      />
+    <div class="qs-hero__creature" aria-hidden="true">
+      <img class="qs-hero__bird" [src]="birdArt" alt="" />
+    </div>
+
+    <div class="qs-hero__services">
+      <ul class="qs-hero__pills">
+        <li>
+          <span class="qs-pill-ico qs-pill-ico--bird"></span>
+          <span>Avistamiento de aves</span>
+        </li>
+        <li>
+          <span class="qs-pill-ico qs-pill-ico--leaf"></span>
+          <span>Experiencias naturales</span>
+        </li>
+        <li>
+          <span class="qs-pill-ico qs-pill-ico--mount"></span>
+          <span>Conexión con la biodiversidad</span>
+        </li>
+      </ul>
+    </div>
+
+    <svg class="qs-hero__wave" viewBox="0 0 780 36" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 22 C90 4 170 32 260 14 C350 0 430 30 520 12 C610 0 690 26 780 14 L780 36 L0 36 Z" fill="#e8a31a"/>
+      <path d="M0 26 C100 10 180 34 280 16 C380 2 460 30 560 14 C650 2 720 22 780 18 L780 36 L0 36 Z" fill="#f0bc3a" opacity="0.9"/>
     </svg>
   </header>
 
@@ -59,17 +47,17 @@
     </div>
     <dl class="qs-meta">
       <div>
-        <dt>N.º Cotización:</dt>
+        <dt>N.º Cotización</dt>
         <dd>
           @if (editing()) {
-            <input class="qs-in" type="text" [ngModel]="document().quoteNumber" (ngModelChange)="patch({ quoteNumber: $event })" placeholder="—" />
+            <input class="qs-in" type="text" [ngModel]="document().quoteNumber" (ngModelChange)="patch({ quoteNumber: $event })" />
           } @else {
             {{ dash(document().quoteNumber) }}
           }
         </dd>
       </div>
       <div>
-        <dt>Fecha de emisión:</dt>
+        <dt>Emisión</dt>
         <dd>
           @if (editing()) {
             <input class="qs-in" type="date" [ngModel]="document().issuedAt" (ngModelChange)="patch({ issuedAt: $event })" />
@@ -79,7 +67,7 @@
         </dd>
       </div>
       <div>
-        <dt>Válida hasta:</dt>
+        <dt>Válida hasta</dt>
         <dd>
           @if (editing()) {
             <input class="qs-in" type="date" [ngModel]="document().validUntil" (ngModelChange)="patch({ validUntil: $event })" />
@@ -88,18 +76,44 @@
           }
         </dd>
       </div>
+      @if (validityLabel()) {
+        <div class="qs-meta__badge">
+          <dt>Vigencia</dt>
+          <dd>{{ validityLabel() }}</dd>
+        </div>
+      }
     </dl>
   </section>
 
+  @if (editing()) {
+    <section class="qs-tools" aria-label="Acciones rápidas">
+      <div class="qs-tools__presets">
+        <span class="qs-tools__label">Paquete rápido</span>
+        <div class="qs-tools__chips">
+          @for (preset of presets; track preset.id) {
+            <button type="button" class="qs-chip" [title]="preset.blurb" (click)="applyPreset(preset)">
+              {{ preset.label }}
+            </button>
+          }
+        </div>
+      </div>
+      <div class="qs-tools__validity">
+        <span class="qs-tools__label">Extender vigencia</span>
+        <div class="qs-tools__chips">
+          <button type="button" class="qs-chip qs-chip--ghost" (click)="extendValidity(7)">+7 días</button>
+          <button type="button" class="qs-chip qs-chip--ghost" (click)="extendValidity(15)">+15 días</button>
+          <button type="button" class="qs-chip qs-chip--ghost" (click)="extendValidity(30)">+30 días</button>
+        </div>
+      </div>
+    </section>
+  }
+
   <section class="qs-split">
     <div class="qs-card">
-      <h2>
-        <span class="qs-ico qs-ico--user" aria-hidden="true"></span>
-        Datos del cliente
-      </h2>
+      <h2><span class="qs-ico qs-ico--user"></span> Datos del cliente</h2>
       <dl class="qs-kv">
         <div>
-          <dt>Nombre:</dt>
+          <dt>Nombre</dt>
           <dd>
             @if (editing()) {
               <input class="qs-in" type="text" [ngModel]="document().clientName" (ngModelChange)="patch({ clientName: $event })" placeholder="Nombre del cliente" />
@@ -109,40 +123,40 @@
           </dd>
         </div>
         <div>
-          <dt>NIT / C.C.:</dt>
+          <dt>NIT / C.C.</dt>
           <dd>
             @if (editing()) {
-              <input class="qs-in" type="text" [ngModel]="document().clientNit" (ngModelChange)="patch({ clientNit: $event })" placeholder="NIT o C.C." />
+              <input class="qs-in" type="text" [ngModel]="document().clientNit" (ngModelChange)="patch({ clientNit: $event })" placeholder="Documento" />
             } @else {
               {{ dash(document().clientNit) }}
             }
           </dd>
         </div>
         <div>
-          <dt>Teléfono:</dt>
+          <dt>Teléfono</dt>
           <dd>
             @if (editing()) {
-              <input class="qs-in" type="text" [ngModel]="document().clientPhone" (ngModelChange)="patch({ clientPhone: $event })" placeholder="Teléfono" />
+              <input class="qs-in" type="text" [ngModel]="document().clientPhone" (ngModelChange)="patch({ clientPhone: $event })" placeholder="WhatsApp / celular" />
             } @else {
               {{ dash(document().clientPhone) }}
             }
           </dd>
         </div>
         <div>
-          <dt>Correo:</dt>
+          <dt>Correo</dt>
           <dd>
             @if (editing()) {
-              <input class="qs-in" type="email" [ngModel]="document().clientEmail" (ngModelChange)="patch({ clientEmail: $event })" placeholder="Correo electrónico" />
+              <input class="qs-in" type="email" [ngModel]="document().clientEmail" (ngModelChange)="patch({ clientEmail: $event })" placeholder="Correo" />
             } @else {
               {{ dash(document().clientEmail) }}
             }
           </dd>
         </div>
         <div>
-          <dt>Ciudad:</dt>
+          <dt>Ciudad</dt>
           <dd>
             @if (editing()) {
-              <input class="qs-in" type="text" [ngModel]="document().clientCity" (ngModelChange)="patch({ clientCity: $event })" placeholder="Ciudad" />
+              <input class="qs-in" type="text" [ngModel]="document().clientCity" (ngModelChange)="patch({ clientCity: $event })" placeholder="Ciudad / pickup" />
             } @else {
               {{ dash(document().clientCity) }}
             }
@@ -151,29 +165,24 @@
       </dl>
     </div>
 
-    <div class="qs-card qs-card--company">
-      <h2>
-        <span class="qs-ico qs-ico--building" aria-hidden="true"></span>
-        Nuestra información
-      </h2>
+    <div class="qs-card">
+      <h2><span class="qs-ico qs-ico--building"></span> Nuestra información</h2>
       <p class="qs-company__name">{{ company.legalName }}</p>
       <dl class="qs-kv qs-kv--plain">
-        <div><dt>NIT:</dt><dd>{{ company.nit }}</dd></div>
-        <div><dt>Dirección:</dt><dd>{{ company.address }}</dd></div>
-        <div><dt>Teléfono:</dt><dd>{{ company.phone }}</dd></div>
-        <div><dt>Correo:</dt><dd>{{ company.email }}</dd></div>
-        @if (editing() || document().advisorName) {
-          <div>
-            <dt>Asesor:</dt>
-            <dd>
-              @if (editing()) {
-                <input class="qs-in" type="text" [ngModel]="document().advisorName" (ngModelChange)="patch({ advisorName: $event })" placeholder="Asesor" />
-              } @else {
-                {{ dash(document().advisorName) }}
-              }
-            </dd>
-          </div>
-        }
+        <div><dt>NIT</dt><dd>{{ company.nit }}</dd></div>
+        <div><dt>Dirección</dt><dd>{{ company.address }}</dd></div>
+        <div><dt>Teléfono</dt><dd>{{ company.phone }}</dd></div>
+        <div><dt>Correo</dt><dd>{{ company.email }}</dd></div>
+        <div>
+          <dt>Asesor</dt>
+          <dd>
+            @if (editing()) {
+              <input class="qs-in" type="text" [ngModel]="document().advisorName" (ngModelChange)="patch({ advisorName: $event })" placeholder="Nombre del asesor" />
+            } @else {
+              {{ dash(document().advisorName) }}
+            }
+          </dd>
+        </div>
       </dl>
       <p class="qs-script qs-script--side">¡La naturaleza también se vive!</p>
     </div>
@@ -181,7 +190,7 @@
 
   <section class="qs-detail">
     <div class="qs-detail__head">
-      <span class="qs-ico qs-ico--leaf qs-ico--on-dark" aria-hidden="true"></span>
+      <span class="qs-ico qs-ico--leaf qs-ico--on-dark"></span>
       <h2>Detalle de la cotización</h2>
     </div>
     <div class="qs-table-wrap">
@@ -190,9 +199,10 @@
           <tr>
             <th class="qs-table__item">Ítem</th>
             <th>Descripción</th>
-            <th>Cantidad</th>
-            <th>Valor unitario</th>
-            <th>Valor total</th>
+            <th>Cant.</th>
+            <th>Vr. unitario</th>
+            <th>Desc.</th>
+            <th>Vr. total</th>
           </tr>
         </thead>
         <tbody>
@@ -204,6 +214,7 @@
                   <span class="qs-row-tools">
                     <button type="button" class="qs-tiny" (click)="moveItem(i, -1)" [disabled]="i === 0" aria-label="Subir">↑</button>
                     <button type="button" class="qs-tiny" (click)="moveItem(i, 1)" [disabled]="i === document().items.length - 1" aria-label="Bajar">↓</button>
+                    <button type="button" class="qs-tiny" (click)="duplicateItem(i)" aria-label="Duplicar">⧉</button>
                     <button type="button" class="qs-tiny qs-tiny--danger" (click)="removeItem(i)" aria-label="Eliminar">×</button>
                   </span>
                 }
@@ -215,7 +226,7 @@
                     rows="2"
                     [ngModel]="item.description"
                     (ngModelChange)="patchItem(i, { description: $event })"
-                    placeholder="Descripción del servicio o paquete&#10;Incluye detalles, actividades, duración…"
+                    placeholder="Servicio o paquete&#10;Detalles, duración, incluye…"
                   ></textarea>
                 } @else {
                   <span class="qs-desc">{{ dash(item.description) }}</span>
@@ -238,9 +249,14 @@
                   {{ moneyOrDash(item.unitPrice) }}
                 }
               </td>
-              <td class="qs-table__money qs-table__strong">
-                {{ moneyOrDash(item.total) }}
+              <td class="qs-table__money">
+                @if (editing()) {
+                  <input class="qs-in qs-in--num" type="number" min="0" step="1000" [ngModel]="item.discount" (ngModelChange)="patchItem(i, { discount: +$event })" />
+                } @else {
+                  {{ item.discount > 0 ? moneyOrDash(item.discount) : '—' }}
+                }
               </td>
+              <td class="qs-table__money qs-table__strong">{{ moneyOrDash(item.total) }}</td>
             </tr>
           }
         </tbody>
@@ -251,38 +267,57 @@
     }
   </section>
 
+  <section class="qs-include">
+    <div class="qs-card qs-card--soft">
+      <h2><span class="qs-ico qs-ico--leaf"></span> Incluye</h2>
+      @if (editing()) {
+        <textarea class="qs-in qs-in--area" rows="3" [ngModel]="document().includes || ''" (ngModelChange)="patch({ includes: $event })" placeholder="Guía, seguro, hidratación…"></textarea>
+      } @else {
+        <p>{{ dash(document().includes) }}</p>
+      }
+    </div>
+    <div class="qs-card qs-card--soft">
+      <h2><span class="qs-ico qs-ico--info"></span> No incluye</h2>
+      @if (editing()) {
+        <textarea class="qs-in qs-in--area" rows="3" [ngModel]="document().excludes || ''" (ngModelChange)="patch({ excludes: $event })" placeholder="Almuerzo, transporte…"></textarea>
+      } @else {
+        <p>{{ dash(document().excludes) }}</p>
+      }
+    </div>
+  </section>
+
   <section class="qs-mid">
     <ul class="qs-trust">
       <li>
-        <span class="qs-trust__ico" aria-hidden="true"><i class="qs-ico qs-ico--binoc"></i></span>
+        <span class="qs-trust__ico"><i class="qs-ico qs-ico--binoc"></i></span>
         <span>Guías expertos en aviturismo</span>
       </li>
       <li>
-        <span class="qs-trust__ico" aria-hidden="true"><i class="qs-ico qs-ico--shield"></i></span>
+        <span class="qs-trust__ico"><i class="qs-ico qs-ico--shield"></i></span>
         <span>Seguridad en todo el recorrido</span>
       </li>
       <li>
-        <span class="qs-trust__ico" aria-hidden="true"><i class="qs-ico qs-ico--leaf"></i></span>
+        <span class="qs-trust__ico"><i class="qs-ico qs-ico--leaf"></i></span>
         <span>Experiencias sostenibles</span>
       </li>
       <li>
-        <span class="qs-trust__ico" aria-hidden="true"><i class="qs-ico qs-ico--star"></i></span>
+        <span class="qs-trust__ico"><i class="qs-ico qs-ico--star"></i></span>
         <span>Atención personalizada</span>
       </li>
     </ul>
     <dl class="qs-totals">
       <div><dt>Subtotal</dt><dd>{{ subtotalText() }}</dd></div>
       <div><dt>IVA (19%)</dt><dd>{{ ivaText() }}</dd></div>
+      @if (discountTotal() > 0) {
+        <div class="qs-totals__disc"><dt>Descuentos</dt><dd>− {{ discountText() }}</dd></div>
+      }
       <div class="qs-totals__grand"><dt>Total</dt><dd>{{ totalText() }}</dd></div>
     </dl>
   </section>
 
   <section class="qs-pay">
     <div class="qs-pay__box">
-      <h2>
-        <span class="qs-ico qs-ico--info" aria-hidden="true"></span>
-        Condiciones y forma de pago
-      </h2>
+      <h2><span class="qs-ico qs-ico--info"></span> Condiciones y forma de pago</h2>
       <ul>
         @for (line of company.payment; track line) {
           <li>{{ line }}</li>
@@ -312,7 +347,7 @@
           rows="2"
           [ngModel]="document().observations"
           (ngModelChange)="patch({ observations: $event })"
-          placeholder="Observaciones"
+          placeholder="Notas para el cliente"
         ></textarea>
       } @else {
         <p>{{ dash(document().observations) }}</p>
@@ -320,28 +355,31 @@
     </section>
   }
 
+  <section class="qs-sign">
+    <div>
+      <p class="qs-sign__line"></p>
+      <p class="qs-sign__label">Firma / aceptación del cliente</p>
+    </div>
+    <div>
+      <p class="qs-sign__line"></p>
+      <p class="qs-sign__label">Escuela Aves Salento</p>
+    </div>
+  </section>
+
   <footer class="qs-foot">
     <div class="qs-foot__bar">
-      <span><i class="qs-ico qs-ico--phone qs-ico--on-dark" aria-hidden="true"></i>{{ company.phone }}</span>
-      <span><i class="qs-ico qs-ico--pin qs-ico--on-dark" aria-hidden="true"></i>{{ company.address }}</span>
-      <span><i class="qs-ico qs-ico--mail qs-ico--on-dark" aria-hidden="true"></i>{{ company.email }}</span>
+      <span><i class="qs-ico qs-ico--phone qs-ico--on-dark"></i>{{ company.phone }}</span>
+      <span><i class="qs-ico qs-ico--pin qs-ico--on-dark"></i>{{ company.address }}</span>
+      <span><i class="qs-ico qs-ico--mail qs-ico--on-dark"></i>{{ company.email }}</span>
     </div>
-    <div class="qs-foot__scene">
-      <div
-        class="qs-foot__photo"
-        [style.background-image]="'url(' + landscape + ')'"
-        role="img"
-        aria-label="Paisaje de Salento"
-      ></div>
-      <div class="qs-foot__veil" aria-hidden="true"></div>
-      <div class="qs-foot__content">
-        <div class="qs-foot__social" aria-label="Redes sociales">
-          <span class="qs-soc qs-soc--ig" title="Instagram"></span>
-          <span class="qs-soc qs-soc--fb" title="Facebook"></span>
-          <span class="qs-soc qs-soc--tt" title="TikTok"></span>
-        </div>
-        <p class="qs-script qs-script--foot">{{ company.footerLine }}</p>
+    <div class="qs-foot__brand">
+      <div class="qs-foot__mark" aria-hidden="true"></div>
+      <div class="qs-foot__social" aria-label="Redes">
+        <span class="qs-soc qs-soc--ig"></span>
+        <span class="qs-soc qs-soc--fb"></span>
+        <span class="qs-soc qs-soc--tt"></span>
       </div>
+      <p class="qs-script qs-script--foot">{{ company.footerLine }}</p>
     </div>
   </footer>
 </article>

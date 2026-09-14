@@ -10,9 +10,11 @@ import {
   type QuoteSheetDocument,
   type QuoteSheetStatus,
   documentToDraft,
-  draftToDocument
+  draftToDocument,
+  emptyQuoteItem
 } from './quote-sheet.model';
 import { downloadQuotePdf } from './quote-pdf';
+import { buildQuoteNumber, toIsoDate, addDays } from './quote-template';
 
 const DRAFT_STORE = 'sig.ave.quote-document';
 
@@ -36,6 +38,8 @@ export class AveQuoteReviewComponent {
   readonly reviewed = signal(false);
   readonly saving = signal(false);
   readonly downloading = signal(false);
+  readonly copied = signal(false);
+  readonly toast = signal<string | null>(null);
   readonly formError = signal<string | null>(null);
   readonly statuses = QUOTE_STATUSES;
   readonly sheet = viewChild(QuoteSheetComponent);
@@ -62,6 +66,7 @@ export class AveQuoteReviewComponent {
     this.reviewFlag.set(!!merged.reviewFlag);
     this.reviewed.set(false);
     this.formError.set(null);
+    this.toast.set(null);
     this.editing.set(true);
   }
 
@@ -112,6 +117,7 @@ export class AveQuoteReviewComponent {
       this.reviewed.set(true);
       this.confirmed.emit(this.currentDraft());
       this.editing.set(false);
+      this.flash('Cotización guardada');
     } catch (err) {
       const local = this.localValidate(draft);
       if (local) {
@@ -148,6 +154,7 @@ export class AveQuoteReviewComponent {
     }
     try {
       await downloadQuotePdf(this.doc(), this.sheet()?.nativeElement() ?? null);
+      this.flash('PDF descargado');
     } catch {
       this.formError.set('No se pudo generar el PDF. Intenta de nuevo.');
     } finally {
@@ -158,9 +165,88 @@ export class AveQuoteReviewComponent {
     }
   }
 
+  async copySummary(): Promise<void> {
+    const text = this.sheet()?.summaryText() || '';
+    try {
+      await navigator.clipboard.writeText(text);
+      this.copied.set(true);
+      this.flash('Resumen copiado al portapapeles');
+      setTimeout(() => this.copied.set(false), 1800);
+    } catch {
+      this.formError.set('No se pudo copiar el resumen.');
+    }
+  }
+
+  shareWhatsApp(): void {
+    const text = this.sheet()?.summaryText() || '';
+    const phone = (this.doc().clientPhone || '').replace(/\D/g, '');
+    const base = phone ? `https://wa.me/57${phone.replace(/^57/, '')}` : 'https://wa.me/';
+    const url = `${base}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank', 'noopener');
+  }
+
+  printSheet(): void {
+    const wasEditing = this.editing();
+    this.editing.set(false);
+    setTimeout(() => {
+      window.print();
+      if (wasEditing) {
+        this.editing.set(true);
+      }
+    }, 120);
+  }
+
+  resetDraft(): void {
+    const issued = toIsoDate(new Date());
+    this.doc.set(
+      draftToDocument({
+        quoteNumber: buildQuoteNumber('EAS', new Date()),
+        issuedAt: issued,
+        validUntil: addDays(issued, 15),
+        clientName: '',
+        clientNit: '',
+        clientPhone: '',
+        clientEmail: '',
+        clientCity: '',
+        advisorName: this.doc().advisorName,
+        items: [emptyQuoteItem()].map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unit: item.unit,
+          unitPrice: item.unitPrice,
+          discount: item.discount,
+          total: item.total
+        })),
+        includes: '',
+        excludes: '',
+        observations: '',
+        commercialConditions: '',
+        status: 'DRAFT'
+      })
+    );
+    try {
+      sessionStorage.removeItem(DRAFT_STORE);
+    } catch {
+      // ignore
+    }
+    this.reviewed.set(false);
+    this.formError.set(null);
+    this.editing.set(true);
+    this.flash('Cotización en blanco lista');
+  }
+
   close(): void {
     persistDraft(this.currentDraft());
     this.closed.emit();
+  }
+
+  private flash(message: string): void {
+    this.toast.set(message);
+    setTimeout(() => {
+      if (this.toast() === message) {
+        this.toast.set(null);
+      }
+    }, 2200);
   }
 
   private localValidate(draft: QuoteDraft): string | null {

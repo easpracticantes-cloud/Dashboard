@@ -3,7 +3,7 @@
   <section class="aqr__panel">
     <header class="aqr__head">
       <div>
-        <p class="aqr__eyebrow">Cotización Escuela Aves · plantilla HTML</p>
+        <p class="aqr__eyebrow">Cotización Escuela Aves</p>
         <h2>{{ editing() ? 'Editar cotización' : 'Vista previa' }}</h2>
       </div>
       <div class="aqr__head-tools">
@@ -43,12 +43,32 @@
       </button>
       <button type="button" class="aqr__btn aqr__btn--primary" [disabled]="downloading()" (click)="downloadPdf()">
         <mat-icon>picture_as_pdf</mat-icon>
-        {{ downloading() ? 'Generando…' : 'Generar PDF' }}
+        {{ downloading() ? 'Generando…' : 'PDF' }}
+      </button>
+      <button type="button" class="aqr__btn aqr__btn--soft" (click)="printSheet()" title="Imprimir">
+        <mat-icon>print</mat-icon>
+        Imprimir
+      </button>
+      <button type="button" class="aqr__btn aqr__btn--soft" (click)="copySummary()" title="Copiar resumen">
+        <mat-icon>content_copy</mat-icon>
+        {{ copied() ? 'Copiado' : 'Copiar' }}
+      </button>
+      <button type="button" class="aqr__btn aqr__btn--soft" (click)="shareWhatsApp()" title="Enviar por WhatsApp">
+        <mat-icon>chat</mat-icon>
+        WhatsApp
+      </button>
+      <button type="button" class="aqr__btn aqr__btn--ghost" (click)="resetDraft()" title="Nueva cotización en blanco">
+        <mat-icon>restart_alt</mat-icon>
+        Limpiar
       </button>
       @if (reviewed()) {
         <span class="aqr__ok"><mat-icon>task_alt</mat-icon> Guardada</span>
       }
     </div>
+
+    @if (toast()) {
+      <p class="aqr__toast">{{ toast() }}</p>
+    }
 
     @if (formError()) {
       <p class="aqr__dl-error">{{ formError() }}</p>

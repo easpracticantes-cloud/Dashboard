@@ -3,11 +3,8 @@
 import { documentTotals, IVA_RATE as SHEET_IVA, splitIvaIncluded } from './quote-sheet.math';
 
 export const QUOTE_TEMPLATE_IMAGE = 'assets/brand/plantilla-cotizacion.jpg';
-/** Foto del ave del encabezado (recortada limpia, sin caja flotante). */
-export const QUOTE_HERO_BIRD = 'assets/brand/quote-hero-bird.jpg';
-/** Paisaje del pie (foto limpia de Cocora, sin barra/iconos de la plantilla). */
-export const QUOTE_FOOTER_LANDSCAPE = 'assets/brand/quote-footer-landscape.jpg';
-export const QUOTE_HEADER_FOLIAGE = 'assets/brand/quote-header-foliage.jpg';
+/** Ave ilustrada del encabezado (SVG de marca, no foto recortada). */
+export const QUOTE_BIRD_ART = 'assets/brand/quote-bird-illustration.svg';
 export const QUOTE_LOGO = 'assets/brand/logo-escuela-aves-salento.png';
 export const QUOTE_MARK = 'assets/brand/logo-escuela-aves-mark.png';
 
