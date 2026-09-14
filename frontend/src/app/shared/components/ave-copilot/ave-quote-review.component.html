@@ -3,11 +3,8 @@
   <section class="aqr__panel">
     <header class="aqr__head">
       <div>
-        <p class="aqr__eyebrow">Ave · Escuela Aves Salento</p>
+        <p class="aqr__eyebrow">Cotización · plantilla Escuela Aves</p>
         <h2>{{ editing() ? 'Editar cotización' : 'Vista previa' }}</h2>
-        <p class="aqr__sub">
-          Editas la cotización real sobre la plantilla Escuela Aves. Logo y foto son de marca (fijos); el PDF sale con la misma estética.
-        </p>
       </div>
       <div class="aqr__head-tools">
         <label class="aqr__status">
@@ -32,11 +29,11 @@
     }
 
     <div class="aqr__toolbar">
-      <button type="button" class="aqr__btn" [class.aqr__btn--soft]="!editing()" (click)="edit()">
+      <button type="button" class="aqr__btn" [class.aqr__btn--soft]="editing()" (click)="edit()">
         <mat-icon>edit</mat-icon>
-        Editar en plantilla
+        Editar
       </button>
-      <button type="button" class="aqr__btn" [class.aqr__btn--soft]="editing()" (click)="preview()">
+      <button type="button" class="aqr__btn" [class.aqr__btn--soft]="!editing()" (click)="preview()">
         <mat-icon>visibility</mat-icon>
         Vista previa
       </button>
@@ -55,12 +52,6 @@
 
     @if (formError()) {
       <p class="aqr__dl-error">{{ formError() }}</p>
-    }
-
-    @if (editing()) {
-      <p class="aqr__hint">
-        Haz clic en nombre, fechas, líneas, cantidades o totales. Se recalculan al instante. La fotografía y el logo son de marca (no se mueven).
-      </p>
     }
 
     <div class="aqr__sheet-wrap" [class.aqr__sheet-wrap--preview]="!editing()">
