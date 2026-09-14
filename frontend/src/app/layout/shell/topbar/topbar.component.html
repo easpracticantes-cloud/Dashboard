@@ -1,17 +1,13 @@
 <header class="tb">
   <button
     type="button"
-    class="tb__menu"
+    class="tb__icon-btn tb__menu"
     (click)="menuToggle.emit()"
     [attr.aria-label]="menuLabel()"
     [attr.aria-expanded]="sidebarOpen"
-    [attr.aria-pressed]="sidebarOpen"
     [title]="menuLabel() + ' (tecla [)'"
   >
-    <span class="tb__menu-bars" aria-hidden="true">
-      <i></i><i></i><i></i>
-    </span>
-    <span class="tb__menu-label">{{ sidebarOpen ? 'Ocultar' : 'Menú' }}</span>
+    <mat-icon>menu</mat-icon>
   </button>
 
   <button type="button" class="tb__search sm-show" (click)="openCommand.emit()">

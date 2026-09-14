@@ -31,17 +31,6 @@ const SIDEBAR_PREF_KEY = 'eas-sidebar-open';
       </mat-sidenav>
 
       <mat-sidenav-content class="shell__content">
-        @if (!sidebarOpen() && !isMobile()) {
-          <button
-            type="button"
-            class="shell__edge"
-            (click)="toggleSidebar()"
-            aria-label="Mostrar menú lateral"
-            title="Mostrar menú lateral (tecla [)"
-          >
-            <span class="shell__edge-label">Menú</span>
-          </button>
-        }
         <eas-topbar
           [sidebarOpen]="sidebarOpen()"
           (menuToggle)="toggleSidebar()"
@@ -85,7 +74,6 @@ const SIDEBAR_PREF_KEY = 'eas-sidebar-open';
       }
 
       .shell__content {
-        position: relative;
         display: flex;
         flex-direction: column;
         height: 100%;
@@ -99,40 +87,6 @@ const SIDEBAR_PREF_KEY = 'eas-sidebar-open';
         background: transparent;
         box-sizing: border-box;
         scroll-behavior: smooth;
-      }
-
-      .shell__edge {
-        position: fixed;
-        left: 0;
-        top: 42%;
-        z-index: 40;
-        width: 28px;
-        min-height: 96px;
-        padding: 0.9rem 0;
-        border: 1px solid rgba(31, 122, 76, 0.22);
-        border-left: none;
-        border-radius: 0 12px 12px 0;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(232, 240, 235, 0.96));
-        color: var(--eas-forest, #1f7a4c);
-        box-shadow: 4px 6px 18px rgba(20, 38, 28, 0.08);
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .shell__edge:hover {
-        width: 32px;
-        background: rgba(31, 122, 76, 0.1);
-        border-color: rgba(31, 122, 76, 0.4);
-      }
-
-      .shell__edge-label {
-        writing-mode: sideways-lr;
-        font-size: 0.68rem;
-        font-weight: 750;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
       }
 
       .shell__main {
@@ -187,13 +141,6 @@ const SIDEBAR_PREF_KEY = 'eas-sidebar-open';
         .shell__canvas[data-nav] {
           animation: none;
         }
-      }
-
-      html[data-theme='dark'] .shell__edge {
-        background: linear-gradient(180deg, rgba(28, 40, 34, 0.96), rgba(22, 32, 27, 0.98));
-        border-color: rgba(61, 154, 106, 0.35);
-        color: #8fd4ad;
-        box-shadow: 4px 8px 22px rgba(0, 0, 0, 0.28);
       }
     `,
   ],
