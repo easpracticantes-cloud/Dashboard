@@ -2,7 +2,8 @@ FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# npm ci falla si el lock fue generado con otra major de npm; install mantiene el build reproducible.
+RUN npm install --no-audit --no-fund
 
 COPY . .
 RUN npm run build
