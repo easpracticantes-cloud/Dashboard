@@ -71,6 +71,7 @@ public class AiAssistService implements AiAssistUseCase {
     }
 
     private String analyzer() {
-        return claudeAiPort.status() == IntegrationStatus.CONNECTED ? "CLAUDE_AI" : "HEURISTICA";
+        return (claudeAiPort.status() == IntegrationStatus.CONNECTED
+                || claudeAiPort.status() == IntegrationStatus.READY) ? "CLAUDE_AI" : "HEURISTICA";
     }
 }

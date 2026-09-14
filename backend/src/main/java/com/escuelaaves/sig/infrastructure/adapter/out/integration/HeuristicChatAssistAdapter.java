@@ -138,7 +138,8 @@ public class HeuristicChatAssistAdapter implements ChatAssistPort {
     // ---------- helpers ----------
 
     private String tryClaude(String instruction, ChatQuoteContext context) {
-        if (claudeAiPort.status() != IntegrationStatus.CONNECTED) {
+        if (claudeAiPort.status() != IntegrationStatus.CONNECTED
+                && claudeAiPort.status() != IntegrationStatus.READY) {
             return null;
         }
         try {

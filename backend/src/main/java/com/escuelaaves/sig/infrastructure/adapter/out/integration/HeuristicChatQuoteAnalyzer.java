@@ -130,7 +130,8 @@ public class HeuristicChatQuoteAnalyzer implements ChatQuoteAnalyzerPort {
         }
 
         // Enriquecimiento opcional con Claude cuando este disponible.
-        if (claudeAiPort.status() == IntegrationStatus.CONNECTED) {
+        if (claudeAiPort.status() == IntegrationStatus.CONNECTED
+                || claudeAiPort.status() == IntegrationStatus.READY) {
             try {
                 String prompt = buildClaudePrompt(context, experienceName, partySize, serviceDate, amount);
                 String suggestion = claudeAiPort.generateSuggestion(prompt);

@@ -562,3 +562,27 @@
     text-align: left;
   }
 }
+
+@media print {
+  .qs {
+    box-shadow: none;
+    border: none;
+    width: 100%;
+    max-width: none;
+  }
+
+  .qs-table tr,
+  .qs-hero,
+  .qs-client,
+  .qs-totals,
+  .qs-pay,
+  .qs-foot {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .qs-table thead {
+    display: table-header-group;
+  }
+}
+

@@ -22,6 +22,7 @@ const ALL_ROLES: RoleCode[] = [
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard Sheets', icon: 'space_dashboard', route: '/app/dashboard', roles: ALL_ROLES },
   { label: 'Registro', icon: 'table_chart', route: '/app/registro', roles: ALL_ROLES },
+  { label: 'Cotizaciones', icon: 'request_quote', route: '/app/quotes', roles: ALL_ROLES },
   {
     label: 'Contabilidad',
     icon: 'account_balance',

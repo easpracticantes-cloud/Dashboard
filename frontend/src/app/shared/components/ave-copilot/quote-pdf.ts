@@ -1,6 +1,7 @@
 /**
- * Genera un PDF dibujando la plantilla (formas + texto + fotos decorativas).
- * No usa la plantilla como fondo ni captura el navegador.
+ * PDF de cotización Escuela Aves Salento.
+ * Dibuja la plantilla con formas + texto + assets (logo/foto decorativa).
+ * Multipágina: mismos colores, tipografía, header y footer; totales solo al final.
  */
 import { documentToDraft } from './quote-sheet.model';
 import type { QuoteSheetDocument } from './quote-sheet.model';
@@ -9,10 +10,16 @@ import {
   QUOTE_LOGO,
   QUOTE_TEMPLATE_IMAGE,
   fillQuoteTemplate,
+  type FilledQuoteTemplate,
+  type QuoteLineItem,
   type QuoteTemplateInput
 } from './quote-template';
 
 export type QuotePdfData = QuoteTemplateInput | QuoteSheetDocument;
+
+const PAGE_W = 794;
+const PAGE_H = 1123;
+const ROWS_PER_PAGE = 6;
 
 export async function downloadQuotePdf(data: QuotePdfData): Promise<void> {
   const blob = await buildQuotePdfBlob(data);
@@ -23,8 +30,53 @@ export async function downloadQuotePdf(data: QuotePdfData): Promise<void> {
 }
 
 export async function buildQuotePdfBlob(data: QuotePdfData): Promise<Blob> {
-  const jpeg = await renderQuoteDocumentJpeg(toInput(data));
-  return jpegToPdf(jpeg.bytes, jpeg.width, jpeg.height);
+  const input = toInput(data);
+  const filled = fillQuoteTemplate(input);
+  const items = filled.items.length
+    ? filled.items
+    : [
+        {
+          description: '',
+          quantity: '',
+          unit: '',
+          unitPrice: '',
+          discount: '',
+          total: '',
+          rawQuantity: 0,
+          rawUnitPrice: 0,
+          rawDiscount: 0,
+          rawTotal: 0
+        } as QuoteLineItem
+      ];
+
+  const chunks: QuoteLineItem[][] = [];
+  for (let i = 0; i < items.length; i += ROWS_PER_PAGE) {
+    chunks.push(items.slice(i, i + ROWS_PER_PAGE));
+  }
+  if (!chunks.length) {
+    chunks.push([]);
+  }
+
+  const [plantilla, logo] = await Promise.all([
+    loadImage(QUOTE_TEMPLATE_IMAGE).catch(() => null),
+    loadImage(QUOTE_LOGO).catch(() => null)
+  ]);
+
+  const pages: Array<{ bytes: Uint8Array; width: number; height: number }> = [];
+  for (let p = 0; p < chunks.length; p++) {
+    pages.push(
+      await renderPage({
+        filled,
+        rows: chunks[p],
+        pageIndex: p,
+        pageCount: chunks.length,
+        itemOffset: p * ROWS_PER_PAGE,
+        plantilla,
+        logo
+      })
+    );
+  }
+  return jpegPagesToPdf(pages);
 }
 
 function toInput(data: QuotePdfData): QuoteTemplateInput {
@@ -35,13 +87,18 @@ function toInput(data: QuotePdfData): QuoteTemplateInput {
   return data as QuoteTemplateInput;
 }
 
-async function renderQuoteDocumentJpeg(data: QuoteTemplateInput): Promise<{
-  bytes: Uint8Array;
-  width: number;
-  height: number;
-}> {
-  const width = 794;
-  const height = 1123;
+async function renderPage(opts: {
+  filled: FilledQuoteTemplate;
+  rows: QuoteLineItem[];
+  pageIndex: number;
+  pageCount: number;
+  itemOffset: number;
+  plantilla: HTMLImageElement | null;
+  logo: HTMLImageElement | null;
+}): Promise<{ bytes: Uint8Array; width: number; height: number }> {
+  const { filled, rows, pageIndex, pageCount, itemOffset, plantilla, logo } = opts;
+  const width = PAGE_W;
+  const height = PAGE_H;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -49,17 +106,13 @@ async function renderQuoteDocumentJpeg(data: QuoteTemplateInput): Promise<{
   if (!ctx) {
     throw new Error('No se pudo dibujar la cotización');
   }
-
-  const filled = fillQuoteTemplate(data);
   const company = ESCUELA_AVES_COMPANY;
-  const [plantilla, logo] = await Promise.all([
-    loadImage(QUOTE_TEMPLATE_IMAGE).catch(() => null),
-    loadImage(QUOTE_LOGO).catch(() => null)
-  ]);
+  const isLast = pageIndex === pageCount - 1;
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
 
+  // Header (identidad protegida)
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, 188);
   ctx.fillStyle = '#0b3d28';
@@ -73,19 +126,10 @@ async function renderQuoteDocumentJpeg(data: QuoteTemplateInput): Promise<{
     ctx.fillStyle = '#0b3d28';
     ctx.font = '700 22px "Segoe UI", Calibri, Arial, sans-serif';
     ctx.fillText('escuelaaves', 40, 80);
-    ctx.font = '600 16px "Segoe UI", Calibri, Arial, sans-serif';
-    ctx.fillText('Salento', 40, 104);
   }
   ctx.fillStyle = '#5a6b60';
   ctx.font = 'italic 13px "Segoe UI", Calibri, Arial, sans-serif';
   ctx.fillText('Naturaleza que inspira', 40, 148);
-
-  ctx.fillStyle = '#f6efe2';
-  ctx.font = '600 13px "Segoe UI", Calibri, Arial, sans-serif';
-  const pills = ['Avistamiento de aves', 'Experiencias naturales', 'Conexión con la biodiversidad'];
-  pills.forEach((text, i) => {
-    ctx.fillText(text, width * 0.66, 58 + i * 40);
-  });
 
   const gold = ctx.createLinearGradient(0, 188, width, 196);
   gold.addColorStop(0, '#b8922a');
@@ -96,55 +140,52 @@ async function renderQuoteDocumentJpeg(data: QuoteTemplateInput): Promise<{
 
   ctx.fillStyle = '#0b3d28';
   ctx.font = '800 28px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText('COTIZACIÓN', 48, 236);
+  ctx.fillText(pageIndex === 0 ? 'COTIZACIÓN' : 'COTIZACIÓN (continuación)', 48, 236);
   ctx.fillStyle = '#5a6b60';
   ctx.font = '400 13px "Segoe UI", Calibri, Arial, sans-serif';
   ctx.fillText(company.tagline, 48, 256);
+  if (pageCount > 1) {
+    ctx.fillText(`Página ${pageIndex + 1} de ${pageCount}`, 48, 274);
+  }
 
   ctx.textAlign = 'left';
   drawMeta(ctx, width - 280, 220, 'N.º Cotización:', filled.quoteNumber);
   drawMeta(ctx, width - 280, 242, 'Fecha de emisión:', filled.issuedAt);
   drawMeta(ctx, width - 280, 264, 'Válida hasta:', filled.validUntil);
 
-  ctx.font = '800 15px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillText('Datos del cliente', 48, 300);
-  ctx.fillText('Nuestra información', width / 2 + 10, 300);
+  let tableTop = 300;
+  if (pageIndex === 0) {
+    ctx.font = '800 15px "Segoe UI", Calibri, Arial, sans-serif';
+    ctx.fillStyle = '#0b3d28';
+    ctx.fillText('Datos del cliente', 48, 300);
+    ctx.fillText('Nuestra información', width / 2 + 10, 300);
+    const clientY = 322;
+    if (filled.clientName) drawKv(ctx, 48, clientY, 'Nombre:', filled.clientName);
+    if (filled.clientNit) drawKv(ctx, 48, clientY + 22, 'NIT / C.C.:', filled.clientNit);
+    if (filled.clientPhone) drawKv(ctx, 48, clientY + 44, 'Teléfono:', filled.clientPhone);
+    if (filled.clientEmail) drawKv(ctx, 48, clientY + 66, 'Correo:', filled.clientEmail);
+    if (filled.clientCity) drawKv(ctx, 48, clientY + 88, 'Ciudad:', filled.clientCity);
 
-  const clientY = 322;
-  drawKv(ctx, 48, clientY, 'Nombre:', filled.clientName);
-  drawKv(ctx, 48, clientY + 22, 'NIT / C.C.:', filled.clientNit);
-  drawKv(ctx, 48, clientY + 44, 'Teléfono:', filled.clientPhone);
-  drawKv(ctx, 48, clientY + 66, 'Correo:', filled.clientEmail);
-  drawKv(ctx, 48, clientY + 88, 'Ciudad:', filled.clientCity);
+    ctx.font = '800 13px "Segoe UI", Calibri, Arial, sans-serif';
+    ctx.fillStyle = '#0b3d28';
+    ctx.fillText(company.legalName, width / 2 + 10, clientY);
+    ctx.font = '400 12px "Segoe UI", Calibri, Arial, sans-serif';
+    drawKv(ctx, width / 2 + 10, clientY + 22, 'NIT:', company.nit);
+    drawKv(ctx, width / 2 + 10, clientY + 44, 'Dirección:', company.address);
+    drawKv(ctx, width / 2 + 10, clientY + 66, 'Teléfono:', company.phone);
+    drawKv(ctx, width / 2 + 10, clientY + 88, 'Correo:', company.email);
+    tableTop = 450;
+  }
 
-  ctx.font = '800 13px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#0b3d28';
-  ctx.fillText(company.legalName, width / 2 + 10, clientY);
-  ctx.font = '400 12px "Segoe UI", Calibri, Arial, sans-serif';
-  drawKv(ctx, width / 2 + 10, clientY + 22, 'NIT:', company.nit);
-  drawKv(ctx, width / 2 + 10, clientY + 44, 'Dirección:', company.address);
-  drawKv(ctx, width / 2 + 10, clientY + 66, 'Teléfono:', company.phone);
-  drawKv(ctx, width / 2 + 10, clientY + 88, 'Correo:', company.email);
-
-  ctx.save();
-  ctx.translate(width - 42, clientY + 70);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillStyle = '#c9a227';
-  ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText(company.slogan, 0, 0);
-  ctx.restore();
-
-  const tableTop = 450;
   ctx.fillStyle = '#0b3d28';
   ctx.font = '800 15px "Segoe UI", Calibri, Arial, sans-serif';
   ctx.fillText('Detalle de la cotización', 48, tableTop);
   const cols = [
-    { x: 48, w: 50, title: 'Ítem' },
-    { x: 98, w: 300, title: 'Descripción' },
-    { x: 398, w: 90, title: 'Cantidad' },
-    { x: 488, w: 120, title: 'Valor unitario' },
-    { x: 608, w: 138, title: 'Valor total' }
+    { x: 48, title: 'Ítem' },
+    { x: 98, title: 'Descripción' },
+    { x: 398, title: 'Cantidad' },
+    { x: 488, title: 'Valor unitario' },
+    { x: 608, title: 'Valor total' }
   ];
   ctx.fillStyle = '#0b3d28';
   ctx.fillRect(48, tableTop + 10, width - 96, 28);
@@ -152,9 +193,9 @@ async function renderQuoteDocumentJpeg(data: QuoteTemplateInput): Promise<{
   ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
   cols.forEach((col) => ctx.fillText(col.title, col.x + 8, tableTop + 28));
 
-  const rows = [...filled.items];
-  while (rows.length < 5) {
-    rows.push({
+  const displayRows = [...rows];
+  while (displayRows.length < Math.min(ROWS_PER_PAGE, 5) && pageIndex === 0 && pageCount === 1) {
+    displayRows.push({
       description: '',
       quantity: '',
       unit: '',
@@ -167,7 +208,8 @@ async function renderQuoteDocumentJpeg(data: QuoteTemplateInput): Promise<{
       rawTotal: 0
     });
   }
-  rows.slice(0, 8).forEach((item, i) => {
+
+  displayRows.forEach((item, i) => {
     const y = tableTop + 38 + i * 42;
     ctx.fillStyle = i % 2 ? '#f4f7f4' : '#ffffff';
     ctx.fillRect(48, y, width - 96, 42);
@@ -178,7 +220,7 @@ async function renderQuoteDocumentJpeg(data: QuoteTemplateInput): Promise<{
     ctx.fillStyle = '#ffffff';
     ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(String(i + 1), 73, y + 25);
+    ctx.fillText(String(itemOffset + i + 1), 73, y + 25);
     ctx.textAlign = 'left';
     ctx.fillStyle = '#1a2c22';
     ctx.font = '400 11px "Segoe UI", Calibri, Arial, sans-serif';
@@ -192,54 +234,56 @@ async function renderQuoteDocumentJpeg(data: QuoteTemplateInput): Promise<{
     ctx.textAlign = 'left';
   });
 
-  const totalsY = tableTop + 38 + Math.min(rows.length, 8) * 42 + 24;
-  const trust = [
-    'Guías expertos en aviturismo',
-    'Seguridad en todo el recorrido',
-    'Experiencias sostenibles',
-    'Atención personalizada'
-  ];
-  ctx.fillStyle = '#0b3d28';
-  ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
-  trust.forEach((text, i) => {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    ctx.fillText(text, 48 + col * 200, totalsY + row * 20);
-  });
+  let cursorY = tableTop + 38 + displayRows.length * 42 + 24;
 
-  ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#5a6b60';
-  ctx.textAlign = 'right';
-  ctx.fillText('Subtotal', 620, totalsY);
-  ctx.fillText('IVA (19%)', 620, totalsY + 20);
-  ctx.fillStyle = '#1a2c22';
-  ctx.fillText(filled.subtotal, 738, totalsY);
-  ctx.fillText(filled.iva, 738, totalsY + 20);
-  ctx.strokeStyle = '#0b3d28';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(560, totalsY + 28);
-  ctx.lineTo(738, totalsY + 28);
-  ctx.stroke();
-  ctx.fillStyle = '#0b3d28';
-  ctx.font = '800 16px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText('Total', 620, totalsY + 48);
-  ctx.fillText(filled.total, 738, totalsY + 48);
-  ctx.textAlign = 'left';
+  if (isLast) {
+    const trust = [
+      'Guías expertos en aviturismo',
+      'Seguridad en todo el recorrido',
+      'Experiencias sostenibles',
+      'Atención personalizada'
+    ];
+    ctx.fillStyle = '#0b3d28';
+    ctx.font = '700 11px "Segoe UI", Calibri, Arial, sans-serif';
+    trust.forEach((text, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      ctx.fillText(text, 48 + col * 200, cursorY + row * 20);
+    });
 
-  const payY = totalsY + 78;
-  ctx.fillStyle = '#0b3d28';
-  ctx.font = '800 14px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillText('Condiciones y forma de pago', 48, payY);
-  ctx.font = '400 11px "Segoe UI", Calibri, Arial, sans-serif';
-  ctx.fillStyle = '#1a2c22';
-  company.payment.forEach((line, i) => {
-    ctx.fillText(`• ${line}`, 48, payY + 20 + i * 16);
-  });
-  ctx.fillStyle = '#0b3d28';
-  ctx.font = '800 16px "Segoe UI", Calibri, Arial, sans-serif';
-  fillWrapped(ctx, company.magic, 520, payY + 28, 220, 18, 'right');
+    ctx.font = '700 12px "Segoe UI", Calibri, Arial, sans-serif';
+    ctx.fillStyle = '#5a6b60';
+    ctx.textAlign = 'right';
+    ctx.fillText('Subtotal', 620, cursorY);
+    ctx.fillText('IVA (19%)', 620, cursorY + 20);
+    ctx.fillStyle = '#1a2c22';
+    ctx.fillText(filled.subtotal, 738, cursorY);
+    ctx.fillText(filled.iva, 738, cursorY + 20);
+    ctx.strokeStyle = '#0b3d28';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(560, cursorY + 28);
+    ctx.lineTo(738, cursorY + 28);
+    ctx.stroke();
+    ctx.fillStyle = '#0b3d28';
+    ctx.font = '800 16px "Segoe UI", Calibri, Arial, sans-serif';
+    ctx.fillText('Total', 620, cursorY + 48);
+    ctx.fillText(filled.total, 738, cursorY + 48);
+    ctx.textAlign = 'left';
 
+    const payY = cursorY + 78;
+    ctx.fillStyle = '#0b3d28';
+    ctx.font = '800 14px "Segoe UI", Calibri, Arial, sans-serif';
+    ctx.fillText('Condiciones y forma de pago', 48, payY);
+    ctx.font = '400 11px "Segoe UI", Calibri, Arial, sans-serif';
+    ctx.fillStyle = '#1a2c22';
+    const paymentLines = [...company.payment];
+    paymentLines.slice(0, 6).forEach((line, i) => {
+      ctx.fillText(`• ${line.replace(/^•\s*/, '')}`, 48, payY + 20 + i * 16);
+    });
+  }
+
+  // Footer protegido
   ctx.fillStyle = '#07261a';
   ctx.fillRect(0, height - 128, width, 36);
   ctx.fillStyle = '#f4efe4';
@@ -311,8 +355,7 @@ function fillWrapped(
   if (row) {
     lines.push(row);
   }
-  const use = lines.slice(0, 3);
-  use.forEach((line, i) => {
+  lines.slice(0, 3).forEach((line, i) => {
     ctx.textAlign = align;
     ctx.fillText(line, x, y + i * lineHeight, maxWidth);
   });
@@ -328,28 +371,43 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function jpegToPdf(jpeg: Uint8Array, imgW: number, imgH: number): Blob {
+function jpegPagesToPdf(pages: Array<{ bytes: Uint8Array; width: number; height: number }>): Blob {
   const pageW = 595;
-  const pageH = Math.round((pageW * imgH) / imgW);
   const objects: Uint8Array[] = [];
   objects.push(ascii('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'));
-  objects.push(ascii('2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'));
-  objects.push(
-    ascii(
-      `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`
-    )
-  );
-  objects.push(
-    concat(
+
+  const pageObjIds: number[] = [];
+  let nextId = 3;
+  for (let i = 0; i < pages.length; i++) {
+    pageObjIds.push(nextId);
+    nextId += 3; // page, image, content
+  }
+  const kids = pageObjIds.map((id) => `${id} 0 R`).join(' ');
+  objects.push(ascii(`2 0 obj\n<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>\nendobj\n`));
+
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const pageH = Math.round((pageW * page.height) / page.width);
+    const pageId = pageObjIds[i];
+    const imgId = pageId + 1;
+    const contentId = pageId + 2;
+    objects.push(
       ascii(
-        `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imgW} /Height ${imgH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`
-      ),
-      jpeg,
-      ascii('\nendstream\nendobj\n')
-    )
-  );
-  const content = `q ${pageW} 0 0 ${pageH} 0 0 cm /Im0 Do Q`;
-  objects.push(ascii(`5 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`));
+        `${pageId} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im${i} ${imgId} 0 R >> >> /Contents ${contentId} 0 R >>\nendobj\n`
+      )
+    );
+    objects.push(
+      concat(
+        ascii(
+          `${imgId} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.bytes.length} >>\nstream\n`
+        ),
+        page.bytes,
+        ascii('\nendstream\nendobj\n')
+      )
+    );
+    const content = `q ${pageW} 0 0 ${pageH} 0 0 cm /Im${i} Do Q`;
+    objects.push(ascii(`${contentId} 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`));
+  }
 
   let body = ascii('%PDF-1.4\n');
   const offsets = [0];

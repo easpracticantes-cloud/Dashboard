@@ -1,0 +1,114 @@
+.qs-studio {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .qs-studio {
+    grid-template-columns: 1fr;
+  }
+}
+
+.qs-studio__panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--eas-line-soft);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--eas-leaf) 5%, var(--eas-surface));
+}
+
+.qs-studio__panel label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--eas-muted);
+}
+
+.qs-studio__stage {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--eas-leaf);
+}
+
+.qs-studio__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.qs-studio__total {
+  margin: 0.25rem 0 0;
+  font-size: 0.92rem;
+}
+
+.qs-studio__conf {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--eas-muted);
+}
+
+.qs-studio__missing h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+}
+
+.qs-studio__missing ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+}
+
+.qs-studio__missing li[data-sev='CRITICAL'] {
+  color: var(--eas-danger);
+  font-weight: 650;
+}
+
+.qs-studio__warn p {
+  margin: 0.2rem 0;
+  font-size: 0.78rem;
+  color: var(--eas-amber-deep);
+}
+
+.qs-studio__preview {
+  min-width: 0;
+  overflow: auto;
+  max-height: calc(100dvh - 7rem);
+  padding: 0.5rem;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--eas-forest) 4%, transparent);
+}
+
+.qs-studio__empty {
+  display: grid;
+  place-items: center;
+  gap: 0.6rem;
+  min-height: 420px;
+  color: var(--eas-muted);
+  text-align: center;
+  padding: 2rem;
+}
+
+.qs-studio__empty mat-icon {
+  font-size: 42px;
+  width: 42px;
+  height: 42px;
+  opacity: 0.5;
+}
+
+.qs-studio__alert {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: var(--eas-danger-bg);
+  border: 1px solid var(--eas-danger-border);
+  color: var(--eas-ink);
+}

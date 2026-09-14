@@ -24,9 +24,12 @@ export const routes: Routes = [
         path: 'registro',
         loadChildren: () => import('./features/registro/registro.routes').then((m) => m.REGISTRO_ROUTES)
       },
+      {
+        path: 'quotes',
+        loadChildren: () => import('./features/quotes/quotes.routes').then((m) => m.QUOTES_ROUTES)
+      },
       { path: 'conversations', redirectTo: 'registro', pathMatch: 'prefix' },
       { path: 'clients', redirectTo: 'registro', pathMatch: 'prefix' },
-      { path: 'quotes', redirectTo: 'registro', pathMatch: 'prefix' },
       { path: 'reservations', redirectTo: 'registro', pathMatch: 'prefix' },
       { path: 'sales', redirectTo: 'registro', pathMatch: 'prefix' },
       {
