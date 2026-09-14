@@ -20,6 +20,8 @@ export class SidebarComponent {
   private readonly router = inject(Router);
 
   @Output() navigate = new EventEmitter<void>();
+  /** Pide al shell cerrar el drawer (desktop y móvil). */
+  @Output() collapse = new EventEmitter<void>();
 
   readonly user = computed(() => this.auth.currentUser());
   readonly roleLabel = computed(() => {

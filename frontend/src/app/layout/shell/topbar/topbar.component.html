@@ -1,6 +1,13 @@
 <header class="tb">
-  <button type="button" class="tb__icon-btn lg-hide" (click)="menuToggle.emit()" aria-label="Abrir menú">
-    <mat-icon>menu</mat-icon>
+  <button
+    type="button"
+    class="tb__icon-btn tb__menu"
+    (click)="menuToggle.emit()"
+    [attr.aria-label]="menuLabel()"
+    [attr.aria-expanded]="sidebarOpen"
+    [title]="menuLabel() + ' (tecla [)'"
+  >
+    <mat-icon>{{ sidebarOpen ? 'menu_open' : 'menu' }}</mat-icon>
   </button>
 
   <button type="button" class="tb__search sm-show" (click)="openCommand.emit()">

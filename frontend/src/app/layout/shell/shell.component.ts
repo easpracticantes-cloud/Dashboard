@@ -1,4 +1,4 @@
-import { Component, HostListener, inject, signal } from '@angular/core';
+import { Component, HostListener, effect, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
@@ -12,6 +12,8 @@ import { LiveSyncService } from '../../core/services/live-sync.service';
 import { CommandPaletteComponent } from '../../shared/components/command-palette/command-palette.component';
 import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-copilot.component';
 
+const SIDEBAR_PREF_KEY = 'eas-sidebar-open';
+
 @Component({
   selector: 'eas-shell',
   standalone: true,
@@ -19,17 +21,21 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
   template: `
     <mat-sidenav-container class="shell">
       <mat-sidenav
-        #drawer
         class="shell__drawer"
         [mode]="isMobile() ? 'over' : 'side'"
-        [opened]="!isMobile()"
+        [opened]="sidebarOpen()"
         [fixedInViewport]="isMobile()"
+        (openedChange)="onDrawerOpenedChange($event)"
       >
-        <eas-sidebar (navigate)="isMobile() && drawer.close()"></eas-sidebar>
+        <eas-sidebar (navigate)="onSidebarNavigate()" (collapse)="toggleSidebar()"></eas-sidebar>
       </mat-sidenav>
 
-      <mat-sidenav-content class="shell__content" #content>
-        <eas-topbar (menuToggle)="drawer.toggle()" (openCommand)="openCommandPalette()"></eas-topbar>
+      <mat-sidenav-content class="shell__content">
+        <eas-topbar
+          [sidebarOpen]="sidebarOpen()"
+          (menuToggle)="toggleSidebar()"
+          (openCommand)="openCommandPalette()"
+        ></eas-topbar>
         <main class="shell__main">
           <div class="shell__canvas" [attr.data-nav]="navTick()">
             <router-outlet></router-outlet>
@@ -136,8 +142,8 @@ import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-cop
           animation: none;
         }
       }
-    `
-  ]
+    `,
+  ],
 })
 export class ShellComponent {
   private readonly breakpointObserver = inject(BreakpointObserver);
@@ -145,21 +151,39 @@ export class ShellComponent {
   private readonly dialog = inject(MatDialog);
   private readonly router = inject(Router);
   private commandOpen = false;
+  private skippingOpenedSync = false;
 
   readonly navTick = signal(0);
+  readonly sidebarOpen = signal(true);
 
   readonly isMobile = toSignal(
     this.breakpointObserver.observe('(max-width: 1023px)').pipe(map((state) => state.matches)),
-    { initialValue: false }
+    {
+      initialValue:
+        typeof window !== 'undefined' ? window.matchMedia('(max-width: 1023px)').matches : false,
+    },
   );
 
   constructor() {
     this.liveSync.start();
 
+    effect(() => {
+      const mobile = this.isMobile();
+      this.skippingOpenedSync = true;
+      if (mobile) {
+        this.sidebarOpen.set(false);
+      } else {
+        this.sidebarOpen.set(this.readSidebarPref());
+      }
+      queueMicrotask(() => {
+        this.skippingOpenedSync = false;
+      });
+    });
+
     this.router.events
       .pipe(
         filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-        takeUntilDestroyed()
+        takeUntilDestroyed(),
       )
       .subscribe(() => {
         this.navTick.update((n) => n + 1);
@@ -168,12 +192,40 @@ export class ShellComponent {
       });
   }
 
+  toggleSidebar(): void {
+    this.sidebarOpen.update((open) => !open);
+    this.persistSidebarPref();
+  }
+
+  onDrawerOpenedChange(opened: boolean): void {
+    if (this.skippingOpenedSync) {
+      return;
+    }
+    this.sidebarOpen.set(opened);
+    this.persistSidebarPref();
+  }
+
+  onSidebarNavigate(): void {
+    if (this.isMobile()) {
+      this.sidebarOpen.set(false);
+    }
+  }
+
   @HostListener('document:keydown', ['$event'])
   onGlobalKeydown(event: KeyboardEvent): void {
     const isK = event.key.toLowerCase() === 'k';
     if ((event.ctrlKey || event.metaKey) && isK) {
       event.preventDefault();
       this.openCommandPalette();
+    }
+    if (event.key === '[' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const t = event.target as HTMLElement | null;
+      const tag = t?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || t?.isContentEditable) {
+        return;
+      }
+      event.preventDefault();
+      this.toggleSidebar();
     }
   }
 
@@ -187,10 +239,36 @@ export class ShellComponent {
       backdropClass: 'eas-command-palette-backdrop',
       autoFocus: false,
       width: 'auto',
-      maxWidth: '95vw'
+      maxWidth: '95vw',
     });
     ref.afterClosed().subscribe(() => {
       this.commandOpen = false;
     });
+  }
+
+  private readSidebarPref(): boolean {
+    try {
+      const stored = localStorage.getItem(SIDEBAR_PREF_KEY);
+      if (stored === '0' || stored === 'false') {
+        return false;
+      }
+      if (stored === '1' || stored === 'true') {
+        return true;
+      }
+    } catch {
+      /* ignore */
+    }
+    return true;
+  }
+
+  private persistSidebarPref(): void {
+    if (this.isMobile()) {
+      return;
+    }
+    try {
+      localStorage.setItem(SIDEBAR_PREF_KEY, this.sidebarOpen() ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
   }
 }

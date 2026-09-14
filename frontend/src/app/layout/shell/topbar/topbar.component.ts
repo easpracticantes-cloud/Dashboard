@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, computed, inject, OnInit, ViewEncapsulation } from '@angular/core';
+import { Component, EventEmitter, Input, Output, computed, inject, OnInit, ViewEncapsulation } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -28,6 +28,8 @@ export class TopbarComponent implements OnInit {
   readonly theme = inject(ThemeService);
   readonly liveSync = inject(LiveSyncService);
 
+  /** Estado del menú lateral (para etiqueta/icono del toggle). */
+  @Input() sidebarOpen = true;
   @Output() menuToggle = new EventEmitter<void>();
   @Output() openCommand = new EventEmitter<void>();
 
@@ -55,6 +57,10 @@ export class TopbarComponent implements OnInit {
     } else {
       setTimeout(run, 1200);
     }
+  }
+
+  menuLabel(): string {
+    return this.sidebarOpen ? 'Ocultar menú lateral' : 'Mostrar menú lateral';
   }
 
   syncNow(): void {

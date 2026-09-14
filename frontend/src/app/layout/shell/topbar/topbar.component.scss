@@ -52,6 +52,16 @@ html[data-theme='dark'] .tb {
   transform: none;
 }
 
+.tb__menu {
+  border: 1px solid var(--eas-line-soft);
+  background: var(--eas-surface);
+  box-shadow: var(--eas-shadow-sm);
+}
+
+.tb__menu:hover {
+  border-color: rgba(31, 122, 76, 0.35);
+}
+
 .tb__sync {
   display: inline-flex;
   align-items: center;

@@ -1,6 +1,15 @@
 <aside class="sb">
   <div class="sb__brand">
     <eas-brand-logo variant="lockup-light" [height]="44" subtitle="SIG"></eas-brand-logo>
+    <button
+      type="button"
+      class="sb__collapse"
+      (click)="collapse.emit()"
+      aria-label="Ocultar menú lateral"
+      title="Ocultar menú lateral"
+    >
+      <mat-icon>chevron_left</mat-icon>
+    </button>
   </div>
 
   <p class="sb__section">Navegación</p>
