@@ -1,4 +1,4 @@
-import { Component, effect, inject, input, output, signal } from '@angular/core';
+import { Component, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { QuoteDraft } from '../../../core/services/enterprise-ai.service';
@@ -38,6 +38,7 @@ export class AveQuoteReviewComponent {
   readonly downloading = signal(false);
   readonly formError = signal<string | null>(null);
   readonly statuses = QUOTE_STATUSES;
+  readonly sheet = viewChild(QuoteSheetComponent);
 
   constructor() {
     effect(() => {
@@ -140,11 +141,19 @@ export class AveQuoteReviewComponent {
     }
     this.formError.set(null);
     this.downloading.set(true);
+    const previewMode = this.editing();
+    if (previewMode) {
+      this.editing.set(false);
+      await new Promise((r) => setTimeout(r, 80));
+    }
     try {
-      await downloadQuotePdf(this.doc());
+      await downloadQuotePdf(this.doc(), this.sheet()?.nativeElement() ?? null);
     } catch {
       this.formError.set('No se pudo generar el PDF. Intenta de nuevo.');
     } finally {
+      if (previewMode) {
+        this.editing.set(true);
+      }
       this.downloading.set(false);
     }
   }

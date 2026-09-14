@@ -1,73 +1,22 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, ElementRef, computed, input, output, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import {
-  CLIENT_FIELDS,
-  META_FIELDS,
-  PAY_FIELDS,
-  QUOTE_MAX_ROWS,
-  ROW_CELLS,
-  TOTAL_FIELDS,
-  boxRect,
-  fontCqw,
-  rowCellBox,
-  rowTint,
-  type BoxRect,
-  type FieldAlign,
-  type TextFieldSpec,
-  type TextKey
-} from './quote-layout';
 import { documentTotals } from './quote-sheet.math';
 import {
-  emptyQuoteItem,
-  recalcItem,
   type QuoteSheetDocument,
-  type QuoteSheetItem
+  type QuoteSheetItem,
+  displayDash,
+  emptyQuoteItem,
+  previewItems,
+  recalcItem
 } from './quote-sheet.model';
-import { QUOTE_TEMPLATE_IMAGE, formatCop, formatQuoteDate } from './quote-template';
-
-/** Campo de texto proyectado sobre un `[placeholder]` de la plantilla. */
-interface SheetField {
-  key: TextKey;
-  rect: BoxRect;
-  tint: string;
-  align: FieldAlign;
-  kind: TextFieldSpec['kind'];
-  label: string;
-  fs: number;
-  /** Valor crudo del documento (lo que edita el input). */
-  raw: string;
-  /** Valor ya formateado para la vista previa. */
-  text: string;
-}
-
-/** Celda de un renglón de la tabla impresa. */
-interface SheetCell {
-  rect: BoxRect;
-  align: FieldAlign;
-  fs: number;
-  text: string;
-}
-
-interface SheetRow {
-  index: number;
-  item: QuoteSheetItem;
-  tint: string;
-  description: SheetCell;
-  quantity: SheetCell;
-  unitPrice: SheetCell;
-  total: SheetCell;
-  filled: boolean;
-}
-
-interface SheetTotal {
-  key: string;
-  rect: BoxRect;
-  tint: string;
-  ink: string;
-  fs: number;
-  bold: boolean;
-  text: string;
-}
+import {
+  ESCUELA_AVES_COMPANY,
+  formatCop,
+  formatQuoteDate,
+  QUOTE_FOOTER_LANDSCAPE,
+  QUOTE_HERO_BIRD,
+  QUOTE_LOGO
+} from './quote-template';
 
 @Component({
   selector: 'eas-quote-sheet',
@@ -80,138 +29,70 @@ export class QuoteSheetComponent {
   readonly document = input.required<QuoteSheetDocument>();
   readonly editing = input(false);
   readonly documentChange = output<QuoteSheetDocument>();
+  readonly sheetRoot = viewChild<ElementRef<HTMLElement>>('sheetRoot');
 
-  readonly plantilla = QUOTE_TEMPLATE_IMAGE;
-  readonly descLineHeight = fontCqw(ROW_CELLS.description.lh);
+  readonly company = ESCUELA_AVES_COMPANY;
+  readonly logo = QUOTE_LOGO;
+  readonly bird = QUOTE_HERO_BIRD;
+  readonly landscape = QUOTE_FOOTER_LANDSCAPE;
 
-  private readonly money = computed(() => documentTotals(this.document().items));
+  readonly rows = computed(() => previewItems(this.document().items, this.editing()));
+  readonly money = computed(() => documentTotals(this.document().items));
+  readonly subtotalText = computed(() => formatCop(this.money().subtotal, this.document().currency));
+  readonly ivaText = computed(() => formatCop(this.money().iva, this.document().currency));
+  readonly totalText = computed(() => formatCop(this.money().total, this.document().currency));
 
-  readonly metaFields = computed(() => META_FIELDS.map((spec) => this.toField(spec)));
-  readonly clientFields = computed(() => CLIENT_FIELDS.map((spec) => this.toField(spec)));
-  readonly payFields = computed(() => PAY_FIELDS.map((spec) => this.toField(spec)));
+  dash = displayDash;
+  dateText = formatQuoteDate;
 
-  readonly rows = computed<SheetRow[]>(() =>
-    this.slots().map((item, index) => ({
-      index,
-      item,
-      tint: rowTint(index),
-      description: this.toCell(index, 'description', item.description),
-      quantity: this.toCell(index, 'quantity', this.qtyLabel(item)),
-      unitPrice: this.toCell(index, 'unitPrice', this.moneyOrBlank(item.unitPrice)),
-      total: this.toCell(index, 'total', this.moneyOrBlank(item.total)),
-      filled: !!(item.description.trim() || item.unitPrice > 0 || item.total > 0)
-    }))
-  );
-
-  /**
-   * La tabla se cubre completa o no se cubre. Si hay un solo ítem cargado, dejar
-   * los otros renglones con el texto "[Descripción del servicio…]" del JPG se
-   * vería roto, así que en ese caso los renglones vacíos quedan limpios.
-   */
-  readonly tableActive = computed(() => this.editing() || this.rows().some((row) => row.filled));
-
-  readonly totals = computed<SheetTotal[]>(() => {
-    const money = this.money();
-    const value: Record<string, number> = {
-      subtotal: money.subtotal,
-      iva: money.iva,
-      grand: money.total
-    };
-    return TOTAL_FIELDS.map((spec) => ({
-      key: spec.key,
-      rect: boxRect(spec.box),
-      tint: spec.tint,
-      ink: spec.ink,
-      fs: fontCqw(spec.fs),
-      bold: spec.bold,
-      text: formatCop(value[spec.key], this.document().currency)
-    }));
-  });
-
-  /** Los totales solo tapan la plantilla cuando ya hay dinero que mostrar. */
-  readonly showTotals = computed(() => this.editing() || this.money().total > 0);
-
-  /** Un campo se dibuja si estamos editando o si ya tiene contenido real. */
-  visible(text: string): boolean {
-    return this.editing() || !!text.trim();
+  nativeElement(): HTMLElement | null {
+    return this.sheetRoot()?.nativeElement ?? null;
   }
 
-  patchField(key: TextKey, value: string): void {
-    this.documentChange.emit({ ...this.document(), [key]: value });
+  patch(partial: Partial<QuoteSheetDocument>): void {
+    this.documentChange.emit({ ...this.document(), ...partial });
   }
 
-  patchRow(index: number, partial: Partial<QuoteSheetItem>): void {
-    const items = (this.document().items || []).slice(0, QUOTE_MAX_ROWS);
-    while (items.length <= index) {
-      items.push(blankItem());
+  patchItem(index: number, partial: Partial<QuoteSheetItem>): void {
+    const items = this.document().items.map((item, i) =>
+      i === index ? recalcItem({ ...item, ...partial }) : item
+    );
+    this.documentChange.emit({ ...this.document(), items });
+  }
+
+  addItem(): void {
+    this.documentChange.emit({
+      ...this.document(),
+      items: [...this.document().items, emptyQuoteItem()]
+    });
+  }
+
+  removeItem(index: number): void {
+    const items = this.document().items.filter((_, i) => i !== index);
+    this.documentChange.emit({
+      ...this.document(),
+      items: items.length ? items : [emptyQuoteItem()]
+    });
+  }
+
+  moveItem(index: number, dir: -1 | 1): void {
+    const items = [...this.document().items];
+    const next = index + dir;
+    if (next < 0 || next >= items.length) {
+      return;
     }
-    const next = recalcItem({ ...items[index], ...partial });
-    // Al describir un renglón vacío la cantidad arranca en 1 pax.
-    items[index] =
-      next.description.trim() && !next.quantity
-        ? recalcItem({ ...next, quantity: 1, unit: next.unit || 'pax' })
-        : next;
-    this.documentChange.emit({ ...this.document(), items: trimTrailingBlanks(items) });
+    [items[index], items[next]] = [items[next], items[index]];
+    this.documentChange.emit({ ...this.document(), items });
   }
 
-  private slots(): QuoteSheetItem[] {
-    const items = (this.document().items || []).slice(0, QUOTE_MAX_ROWS).map(recalcItem);
-    while (items.length < QUOTE_MAX_ROWS) {
-      items.push({ ...blankItem(), id: `slot-${items.length}` });
-    }
-    return items;
-  }
-
-  private toField(spec: TextFieldSpec): SheetField {
-    const raw = String((this.document() as unknown as Record<string, unknown>)[spec.key] ?? '');
-    return {
-      key: spec.key,
-      rect: boxRect(spec.box),
-      tint: spec.tint,
-      align: spec.align,
-      kind: spec.kind,
-      label: spec.label,
-      fs: fontCqw(spec.fs),
-      raw,
-      text: spec.kind === 'date' ? (raw ? formatQuoteDate(raw) : '') : raw
-    };
-  }
-
-  private toCell(index: number, key: keyof typeof ROW_CELLS, text: string): SheetCell {
-    const spec = ROW_CELLS[key];
-    return {
-      rect: boxRect(rowCellBox(index, key)),
-      align: spec.align,
-      fs: fontCqw(spec.fs),
-      text
-    };
-  }
-
-  private qtyLabel(item: QuoteSheetItem): string {
+  qtyLabel(item: QuoteSheetItem): string {
     if (!item.quantity) {
       return '';
     }
     return item.unit ? `${item.quantity} ${item.unit}` : String(item.quantity);
   }
 
-  private moneyOrBlank(amount: number): string {
-    return amount > 0 ? formatCop(amount, this.document().currency) : '';
+  moneyOrDash(amount: number): string {
+    return amount > 0 ? formatCop(amount, this.document().currency) : '—';
   }
-}
-
-/** Renglón de relleno: sin cantidad, para no pintar un "1" fantasma. */
-function blankItem(): QuoteSheetItem {
-  return { ...emptyQuoteItem(), quantity: 0, unit: 'pax' };
-}
-
-function trimTrailingBlanks(items: QuoteSheetItem[]): QuoteSheetItem[] {
-  const out = [...items];
-  while (out.length && isBlank(out[out.length - 1])) {
-    out.pop();
-  }
-  return out.length ? out : [emptyQuoteItem()];
-}
-
-function isBlank(item: QuoteSheetItem): boolean {
-  return !item.description.trim() && !item.unitPrice && !item.total;
 }
