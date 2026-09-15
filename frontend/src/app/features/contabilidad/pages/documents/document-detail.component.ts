@@ -209,6 +209,35 @@ export class DocumentDetailComponent implements OnInit, OnDestroy {
     return this.doc?.confidence?.fields_detail?.[key]?.fuente || '';
   }
 
+  copiado = false;
+
+  labelContramarcado(status: string | undefined): string {
+    switch ((status || '').toUpperCase()) {
+      case 'GENERADO':
+        return '✓ Generado automáticamente';
+      case 'AMBIGUO':
+        return '⚠ Ambiguo — revisión requerida';
+      case 'PENDIENTE':
+        return '⚠ Revisión requerida: no se encontró COM';
+      case 'ERROR':
+        return '✗ Error al generar';
+      default:
+        return status || '';
+    }
+  }
+
+  async copiarContramarcado(): Promise<void> {
+    const text = this.doc?.contramarcado?.value;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      this.copiado = true;
+      setTimeout(() => (this.copiado = false), 1800);
+    } catch {
+      this.error = 'No se pudo copiar el contramarcado.';
+    }
+  }
+
   private reloadDocument(id: number): void {
     this.api.get(id).subscribe({
       next: (doc) => {

@@ -10,6 +10,16 @@ export interface FolderDocumentSummary {
   proveedor_nombre?: string | null;
   total?: number | null;
   requiere_revision?: boolean;
+  fecha_emision?: string | null;
+  tipo?: string | null;
+  contramarcado?: {
+    value: string;
+    status: string;
+    com?: string | null;
+    source?: string | null;
+    confidence?: number | null;
+    warning?: string | null;
+  } | null;
 }
 
 export interface InvoiceFolder {

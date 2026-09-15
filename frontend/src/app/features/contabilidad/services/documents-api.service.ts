@@ -3,6 +3,16 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ContabilidadUserContext } from './contabilidad-user-context';
 
+export interface ContramarcadoInfo {
+  value: string;
+  status: string;
+  com?: string | null;
+  source?: string | null;
+  confidence?: number | null;
+  warning?: string | null;
+  candidates?: Array<Record<string, unknown>>;
+}
+
 export interface DocumentSummary {
   id: number;
   filename: string;
@@ -17,6 +27,7 @@ export interface DocumentSummary {
   requiere_revision: boolean;
   observaciones?: string;
   received_at: string;
+  contramarcado?: ContramarcadoInfo | null;
 }
 
 export interface DocumentListResponse {
@@ -47,6 +58,7 @@ export interface DocumentDetail {
   requiere_revision: boolean;
   observaciones?: string;
   extracted: Record<string, unknown>;
+  contramarcado?: ContramarcadoInfo | null;
   ocr_preview: string;
   preview_url?: string;
   received_at: string;

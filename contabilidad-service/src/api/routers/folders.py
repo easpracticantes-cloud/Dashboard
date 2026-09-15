@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from application.services.document_service import DocumentService
 from domain.utils.period_utils import week_bounds_saturday
 from infrastructure.persistence.database import get_db
 from infrastructure.persistence.models import InvoiceFolderModel
@@ -92,6 +93,9 @@ def _serialize(folder: InvoiceFolderModel, db: Session | None = None) -> dict:
                     "proveedor_nombre": doc.provider.nombre if doc.provider else None,
                     "total": doc.total,
                     "requiere_revision": bool(doc.requiere_revision),
+                    "contramarcado": DocumentService.contramarcado_dict(doc),
+                    "fecha_emision": doc.fecha_emision,
+                    "tipo": doc.tipo,
                 }
             )
     return {

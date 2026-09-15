@@ -59,6 +59,19 @@ def _apply_sqlite_migrations() -> None:
         if batch_cols and "file_hash" not in batch_names:
             conn.execute(text("ALTER TABLE autobits_import_batches ADD COLUMN file_hash VARCHAR(64)"))
 
+        doc_cols = conn.execute(text("PRAGMA table_info(documents)")).fetchall()
+        doc_names = {row[1] for row in doc_cols}
+        if doc_cols:
+            for col, ddl in {
+                "contramarcado": "TEXT",
+                "contramarcado_status": "VARCHAR(32)",
+                "contramarcado_com": "VARCHAR(64)",
+                "contramarcado_source": "VARCHAR(32)",
+                "contramarcado_confidence": "FLOAT",
+            }.items():
+                if col not in doc_names:
+                    conn.execute(text(f"ALTER TABLE documents ADD COLUMN {col} {ddl}"))
+
         xcols = conn.execute(text("PRAGMA table_info(account_crossings)")).fetchall()
         if not xcols:
             return

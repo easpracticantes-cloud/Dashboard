@@ -201,6 +201,8 @@ class DocumentService:
         if doc.storage_path and Path(doc.storage_path).suffix.lower() in {".jpg", ".jpeg", ".png"}:
             preview_url = f"/api/documents/{doc.id}/preview"
 
+        contramarcado = self.contramarcado_dict(doc, extracted)
+
         return {
             "id": doc.id,
             "filename": doc.filename,
@@ -220,9 +222,40 @@ class DocumentService:
             "requiere_revision": doc.requiere_revision,
             "observaciones": doc.observaciones,
             "extracted": extracted,
+            "contramarcado": contramarcado,
             "ocr_preview": (doc.ocr_text or "")[:500],
             "preview_url": preview_url,
             "storage_path": doc.storage_path,
             "received_at": doc.received_at.isoformat() if doc.received_at else "",
             "updated_at": doc.updated_at.isoformat() if doc.updated_at else "",
+        }
+
+    @staticmethod
+    def contramarcado_dict(doc: DocumentModel, extracted: dict | None = None) -> dict | None:
+        data = extracted
+        if data is None and doc.extracted_json:
+            try:
+                data = json.loads(doc.extracted_json)
+            except json.JSONDecodeError:
+                data = {}
+        nested = (data or {}).get("_contramarcado") if isinstance(data, dict) else None
+        if isinstance(nested, dict) and nested.get("value"):
+            return nested
+        value = getattr(doc, "contramarcado", None) or (data or {}).get("contramarcado")
+        if not value:
+            return None
+        return {
+            "value": value,
+            "status": getattr(doc, "contramarcado_status", None)
+            or (data or {}).get("contramarcadoStatus")
+            or "PENDIENTE",
+            "com": getattr(doc, "contramarcado_com", None) or (data or {}).get("contramarcadoCom"),
+            "source": getattr(doc, "contramarcado_source", None)
+            or (data or {}).get("contramarcadoSource")
+            or "NONE",
+            "confidence": getattr(doc, "contramarcado_confidence", None)
+            or (data or {}).get("contramarcadoConfidence")
+            or 0,
+            "warning": (data or {}).get("contramarcadoWarning"),
+            "candidates": (data or {}).get("contramarcadoCandidates") or [],
         }

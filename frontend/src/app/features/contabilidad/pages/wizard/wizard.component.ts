@@ -91,6 +91,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   chatInput = '';
   chatMsgs = signal<ChatMsg[]>([]);
   preguntando = signal(false);
+  copiadoId = signal<number | null>(null);
 
   private poll?: Subscription;
   private autobitsUpload?: Subscription;
@@ -721,6 +722,19 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (e === 'ERROR') return 'bad';
     if (['EXTRAIDO', 'PROCESADO', 'APROBADO'].includes(e)) return 'ok';
     return '';
+  }
+
+  async copiarContramarcado(value: string, docId: number): Promise<void> {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      this.copiadoId.set(docId);
+      setTimeout(() => {
+        if (this.copiadoId() === docId) this.copiadoId.set(null);
+      }, 1600);
+    } catch {
+      this.error.set('No se pudo copiar el contramarcado.');
+    }
   }
 
   private cargarCarpetas(restoreActive = false): void {

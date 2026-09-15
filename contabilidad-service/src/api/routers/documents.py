@@ -112,6 +112,16 @@ class ConfidenceFields(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class ContramarcadoFields(BaseModel):
+    value: str
+    status: str
+    com: str | None = None
+    source: str | None = None
+    confidence: float | None = None
+    warning: str | None = None
+    candidates: list[dict] = []
+
+
 class DocumentSummary(BaseModel):
     id: int
     filename: str
@@ -126,6 +136,7 @@ class DocumentSummary(BaseModel):
     requiere_revision: bool
     observaciones: str | None = None
     received_at: str
+    contramarcado: ContramarcadoFields | None = None
 
 
 class DocumentListResponse(BaseModel):
@@ -152,6 +163,7 @@ class DocumentDetail(BaseModel):
     requiere_revision: bool
     observaciones: str | None = None
     extracted: dict = {}
+    contramarcado: ContramarcadoFields | None = None
     ocr_preview: str = ""
     preview_url: str | None = None
     received_at: str
@@ -175,6 +187,7 @@ class ProcessResponse(BaseModel):
     document_id: int
     estado: str
     error: str | None = None
+    contramarcado: ContramarcadoFields | None = None
 
 
 @router.get("", response_model=DocumentListResponse)
@@ -748,17 +761,22 @@ def process_document(
 
     result = processor.process_by_id(document_id, solicitud)
     estado = result.get("estado") or ("EXTRAIDO" if result.get("ok") else "ERROR")
+    cm = result.get("contramarcado")
     return ProcessResponse(
         ok=result.get("ok", False),
         document_id=document_id,
         estado=estado,
         error=result.get("error") or None,
+        contramarcado=ContramarcadoFields(**cm) if isinstance(cm, dict) and cm.get("value") else None,
     )
 
 
 def _to_summary(doc) -> DocumentSummary:
+    from application.services.document_service import DocumentService
+
     proveedor = doc.provider.nombre if doc.provider else None
     nit = doc.provider.nit if doc.provider else None
+    contramarcado = DocumentService.contramarcado_dict(doc)
     return DocumentSummary(
         id=doc.id,
         filename=doc.filename,
@@ -773,4 +791,5 @@ def _to_summary(doc) -> DocumentSummary:
         requiere_revision=doc.requiere_revision,
         observaciones=doc.observaciones,
         received_at=doc.received_at.isoformat() if doc.received_at else "",
+        contramarcado=ContramarcadoFields(**contramarcado) if contramarcado else None,
     )

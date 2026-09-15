@@ -59,6 +59,11 @@ class DocumentModel(Base):
     confidence_global: Mapped[float | None] = mapped_column(Float)
     requiere_revision: Mapped[bool] = mapped_column(default=False)
     observaciones: Mapped[str | None] = mapped_column(Text)
+    contramarcado: Mapped[str | None] = mapped_column(Text)
+    contramarcado_status: Mapped[str | None] = mapped_column(String(32))
+    contramarcado_com: Mapped[str | None] = mapped_column(String(64))
+    contramarcado_source: Mapped[str | None] = mapped_column(String(32))
+    contramarcado_confidence: Mapped[float | None] = mapped_column(Float)
     received_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()

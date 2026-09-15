@@ -103,6 +103,13 @@ class CrossingService:
             valor_nuevo=f"{created} cruces generados",
             usuario=usuario,
         )
+        # Regenerar contramarcado con COM de Autobits recién cruzado
+        try:
+            from application.services.contramarcado_service import ContramarcadoService
+
+            ContramarcadoService(self.db).apply_for_documents(documents, batch_id=batch_id)
+        except Exception:  # noqa: BLE001
+            pass
         self.db.commit()
         return {"created": created, "items": results}
 
@@ -132,6 +139,12 @@ class CrossingService:
             valor_nuevo=f"{created} facturas vinculadas al Excel de Cruce de Cuentas",
             usuario=usuario,
         )
+        try:
+            from application.services.contramarcado_service import ContramarcadoService
+
+            ContramarcadoService(self.db).apply_for_documents(documents)
+        except Exception:  # noqa: BLE001
+            pass
         self.db.commit()
         return {"created": created, "items": results, "origen": "CRUCE_DE_CUENTAS"}
 

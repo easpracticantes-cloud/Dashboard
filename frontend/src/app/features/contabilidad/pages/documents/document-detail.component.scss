@@ -438,3 +438,63 @@
   }
 }
 
+
+.contramarca {
+  margin: 1rem 1.15rem 1.25rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(31, 74, 51, 0.18);
+  background: rgba(31, 74, 51, 0.06);
+}
+
+.contramarca[data-status='PENDIENTE'],
+.contramarca[data-status='AMBIGUO'] {
+  border-color: rgba(180, 120, 20, 0.35);
+  background: rgba(240, 188, 72, 0.1);
+}
+
+.contramarca[data-status='ERROR'] {
+  border-color: rgba(163, 59, 50, 0.35);
+  background: rgba(163, 59, 50, 0.08);
+}
+
+.contramarca__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.contramarca__status {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--muted, #5c6d63);
+}
+
+.contramarca__value {
+  display: block;
+  padding: 0.7rem 0.85rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #14261c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86rem;
+  line-height: 1.35;
+  word-break: break-word;
+  border: 1px solid rgba(20, 38, 28, 0.1);
+}
+
+.contramarca__ok {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  color: #1f4a33;
+  font-weight: 600;
+}
+
+.contramarca__warn {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  color: #7a4e00;
+  font-weight: 600;
+}

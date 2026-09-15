@@ -321,6 +321,21 @@ class DocumentProcessingService:
             confidence_global=conf.global_score,
         )
 
+        # Contramarcado automático (determinista; no inventa COM)
+        contramarcado_payload = None
+        try:
+            from application.services.contramarcado_service import ContramarcadoService
+
+            cm = ContramarcadoService(db).apply_for_document(
+                document,
+                extracted=extracted,
+                ocr_text=ocr_text,
+            )
+            contramarcado_payload = cm.to_dict()
+            extracted.update(cm.persist_fields())
+        except Exception:  # noqa: BLE001
+            logger.exception("Contramarcado automático falló doc=%s", document.id)
+
         dup_detector = DuplicateDetector(db)
         nit = extracted.get("nit_o_identificacion")
         if isinstance(extracted.get("proveedor"), dict):
@@ -351,6 +366,7 @@ class DocumentProcessingService:
             "estado": estado_doc,
             "document_id": document.id,
             "datos": extracted,
+            "contramarcado": contramarcado_payload,
             "metodo_ocr": metodo_ocr,
             "confidence_global": conf.global_score,
             "respuesta_ia": json.dumps(

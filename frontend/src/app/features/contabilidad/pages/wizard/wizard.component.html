@@ -207,16 +207,35 @@
                 <th>N° factura</th>
                 <th>Proveedor</th>
                 <th>Total</th>
+                <th>Contramarcado</th>
                 <th>Estado</th>
               </tr>
             </thead>
             <tbody>
               @for (d of documentos(); track d.id) {
-                <tr [class.is-miss]="d.requiere_revision">
+                <tr [class.is-miss]="d.requiere_revision || d.contramarcado?.status === 'PENDIENTE' || d.contramarcado?.status === 'AMBIGUO'">
                   <td>{{ d.filename }}</td>
                   <td>{{ d.numero_documento || '—' }}</td>
                   <td>{{ d.proveedor_nombre || '—' }}</td>
                   <td>{{ formatCop(d.total) }}</td>
+                  <td class="wiz__cm">
+                    @if (d.contramarcado?.value) {
+                      <code class="wiz__cm-code">{{ d.contramarcado!.value }}</code>
+                      <div class="wiz__cm-actions">
+                        <span class="wiz__chip" [class]="'is-cm-' + (d.contramarcado!.status || '').toLowerCase()">
+                          {{ d.contramarcado!.status }}
+                        </span>
+                        <button type="button" class="wiz__ghost wiz__ghost--tiny" (click)="copiarContramarcado(d.contramarcado!.value, d.id)">
+                          {{ copiadoId() === d.id ? 'Copiado' : 'Copiar' }}
+                        </button>
+                      </div>
+                      @if (d.contramarcado?.warning) {
+                        <small class="wiz__cm-warn">{{ d.contramarcado!.warning }}</small>
+                      }
+                    } @else {
+                      <span class="wiz__muted">Pendiente de análisis</span>
+                    }
+                  </td>
                   <td>
                     <span class="wiz__chip" [class]="'is-' + tonoEstado(d.estado)">
                       {{ d.estado }}
@@ -321,7 +340,7 @@
   <section class="wiz__card wiz__chat" [class.is-dim]="!carpetaActiva()">
     <h3>Chat con la IA (carpeta + Autobits)</h3>
     <p class="wiz__hint">
-      Un solo chat: analiza las facturas de la carpeta activa y las filas Autobits vinculadas (ideal para contramarcado).
+      Un solo chat: consulta las facturas de la carpeta y Autobits. El contramarcado se genera solo al analizar cada factura.
     </p>
     <div class="wiz__chips">
       @for (s of chatSugerencias; track s) {

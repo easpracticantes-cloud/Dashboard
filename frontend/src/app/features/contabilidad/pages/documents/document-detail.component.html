@@ -240,6 +240,10 @@
               <span class="field-value">{{ formatFechaContable(doc.fecha_emision) }}</span>
             </div>
             <div class="field-cell">
+              <span class="field-label">Tipo</span>
+              <span class="field-value mono">{{ doc.tipo || '—' }}</span>
+            </div>
+            <div class="field-cell">
               <span class="field-label">Subtotal</span>
               <span class="field-value mono">{{ formatCop(doc.subtotal) }}</span>
             </div>
@@ -264,6 +268,27 @@
               <span class="field-value">{{ doc.metodo_ocr || '—' }}</span>
             </div>
           </div>
+
+          @if (doc.contramarcado?.value) {
+            <div class="contramarca" [attr.data-status]="doc.contramarcado.status">
+              <div class="contramarca__head">
+                <div>
+                  <span class="label-caps">Contramarcado</span>
+                  <p class="contramarca__status">{{ labelContramarcado(doc.contramarcado.status) }}</p>
+                </div>
+                <button type="button" class="btn btn-ghost" (click)="copiarContramarcado()">
+                  <mat-icon>{{ copiado ? 'check' : 'content_copy' }}</mat-icon>
+                  {{ copiado ? 'Copiado' : 'Copiar' }}
+                </button>
+              </div>
+              <code class="contramarca__value">{{ doc.contramarcado.value }}</code>
+              @if (doc.contramarcado.warning) {
+                <p class="contramarca__warn">{{ doc.contramarcado.warning }}</p>
+              } @else if (doc.contramarcado.status === 'GENERADO') {
+                <p class="contramarca__ok">Generado automáticamente</p>
+              }
+            </div>
+          }
 
           @if (doc.confidence.global != null) {
             <div class="conf-meter">
