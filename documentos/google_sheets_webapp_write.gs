@@ -1,26 +1,27 @@
 /**
- * Google Sheets Web App — escritura desde SIG
+ * Google Sheets Web App — SOLO escritura (doPost) desde SIG
  * =====================================================
- * CÓMO ACTIVAR (obligatorio para que "Guardar" en la web actualice Sheets):
+ * PREFERIDO: usa documentos/google_sheets_webapp_completo.gs
+ * (doGet + doPost). Si publicas SOLO este archivo, el dashboard
+ * deja de leer las hojas.
  *
- * 1. Abre el Apps Script del spreadsheet (Extensiones → Apps Script).
- * 2. Pega ESTE archivo COMPLETO al final del proyecto (o fusiona doPost
- *    con tu script actual si ya tienes doGet).
- * 3. En Propiedades del script (⚙️ → Propiedades del proyecto) agrega opcional:
- *      SHEETS_WRITE_TOKEN = un secreto largo
- *    El mismo valor va en Render como GOOGLE_SHEETS_WRITE_TOKEN.
- * 4. Implementar → Nueva implementación → Tipo: Aplicación web
- *    - Ejecutar como: Yo
- *    - Quién tiene acceso: Cualquiera
- * 5. Copia la URL /exec a integrations.googleSheets.webAppUrl (o GOOGLE_SHEETS_WEBAPP_URL).
+ * Si ya tienes doGet de lectura, puedes pegar ESTE doPost al final
+ * del mismo proyecto Apps Script (sin borrar doGet) y redesplegar.
+ *
+ * CÓMO ACTIVAR:
+ * 1. Extensiones → Apps Script (mismo spreadsheet).
+ * 2. Preferir google_sheets_webapp_completo.gs; o fusionar este doPost
+ *    con tu doGet existente.
+ * 3. Opcional: Propiedades → SHEETS_WRITE_TOKEN (= GOOGLE_SHEETS_WRITE_TOKEN).
+ * 4. Implementar → Nueva implementación → Aplicación web
+ *    - Ejecutar como: Yo | Acceso: Cualquiera
+ * 5. URL /exec → GOOGLE_SHEETS_WEBAPP_URL y recrear backend.
  *
  * Acciones POST (JSON body):
  *   { "action": "updateRow", "sheetName": "ENE", "match": { "celular": "...", "fecha": "..." }, "fields": { "SEMAFORO": "CALIENTE", "NOTAS": "..." }, "token": "..." }
  *   { "action": "appendRow", "sheetName": "VENTAS", "fields": { "NOMBRE": "...", "CELULAR": "..." }, "token": "..." }
  *   { "action": "deleteRow", "sheetName": "ENE", "match": { "celular": "...", "fecha": "...", "cliente": "..." }, "token": "..." }
  *   { "action": "ping", "token": "..." }
- *
- * Si ya tienes doGet para el dashboard, NO lo borres. Solo agrega doPost + helpers.
  */
 
 function doPost(e) {
