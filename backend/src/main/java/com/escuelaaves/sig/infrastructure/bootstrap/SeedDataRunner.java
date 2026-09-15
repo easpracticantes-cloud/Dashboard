@@ -40,7 +40,7 @@ import java.util.Set;
 public class SeedDataRunner implements ApplicationRunner {
 
     private static final String SHEETS_WEBAPP_URL =
-            "https://script.google.com/macros/s/AKfycbwfFkKwgD5lPBGzrP8J477cKBrueQroZ6rW4c7XgU7ebMdRT1xlZFl6XoFgH29ugUObPg/exec";
+            "https://script.google.com/macros/s/AKfycbyvgBfHFSx2PyPWR9HgqFFNKkDzLo81NXca3hOVZlAWJpa_BZTl-aI6Q1Z-5DSfFnJaaA/exec";
 
     private static final String ADMIN_USERNAME = "admin";
 
