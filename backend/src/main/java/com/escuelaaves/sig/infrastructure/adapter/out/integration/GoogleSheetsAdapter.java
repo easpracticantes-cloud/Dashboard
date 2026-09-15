@@ -219,22 +219,33 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
     }
 
     /**
-     * Apps Script Web App suele responder 302/303 hacia googleusercontent.com.
-     * Hay que re-enviar POST al Location (nunca convertir a GET: eso provoca HTTP 405 + HTML).
+     * Apps Script Web App: el POST a /exec ejecuta doPost y responde 302/303 hacia
+     * googleusercontent.com. El JSON de ContentService se obtiene con GET al Location
+     * (re-POST ahí suele devolver HTTP 405 HTML aunque la escritura ya haya ocurrido).
      */
     private String postFollowingAppsScriptRedirect(String url, String jsonBody) throws Exception {
         URI current = URI.create(url);
         String lastBody = "";
         int lastCode = 0;
+        boolean posted = false;
 
         for (int hop = 0; hop < 5; hop++) {
-            HttpRequest request = HttpRequest.newBuilder(current)
+            HttpRequest.Builder builder = HttpRequest.newBuilder(current)
                     .timeout(Duration.ofSeconds(90))
-                    // Sin charset extra: Apps Script es más fiable con application/json puro
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json, text/plain, */*")
-                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-                    .build();
+                    .header("Accept", "application/json, text/plain, */*");
+
+            HttpRequest request;
+            if (!posted || hop == 0) {
+                // Primer hop (y reintentos 307/308): POST con el body de escritura.
+                request = builder
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                        .build();
+                posted = true;
+            } else {
+                // Tras 302/303: GET para leer la respuesta JSON de doPost.
+                request = builder.GET().build();
+            }
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             lastCode = response.statusCode();
@@ -258,7 +269,9 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
                     throw new IllegalStateException("Redirect HTTP " + lastCode + " sin header Location");
                 }
                 URI next = current.resolve(location);
-                log.info("[GoogleSheets] write redirect hop={} {} → {}", hop, lastCode, sanitizeUrl_(next));
+                log.info("[GoogleSheets] write redirect hop={} {} → {} (nextMethod={})",
+                        hop, lastCode, sanitizeUrl_(next),
+                        (lastCode == 307 || lastCode == 308) ? "POST" : "GET");
                 if (next.toString().contains("accounts.google.com")) {
                     throw new IllegalStateException(
                             "Google pide login en el Web App. En Apps Script: Implementar → "
@@ -266,18 +279,19 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
                     );
                 }
                 current = next;
+                // 307/308 exigen preservar el método; el resto de Apps Script usa GET al echo.
+                if (lastCode == 307 || lastCode == 308) {
+                    posted = false; // fuerza POST en el siguiente hop
+                }
                 continue;
             }
 
-            // 405 típico cuando el redirect se trató mal o el deployment no tiene doPost
             if (lastCode == 405 || looksLikeHtml_(lastBody)) {
                 throw new IllegalStateException(
                         "HTTP " + lastCode + " al escribir/eliminar en Sheets. "
-                                + "La URL /exec no tiene doPost desplegado (o es una implementación vieja). "
-                                + "En Apps Script: Implementar → Nueva implementación → Aplicación web "
-                                + "(Ejecutar como Yo, acceso Cualquiera) → copia la URL /exec nueva a "
-                                + "GOOGLE_SHEETS_WEBAPP_URL en el .env del servidor (Oracle) y reinicia el backend. "
-                                + "Script: documentos/google_sheets_webapp_write.gs"
+                                + "Si la fila sí cambió en Sheets, era un falso positivo de redirect; "
+                                + "actualiza el backend. Si no cambió: redespliega doPost "
+                                + "(documentos/google_sheets_webapp_completo.gs) con acceso «Cualquiera»."
                 );
             }
 
