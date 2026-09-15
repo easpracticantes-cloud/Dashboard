@@ -773,10 +773,17 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private detalleError(
-    err: { error?: { detail?: unknown; message?: string } },
+    err: { status?: number; error?: { detail?: unknown; message?: string; error?: string } },
     fallback: string
   ): string {
-    const d = err?.error?.detail ?? err?.error?.message;
+    const status = err?.status;
+    const d = err?.error?.detail ?? err?.error?.message ?? err?.error?.error;
+    if (status === 404) {
+      return (
+        (typeof d === 'string' && d !== 'Not Found' ? d : null) ||
+        'API de carpetas no encontrada. Hay que reconstruir el servicio Contabilidad en el servidor (docker compose build contabilidad).'
+      );
+    }
     if (typeof d === 'string') return d;
     if (Array.isArray(d)) {
       return d

@@ -118,6 +118,7 @@ def _default_week() -> tuple[str, str, str]:
 
 
 @router.get("")
+@router.get("/")
 def list_folders(limit: int = 40, db: Session = Depends(get_db)):
     rows = (
         db.query(InvoiceFolderModel)
@@ -129,6 +130,7 @@ def list_folders(limit: int = 40, db: Session = Depends(get_db)):
 
 
 @router.post("")
+@router.post("/")
 def create_folder(body: FolderCreate, db: Session = Depends(get_db)):
     name = (body.name or "").strip()
     if not name:

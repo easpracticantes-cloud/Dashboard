@@ -60,7 +60,17 @@ public class ContabilidadProxyController {
             RequestMethod.PATCH, RequestMethod.DELETE, RequestMethod.OPTIONS
     })
     public ResponseEntity<byte[]> proxy(HttpServletRequest request) throws IOException {
-        String suffix = request.getRequestURI().substring("/api/v1/contabilidad".length());
+        String uri = request.getRequestURI();
+        String context = request.getContextPath() == null ? "" : request.getContextPath();
+        String relative = uri.startsWith(context) ? uri.substring(context.length()) : uri;
+        String marker = "/api/v1/contabilidad";
+        int markerAt = relative.indexOf(marker);
+        if (markerAt < 0) {
+            return ResponseEntity.status(404)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"detail\":\"Ruta Contabilidad no reconocida.\"}".getBytes(StandardCharsets.UTF_8));
+        }
+        String suffix = relative.substring(markerAt + marker.length());
         if (suffix.isBlank()) {
             suffix = "/";
         }
