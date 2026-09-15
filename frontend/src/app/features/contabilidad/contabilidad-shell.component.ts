@@ -11,7 +11,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       <eas-page-header
         eyebrow="Escuela Aves Salento"
         title="Contabilidad"
-        subtitle="Un solo módulo: crea la carpeta, mete las facturas y carga Autobits cuando quieras."
+        subtitle="Crea la carpeta e integra facturas (una a una, varias, carpeta o ZIP) + Autobits."
       />
       <div class="contab__body">
         <router-outlet />

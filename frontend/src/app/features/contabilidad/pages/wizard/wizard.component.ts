@@ -358,6 +358,12 @@ export class WizardComponent implements OnInit, OnDestroy {
     void this.subirFacturas(files);
   }
 
+  onFacturasZip(ev: Event): void {
+    const files = Array.from((ev.target as HTMLInputElement).files || []);
+    (ev.target as HTMLInputElement).value = '';
+    void this.subirFacturas(files);
+  }
+
   onFacturasCarpeta(ev: Event): void {
     const files = Array.from((ev.target as HTMLInputElement).files || []);
     (ev.target as HTMLInputElement).value = '';
@@ -425,9 +431,12 @@ export class WizardComponent implements OnInit, OnDestroy {
     }
     this.subiendoFacturas.set(true);
     this.error.set('');
-    const label = hasZip
-      ? `Subiendo ${payload.length} ítem(s) (archivos/ZIP) a «${folder.name}»…`
-      : `Subiendo ${payload.length} factura(s) a «${folder.name}»…`;
+    const label =
+      payload.length === 1 && !hasZip
+        ? `Integrando 1 factura en «${folder.name}»…`
+        : hasZip
+          ? `Integrando ${payload.length} ítem(s) (archivos/ZIP) en «${folder.name}»…`
+          : `Integrando ${payload.length} factura(s) en «${folder.name}»…`;
     this.aviso.set(label);
     this.docsApi
       .uploadBatch(payload, 'FACTURA', PACK_MAX)
@@ -438,16 +447,31 @@ export class WizardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.facturaItems.set([...(res.items || [])]);
-          const ids = this.idsDePaquete(res.queued_ids, res.items);
-          this.idsFacturasOperacion.set(ids);
-          this.packMsg.set(res.mensaje);
-          this.aviso.set(res.mensaje);
+          const nuevos = this.idsDePaquete(res.queued_ids, res.items);
+          const previos = [
+            ...(folder.document_ids || []),
+            ...this.idsFacturasOperacion(),
+          ];
+          const merged = [...new Set([...previos, ...nuevos].filter((id) => id > 0))];
+          this.idsFacturasOperacion.set(merged);
+          const integradas = nuevos.length || (res.items || []).filter((i) => i.ok).length;
+          const msg =
+            res.mensaje ||
+            `${integradas} factura(s) integradas en «${folder.name}». Ya van ${merged.length} en la carpeta.`;
+          this.packMsg.set(msg);
+          this.aviso.set(
+            `${integradas} factura(s) añadidas a «${folder.name}». Total en carpeta: ${merged.length}.`
+          );
           this.foldersApi
-            .addDocuments(folder.id, ids)
+            .addDocuments(folder.id, nuevos)
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
               next: (r) => {
                 this.aplicarCarpeta(r.folder);
+                const total = r.folder.document_count || r.folder.document_ids?.length || merged.length;
+                this.aviso.set(
+                  `${r.added ?? integradas} factura(s) integradas en «${r.folder.name}». Total: ${total}.`
+                );
                 this.refrescarFacturas();
                 this.startPoll();
               },
@@ -631,12 +655,10 @@ export class WizardComponent implements OnInit, OnDestroy {
     items: BatchUploadItem[] | undefined
   ): number[] {
     const fromQueued = (queued || []).filter((id) => Number.isFinite(id) && id > 0);
-    if (fromQueued.length) {
-      return fromQueued;
-    }
-    return (items || [])
-      .map((item) => item.document?.id)
+    const fromItems = (items || [])
+      .flatMap((item) => [item.document?.id, item.duplicate_document_id])
       .filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0);
+    return [...new Set([...fromQueued, ...fromItems])];
   }
 
   private aplicarAutobits(res: ImportResult): void {

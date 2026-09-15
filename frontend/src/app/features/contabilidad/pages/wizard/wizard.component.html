@@ -1,7 +1,7 @@
 <div class="wiz">
   <header class="wiz__hero">
     <p class="wiz__lead">
-      Crea una carpeta, mete las facturas ahí dentro y carga Autobits cuando quieras — todo en esta misma pantalla.
+      Crea una carpeta y ve integrando facturas (una, varias, carpeta o ZIP). Autobits cuando quieras — todo aquí.
     </p>
     <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando()">
       {{ limpiando() ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
@@ -45,8 +45,8 @@
       <div>
         <h3>1. Carpeta y facturas</h3>
         <p>
-          Primero crea o elige la carpeta. Luego añade facturas ahí (archivos, carpeta del PC o ZIP;
-          máx. {{ packMax }} por carga).
+          Primero crea o elige la carpeta. Luego ve metiendo facturas: de una en una, varias a la vez,
+          una carpeta del PC o un ZIP. Cada carga se integra a la misma carpeta (máx. {{ packMax }} por carga).
         </p>
       </div>
       <button
@@ -121,24 +121,34 @@
           <mat-icon>photo_library</mat-icon>
           <span>
             @if (subiendoFacturas()) {
-              Subiendo y encolando OCR…
+              Integrando facturas en la carpeta…
             } @else if (arrastrandoFacturas()) {
-              Suelta archivos, carpeta o ZIP
+              Suelta factura(s), carpeta o ZIP
             } @else {
-              Arrastra facturas, una carpeta o un ZIP (máx. {{ packMax }} por carga)
+              Arrastra o elige facturas individuales (se van sumando), carpeta o ZIP · máx. {{ packMax }} por carga
             }
           </span>
           <div class="wiz__drop-actions">
-            <label class="wiz__copy">
+            <label class="wiz__copy wiz__copy--primary">
               <input
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.webp,.zip"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
                 multiple
                 (change)="onFacturas($event)"
                 [disabled]="subiendoFacturas()"
                 hidden
               />
-              Archivos / ZIP
+              Factura(s)
+            </label>
+            <label class="wiz__copy">
+              <input
+                type="file"
+                accept=".zip,application/zip"
+                (change)="onFacturasZip($event)"
+                [disabled]="subiendoFacturas()"
+                hidden
+              />
+              ZIP
             </label>
             <label class="wiz__copy">
               <input
@@ -159,8 +169,9 @@
         <p class="wiz__hint">{{ packMsg() }}</p>
       }
       @if (facturaItems().length) {
+        <h4 class="wiz__sub">Última carga (integrada a la carpeta)</h4>
         <ul class="wiz__files">
-          @for (it of facturaItems(); track it.filename) {
+          @for (it of facturaItems(); track it.filename + (it.document?.id || it.error || '')) {
             <li [class.is-bad]="!it.ok">
               <strong>{{ it.filename }}</strong>
               <small>{{ it.ok ? (it.document?.estado || 'en cola') : it.error }}</small>
