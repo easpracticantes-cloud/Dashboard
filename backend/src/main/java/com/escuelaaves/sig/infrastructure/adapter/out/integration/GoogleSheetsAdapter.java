@@ -272,11 +272,12 @@ public class GoogleSheetsAdapter implements GoogleSheetsPort {
             // 405 típico cuando el redirect se trató mal o el deployment no tiene doPost
             if (lastCode == 405 || looksLikeHtml_(lastBody)) {
                 throw new IllegalStateException(
-                        "HTTP " + lastCode + " al escribir en Sheets. "
-                                + "Casi siempre falta redesplegar la web app DESPUÉS de pegar doPost: "
-                                + "Implementar → Nueva implementación → Aplicación web → "
-                                + "copiá de nuevo la URL /exec a GOOGLE_SHEETS_WEBAPP_URL. "
-                                + "Detalle: " + truncate(lastBody, 160)
+                        "HTTP " + lastCode + " al escribir/eliminar en Sheets. "
+                                + "La URL /exec no tiene doPost desplegado (o es una implementación vieja). "
+                                + "En Apps Script: Implementar → Nueva implementación → Aplicación web "
+                                + "(Ejecutar como Yo, acceso Cualquiera) → copia la URL /exec nueva a "
+                                + "GOOGLE_SHEETS_WEBAPP_URL en el .env del servidor (Oracle) y reinicia el backend. "
+                                + "Script: documentos/google_sheets_webapp_write.gs"
                 );
             }
 
