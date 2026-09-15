@@ -49,6 +49,7 @@ class FolderContramarcadoRequest(BaseModel):
     """Recontramarca facturas de la carpeta usando Autobits vinculado."""
 
     only_missing_com: bool = True
+    autobits_batch_id: int | None = None
 
 
 def _parse_ids(raw: str | None) -> list[int]:
@@ -258,14 +259,19 @@ def recontramarcado_folder(
     folder = db.get(InvoiceFolderModel, folder_id)
     if not folder:
         raise HTTPException(status_code=404, detail="Carpeta no encontrada.")
-    if not folder.autobits_batch_id:
+    batch_id = opts.autobits_batch_id or folder.autobits_batch_id
+    if not batch_id:
         raise HTTPException(
             status_code=400,
-            detail="Vincula primero el Excel de Autobits a esta carpeta.",
+            detail="Carga el Excel de Autobits y vincúlalo a esta carpeta.",
         )
-    batch = AutobitsRepository(db).get_batch(folder.autobits_batch_id)
+    batch = AutobitsRepository(db).get_batch(batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Lote Autobits no encontrado.")
+    if not folder.autobits_batch_id:
+        folder.autobits_batch_id = batch_id
+        if folder.status == "OPEN":
+            folder.status = "READY"
 
     ids = _parse_ids(folder.document_ids_json)
     if not ids:
@@ -285,10 +291,10 @@ def recontramarcado_folder(
     service = ContramarcadoService(db)
     if opts.only_missing_com:
         updated, skipped, items = service.apply_missing_for_documents(
-            docs, batch_id=folder.autobits_batch_id
+            docs, batch_id=batch_id
         )
     else:
-        updated = service.apply_for_documents(docs, batch_id=folder.autobits_batch_id)
+        updated = service.apply_for_documents(docs, batch_id=batch_id)
         skipped = max(0, len(docs) - updated)
         items = []
         for doc in docs:
@@ -306,7 +312,7 @@ def recontramarcado_folder(
     return {
         "ok": True,
         "folder_id": folder.id,
-        "autobits_batch_id": folder.autobits_batch_id,
+        "autobits_batch_id": batch_id,
         "only_missing_com": opts.only_missing_com,
         "updated": updated,
         "skipped": skipped,

@@ -95,7 +95,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   chatMsgs = signal<ChatMsg[]>([]);
   preguntando = signal(false);
   copiadoId = signal<number | null>(null);
-  recontramarcando = signal(false);
+  reanalizando = signal(false);
 
   private poll?: Subscription;
   private autobitsUpload?: Subscription;
@@ -771,36 +771,76 @@ export class WizardComponent implements OnInit, OnDestroy {
     }
   }
 
-  volverAContramarcar(): void {
+  batchIdAutobits(): number | undefined {
+    const folderBatch = this.carpetaActiva()?.autobits_batch_id;
+    const sessionBatch = this.autobits()?.batch?.id;
+    return folderBatch ?? sessionBatch ?? undefined;
+  }
+
+  volverAAnalizarFacturas(): void {
     const folder = this.carpetaActiva();
     if (!folder?.id) {
       this.feedback.error('Elige una carpeta primero.');
       return;
     }
-    if (!folder.autobits_batch_id) {
-      this.feedback.error('Carga el Excel de Autobits y vincúlalo a la carpeta.');
+    if (!this.documentos().length) {
+      this.feedback.error('La carpeta no tiene facturas.');
       return;
     }
-    if (this.recontramarcando()) return;
+    if (this.reanalizando()) return;
 
-    const pendientes = this.documentos().filter((d) => {
-      const com = (d.contramarcado?.com || '').trim();
-      if (!com) return true;
-      const upper = com.toUpperCase().replace(/\s+/g, '');
-      return upper === 'COMPENDIENTE' || upper.includes('PENDIENTE');
-    }).length;
+    const batchId = this.batchIdAutobits();
+    const sinCom = this.facturasSinCom();
 
-    this.recontramarcando.set(true);
+    if (batchId) {
+      this.reanalizarConAutobits(folder, batchId, sinCom.length);
+      return;
+    }
+
+    const pendientesOcr = this.facturasPendientesAnalisis();
+    if (!pendientesOcr.length) {
+      this.feedback.error(
+        'Carga el Excel de Autobits para buscar COM en facturas sin contramarcado.'
+      );
+      return;
+    }
+    this.reanalizarOcr(pendientesOcr.map((d) => d.id));
+  }
+
+  private facturasSinCom(): DocumentSummary[] {
+    return this.documentos().filter((d) => this.documentoSinCom(d));
+  }
+
+  private documentoSinCom(d: DocumentSummary): boolean {
+    const com = (d.contramarcado?.com || '').trim();
+    if (!com) return true;
+    const upper = com.toUpperCase().replace(/\s+/g, '');
+    return upper === 'COMPENDIENTE' || upper.includes('PENDIENTE');
+  }
+
+  private facturasPendientesAnalisis(): DocumentSummary[] {
+    return this.documentos().filter((d) => {
+      const st = (d.estado || '').toUpperCase();
+      return st === 'PENDIENTE' || st === 'EN_PROCESO' || st === 'ERROR' || !d.numero_documento;
+    });
+  }
+
+  private reanalizarConAutobits(
+    folder: InvoiceFolder,
+    batchId: number,
+    sinComCount: number
+  ): void {
+    this.reanalizando.set(true);
     this.feedback.info(
-      pendientes
-        ? `Buscando COM en Autobits para ${pendientes} factura(s) sin COM…`
+      sinComCount
+        ? `Analizando COM en Autobits para ${sinComCount} factura(s)…`
         : 'Revisando facturas sin COM contra Autobits…'
     );
     this.foldersApi
-      .recontramarcado(folder.id, true)
+      .recontramarcado(folder.id, true, batchId)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.recontramarcando.set(false))
+        finalize(() => this.reanalizando.set(false))
       )
       .subscribe({
         next: (res) => {
@@ -809,13 +849,36 @@ export class WizardComponent implements OnInit, OnDestroy {
           } else {
             this.seleccionarCarpeta(folder.id);
           }
-          this.feedback.success(
+          const msg =
             res.message ||
-              `Contramarcado: ${res.updated} actualizada(s), ${res.skipped} omitida(s).`
-          );
+            `Análisis: ${res.updated} actualizada(s), ${res.skipped} omitida(s).`;
+          if (res.updated > 0) {
+            this.feedback.success(msg);
+          } else {
+            this.feedback.info(msg || 'Todas las facturas ya tienen COM.');
+          }
         },
         error: (err) =>
-          this.feedback.error(this.detalleError(err, 'No se pudo volver a contramarcar.')),
+          this.feedback.error(this.detalleError(err, 'No se pudo analizar las facturas.')),
+      });
+  }
+
+  private reanalizarOcr(documentIds: number[]): void {
+    this.reanalizando.set(true);
+    this.feedback.info(`Reprocesando ${documentIds.length} factura(s) pendientes…`);
+    this.docsApi
+      .processBatch(documentIds)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.reanalizando.set(false))
+      )
+      .subscribe({
+        next: (res) => {
+          this.feedback.success(res.mensaje || `${res.queued} factura(s) en cola de análisis.`);
+          this.startPoll();
+        },
+        error: (err) =>
+          this.feedback.error(this.detalleError(err, 'No se pudo reprocesar las facturas.')),
       });
   }
 

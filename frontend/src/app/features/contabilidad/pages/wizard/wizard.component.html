@@ -204,17 +204,15 @@
       @if (documentos().length) {
         <div class="wiz__sub-row">
           <h4 class="wiz__sub">Facturas en la carpeta</h4>
-          @if (carpetaActiva()?.autobits_batch_id) {
-            <button
-              type="button"
-              class="wiz__ghost wiz__ghost--tiny"
-              (click)="volverAContramarcar()"
-              [disabled]="recontramarcando() || limpiando() || !documentos().length"
-              title="Busca COM en Autobits solo para facturas que aún no lo tienen"
-            >
-              {{ recontramarcando() ? 'Contramarcar…' : 'Volver a contramarcar' }}
-            </button>
-          }
+          <button
+            type="button"
+            class="wiz__ghost wiz__ghost--tiny"
+            (click)="volverAAnalizarFacturas()"
+            [disabled]="reanalizando() || limpiando() || !documentos().length"
+            [title]="batchIdAutobits() ? 'Busca COM en Autobits para facturas que aún no lo tienen' : 'Reprocesa facturas pendientes de análisis OCR'"
+          >
+            {{ reanalizando() ? 'Analizando…' : 'Volver a analizar facturas' }}
+          </button>
         </div>
         <div class="wiz__table-wrap">
           <table class="wiz__table">
@@ -308,15 +306,26 @@
       </label>
     </div>
     @if (autobits(); as ab) {
-      <div class="wiz__meta">
+      <div class="wiz__meta wiz__meta--actions">
         <span>{{ ab.batch.filename }}</span>
         <span>{{ ab.imported_rows }} filas</span>
         <span>{{ ab.batch.period_start }} → {{ ab.batch.period_end }}</span>
         @if (ab.reused) {
           <span>Reutilizado (mismo archivo)</span>
         }
-        @if (carpetaActiva()?.autobits_batch_id) {
+        @if (carpetaActiva()?.autobits_batch_id || ab.batch?.id) {
           <span>Vinculado a la carpeta</span>
+        }
+        @if (documentos().length) {
+          <button
+            type="button"
+            class="wiz__ghost wiz__ghost--tiny"
+            (click)="volverAAnalizarFacturas()"
+            [disabled]="reanalizando() || limpiando()"
+            title="Busca COM en Autobits para facturas que aún no lo tienen"
+          >
+            {{ reanalizando() ? 'Analizando…' : 'Volver a analizar facturas' }}
+          </button>
         }
       </div>
     }
