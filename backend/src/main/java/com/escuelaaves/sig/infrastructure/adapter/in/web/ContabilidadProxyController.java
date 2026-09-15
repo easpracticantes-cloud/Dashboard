@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -12,6 +13,7 @@ import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -85,8 +87,16 @@ public class ContabilidadProxyController {
             String contentType = request.getContentType();
             boolean multipart = contentType != null
                     && contentType.toLowerCase().startsWith("multipart/");
-            if (multipart && request instanceof MultipartHttpServletRequest multi) {
-                return forwardMultipart(target, method, headers, multi);
+            if (multipart) {
+                if (request instanceof MultipartHttpServletRequest multi) {
+                    return forwardMultipart(target, method, headers, multi);
+                }
+                log.warn("[ContabilidadProxy] Content-Type multipart pero request no parseado: {}", contentType);
+                return ResponseEntity.status(400)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(("{\"detail\":\"No se pudo parsear la carga multipart "
+                                + "(¿supera el limite del backend?). Divide la carga.\"}")
+                                .getBytes(StandardCharsets.UTF_8));
             }
 
             byte[] payload = StreamUtils.copyToByteArray(request.getInputStream());
@@ -200,17 +210,19 @@ public class ContabilidadProxyController {
         }
 
         log.info("[ContabilidadProxy] multipart → {} ({} archivo(s))", target, fileParts);
+        MultiValueMap<String, HttpEntity<?>> parts = builder.build();
         ResponseEntity<byte[]> upstream = restClientBuilder.build()
                 .method(method)
                 .uri(URI.create(target))
                 .headers(h -> h.addAll(headers))
-                .body(builder.build())
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(parts)
                 .retrieve()
                 .toEntity(byte[].class);
 
         return ResponseEntity.status(upstream.getStatusCode())
                 .headers(filterResponseHeaders(upstream.getHeaders()))
-                .body(upstream.getBody());
+                .body(upstream.getBody() != null ? upstream.getBody() : new byte[0]);
     }
 
     private void copyRequestHeaders(HttpServletRequest request, HttpHeaders headers) {

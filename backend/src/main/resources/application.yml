@@ -7,6 +7,9 @@ server:
     min-response-size: 1024
   http2:
     enabled: true
+  tomcat:
+    max-http-form-post-size: 300MB
+    max-swallow-size: 300MB
 
 spring:
   application:

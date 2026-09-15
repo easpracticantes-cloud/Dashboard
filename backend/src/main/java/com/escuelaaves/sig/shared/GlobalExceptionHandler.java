@@ -15,6 +15,8 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import java.util.List;
 
@@ -72,10 +74,52 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
     }
 
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleMaxUpload(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        log.warn("Subida demasiado grande en {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "El archivo supera el limite de subida del backend (250 MB). Divide el ZIP o sube menos facturas por vez.",
+                request
+        );
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiError> handleMultipart(MultipartException ex, HttpServletRequest request) {
+        log.warn("Error multipart en {}: {}", request.getRequestURI(), ex.getMessage());
+        Throwable root = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause() : ex;
+        String detail = root.getMessage() != null ? root.getMessage() : ex.getMessage();
+        if (detail != null && detail.toLowerCase().contains("size")) {
+            return build(
+                    HttpStatus.PAYLOAD_TOO_LARGE,
+                    "La carga supera el limite multipart del servidor. Sube menos archivos o un ZIP mas pequeno.",
+                    request
+            );
+        }
+        return build(
+                HttpStatus.BAD_REQUEST,
+                "No se pudo leer la carga multipart. Intenta de nuevo con menos archivos.",
+                request
+        );
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest request) {
         log.error("Error no controlado procesando {}", request.getRequestURI(), ex);
-        return build(HttpStatus.INTERNAL_SERVER_ERROR, "Ocurrio un error inesperado. Intente nuevamente.", request);
+        String hint = ex.getClass().getSimpleName();
+        String msg = ex.getMessage();
+        if (msg != null && !msg.isBlank() && msg.length() < 180) {
+            return build(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Ocurrio un error inesperado (" + hint + "): " + msg,
+                    request
+            );
+        }
+        return build(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Ocurrio un error inesperado (" + hint + "). Revisa logs del backend.",
+                request
+        );
     }
 
     private ResponseEntity<ApiError> build(HttpStatus status, String message, HttpServletRequest request) {
