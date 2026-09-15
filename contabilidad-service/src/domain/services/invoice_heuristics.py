@@ -11,20 +11,55 @@ _NIT_RE = re.compile(
     re.IGNORECASE,
 )
 _NIT_BARE_RE = re.compile(r"\b(\d{8,10}[\-]?\d)\b")
-_FACTURA_RE = re.compile(
-    r"(?:factura(?:\s+de\s+venta)?|cuenta\s+de\s+cobro|cdc|fpos|fv\s*pos|fe\s*pos|fe-?e?|n[uú]mero)\s*"
-    r"(?:electr[oó]nica)?\s*(?:n[uú]mero|no\.?|nro\.?|n°|nº|#|-)?\s*[:.]?\s*"
-    r"([A-Z]{0,8}[\-]?\d[\w\-/]{1,20})",
+
+# Prefijos reales de factura (Flypass, POS, DIAN, etc.) — máxima prioridad
+_FACTURA_STRONG_RE = re.compile(
+    r"\b("
+    r"(?:FPFL|FPOS|FV\s*POS|FE\s*POS|FVPOS|FEPOS|FE-E|FVE|FE|FV|CDC|FAC|FACT|INV)"
+    r"\s*[-]?\s*\d{3,14}"
+    r")\b",
     re.IGNORECASE,
 )
-_FACTURA_POS_RE = re.compile(
-    r"\b((?:FPOS|FV\s*POS|FE\s*POS|FVPOS|FEPOS|FE-E|FE|FV|CDC)\s*[-]?\s*\d{2,8})\b",
+
+# Etiquetas explícitas de número de factura / documento
+_FACTURA_LABELED_RE = re.compile(
+    r"(?:factura(?:\s+electr[oó]nica)?(?:\s+de\s+venta)?|"
+    r"cuenta\s+de\s+cobro|"
+    r"n[uú]mero\s+(?:de\s+)?(?:factura|documento|documento\s+soporte)|"
+    r"prefijo\s+y\s+consecutivo|"
+    r"invoice\s*(?:no\.?|number|#)|"
+    r"bill\s*#)"
+    r"\s*(?:n[uú]mero|no\.?|nro\.?|n°|nº|#)?\s*[:.\-]?\s*"
+    r"([A-Z]{0,8}[\-]?\d[\w\-/]{2,24})",
     re.IGNORECASE,
 )
+
+# Fallback: No./Nro cerca de factura (no genérico "número" suelto)
 _FACTURA_NO_RE = re.compile(
-    r"(?:n[uú]m(?:ero)?|no\.?|nro\.?|n°|nº)\s*[:.]?\s*([A-Z]{1,6}[\s\-/]?\d{3,10})",
+    r"(?:factura|documento)\s*(?:n[uú]m(?:ero)?|no\.?|nro\.?|n°|nº)\s*[:.]?\s*"
+    r"([A-Z]{1,8}[\s\-/]?\d{3,14})",
     re.IGNORECASE,
 )
+
+_INVOICE_EN_RE = re.compile(
+    r"(?:invoice\s*(?:no\.?|number|#)|bill\s*#)\s*[:.]?\s*([A-Z0-9][\w\-/]{2,20})",
+    re.IGNORECASE,
+)
+
+# Contexto de TURNO / caja / mesa — NUNCA es número de factura
+_TURNO_CONTEXT_RE = re.compile(
+    r"(?:turno|caja|mesa|puesto|taquilla|ventana|terminal|atenci[oó]n|"
+    r"orden\s+de\s+servicio|ticket\s+turno|n[uú]mero\s+de\s+turno)"
+    r"\s*(?:n[uú]m(?:ero)?|no\.?|nro\.?|n°|nº|#|:)?\s*"
+    r"([A-Z0-9][\w\-/]{0,14})",
+    re.IGNORECASE,
+)
+
+_TURNO_VALUE_RE = re.compile(
+    r"^(?:TURNO|TNO|TRN)[\s\-/]?\d{1,6}$",
+    re.IGNORECASE,
+)
+
 _COMPRA_RE = re.compile(r"\b(COM\s*\d{4,8}|COT\s*\d{4,8})\b", re.IGNORECASE)
 _RESERVA_RE = re.compile(r"\b(EAS\s*\d{4,8})\b", re.IGNORECASE)
 _FECHA_RE = re.compile(
@@ -53,10 +88,6 @@ _SUBTOTAL_RE = re.compile(
 )
 _CUFE_RE = re.compile(r"\b([a-fA-F0-9]{40,96})\b")
 _RUT_RE = re.compile(r"(?:RUT)\s*[:#]?\s*([\d]{6,12}[\s\-]?[\d]?)", re.IGNORECASE)
-_INVOICE_EN_RE = re.compile(
-    r"(?:invoice\s*(?:no\.?|number|#)|bill\s*#)\s*[:.]?\s*([A-Z0-9][\w\-/]{2,20})",
-    re.IGNORECASE,
-)
 _OC_RE = re.compile(
     r"(?:orden\s+de\s+compra|o\.?\s*c\.?|oc|purchase\s+order)\s*[:#]?\s*([A-Z]{0,6}\d{3,10})",
     re.IGNORECASE,
@@ -115,6 +146,133 @@ def _norm_fecha(raw: str | None) -> str | None:
         return raw.strip()
 
 
+def _clean_invoice_number(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    num = re.sub(r"\s+", "", str(raw).strip(" .:|-"))
+    if len(num) < 3:
+        return None
+    if num.lower().startswith("de"):
+        return None
+    return num.upper() if any(c.isalpha() for c in num) else num
+
+
+def looks_like_turno(value: str | None, *, ocr_text: str | None = None) -> bool:
+    """True si el valor parece turno/caja/mesa y NO un número de factura DIAN/POS."""
+    cleaned = _clean_invoice_number(value)
+    if not cleaned:
+        return True
+
+    if _TURNO_VALUE_RE.match(cleaned):
+        return True
+
+    # Prefijos fuertes de factura → nunca turno
+    if re.match(
+        r"^(?:FPFL|FPOS|FVPOS|FEPOS|FE-E|FVE|FE|FV|CDC|FAC|FACT|INV)[\-]?\d{3,}$",
+        cleaned,
+        re.IGNORECASE,
+    ):
+        return False
+
+    digits = re.sub(r"\D", "", cleaned)
+    # Turnos suelen ser cortos (1–4 dígitos) sin prefijo de factura
+    if cleaned.isdigit() and len(cleaned) <= 4:
+        return True
+    if len(digits) <= 4 and not re.search(r"[A-Za-z]{2,}", cleaned):
+        return True
+
+    if ocr_text:
+        # Si aparece como valor de "Turno …" en el OCR, rechazar
+        for m in _TURNO_CONTEXT_RE.finditer(ocr_text):
+            cand = _clean_invoice_number(m.group(1))
+            if cand and cand.upper() == cleaned.upper():
+                return True
+            # También comparar solo dígitos
+            if cand and re.sub(r"\D", "", cand) == digits and digits:
+                return True
+
+    return False
+
+
+def _score_invoice_candidate(value: str, *, source: str) -> int:
+    cleaned = _clean_invoice_number(value)
+    if not cleaned or looks_like_turno(cleaned):
+        return -1
+    score = 0
+    upper = cleaned.upper()
+    if re.match(r"^(?:FPFL|FPOS|FVPOS|FEPOS)\d", upper.replace("-", "")):
+        score += 100
+    elif re.match(r"^(?:FE|FV|CDC|FAC|FACT|INV)[\-]?\d{3,}", upper):
+        score += 80
+    elif re.search(r"[A-Z]{2,}\-?\d{4,}", upper):
+        score += 60
+    elif re.search(r"[A-Z]+\d+", upper):
+        score += 40
+    else:
+        score += 10
+
+    digits = re.sub(r"\D", "", cleaned)
+    if len(digits) >= 6:
+        score += 20
+    elif len(digits) >= 4:
+        score += 10
+
+    if source == "strong":
+        score += 30
+    elif source == "labeled":
+        score += 20
+    elif source == "fallback":
+        score += 5
+    return score
+
+
+def _collect_turno_values(text: str) -> set[str]:
+    out: set[str] = set()
+    for m in _TURNO_CONTEXT_RE.finditer(text or ""):
+        cand = _clean_invoice_number(m.group(1))
+        if cand:
+            out.add(cand.upper())
+            digits = re.sub(r"\D", "", cand)
+            if digits:
+                out.add(digits)
+    return out
+
+
+def extract_best_invoice_number(ocr_text: str) -> str | None:
+    """Elige el mejor número de factura; excluye turnos/caja/mesa."""
+    text = ocr_text or ""
+    turno_vals = _collect_turno_values(text)
+    candidates: list[tuple[int, str]] = []
+
+    patterns: list[tuple[str, re.Pattern[str]]] = [
+        ("strong", _FACTURA_STRONG_RE),
+        ("labeled", _FACTURA_LABELED_RE),
+        ("labeled", _INVOICE_EN_RE),
+        ("fallback", _FACTURA_NO_RE),
+    ]
+    for source, pattern in patterns:
+        for m in pattern.finditer(text):
+            raw = m.group(1)
+            cleaned = _clean_invoice_number(raw)
+            if not cleaned:
+                continue
+            if cleaned.upper() in turno_vals or re.sub(r"\D", "", cleaned) in turno_vals:
+                continue
+            if looks_like_turno(cleaned, ocr_text=text):
+                continue
+            # Evitar capturar la palabra TURNO misma
+            if "TURNO" in cleaned.upper() and not re.search(r"[A-Z]{2,}\d{4,}", cleaned.upper()):
+                continue
+            score = _score_invoice_candidate(cleaned, source=source)
+            if score >= 0:
+                candidates.append((score, cleaned))
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: (-x[0], -len(x[1])))
+    return candidates[0][1]
+
+
 def extract_invoice_hints(ocr_text: str) -> dict[str, Any]:
     """Extrae candidatos tipados desde OCR (sin inventar)."""
     text = ocr_text or ""
@@ -128,16 +286,9 @@ def extract_invoice_hints(ocr_text: str) -> dict[str, Any]:
         if m2:
             hints["nit_o_identificacion"] = m2.group(1)
 
-    m = (
-        _FACTURA_POS_RE.search(text)
-        or _FACTURA_RE.search(text)
-        or _INVOICE_EN_RE.search(text)
-        or _FACTURA_NO_RE.search(text)
-    )
-    if m:
-        num = re.sub(r"\s+", " ", m.group(1)).strip()
-        if len(num) >= 3 and not num.lower().startswith("de"):
-            hints["numero_factura"] = num
+    numero = extract_best_invoice_number(text)
+    if numero:
+        hints["numero_factura"] = numero
 
     m = _COMPRA_RE.search(text) or _OC_RE.search(text)
     if m:
@@ -176,10 +327,23 @@ def extract_invoice_hints(ocr_text: str) -> dict[str, Any]:
     return {k: v for k, v in hints.items() if v is not None and v != ""}
 
 
-def merge_hints_into_extraction(extracted: dict[str, Any], hints: dict[str, Any]) -> dict[str, Any]:
-    """Rellena vacíos y corrige totales IA ×10 típicos al mal parsear 14,300.00."""
+def merge_hints_into_extraction(
+    extracted: dict[str, Any],
+    hints: dict[str, Any],
+    *,
+    ocr_text: str | None = None,
+) -> dict[str, Any]:
+    """Rellena vacíos y corrige totales IA ×10 típicos al mal parsear 14,300.00.
+
+    Si la IA puso un TURNO como numero_factura y el OCR tiene un FPFL/FPOS/FE real,
+    reemplaza el valor de la IA.
+    """
     out = dict(extracted or {})
+    ocr_blob = ocr_text or ""
+
     for key, value in hints.items():
+        if key.startswith("_"):
+            continue
         current = out.get(key)
         empty = current is None or current == "" or current == {}
         if empty:
@@ -198,8 +362,45 @@ def merge_hints_into_extraction(extracted: dict[str, Any], hints: dict[str, Any]
             corrected = _prefer_ocr_amount(current, value)
             if corrected is not None:
                 out[key] = corrected
+        if key == "numero_factura" and isinstance(value, str):
+            cur = str(current)
+            # IA tomó turno / número corto → preferir candidato OCR de factura
+            if looks_like_turno(cur, ocr_text=ocr_blob) and not looks_like_turno(value, ocr_text=ocr_blob):
+                out[key] = value
+            elif _score_invoice_candidate(value, source="strong") >= 90 and _score_invoice_candidate(
+                cur, source="fallback"
+            ) < 90:
+                out[key] = value
+
+    # Último filtro: si el número final sigue pareciendo turno y hay hint bueno, usa hint
+    hint_num = hints.get("numero_factura")
+    final_num = out.get("numero_factura")
+    if hint_num and looks_like_turno(str(final_num) if final_num else None, ocr_text=ocr_blob) and not looks_like_turno(
+        str(hint_num), ocr_text=ocr_blob
+    ):
+        out["numero_factura"] = hint_num
+        asumidos = list(out.get("campos_asumidos") or [])
+        asumidos.append(
+            {
+                "campo": "numero_factura",
+                "valor": hint_num,
+                "razon": "Se descartó un valor tipo TURNO; se usó el número de factura del OCR.",
+            }
+        )
+        out["campos_asumidos"] = asumidos
+        amb = list(out.get("ambiguedades") or [])
+        amb.append(
+            {
+                "campo": "numero_factura",
+                "opciones": [str(final_num), str(hint_num)],
+                "elegido": str(hint_num),
+                "motivo": "El valor previo coincidía con TURNO/caja, no con factura.",
+            }
+        )
+        out["ambiguedades"] = amb
+
     if hints:
-        out["_ocr_hints"] = hints
+        out["_ocr_hints"] = {k: v for k, v in hints.items() if not str(k).startswith("_")}
     return out
 
 

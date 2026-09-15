@@ -78,3 +78,44 @@ def test_us_total_fourteen_thousand_three_hundred():
 
     merged = merge_hints_into_extraction({"total": 143000.0}, {"total": 14300.0})
     assert merged["total"] == 14300.0
+
+
+def test_no_toma_turno_como_numero_factura():
+    texto = """
+    FLYPASS S.A.S.
+    NIT 900.123.456-7
+    Turno: 15
+    Factura electrónica FPFL-18121030
+    Fecha 02/08/2026
+    TOTAL A PAGAR $ 21.200
+    COM007244
+    """
+    hints = extract_invoice_hints(texto)
+    assert hints["numero_factura"].upper().replace(" ", "") in (
+        "FPFL-18121030",
+        "FPFL18121030",
+    )
+    assert "18121030" in hints["numero_factura"]
+    assert hints["numero_factura"] not in ("15", "TURNO", "TURNO15")
+
+
+def test_merge_reemplaza_turno_de_la_ia():
+    ocr = """
+    Turno No. 42
+    Factura de venta No. FE-88991
+    TOTAL $ 50.000
+    """
+    hints = extract_invoice_hints(ocr)
+    merged = merge_hints_into_extraction(
+        {"numero_factura": "42", "total": 50000},
+        hints,
+        ocr_text=ocr,
+    )
+    assert "88991" in str(merged["numero_factura"])
+    assert str(merged["numero_factura"]) != "42"
+
+
+def test_fpfl_gana_sobre_numero_corto():
+    texto = "Caja 3  Turno 7  FPFL-991122  Total $ 10.000"
+    hints = extract_invoice_hints(texto)
+    assert "991122" in hints.get("numero_factura", "")

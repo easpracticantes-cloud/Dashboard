@@ -290,7 +290,7 @@ class DocumentProcessingService:
     ) -> dict:
         """Aplica reglas + confidence + duplicados sobre extracción JSON de factura."""
         hints = extract_invoice_hints(ocr_text)
-        extracted = merge_hints_into_extraction(dict(ai_data), hints)
+        extracted = merge_hints_into_extraction(dict(ai_data), hints, ocr_text=ocr_text)
         extracted["_metodo_ocr"] = metodo_ocr
         if extracted.get("campos_asumidos"):
             extracted["requiere_revision"] = True
@@ -459,6 +459,7 @@ class DocumentProcessingService:
                                         for k, v in (text_result.data or {}).items()
                                         if v not in (None, "", [], {})
                                     },
+                                    ocr_text=ocr_text,
                                 )
                                 ai_result = AIExtractionResult(ok=True, data=merged, raw_text=ocr_text)
                             else:
@@ -503,7 +504,7 @@ class DocumentProcessingService:
                 ]
                 if any(utiles):
                     base = dict(ai_result.data) if ai_result and ai_result.ok else {}
-                    merged = merge_hints_into_extraction(base, hints)
+                    merged = merge_hints_into_extraction(base, hints, ocr_text=ocr_text)
                     if not self._ai_configured():
                         merged["requiere_revision"] = True
                         merged["observaciones"] = (
