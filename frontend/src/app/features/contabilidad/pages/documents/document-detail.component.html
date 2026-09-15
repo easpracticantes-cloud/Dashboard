@@ -269,25 +269,27 @@
             </div>
           </div>
 
-          @if (doc.contramarcado?.value) {
-            <div class="contramarca" [attr.data-status]="doc.contramarcado.status">
-              <div class="contramarca__head">
-                <div>
-                  <span class="label-caps">Contramarcado</span>
-                  <p class="contramarca__status">{{ labelContramarcado(doc.contramarcado.status) }}</p>
+          @if (doc.contramarcado; as cm) {
+            @if (cm.value) {
+              <div class="contramarca" [attr.data-status]="cm.status">
+                <div class="contramarca__head">
+                  <div>
+                    <span class="label-caps">Contramarcado</span>
+                    <p class="contramarca__status">{{ labelContramarcado(cm.status) }}</p>
+                  </div>
+                  <button type="button" class="btn btn-ghost" (click)="copiarContramarcado()">
+                    <mat-icon>{{ copiado ? 'check' : 'content_copy' }}</mat-icon>
+                    {{ copiado ? 'Copiado' : 'Copiar' }}
+                  </button>
                 </div>
-                <button type="button" class="btn btn-ghost" (click)="copiarContramarcado()">
-                  <mat-icon>{{ copiado ? 'check' : 'content_copy' }}</mat-icon>
-                  {{ copiado ? 'Copiado' : 'Copiar' }}
-                </button>
+                <code class="contramarca__value">{{ cm.value }}</code>
+                @if (cm.warning) {
+                  <p class="contramarca__warn">{{ cm.warning }}</p>
+                } @else if (cm.status === 'GENERADO') {
+                  <p class="contramarca__ok">Generado automáticamente</p>
+                }
               </div>
-              <code class="contramarca__value">{{ doc.contramarcado.value }}</code>
-              @if (doc.contramarcado.warning) {
-                <p class="contramarca__warn">{{ doc.contramarcado.warning }}</p>
-              } @else if (doc.contramarcado.status === 'GENERADO') {
-                <p class="contramarca__ok">Generado automáticamente</p>
-              }
-            </div>
+            }
           }
 
           @if (doc.confidence.global != null) {
