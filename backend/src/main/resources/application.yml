@@ -63,7 +63,7 @@ app:
     enabled: ${SEED_ENABLED:true}
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
-    allowed-emails: ${GOOGLE_ALLOWED_EMAILS:escuelaavescomercial@gmail.com,easpracticantes@gmail.com,escuelaavesdesalento@gmail.com}
+    allowed-emails: ${GOOGLE_ALLOWED_EMAILS:escuelaavescomercial@gmail.com,easpracticantes@gmail.com,escuelaavesdesalento@gmail.com,escuelaavescontabilidad@gmail.com}
     default-role: ${GOOGLE_DEFAULT_ROLE:GERENCIA}
   sheets:
     webapp-url: ${GOOGLE_SHEETS_WEBAPP_URL:https://script.google.com/macros/s/AKfycbwfFkKwgD5lPBGzrP8J477cKBrueQroZ6rW4c7XgU7ebMdRT1xlZFl6XoFgH29ugUObPg/exec}

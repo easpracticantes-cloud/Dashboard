@@ -41,7 +41,7 @@ Variables de entorno (archivo `.env` en la raíz, ya soportadas por `docker-comp
 
 ```env
 GOOGLE_CLIENT_ID=896582936314-7mnegqbnnnaeduahj1m4kp256q0k574g.apps.googleusercontent.com
-GOOGLE_ALLOWED_EMAILS=escuelaavescomercial@gmail.com,easpracticantes@gmail.com,escuelaavesdesalento@gmail.com
+GOOGLE_ALLOWED_EMAILS=escuelaavescomercial@gmail.com,easpracticantes@gmail.com,escuelaavesdesalento@gmail.com,escuelaavescontabilidad@gmail.com
 GOOGLE_DEFAULT_ROLE=GERENCIA
 ```
 
