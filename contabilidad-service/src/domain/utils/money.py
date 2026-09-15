@@ -97,10 +97,12 @@ def to_money_or_none(value: object) -> Decimal | None:
 
 
 def format_cop(value: object) -> str:
-    """Formato de presentación: ``$1.234.567``."""
-    entero = to_money(value).to_integral_value(rounding=ROUND_HALF_UP)
-    signo = "-" if entero < 0 else ""
-    return f"{signo}${abs(int(entero)):,}".replace(",", ".")
+    """Formato de presentación con centavos: ``$83.999,99``."""
+    monto = to_money(value)
+    signo = "-" if monto < 0 else ""
+    # En-US: 83999.99 → 83,999.99 → es-CO: 83.999,99
+    texto = f"{abs(monto):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"{signo}${texto}"
 
 
 def _a_decimal(value: float | Decimal) -> Decimal:

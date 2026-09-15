@@ -1215,17 +1215,15 @@ class CruceRepository:
 
 
 def _to_float(value) -> float | None:
-    """Parsea montos sin romper floats ya numéricos (evita 14300.0 → 143000)."""
+    """Parsea montos a float con 2 decimales (evita perder centavos y basura binaria)."""
     from domain.utils.money import money_to_float, to_money_or_none
 
     if value is None or value == "":
         return None
     if isinstance(value, bool):
         return None
-    if isinstance(value, (int, float)):
-        if isinstance(value, float) and (value != value):  # NaN
-            return None
-        return float(value)
+    if isinstance(value, float) and value != value:  # NaN
+        return None
     parsed = to_money_or_none(value)
     if parsed is None:
         return None

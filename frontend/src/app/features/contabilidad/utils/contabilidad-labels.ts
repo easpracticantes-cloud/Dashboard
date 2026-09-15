@@ -148,15 +148,51 @@ export function formatCop(value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === '') {
     return '—';
   }
-  const n = typeof value === 'number' ? value : Number(String(value).replace(',', '.'));
-  if (Number.isNaN(n)) {
+  const n = typeof value === 'number' ? value : parseCopAmount(String(value));
+  if (n === null || Number.isNaN(n)) {
     return '—';
   }
+  // Conservar centavos tal como vienen de la factura (ej. 83999.99 → $ 83.999,99).
   return new Intl.NumberFormat('es-CO', {
     style: 'currency',
     currency: 'COP',
-    maximumFractionDigits: 0
-  }).format(Math.round(n));
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+/** Parsea montos CO/US: `83.999,99`, `83,999.99`, `83999.99`. */
+export function parseCopAmount(raw: string): number | null {
+  let texto = raw.trim();
+  if (!texto) return null;
+  const negativo = texto.startsWith('-') || (texto.startsWith('(') && texto.endsWith(')'));
+  texto = texto.replace(/[^\d.,\-]/g, '').replace(/-/g, '');
+  if (!texto) return null;
+
+  const lastDot = texto.lastIndexOf('.');
+  const lastComma = texto.lastIndexOf(',');
+  if (lastDot >= 0 && lastComma >= 0) {
+    if (lastComma > lastDot) {
+      texto = texto.replace(/\./g, '').replace(',', '.');
+    } else {
+      texto = texto.replace(/,/g, '');
+    }
+  } else if (lastComma >= 0) {
+    const parts = texto.split(',');
+    texto =
+      parts.length > 2 || parts[parts.length - 1].length === 3
+        ? texto.replace(/,/g, '')
+        : texto.replace(',', '.');
+  } else if (lastDot >= 0) {
+    const parts = texto.split('.');
+    if (parts.length > 2 || parts[parts.length - 1].length === 3) {
+      texto = texto.replace(/\./g, '');
+    }
+  }
+
+  const n = Number(texto);
+  if (!Number.isFinite(n)) return null;
+  return negativo ? -n : n;
 }
 
 export function formatFechaContable(value: string | Date | null | undefined): string {

@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PaymentSummary, PaymentsApiService } from '../../services/payments-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
-import { formatCop, iconEstado, labelEstado, toneEstado } from '../../utils/contabilidad-labels';
+import { formatCop, iconEstado, labelEstado, parseCopAmount, toneEstado } from '../../utils/contabilidad-labels';
 
 /** Estados desde los que el backend exige motivo reforzado (≥10 caracteres). */
 const ESTADOS_MOTIVO_REFORZADO = new Set([
@@ -279,16 +279,15 @@ export class PaymentsComponent implements OnInit {
       return;
     }
     const raw = prompt(
-      `Nuevo valor en COP (actual: ${formatCop(p.valor)}). Solo números:`,
-      p.valor != null ? String(Math.round(Number(p.valor))) : ''
+      `Nuevo valor en COP (actual: ${formatCop(p.valor)}). Usa punto o coma para centavos:`,
+      p.valor != null ? String(p.valor) : ''
     );
     if (raw === null) {
       return;
     }
-    const digits = String(raw).replace(/[^\d]/g, '');
-    const valor = Number(digits);
-    if (!Number.isFinite(valor) || valor <= 0) {
-      this.error = 'Indique un valor numérico mayor que cero.';
+    const valor = parseCopAmount(String(raw));
+    if (valor == null || !Number.isFinite(valor) || valor <= 0) {
+      this.error = 'Indique un valor numérico mayor que cero (puede usar centavos).';
       return;
     }
     const motivo = (prompt('Motivo del ajuste de valor (obligatorio):') || '').trim();

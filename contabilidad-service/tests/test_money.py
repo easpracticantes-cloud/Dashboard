@@ -67,9 +67,10 @@ def test_value_difference_es_exacta():
 
 
 def test_format_cop():
-    assert format_cop(1234567.89) == "$1.234.568"
-    assert format_cop(0) == "$0"
-    assert format_cop(-1500) == "-$1.500"
+    assert format_cop(1234567.89) == "$1.234.567,89"
+    assert format_cop(83999.99) == "$83.999,99"
+    assert format_cop(0) == "$0,00"
+    assert format_cop(-1500) == "-$1.500,00"
 
 
 def test_validar_factura_iva_consistente_en_formato_colombiano():
