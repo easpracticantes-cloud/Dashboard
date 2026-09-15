@@ -82,15 +82,26 @@
       @if (carpetas().length) {
         <div class="wiz__folder-list">
           @for (f of carpetas(); track f.id) {
-            <button
-              type="button"
-              class="wiz__folder-chip"
-              [class.is-on]="carpetaActiva()?.id === f.id"
-              (click)="seleccionarCarpeta(f.id)"
-            >
-              <strong>{{ f.name }}</strong>
-              <small>{{ f.document_count || 0 }} fact. · {{ f.status }}</small>
-            </button>
+            <div class="wiz__folder-chip-wrap" [class.is-on]="carpetaActiva()?.id === f.id">
+              <button
+                type="button"
+                class="wiz__folder-chip"
+                [class.is-on]="carpetaActiva()?.id === f.id"
+                (click)="seleccionarCarpeta(f.id)"
+              >
+                <strong>{{ f.name }}</strong>
+                <small>{{ f.document_count || 0 }} fact. · {{ f.status }}</small>
+              </button>
+              <button
+                type="button"
+                class="wiz__folder-del"
+                title="Eliminar carpeta"
+                aria-label="Eliminar carpeta {{ f.name }}"
+                (click)="eliminarCarpeta($event, f)"
+              >
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
           }
         </div>
       }
@@ -102,10 +113,13 @@
         @if (folder.week_label) {
           <span>{{ folder.week_label }}</span>
         }
-        <span>{{ folder.document_count || 0 }} facturas</span>
+        <span>{{ folder.document_count || documentos().length || 0 }} facturas</span>
         @if (folder.autobits_batch_id) {
           <span>Autobits #{{ folder.autobits_batch_id }}</span>
         }
+        <button type="button" class="wiz__ghost wiz__ghost--tiny" (click)="eliminarCarpeta($event, folder)">
+          Eliminar carpeta
+        </button>
       </div>
 
       <div

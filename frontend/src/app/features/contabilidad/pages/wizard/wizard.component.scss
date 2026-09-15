@@ -702,3 +702,37 @@
   color: var(--eas-muted, #5c6d63);
   font-size: 0.8rem;
 }
+
+.wiz__folder-chip-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0.2rem;
+  border-radius: 12px;
+}
+
+.wiz__folder-chip-wrap.is-on .wiz__folder-del {
+  border-color: var(--eas-leaf);
+  background: var(--eas-tint-leaf);
+}
+
+.wiz__folder-del {
+  border: 1px solid var(--eas-line-soft);
+  background: var(--eas-surface);
+  color: #a33b32;
+  border-radius: 12px;
+  width: 2.2rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.wiz__folder-del mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.wiz__folder-del:hover {
+  background: rgba(163, 59, 50, 0.1);
+}

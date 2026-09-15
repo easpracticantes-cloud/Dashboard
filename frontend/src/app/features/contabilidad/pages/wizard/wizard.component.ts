@@ -95,6 +95,7 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   private poll?: Subscription;
   private autobitsUpload?: Subscription;
+  private folderSeq = 0;
 
   ngOnInit(): void {
     sessionStorage.setItem(SESSION_KEY, '1');
@@ -148,9 +149,11 @@ export class WizardComponent implements OnInit, OnDestroy {
   );
 
   readonly idsParaExcel = computed(() => {
-    const fromFolder = this.carpetaActiva()?.document_ids || [];
-    if (fromFolder.length) {
-      return fromFolder;
+    // Con carpeta activa: SOLO sus document_ids (aunque esté vacía).
+    // No reutilizar facturas de la carpeta anterior ni el listado global.
+    const folder = this.carpetaActiva();
+    if (folder) {
+      return [...(folder.document_ids || [])];
     }
     const operacion = this.idsFacturasOperacion().filter(
       (id): id is number => typeof id === 'number' && Number.isFinite(id)
@@ -221,6 +224,50 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.foldersApi.get(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (folder) => this.aplicarCarpeta(folder),
       error: (err) => this.error.set(this.detalleError(err, 'No se pudo abrir la carpeta.')),
+    });
+  }
+
+  eliminarCarpeta(ev: Event, folder: InvoiceFolder): void {
+    ev.stopPropagation();
+    ev.preventDefault();
+    const name = folder.name || `Carpeta #${folder.id}`;
+    const ok = window.confirm(
+      `¿Eliminar la carpeta «${name}»?\n\n` +
+        `Se quita la carpeta de la lista. Las facturas subidas no se borran del sistema; ` +
+        `solo dejan de estar agrupadas aquí.`
+    );
+    if (!ok) {
+      return;
+    }
+    this.error.set('');
+    this.foldersApi.delete(folder.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.carpetas.update((list) => list.filter((f) => f.id !== folder.id));
+        if (this.carpetaActiva()?.id === folder.id) {
+          this.carpetaActiva.set(null);
+          this.idsFacturasOperacion.set([]);
+          this.documentos.set([]);
+          this.facturaItems.set([]);
+          this.crossings.set([]);
+          this.chatMsgs.set([]);
+          this.packMsg.set('');
+          try {
+            sessionStorage.removeItem(FOLDER_KEY);
+          } catch {
+            /* ignore */
+          }
+          const next = this.carpetas()[0];
+          if (next) {
+            this.seleccionarCarpeta(next.id);
+          } else {
+            this.paso.set(1);
+            this.aviso.set(`Carpeta «${name}» eliminada.`);
+          }
+        } else {
+          this.aviso.set(`Carpeta «${name}» eliminada.`);
+        }
+      },
+      error: (err) => this.error.set(this.detalleError(err, 'No se pudo eliminar la carpeta.')),
     });
   }
 
@@ -763,16 +810,108 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private aplicarCarpeta(folder: InvoiceFolder): void {
+    const switching = this.carpetaActiva()?.id !== folder.id;
+    this.folderSeq += 1;
+    const seq = this.folderSeq;
+    this.poll?.unsubscribe();
+
     this.carpetaActiva.set(folder);
     this.guardarFolderId(folder.id);
     this.idsFacturasOperacion.set([...(folder.document_ids || [])]);
-    this.refrescarFacturas();
+    if (switching) {
+      this.facturaItems.set([]);
+      this.packMsg.set('');
+      this.chatMsgs.set([]);
+      this.crossings.set([]);
+    }
+
+    // Pintar de inmediato lo que vino en GET /folders/{id} (evita ver facturas de otra carpeta)
+    this.documentos.set(this.docsFromFolderSummary(folder));
+
     if (folder.autobits_batch_id) {
       this.paso.set(2);
       this.cargarRecords(folder.autobits_batch_id);
     } else {
       this.paso.set(1);
+      if (switching) {
+        this.records.set([]);
+        this.autobits.set(null);
+      }
     }
+
+    this.carpetas.update((list) => {
+      const rest = list.filter((f) => f.id !== folder.id);
+      return [folder, ...rest];
+    });
+
+    this.refrescarFacturas(seq);
+    if ((folder.document_ids || []).length) {
+      this.startPoll();
+    }
+  }
+
+  private docsFromFolderSummary(folder: InvoiceFolder): DocumentSummary[] {
+    return (folder.documents || []).map((d) => ({
+      id: d.id,
+      filename: d.filename,
+      tipo: d.tipo || 'FACTURA',
+      origen: 'CARGA_MANUAL',
+      estado: d.estado,
+      proveedor_nombre: d.proveedor_nombre || undefined,
+      numero_documento: d.numero_documento || undefined,
+      total: d.total ?? undefined,
+      requiere_revision: !!d.requiere_revision,
+      received_at: '',
+      contramarcado: d.contramarcado ?? null,
+    }));
+  }
+
+  private refrescarFacturas(expectedSeq?: number): void {
+    const seq = expectedSeq ?? this.folderSeq;
+    const folder = this.carpetaActiva();
+    const folderIds = folder ? [...(folder.document_ids || [])] : null;
+
+    this.docsApi.list({ limit: 200 }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (res) => {
+        if (seq !== this.folderSeq) {
+          return;
+        }
+        const all = res.items || [];
+        if (folderIds) {
+          // Carpeta activa (aunque vacía): nunca mezclar con otras facturas
+          const set = new Set(folderIds);
+          this.documentos.set(all.filter((d) => set.has(d.id)));
+        } else {
+          this.documentos.set(all);
+        }
+      },
+      error: () => undefined,
+    });
+
+    const batchId = folder?.autobits_batch_id || this.autobits()?.batch?.id;
+    this.crossingsApi
+      .list({
+        limit: 200,
+        batch_id: batchId,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          if (seq !== this.folderSeq) {
+            return;
+          }
+          const items = res.items || [];
+          if (folderIds && folderIds.length) {
+            const set = new Set(folderIds);
+            this.crossings.set(items.filter((c) => !c.document_id || set.has(c.document_id)));
+          } else if (folderIds && !folderIds.length) {
+            this.crossings.set([]);
+          } else {
+            this.crossings.set(items);
+          }
+        },
+        error: () => undefined,
+      });
   }
 
   private vincularAutobitsACarpeta(batchId?: number): void {
@@ -860,35 +999,11 @@ export class WizardComponent implements OnInit, OnDestroy {
       });
   }
 
-  private refrescarFacturas(): void {
-    const ids = this.idsParaExcel();
-    this.docsApi.list({ limit: 200 }).subscribe({
-      next: (res) => {
-        const all = res.items || [];
-        if (ids.length) {
-          const set = new Set(ids);
-          this.documentos.set(all.filter((d) => set.has(d.id)));
-        } else {
-          this.documentos.set(all);
-        }
-      },
-      error: () => undefined,
-    });
-    this.crossingsApi
-      .list({
-        limit: 200,
-        batch_id: this.carpetaActiva()?.autobits_batch_id || this.autobits()?.batch?.id,
-      })
-      .subscribe({
-        next: (res) => this.crossings.set(res.items || []),
-        error: () => undefined,
-      });
-  }
-
   private startPoll(): void {
     this.poll?.unsubscribe();
     this.poll = interval(2000).subscribe(() => {
-      this.refrescarFacturas();
+      const seq = this.folderSeq;
+      this.refrescarFacturas(seq);
       const pending = this.documentos().some((d) =>
         ['RECIBIDO', 'PROCESANDO'].includes((d.estado || '').toUpperCase())
       );
@@ -897,7 +1012,7 @@ export class WizardComponent implements OnInit, OnDestroy {
         const batchId = this.carpetaActiva()?.autobits_batch_id || this.autobits()?.batch?.id;
         if (batchId) {
           this.crossingsApi.runMatching(batchId).subscribe({
-            next: () => this.refrescarFacturas(),
+            next: () => this.refrescarFacturas(this.folderSeq),
           });
         }
       }

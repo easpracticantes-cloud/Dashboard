@@ -130,7 +130,7 @@ def list_folders(limit: int = 40, db: Session = Depends(get_db)):
         .limit(max(1, min(limit, 100)))
         .all()
     )
-    return {"total": len(rows), "items": [_serialize(r) for r in rows]}
+    return {"total": len(rows), "items": [_serialize(r, db) for r in rows]}
 
 
 @router.post("")
