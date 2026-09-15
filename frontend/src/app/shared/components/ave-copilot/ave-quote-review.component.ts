@@ -7,6 +7,7 @@ import { AveUiContextService } from './ave-ui-context.service';
 import { QuoteSheetComponent } from './quote-sheet.component';
 import {
   QUOTE_STATUSES,
+  QUOTE_STATUS_LABELS,
   type QuoteSheetDocument,
   type QuoteSheetStatus,
   documentToDraft,
@@ -17,6 +18,7 @@ import { downloadQuotePdf } from './quote-pdf';
 import { buildQuoteNumber, toIsoDate, addDays } from './quote-template';
 
 const DRAFT_STORE = 'sig.ave.quote-document';
+const ZOOM_STEPS = [80, 90, 100, 110, 120] as const;
 
 @Component({
   selector: 'eas-ave-quote-review',
@@ -41,6 +43,7 @@ export class AveQuoteReviewComponent {
   readonly copied = signal(false);
   readonly toast = signal<string | null>(null);
   readonly formError = signal<string | null>(null);
+  readonly zoom = signal(100);
   readonly statuses = QUOTE_STATUSES;
   readonly sheet = viewChild(QuoteSheetComponent);
 
@@ -77,6 +80,22 @@ export class AveQuoteReviewComponent {
 
   setStatus(status: QuoteSheetStatus): void {
     this.doc.set({ ...this.doc(), status });
+  }
+
+  statusLabel(status: QuoteSheetStatus): string {
+    return QUOTE_STATUS_LABELS[status] || status;
+  }
+
+  zoomIn(): void {
+    const current = this.zoom();
+    const next = ZOOM_STEPS.find((step) => step > current) ?? ZOOM_STEPS[ZOOM_STEPS.length - 1];
+    this.zoom.set(next);
+  }
+
+  zoomOut(): void {
+    const current = this.zoom();
+    const prev = [...ZOOM_STEPS].reverse().find((step) => step < current) ?? ZOOM_STEPS[0];
+    this.zoom.set(prev);
   }
 
   currentDraft(): QuoteDraft {
@@ -183,6 +202,28 @@ export class AveQuoteReviewComponent {
     const base = phone ? `https://wa.me/57${phone.replace(/^57/, '')}` : 'https://wa.me/';
     const url = `${base}?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank', 'noopener');
+  }
+
+  shareEmail(): void {
+    const text = this.sheet()?.summaryText() || '';
+    const to = (this.doc().clientEmail || '').trim();
+    const subject = encodeURIComponent(`Cotización ${this.doc().quoteNumber || ''} — Escuela Aves Salento`);
+    const body = encodeURIComponent(text);
+    window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+  }
+
+  duplicateAsNew(): void {
+    const current = this.doc();
+    this.doc.set({
+      ...current,
+      quoteNumber: buildQuoteNumber(current.code || 'EAS', new Date()),
+      status: 'DRAFT',
+      issuedAt: toIsoDate(new Date()),
+      validUntil: addDays(toIsoDate(new Date()), 15)
+    });
+    this.reviewed.set(false);
+    this.editing.set(true);
+    this.flash('Duplicada con nuevo número');
   }
 
   printSheet(): void {

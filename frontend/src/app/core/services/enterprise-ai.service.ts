@@ -300,6 +300,7 @@ export interface QuoteDraft {
   total?: number;
   currency?: string;
   date?: string;
+  serviceDate?: string;
   pickup?: string;
   clientName?: string;
   clientNit?: string;

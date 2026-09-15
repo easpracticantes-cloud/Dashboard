@@ -1,63 +1,95 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 280" fill="none" role="img" aria-label="Ave Escuela Aves Salento">
-  <!-- Soft forest glow -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 300" fill="none" role="img" aria-label="Ave Escuela Aves Salento">
   <defs>
-    <radialGradient id="qsGlow" cx="55%" cy="45%" r="55%">
-      <stop offset="0%" stop-color="#1a6b4a" stop-opacity="0.55"/>
+    <radialGradient id="qsGlow" cx="52%" cy="48%" r="58%">
+      <stop offset="0%" stop-color="#1b7a52" stop-opacity="0.5"/>
+      <stop offset="55%" stop-color="#0a3d2e" stop-opacity="0.12"/>
       <stop offset="100%" stop-color="#0a3d2e" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="qsChest" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffe566"/>
-      <stop offset="55%" stop-color="#f0bc3a"/>
-      <stop offset="100%" stop-color="#e8a31a"/>
+    <linearGradient id="qsChest" x1="0.15" y1="0" x2="0.9" y2="1">
+      <stop offset="0%" stop-color="#fff1a0"/>
+      <stop offset="35%" stop-color="#ffe566"/>
+      <stop offset="70%" stop-color="#f0bc3a"/>
+      <stop offset="100%" stop-color="#e09410"/>
     </linearGradient>
-    <linearGradient id="qsHead" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#5eead4"/>
-      <stop offset="45%" stop-color="#2dd4bf"/>
+    <linearGradient id="qsHead" x1="0.2" y1="0" x2="0.85" y2="1">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="40%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="qsWing" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="45%" stop-color="#16a34a"/>
+      <stop offset="100%" stop-color="#14532d"/>
+    </linearGradient>
+    <linearGradient id="qsTail" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2dd4bf"/>
       <stop offset="100%" stop-color="#0f766e"/>
     </linearGradient>
-    <linearGradient id="qsWing" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#34d399"/>
-      <stop offset="100%" stop-color="#065f46"/>
-    </linearGradient>
+    <filter id="qsSoft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="0.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
 
-  <ellipse cx="190" cy="150" rx="120" ry="100" fill="url(#qsGlow)"/>
+  <!-- Ambient -->
+  <ellipse cx="210" cy="155" rx="130" ry="108" fill="url(#qsGlow)"/>
+
+  <!-- Soft foliage behind -->
+  <path d="M268 92 C292 70 318 78 330 98 C312 92 296 102 286 118 C278 108 270 100 268 92Z" fill="#146445" opacity="0.35"/>
+  <path d="M48 168 C28 150 18 128 34 112 C42 132 58 146 78 152 C64 158 54 164 48 168Z" fill="#0a3d2e" opacity="0.2"/>
 
   <!-- Branch -->
-  <path d="M40 210 C110 198 170 205 250 188 C270 184 290 178 310 172" stroke="#8b6914" stroke-width="7" stroke-linecap="round"/>
-  <path d="M40 210 C110 198 170 205 250 188" stroke="#c4a35a" stroke-width="2.5" stroke-linecap="round" opacity="0.55"/>
+  <path d="M28 228 C96 214 168 222 248 204 C278 196 308 186 342 176" stroke="#6b4f1a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M28 228 C96 214 168 222 248 204" stroke="#c4a35a" stroke-width="2.8" stroke-linecap="round" opacity="0.55"/>
+  <path d="M210 210 C226 198 238 186 246 172" stroke="#8b6914" stroke-width="3.5" stroke-linecap="round"/>
 
-  <!-- Tail -->
-  <path d="M220 168 C248 150 268 128 278 108 C262 128 248 148 228 162 Z" fill="#0f766e"/>
-  <path d="M226 172 C250 158 272 142 286 124 C268 144 252 160 232 170 Z" fill="#14b8a6" opacity="0.85"/>
+  <!-- Leaves on branch -->
+  <path d="M236 196 C248 184 266 186 272 198 C258 200 246 204 236 196Z" fill="#146445" opacity="0.85"/>
+  <path d="M252 188 C262 176 278 178 282 190 C270 192 260 194 252 188Z" fill="#22c55e" opacity="0.7"/>
 
-  <!-- Body -->
-  <ellipse cx="168" cy="148" rx="58" ry="48" fill="url(#qsChest)"/>
-  <ellipse cx="152" cy="138" rx="36" ry="30" fill="#fff3bf" opacity="0.35"/>
+  <!-- Tail feathers -->
+  <path d="M232 172 C268 148 292 118 304 90 C286 118 268 146 242 166 Z" fill="url(#qsTail)"/>
+  <path d="M238 178 C274 158 300 132 314 106 C294 132 274 156 246 174 Z" fill="#14b8a6" opacity="0.75"/>
+  <path d="M244 182 C276 166 298 146 308 128 C292 146 274 164 250 178 Z" fill="#0f766e" opacity="0.9"/>
+
+  <!-- Body / chest -->
+  <g filter="url(#qsSoft)">
+    <ellipse cx="178" cy="158" rx="64" ry="52" fill="url(#qsChest)"/>
+    <ellipse cx="158" cy="146" rx="38" ry="32" fill="#fff8d6" opacity="0.4"/>
+    <path d="M140 168 C156 186 196 190 218 172" stroke="#d97706" stroke-width="2" stroke-linecap="round" opacity="0.25"/>
+  </g>
 
   <!-- Wing -->
-  <path d="M168 128 C198 118 218 132 224 158 C228 178 214 192 188 186 C170 182 158 168 156 150 C154 138 160 130 168 128 Z" fill="url(#qsWing)"/>
-  <path d="M176 138 C196 132 208 142 212 156" stroke="#a7f3d0" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
-  <path d="M172 150 C190 146 202 154 206 166" stroke="#a7f3d0" stroke-width="1.6" stroke-linecap="round" opacity="0.55"/>
+  <path d="M176 134 C214 120 242 136 248 168 C252 192 232 210 200 204 C176 198 162 178 160 156 C158 142 166 134 176 134 Z" fill="url(#qsWing)"/>
+  <path d="M186 146 C212 138 228 150 232 168" stroke="#bbf7d0" stroke-width="2.2" stroke-linecap="round" opacity="0.75"/>
+  <path d="M180 160 C204 154 220 164 224 178" stroke="#86efac" stroke-width="1.8" stroke-linecap="round" opacity="0.55"/>
+  <path d="M176 172 C196 168 210 176 214 188" stroke="#86efac" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
 
   <!-- Head -->
-  <ellipse cx="118" cy="112" rx="42" ry="38" fill="url(#qsHead)"/>
-  <path d="M90 108 C98 88 120 78 138 86 C124 90 112 100 108 114 Z" fill="#99f6e4" opacity="0.45"/>
+  <ellipse cx="122" cy="118" rx="46" ry="42" fill="url(#qsHead)"/>
+  <path d="M92 114 C102 88 128 76 150 88 C132 94 118 106 112 122 Z" fill="#bae6fd" opacity="0.5"/>
+  <ellipse cx="118" cy="132" rx="22" ry="14" fill="#0ea5e9" opacity="0.35"/>
+
+  <!-- Crown / nape green blend -->
+  <path d="M148 100 C160 108 168 124 164 140 C152 128 146 114 148 100Z" fill="#16a34a" opacity="0.45"/>
 
   <!-- Beak -->
-  <path d="M78 118 L52 122 L78 128 Z" fill="#1c1917"/>
-  <path d="M78 118 L58 121.5 L78 123.5 Z" fill="#44403c"/>
+  <path d="M78 124 L46 130 L78 136 Z" fill="#1c1917"/>
+  <path d="M78 124 L54 129 L78 131.5 Z" fill="#57534e"/>
 
   <!-- Eye -->
-  <ellipse cx="104" cy="108" rx="7.5" ry="8" fill="#0a0a0a"/>
-  <circle cx="106.5" cy="105.5" r="2.2" fill="#fff"/>
+  <ellipse cx="108" cy="114" rx="8.5" ry="9" fill="#0a0a0a"/>
+  <circle cx="111" cy="111" r="2.6" fill="#fff"/>
+  <circle cx="106" cy="117" r="1.2" fill="#fff" opacity="0.45"/>
 
-  <!-- Mask / cheek -->
-  <path d="M88 118 C96 126 112 128 124 122" stroke="#042f2e" stroke-width="3" stroke-linecap="round" opacity="0.35"/>
+  <!-- Cheek / throat transition -->
+  <path d="M96 138 C112 152 138 154 154 142" stroke="#0369a1" stroke-width="3.5" stroke-linecap="round" opacity="0.28"/>
+  <ellipse cx="132" cy="140" rx="18" ry="10" fill="#fde047" opacity="0.55"/>
 
   <!-- Feet -->
-  <path d="M150 188 L146 208 M150 188 L156 208 M164 190 L160 210 M164 190 L170 210" stroke="#1c1917" stroke-width="3" stroke-linecap="round"/>
+  <path d="M158 200 L152 224 M158 200 L164 224 M174 202 L168 226 M174 202 L180 226" stroke="#1c1917" stroke-width="3.2" stroke-linecap="round"/>
 
-  <!-- Brand accent spiral (tiny mark echo) -->
-  <path d="M248 78 C262 82 270 94 266 106 C263 114 254 120 244 118" stroke="#e8a31a" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.9"/>
+  <!-- Brand gold accent -->
+  <path d="M286 70 C304 76 314 92 308 108 C304 118 292 126 278 122" stroke="#e8a31a" stroke-width="4.5" stroke-linecap="round" fill="none"/>
+  <circle cx="278" cy="122" r="3.5" fill="#f0bc3a"/>
 </svg>

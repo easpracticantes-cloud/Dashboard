@@ -31,9 +31,9 @@
       </ul>
     </div>
 
-    <svg class="qs-hero__wave" viewBox="0 0 780 36" preserveAspectRatio="none" aria-hidden="true">
-      <path d="M0 22 C90 4 170 32 260 14 C350 0 430 30 520 12 C610 0 690 26 780 14 L780 36 L0 36 Z" fill="#e8a31a"/>
-      <path d="M0 26 C100 10 180 34 280 16 C380 2 460 30 560 14 C650 2 720 22 780 18 L780 36 L0 36 Z" fill="#f0bc3a" opacity="0.9"/>
+    <svg class="qs-hero__wave" viewBox="0 0 780 40" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0 24 C95 4 175 34 265 16 C355 0 435 32 525 14 C615 0 695 28 780 16 L780 40 L0 40 Z" fill="#e8a31a"/>
+      <path d="M0 28 C105 12 185 36 285 18 C385 4 465 32 565 16 C655 4 725 24 780 20 L780 40 L0 40 Z" fill="#f0bc3a" opacity="0.92"/>
     </svg>
   </header>
 
@@ -48,9 +48,10 @@
     <dl class="qs-meta">
       <div>
         <dt>N.º Cotización</dt>
-        <dd>
+        <dd class="qs-meta__num">
           @if (editing()) {
             <input class="qs-in" type="text" [ngModel]="document().quoteNumber" (ngModelChange)="patch({ quoteNumber: $event })" />
+            <button type="button" class="qs-meta__regen" (click)="regenQuoteNumber()" title="Generar nuevo número">↻</button>
           } @else {
             {{ dash(document().quoteNumber) }}
           }
@@ -77,12 +78,52 @@
         </dd>
       </div>
       @if (validityLabel()) {
-        <div class="qs-meta__badge">
+        <div class="qs-meta__badge" [attr.data-tone]="validityTone()">
           <dt>Vigencia</dt>
           <dd>{{ validityLabel() }}</dd>
         </div>
       }
     </dl>
+  </section>
+
+  <section class="qs-trip" aria-label="Datos del servicio">
+    <div>
+      <span class="qs-trip__label">Fecha servicio</span>
+      @if (editing()) {
+        <input class="qs-in" type="date" [ngModel]="document().serviceDate || ''" (ngModelChange)="patch({ serviceDate: $event })" />
+      } @else {
+        <strong>{{ document().serviceDate ? dateText(document().serviceDate!) : '—' }}</strong>
+      }
+    </div>
+    <div>
+      <span class="qs-trip__label">Modalidad</span>
+      @if (editing()) {
+        <select class="qs-in qs-in--select" [ngModel]="document().modality || ''" (ngModelChange)="patch({ modality: $event })">
+          <option value="">Seleccionar…</option>
+          @for (m of modalities; track m) {
+            <option [value]="m">{{ m }}</option>
+          }
+        </select>
+      } @else {
+        <strong>{{ dash(document().modality) }}</strong>
+      }
+    </div>
+    <div>
+      <span class="qs-trip__label">Personas</span>
+      @if (editing()) {
+        <input class="qs-in qs-in--num" type="number" min="1" [ngModel]="document().people || 1" (ngModelChange)="setPeople($event)" />
+      } @else {
+        <strong>{{ document().people || '—' }}</strong>
+      }
+    </div>
+    <div>
+      <span class="qs-trip__label">Pickup</span>
+      @if (editing()) {
+        <input class="qs-in" type="text" [ngModel]="document().pickup || document().clientCity || ''" (ngModelChange)="patch({ pickup: $event })" placeholder="Hotel / punto de encuentro" />
+      } @else {
+        <strong>{{ dash(document().pickup || document().clientCity) }}</strong>
+      }
+    </div>
   </section>
 
   @if (editing()) {
@@ -97,12 +138,23 @@
           }
         </div>
       </div>
-      <div class="qs-tools__validity">
-        <span class="qs-tools__label">Extender vigencia</span>
-        <div class="qs-tools__chips">
-          <button type="button" class="qs-chip qs-chip--ghost" (click)="extendValidity(7)">+7 días</button>
-          <button type="button" class="qs-chip qs-chip--ghost" (click)="extendValidity(15)">+15 días</button>
-          <button type="button" class="qs-chip qs-chip--ghost" (click)="extendValidity(30)">+30 días</button>
+      <div class="qs-tools__row">
+        <div class="qs-tools__validity">
+          <span class="qs-tools__label">Extender vigencia</span>
+          <div class="qs-tools__chips">
+            <button type="button" class="qs-chip qs-chip--ghost" (click)="extendValidity(7)">+7 días</button>
+            <button type="button" class="qs-chip qs-chip--ghost" (click)="extendValidity(15)">+15 días</button>
+            <button type="button" class="qs-chip qs-chip--ghost" (click)="extendValidity(30)">+30 días</button>
+          </div>
+        </div>
+        <div class="qs-tools__disc">
+          <span class="qs-tools__label">Descuento global</span>
+          <div class="qs-tools__chips">
+            <button type="button" class="qs-chip qs-chip--ghost" (click)="applyPercentDiscount(5)">5%</button>
+            <button type="button" class="qs-chip qs-chip--ghost" (click)="applyPercentDiscount(10)">10%</button>
+            <button type="button" class="qs-chip qs-chip--ghost" (click)="applyPercentDiscount(15)">15%</button>
+            <button type="button" class="qs-chip qs-chip--ghost" (click)="clearDiscounts()">Quitar</button>
+          </div>
         </div>
       </div>
     </section>
@@ -156,7 +208,7 @@
           <dt>Ciudad</dt>
           <dd>
             @if (editing()) {
-              <input class="qs-in" type="text" [ngModel]="document().clientCity" (ngModelChange)="patch({ clientCity: $event })" placeholder="Ciudad / pickup" />
+              <input class="qs-in" type="text" [ngModel]="document().clientCity" (ngModelChange)="patch({ clientCity: $event })" placeholder="Ciudad" />
             } @else {
               {{ dash(document().clientCity) }}
             }
@@ -228,8 +280,15 @@
                     (ngModelChange)="patchItem(i, { description: $event })"
                     placeholder="Servicio o paquete&#10;Detalles, duración, incluye…"
                   ></textarea>
+                } @else if (item.description) {
+                  <span class="qs-desc">
+                    <strong class="qs-desc__title">{{ descTitle(item.description) }}</strong>
+                    @if (descDetail(item.description)) {
+                      <span class="qs-desc__detail">{{ descDetail(item.description) }}</span>
+                    }
+                  </span>
                 } @else {
-                  <span class="qs-desc">{{ dash(item.description) }}</span>
+                  <span class="qs-desc">—</span>
                 }
               </td>
               <td class="qs-table__qty">
@@ -273,7 +332,7 @@
       @if (editing()) {
         <textarea class="qs-in qs-in--area" rows="3" [ngModel]="document().includes || ''" (ngModelChange)="patch({ includes: $event })" placeholder="Guía, seguro, hidratación…"></textarea>
       } @else {
-        <p>{{ dash(document().includes) }}</p>
+        <p class="qs-include__text">{{ dash(document().includes) }}</p>
       }
     </div>
     <div class="qs-card qs-card--soft">
@@ -281,7 +340,7 @@
       @if (editing()) {
         <textarea class="qs-in qs-in--area" rows="3" [ngModel]="document().excludes || ''" (ngModelChange)="patch({ excludes: $event })" placeholder="Almuerzo, transporte…"></textarea>
       } @else {
-        <p>{{ dash(document().excludes) }}</p>
+        <p class="qs-include__text">{{ dash(document().excludes) }}</p>
       }
     </div>
   </section>
@@ -373,6 +432,10 @@
       <span><i class="qs-ico qs-ico--mail qs-ico--on-dark"></i>{{ company.email }}</span>
     </div>
     <div class="qs-foot__brand">
+      <svg class="qs-foot__ridge" viewBox="0 0 780 72" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 52 L90 28 L160 44 L250 18 L340 40 L430 12 L520 36 L610 20 L700 42 L780 26 L780 72 L0 72 Z" fill="rgba(0,0,0,0.18)"/>
+        <path d="M0 58 L120 38 L210 52 L300 30 L400 48 L500 28 L600 46 L700 34 L780 48 L780 72 L0 72 Z" fill="rgba(232,163,26,0.12)"/>
+      </svg>
       <div class="qs-foot__mark" aria-hidden="true"></div>
       <div class="qs-foot__social" aria-label="Redes">
         <span class="qs-soc qs-soc--ig"></span>

@@ -14,6 +14,7 @@ import { QUOTE_PACKAGE_PRESETS, itemsFromPreset, type QuotePackagePreset } from 
 import {
   ESCUELA_AVES_COMPANY,
   addDays,
+  buildQuoteNumber,
   formatCop,
   formatQuoteDate,
   QUOTE_LOGO,
@@ -21,6 +22,7 @@ import {
 } from './quote-template';
 
 const BIRD_ART = 'assets/brand/quote-bird-illustration.svg';
+const MODALITIES = ['Privado', 'Compartido', 'Grupo', 'A medida'] as const;
 
 @Component({
   selector: 'eas-quote-sheet',
@@ -39,6 +41,7 @@ export class QuoteSheetComponent {
   readonly logo = QUOTE_LOGO;
   readonly birdArt = BIRD_ART;
   readonly presets = QUOTE_PACKAGE_PRESETS;
+  readonly modalities = MODALITIES;
 
   readonly rows = computed(() => previewItems(this.document().items, this.editing()));
   readonly money = computed(() => documentTotals(this.document().items));
@@ -49,6 +52,26 @@ export class QuoteSheetComponent {
   readonly ivaText = computed(() => formatCop(this.money().iva, this.document().currency));
   readonly totalText = computed(() => formatCop(this.money().total, this.document().currency));
   readonly discountText = computed(() => formatCop(this.discountTotal(), this.document().currency));
+  readonly validityTone = computed(() => {
+    const until = this.document().validUntil;
+    if (!until) {
+      return '';
+    }
+    const end = new Date(`${until}T23:59:59`);
+    if (Number.isNaN(end.getTime())) {
+      return '';
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.ceil((end.getTime() - today.getTime()) / 86400000);
+    if (days < 0) {
+      return 'expired';
+    }
+    if (days <= 3) {
+      return 'soon';
+    }
+    return 'ok';
+  });
   readonly validityLabel = computed(() => {
     const until = this.document().validUntil;
     if (!until) {
@@ -86,6 +109,10 @@ export class QuoteSheetComponent {
       `Cotización ${d.quoteNumber || ''} — Escuela Aves Salento`,
       d.clientName ? `Cliente: ${d.clientName}` : '',
       d.clientPhone ? `Tel: ${d.clientPhone}` : '',
+      d.serviceDate ? `Fecha del servicio: ${formatQuoteDate(d.serviceDate)}` : '',
+      d.modality ? `Modalidad: ${d.modality}` : '',
+      d.people ? `Personas: ${d.people}` : '',
+      d.pickup ? `Pickup: ${d.pickup}` : '',
       ...d.items
         .filter((item) => (item.description || '').trim())
         .map(
@@ -152,13 +179,43 @@ export class QuoteSheetComponent {
       name: preset.label,
       items: itemsFromPreset(preset),
       includes: preset.includes || this.document().includes,
-      excludes: preset.excludes || this.document().excludes
+      excludes: preset.excludes || this.document().excludes,
+      people: preset.items[0]?.quantity || this.document().people
     });
   }
 
   extendValidity(days: number): void {
     const base = this.document().issuedAt || toIsoDate(new Date());
     this.patch({ validUntil: addDays(base, days) });
+  }
+
+  regenQuoteNumber(): void {
+    this.patch({ quoteNumber: buildQuoteNumber(this.document().code || 'EAS', new Date()) });
+  }
+
+  setPeople(raw: number | string): void {
+    const people = Math.max(1, Number(raw) || 1);
+    const items = this.document().items.map((item, i) =>
+      i === 0 ? recalcItem({ ...item, quantity: people }) : item
+    );
+    this.documentChange.emit({ ...this.document(), people, items });
+  }
+
+  applyPercentDiscount(pct: number): void {
+    const rate = Math.min(100, Math.max(0, pct)) / 100;
+    if (!rate) {
+      return;
+    }
+    const items = this.document().items.map((item) => {
+      const gross = Math.max(0, (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0));
+      return recalcItem({ ...item, discount: Math.round(gross * rate) });
+    });
+    this.documentChange.emit({ ...this.document(), items });
+  }
+
+  clearDiscounts(): void {
+    const items = this.document().items.map((item) => recalcItem({ ...item, discount: 0 }));
+    this.documentChange.emit({ ...this.document(), items });
   }
 
   qtyLabel(item: QuoteSheetItem): string {
@@ -170,5 +227,15 @@ export class QuoteSheetComponent {
 
   moneyOrDash(amount: number): string {
     return amount > 0 ? formatCop(amount, this.document().currency) : '—';
+  }
+
+  descTitle(text: string): string {
+    const first = (text || '').split(/\n/)[0]?.trim() || '';
+    return first;
+  }
+
+  descDetail(text: string): string {
+    const parts = (text || '').split(/\n/).slice(1).join('\n').trim();
+    return parts;
   }
 }

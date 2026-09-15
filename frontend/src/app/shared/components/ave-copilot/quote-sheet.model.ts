@@ -5,6 +5,14 @@ import { addDays, buildQuoteNumber, toIsoDate } from './quote-template';
 export const QUOTE_STATUSES = ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'CANCELLED'] as const;
 export type QuoteSheetStatus = (typeof QUOTE_STATUSES)[number];
 
+export const QUOTE_STATUS_LABELS: Record<QuoteSheetStatus, string> = {
+  DRAFT: 'Borrador',
+  SENT: 'Enviada',
+  ACCEPTED: 'Aceptada',
+  REJECTED: 'Rechazada',
+  CANCELLED: 'Cancelada'
+};
+
 export interface QuoteSheetItem {
   id: string;
   description: string;
@@ -37,6 +45,7 @@ export interface QuoteSheetDocument {
   modality?: string;
   people?: number;
   pickup?: string;
+  serviceDate?: string;
   includes?: string;
   excludes?: string;
   notes?: string;
@@ -110,6 +119,7 @@ export function draftToDocument(draft: QuoteDraft, now = new Date()): QuoteSheet
     modality: draft.modality,
     people,
     pickup: draft.pickup,
+    serviceDate: draft.serviceDate || '',
     includes: draft.includes,
     excludes: draft.excludes,
     notes: draft.notes,
@@ -130,6 +140,7 @@ export function documentToDraft(doc: QuoteSheetDocument): QuoteDraft {
     total: money.total,
     currency: doc.currency || 'COP',
     date: doc.issuedAt,
+    serviceDate: emptyToUndef(doc.serviceDate),
     pickup: doc.pickup || doc.clientCity,
     clientName: emptyToUndef(doc.clientName),
     clientNit: emptyToUndef(doc.clientNit),

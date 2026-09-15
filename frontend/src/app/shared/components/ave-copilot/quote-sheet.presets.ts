@@ -71,6 +71,21 @@ export const QUOTE_PACKAGE_PRESETS: QuotePackagePreset[] = [
         unitPrice: 650000
       }
     ]
+  },
+  {
+    id: 'coffee',
+    label: 'Café de origen',
+    blurb: 'Finca + degustación',
+    includes: 'Traslado local, guía, degustación',
+    excludes: 'Compra de café para llevar',
+    items: [
+      {
+        description: 'Tour café de origen\nVisita a finca cafetera con proceso y catación.',
+        quantity: 2,
+        unit: 'pax',
+        unitPrice: 160000
+      }
+    ]
   }
 ];
 

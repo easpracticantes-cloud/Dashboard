@@ -11,7 +11,7 @@
           <span>Estado</span>
           <select [ngModel]="doc().status" (ngModelChange)="setStatus($event)">
             @for (st of statuses; track st) {
-              <option [value]="st">{{ st }}</option>
+              <option [value]="st">{{ statusLabel(st) }}</option>
             }
           </select>
         </label>
@@ -29,41 +29,62 @@
     }
 
     <div class="aqr__toolbar">
-      <button type="button" class="aqr__btn" [class.aqr__btn--soft]="editing()" (click)="edit()">
-        <mat-icon>edit</mat-icon>
-        Editar
-      </button>
-      <button type="button" class="aqr__btn" [class.aqr__btn--soft]="!editing()" (click)="preview()">
-        <mat-icon>visibility</mat-icon>
-        Vista previa
-      </button>
-      <button type="button" class="aqr__btn aqr__btn--soft" [disabled]="saving()" (click)="save()">
-        <mat-icon>save</mat-icon>
-        {{ saving() ? 'Guardando…' : 'Guardar' }}
-      </button>
-      <button type="button" class="aqr__btn aqr__btn--primary" [disabled]="downloading()" (click)="downloadPdf()">
-        <mat-icon>picture_as_pdf</mat-icon>
-        {{ downloading() ? 'Generando…' : 'PDF' }}
-      </button>
-      <button type="button" class="aqr__btn aqr__btn--soft" (click)="printSheet()" title="Imprimir">
-        <mat-icon>print</mat-icon>
-        Imprimir
-      </button>
-      <button type="button" class="aqr__btn aqr__btn--soft" (click)="copySummary()" title="Copiar resumen">
-        <mat-icon>content_copy</mat-icon>
-        {{ copied() ? 'Copiado' : 'Copiar' }}
-      </button>
-      <button type="button" class="aqr__btn aqr__btn--soft" (click)="shareWhatsApp()" title="Enviar por WhatsApp">
-        <mat-icon>chat</mat-icon>
-        WhatsApp
-      </button>
-      <button type="button" class="aqr__btn aqr__btn--ghost" (click)="resetDraft()" title="Nueva cotización en blanco">
-        <mat-icon>restart_alt</mat-icon>
-        Limpiar
-      </button>
-      @if (reviewed()) {
-        <span class="aqr__ok"><mat-icon>task_alt</mat-icon> Guardada</span>
-      }
+      <div class="aqr__toolbar-group">
+        <button type="button" class="aqr__btn" [class.aqr__btn--soft]="editing()" (click)="edit()">
+          <mat-icon>edit</mat-icon>
+          Editar
+        </button>
+        <button type="button" class="aqr__btn" [class.aqr__btn--soft]="!editing()" (click)="preview()">
+          <mat-icon>visibility</mat-icon>
+          Vista previa
+        </button>
+        <button type="button" class="aqr__btn aqr__btn--soft" [disabled]="saving()" (click)="save()">
+          <mat-icon>save</mat-icon>
+          {{ saving() ? 'Guardando…' : 'Guardar' }}
+        </button>
+        <button type="button" class="aqr__btn aqr__btn--primary" [disabled]="downloading()" (click)="downloadPdf()">
+          <mat-icon>picture_as_pdf</mat-icon>
+          {{ downloading() ? 'Generando…' : 'PDF' }}
+        </button>
+      </div>
+
+      <div class="aqr__toolbar-group aqr__toolbar-group--share">
+        <button type="button" class="aqr__btn aqr__btn--soft" (click)="printSheet()" title="Imprimir">
+          <mat-icon>print</mat-icon>
+          Imprimir
+        </button>
+        <button type="button" class="aqr__btn aqr__btn--soft" (click)="copySummary()" title="Copiar resumen">
+          <mat-icon>content_copy</mat-icon>
+          {{ copied() ? 'Copiado' : 'Copiar' }}
+        </button>
+        <button type="button" class="aqr__btn aqr__btn--soft" (click)="shareWhatsApp()" title="Enviar por WhatsApp">
+          <mat-icon>chat</mat-icon>
+          WhatsApp
+        </button>
+        <button type="button" class="aqr__btn aqr__btn--soft" (click)="shareEmail()" title="Enviar por correo">
+          <mat-icon>mail</mat-icon>
+          Correo
+        </button>
+      </div>
+
+      <div class="aqr__toolbar-group aqr__toolbar-group--meta">
+        <div class="aqr__zoom" role="group" aria-label="Zoom">
+          <button type="button" class="aqr__zoom-btn" (click)="zoomOut()" [disabled]="zoom() <= 80" aria-label="Alejar">−</button>
+          <span>{{ zoom() }}%</span>
+          <button type="button" class="aqr__zoom-btn" (click)="zoomIn()" [disabled]="zoom() >= 120" aria-label="Acercar">+</button>
+        </div>
+        <button type="button" class="aqr__btn aqr__btn--ghost" (click)="duplicateAsNew()" title="Duplicar con nuevo número">
+          <mat-icon>content_copy</mat-icon>
+          Duplicar
+        </button>
+        <button type="button" class="aqr__btn aqr__btn--ghost" (click)="resetDraft()" title="Nueva cotización en blanco">
+          <mat-icon>restart_alt</mat-icon>
+          Limpiar
+        </button>
+        @if (reviewed()) {
+          <span class="aqr__ok"><mat-icon>task_alt</mat-icon> Guardada</span>
+        }
+      </div>
     </div>
 
     @if (toast()) {
@@ -75,7 +96,9 @@
     }
 
     <div class="aqr__sheet-wrap" [class.aqr__sheet-wrap--preview]="!editing()">
-      <eas-quote-sheet [document]="doc()" [editing]="editing()" (documentChange)="onDocumentChange($event)" />
+      <div class="aqr__sheet-scale" [style.transform]="'scale(' + zoom() / 100 + ')'">
+        <eas-quote-sheet [document]="doc()" [editing]="editing()" (documentChange)="onDocumentChange($event)" />
+      </div>
     </div>
   </section>
 </div>
