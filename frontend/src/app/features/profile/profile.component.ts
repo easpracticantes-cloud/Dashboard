@@ -11,6 +11,7 @@ import { mapUserDtoToAuthUser, UserDto } from '../../core/models/user.model';
 import { ROLE_LABELS } from '../../core/models/role.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 const AVATAR_PRESETS = [
   'https://api.dicebear.com/7.x/avataaars/svg?seed=Samuel',
@@ -43,6 +44,8 @@ interface ProfilePrefs {
   encapsulation: ViewEncapsulation.None
 })
 export class ProfileComponent implements OnInit {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly profileService = inject(ProfileService);
@@ -149,13 +152,11 @@ export class ProfileComponent implements OnInit {
       return;
     }
     void navigator.clipboard.writeText(username).then(() => {
-      this.message.set({ type: 'success', text: 'Usuario copiado al portapapeles.' });
-      setTimeout(() => this.message.set(null), 2000);
+      this.feedback.success('Usuario copiado al portapapeles.');
     });
   }
 
   save(): void {
-    this.message.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -163,7 +164,7 @@ export class ProfileComponent implements OnInit {
 
     const { fullName, email, avatarUrl, password, confirmPassword } = this.form.getRawValue();
     if (password && password !== confirmPassword) {
-      this.message.set({ type: 'error', text: 'Las contraseñas no coinciden.' });
+      this.feedback.error('Las contraseñas no coinciden.');
       return;
     }
 
@@ -179,19 +180,18 @@ export class ProfileComponent implements OnInit {
         next: (dto) => {
           this.saving.set(false);
           if (!dto) {
-            this.message.set({ type: 'error', text: 'No pudimos guardar los cambios. Inténtalo de nuevo.' });
+            this.feedback.error('No pudimos guardar los cambios. Inténtalo de nuevo.');
             return;
           }
           this.profileDto.set(dto);
           this.auth.updateCurrentUser(mapUserDtoToAuthUser(dto));
           this.form.patchValue({ password: '', confirmPassword: '' });
-          this.message.set({ type: 'success', text: 'Perfil actualizado correctamente.' });
-          setTimeout(() => this.message.set(null), 3500);
+          this.feedback.success('Perfil actualizado correctamente.');
         },
         error: (err) => {
           this.saving.set(false);
           const apiMessage = err?.error?.message || 'No pudimos guardar los cambios.';
-          this.message.set({ type: 'error', text: apiMessage });
+          this.feedback.error(apiMessage);
         }
       });
   }

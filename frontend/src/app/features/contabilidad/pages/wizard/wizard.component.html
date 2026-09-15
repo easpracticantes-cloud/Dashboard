@@ -8,16 +8,6 @@
     </button>
   </header>
 
-  @if (error()) {
-    <p class="wiz__alert wiz__alert--bad" role="alert">{{ error() }}</p>
-  }
-  @if (aiWarn()) {
-    <p class="wiz__alert wiz__alert--bad" role="alert">{{ aiWarn() }}</p>
-  }
-  @if (aviso()) {
-    <p class="wiz__alert" role="status">{{ aviso() }}</p>
-  }
-
   <ol class="wiz__steps">
     @for (s of steps; track s.n) {
       <li [class.is-on]="paso() === s.n" [class.is-done]="paso() > s.n">

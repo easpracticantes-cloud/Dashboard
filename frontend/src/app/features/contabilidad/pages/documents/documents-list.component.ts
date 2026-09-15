@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -11,6 +11,7 @@ import {
   DocumentsApiService,
 } from '../../services/documents-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
+import { UiFeedbackService } from '../../../../core/services/ui-feedback.service';
 import {
   formatCop,
   formatFechaContable,
@@ -36,6 +37,8 @@ interface ChatMsg {
   styleUrl: './documents-list.component.scss',
 })
 export class DocumentsListComponent implements OnInit, OnDestroy {
+  private readonly feedback = inject(UiFeedbackService);
+
   documentos: DocumentSummary[] = [];
   total = 0;
   cargando = true;
@@ -138,7 +141,7 @@ export class DocumentsListComponent implements OnInit, OnDestroy {
   cargar(silent = false): void {
     if (!silent) {
       this.cargando = true;
-      this.error = '';
+      
     }
     this.api
       .list({
@@ -163,7 +166,7 @@ export class DocumentsListComponent implements OnInit, OnDestroy {
         },
         error: () => {
           if (!silent) {
-            this.error = 'No se pudieron cargar los documentos.';
+            this.feedback.error('No se pudieron cargar los documentos.');
           }
           this.cargando = false;
         },
@@ -185,7 +188,7 @@ export class DocumentsListComponent implements OnInit, OnDestroy {
       /\.(jpe?g|png|pdf)$/i.test(f.name)
     );
     if (!files.length) {
-      this.error = 'Solo se aceptan JPG, PNG o PDF.';
+      this.feedback.error('Solo se aceptan JPG, PNG o PDF.');
       return;
     }
     this.subirLote(files);
@@ -197,11 +200,11 @@ export class DocumentsListComponent implements OnInit, OnDestroy {
 
   private subirLote(files: File[]): void {
     if (files.length > PACK_SIZE) {
-      this.error = `Máximo ${PACK_SIZE} facturas por paquete. Seleccionaste ${files.length}. Divide la carga.`;
+      this.feedback.error(`Máximo ${PACK_SIZE} facturas por paquete. Seleccionaste ${files.length}. Divide la carga.`);
       return;
     }
     this.subiendo = true;
-    this.error = '';
+    
     this.loteMensaje = '';
     this.loteResumen = null;
     this.loteItems = [];
@@ -229,9 +232,8 @@ export class DocumentsListComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.subiendo = false;
-        this.error =
-          err?.error?.detail ||
-          'No se pudo subir el lote. Pruebe con menos archivos o revise el tamaño.';
+        this.feedback.error(err?.error?.detail ||
+          'No se pudo subir el lote. Pruebe con menos archivos o revise el tamaño.');
       },
     });
   }
@@ -258,7 +260,7 @@ export class DocumentsListComponent implements OnInit, OnDestroy {
         this.startPoll();
       },
       error: (err) => {
-        this.error = err?.error?.detail || 'No se pudo encolar el reproceso.';
+        this.feedback.error(err?.error?.detail || 'No se pudo encolar el reproceso.');
       },
     });
   }

@@ -11,6 +11,7 @@ import {
 } from '../../services/documents-api.service';
 import { OpsApiService, OpsChain } from '../../services/ops-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
+import { UiFeedbackService } from '../../../../core/services/ui-feedback.service';
 import {
   formatCop,
   formatFechaContable,
@@ -42,6 +43,8 @@ interface ChainStep {
   styleUrl: './document-detail.component.scss',
 })
 export class DocumentDetailComponent implements OnInit, OnDestroy {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(DocumentsApiService);
   private readonly opsApi = inject(OpsApiService);
@@ -86,7 +89,8 @@ export class DocumentDetailComponent implements OnInit, OnDestroy {
         }
       },
       error: () => {
-        this.error = 'Documento no encontrado.';
+        this.feedback.error('Documento no encontrado.');
+        this.error = 'missing';
         this.cargando = false;
       },
     });
@@ -96,7 +100,7 @@ export class DocumentDetailComponent implements OnInit, OnDestroy {
         this.chain = chain;
       },
       error: () => {
-        this.chainError = 'No se pudo cargar la cadena documental.';
+        this.feedback.error('No se pudo cargar la cadena documental.');
       },
     });
   }
@@ -183,19 +187,19 @@ export class DocumentDetailComponent implements OnInit, OnDestroy {
   procesar(): void {
     if (!this.doc) return;
     this.procesando = true;
-    this.error = '';
+    
     this.api.process(this.doc.id).subscribe({
       next: (res) => {
         this.procesando = false;
         if (!res.ok) {
-          this.error = res.error || 'Error al procesar.';
+          this.feedback.error(res.error || 'Error al procesar.');
           return;
         }
         this.reloadDocument(this.doc!.id);
       },
       error: (err) => {
         this.procesando = false;
-        this.error = err?.error?.detail || err?.message || 'No se pudo procesar el documento.';
+        this.feedback.error(err?.error?.detail || err?.message || 'No se pudo procesar el documento.');
       },
     });
   }
@@ -234,7 +238,7 @@ export class DocumentDetailComponent implements OnInit, OnDestroy {
       this.copiado = true;
       setTimeout(() => (this.copiado = false), 1800);
     } catch {
-      this.error = 'No se pudo copiar el contramarcado.';
+      this.feedback.error('No se pudo copiar el contramarcado.');
     }
   }
 

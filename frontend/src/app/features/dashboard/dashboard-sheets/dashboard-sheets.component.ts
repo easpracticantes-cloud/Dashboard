@@ -51,6 +51,7 @@ import {
   uniqueSorted
 } from './sheets-analytics.util';
 import { formatContactFecha } from '../../../core/utils/sheet-date';
+import { UiFeedbackService } from '../../../core/services/ui-feedback.service';
 
 const FONT = 'Sora, sans-serif';
 const REFRESH_MS = 8 * 60 * 1000;
@@ -99,6 +100,8 @@ type Section = 'resumen' | 'seguimientos' | 'ventas';
   encapsulation: ViewEncapsulation.None
 })
 export class DashboardSheetsComponent implements AfterViewInit {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly dashboardService = inject(DashboardService);
   private readonly integrations = inject(IntegrationsService);
   private readonly theme = inject(ThemeService);
@@ -301,8 +304,8 @@ export class DashboardSheetsComponent implements AfterViewInit {
 
   openSeguimientoEditor(row: SeguimientoWhatsapp): void {
     this.editingVenta.set(null);
-    this.editError.set(null);
-    this.editSuccess.set(null);
+    
+    
     this.editingSeguimiento.set(row);
     this.editDraft.set({
       fecha: row.fecha ?? '',
@@ -335,8 +338,8 @@ export class DashboardSheetsComponent implements AfterViewInit {
 
   openVentaEditor(row: VentaSheet): void {
     this.editingSeguimiento.set(null);
-    this.editError.set(null);
-    this.editSuccess.set(null);
+    
+    
     this.editingVenta.set(row);
     this.editDraft.set({
       fechaCot: row.fechaCot ?? '',
@@ -359,7 +362,7 @@ export class DashboardSheetsComponent implements AfterViewInit {
     this.editingSeguimiento.set(null);
     this.editingVenta.set(null);
     this.editDraft.set({});
-    this.editError.set(null);
+    
     this.savingEdit.set(false);
   }
 
@@ -369,8 +372,8 @@ export class DashboardSheetsComponent implements AfterViewInit {
 
   saveEditor(): void {
     if (this.savingEdit()) return;
-    this.editError.set(null);
-    this.editSuccess.set(null);
+    
+    
     this.savingEdit.set(true);
     const draft = this.editDraft();
 
@@ -388,12 +391,12 @@ export class DashboardSheetsComponent implements AfterViewInit {
           next: (res) => {
             this.savingEdit.set(false);
             this.applySeguimientoLocal(draft as unknown as SeguimientoWhatsapp, originalSeg);
-            this.editSuccess.set(res.message || 'Guardado en Google Sheets');
+            this.feedback.success(res.message || 'Guardado en Google Sheets');
             setTimeout(() => this.closeEditor(), 700);
           },
           error: (err) => {
             this.savingEdit.set(false);
-            this.editError.set(err?.message || 'No se pudo guardar en Google Sheets');
+            this.feedback.error(err?.message || 'No se pudo guardar en Google Sheets');
           }
         });
       return;
@@ -413,12 +416,12 @@ export class DashboardSheetsComponent implements AfterViewInit {
           next: (res) => {
             this.savingEdit.set(false);
             this.applyVentaLocal(draft as unknown as VentaSheet, originalVenta);
-            this.editSuccess.set(res.message || 'Venta guardada en Google Sheets');
+            this.feedback.success(res.message || 'Venta guardada en Google Sheets');
             setTimeout(() => this.closeEditor(), 700);
           },
           error: (err) => {
             this.savingEdit.set(false);
-            this.editError.set(err?.message || 'No se pudo guardar la venta en Google Sheets');
+            this.feedback.error(err?.message || 'No se pudo guardar la venta en Google Sheets');
           }
         });
     }
@@ -557,7 +560,7 @@ export class DashboardSheetsComponent implements AfterViewInit {
       this.refreshing.set(true);
       this.dashboardService.invalidateCache();
     }
-    this.error.set(null);
+    
 
     this.dashboardService.getSheetsSummary(force).subscribe({
       next: (payload) => {
@@ -565,7 +568,9 @@ export class DashboardSheetsComponent implements AfterViewInit {
         this.refreshing.set(false);
         if (!payload) {
           if (!this.data()) {
-            this.error.set('No se pudo obtener el dashboard.');
+            const msg = 'No se pudo obtener el dashboard.';
+            this.error.set(msg);
+            this.feedback.error(msg);
           }
           return;
         }
@@ -581,7 +586,11 @@ export class DashboardSheetsComponent implements AfterViewInit {
           this.data.set(payload);
         }
         if (!payload.success) {
-          this.error.set(payload.message || 'Dashboard aún sincronizando.');
+          const msg = payload.message || 'Dashboard aún sincronizando.';
+          this.error.set(msg);
+          this.feedback.error(msg);
+        } else {
+          this.error.set(null);
         }
         const hydrate = () => this.ensureFullPayload();
         if (typeof requestIdleCallback !== 'undefined') {
@@ -594,7 +603,9 @@ export class DashboardSheetsComponent implements AfterViewInit {
         this.loading.set(false);
         this.refreshing.set(false);
         if (!this.data()) {
-          this.error.set('Error de red al consultar el dashboard (PostgreSQL).');
+          const msg = 'Error de red al consultar el dashboard (PostgreSQL).';
+          this.error.set(msg);
+          this.feedback.error(msg);
         }
       }
     });

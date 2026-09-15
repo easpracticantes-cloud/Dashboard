@@ -4,7 +4,10 @@
     <span>Cargando documento…</span>
   </div>
 } @else if (error && !doc) {
-  <div class="alert error">{{ error }}</div>
+  <div class="sheet empty-state" style="padding: 2rem">
+    <h2>No se pudo cargar el documento</h2>
+    <p>Vuelve al listado e inténtalo de nuevo.</p>
+  </div>
 } @else if (doc) {
   <div class="viewer cosmos-page">
     <header class="viewer-hero sheet">
@@ -43,9 +46,7 @@
       <mat-progress-bar mode="indeterminate"></mat-progress-bar>
     }
 
-    @if (error) {
-      <div class="alert error">{{ error }}</div>
-    }
+    
 
     @if (chain) {
       <section class="sheet sheet-pad chain-panel">
@@ -182,8 +183,6 @@
           </div>
         </section>
       </div>
-    } @else if (chainError) {
-      <div class="alert error">{{ chainError }}</div>
     }
 
     <div class="viewer-body">

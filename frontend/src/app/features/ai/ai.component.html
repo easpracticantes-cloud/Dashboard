@@ -21,10 +21,6 @@
   }
 </nav>
 
-@if (error()) {
-  <p class="ai-error" role="alert">{{ error() }}</p>
-}
-
 @switch (tab()) {
   @case ('quote') {
     <section class="ai-panel">

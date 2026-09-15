@@ -70,9 +70,6 @@
         </button>
       </div>
     }
-    @if (waError()) {
-      <p class="reg__alert">{{ waError() }}</p>
-    }
     @if (waErrors().length) {
       <ul class="reg__wa-errors">
         @for (e of waErrors(); track $index) {
@@ -120,10 +117,6 @@
       </div>
     }
   </section>
-
-  @if (aviso()) {
-    <p class="reg__alert">{{ aviso() }}</p>
-  }
 
   @if (modo() !== 'lista') {
     <section class="reg__card">

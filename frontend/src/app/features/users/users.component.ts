@@ -13,6 +13,7 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
 import { TimeAgoPipe } from '../../shared/pipes/time-ago.pipe';
 import { UserFormDialogComponent } from './user-form-dialog/user-form-dialog.component';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 @Component({
   selector: 'eas-users',
@@ -30,6 +31,8 @@ import { UserFormDialogComponent } from './user-form-dialog/user-form-dialog.com
   styleUrl: './users.component.scss'
 })
 export class UsersComponent {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly usersService = inject(UsersService);
   private readonly ops = inject(OpsService);
   private readonly dialog = inject(MatDialog);
@@ -225,7 +228,7 @@ export class UsersComponent {
   }
 
   private flash(message: string, kind: 'ok' | 'err'): void {
-    this.aviso.set(message);
-    this.avisoKind.set(kind);
+    if (kind === 'err') this.feedback.error(message);
+    else this.feedback.success(message);
   }
 }

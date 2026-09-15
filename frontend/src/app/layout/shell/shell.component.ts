@@ -11,13 +11,14 @@ import { TopbarComponent } from './topbar/topbar.component';
 import { LiveSyncService } from '../../core/services/live-sync.service';
 import { CommandPaletteComponent } from '../../shared/components/command-palette/command-palette.component';
 import { AveCopilotComponent } from '../../shared/components/ave-copilot/ave-copilot.component';
+import { UiFeedbackModalComponent } from '../../shared/components/ui-feedback-modal/ui-feedback-modal.component';
 
 const SIDEBAR_PREF_KEY = 'eas-sidebar-open';
 
 @Component({
   selector: 'eas-shell',
   standalone: true,
-  imports: [RouterOutlet, MatSidenavModule, MatDialogModule, SidebarComponent, TopbarComponent, AveCopilotComponent],
+  imports: [RouterOutlet, MatSidenavModule, MatDialogModule, SidebarComponent, TopbarComponent, AveCopilotComponent, UiFeedbackModalComponent],
   template: `
     <mat-sidenav-container class="shell">
       <mat-sidenav
@@ -42,6 +43,7 @@ const SIDEBAR_PREF_KEY = 'eas-sidebar-open';
           </div>
         </main>
         <eas-ave-copilot />
+        <eas-ui-feedback-modal />
       </mat-sidenav-content>
     </mat-sidenav-container>
   `,

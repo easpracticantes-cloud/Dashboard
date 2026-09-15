@@ -12,6 +12,7 @@ import {
 } from '../../core/services/whatsapp-registro-api.service';
 import { SeguimientoWhatsapp, SheetsDashboard } from '../../core/models/sheets-dashboard.model';
 import { AveUiContextService } from '../../shared/components/ave-copilot/ave-ui-context.service';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 import {
   formatContactFecha,
   formatSheetDate,
@@ -172,6 +173,8 @@ function discTone(raw?: string | null): string {
   styleUrl: './registro.component.scss',
 })
 export class RegistroComponent {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly dashboard = inject(DashboardService);
   private readonly integrations = inject(IntegrationsService);
   private readonly whatsappApi = inject(WhatsappRegistroApiService);
@@ -429,7 +432,7 @@ export class RegistroComponent {
   nueva(): void {
     this.original.set(null);
     this.draft.set(emptyDraft(this.hojaFiltro() || this.hojas()[0] || ''));
-    this.aviso.set('');
+    
     this.modo.set('nueva');
     this.aveUi.clearEntity();
   }
@@ -437,7 +440,7 @@ export class RegistroComponent {
   editar(row: SeguimientoWhatsapp): void {
     this.original.set(row);
     this.draft.set(fromRow(row));
-    this.aviso.set('');
+    
     this.modo.set('editar');
     this.publishAveFocus(row);
   }
@@ -493,15 +496,15 @@ export class RegistroComponent {
         if (!dup) merged.push(file);
       }
       if (merged.length > MAX_WA_FILES) {
-        this.waError.set(`Máximo ${MAX_WA_FILES} archivos. El ZIP interno también cuenta hasta ${MAX_WA_FILES} chats.`);
+        this.feedback.error(`Máximo ${MAX_WA_FILES} archivos. El ZIP interno también cuenta hasta ${MAX_WA_FILES} chats.`);
         return merged.slice(0, MAX_WA_FILES);
       }
       return merged;
     });
     if (rejected.length) {
-      this.waError.set('Solo .txt o .zip exportados desde WhatsApp: ' + rejected.slice(0, 4).join(', '));
+      this.feedback.error('Solo .txt o .zip exportados desde WhatsApp: ' + rejected.slice(0, 4).join(', '));
     } else if (!this.waError().includes('Máximo')) {
-      this.waError.set('');
+      
     }
   }
 
@@ -509,7 +512,7 @@ export class RegistroComponent {
     const files = this.waQueue();
     if (!files.length || this.waEstado() === 'analizando') return;
     this.waEstado.set('analizando');
-    this.waError.set('');
+    
     this.waErrors.set([]);
     this.waItems.set([]);
     this.waPreview.set(null);
@@ -521,9 +524,7 @@ export class RegistroComponent {
         this.waErrors.set(res.errors || []);
         if (!items.length) {
           this.waEstado.set('error');
-          this.waError.set(
-            res.errors?.[0]?.message || 'No se pudo analizar ningún chat de WhatsApp.'
-          );
+          this.feedback.error(res.errors?.[0]?.message || 'No se pudo analizar ningún chat de WhatsApp.');
           return;
         }
         const drafts: Record<string, Draft> = {};
@@ -538,7 +539,7 @@ export class RegistroComponent {
       },
       error: (err) => {
         this.waEstado.set('error');
-        this.waError.set(err?.error?.message || err?.error?.detail || 'No se pudo analizar el lote.');
+        this.feedback.error(err?.error?.message || err?.error?.detail || 'No se pudo analizar el lote.');
       },
     });
   }
@@ -551,7 +552,7 @@ export class RegistroComponent {
     this.waPreview.set(preview);
     const draft = this.waDrafts()[preview.previewId] || this.draftFromWhatsapp(preview);
     this.draft.set(draft);
-    this.aviso.set('');
+    
     this.modo.set('nueva');
     this.original.set(null);
     this.publishAveFocus({
@@ -589,7 +590,7 @@ export class RegistroComponent {
       },
       error: (err) => {
         this.waConfirmando.set(false);
-        this.aviso.set(err?.error?.message || 'No se pudo guardar en el Registro.');
+        this.feedback.error(err?.error?.message || 'No se pudo guardar en el Registro.');
       },
     });
   }
@@ -599,7 +600,7 @@ export class RegistroComponent {
     if (!items.length || this.waConfirmando()) return;
     const hoja = this.hojaFiltro() || this.hojas()[0] || '';
     if (!hoja) {
-      this.aviso.set('Elige la hoja del Excel antes de guardar el lote.');
+      this.feedback.error('Elige la hoja del Excel antes de guardar el lote.');
       return;
     }
     this.waConfirmando.set(true);
@@ -623,7 +624,7 @@ export class RegistroComponent {
           const d = this.waDrafts()[preview.previewId] || this.draftFromWhatsapp(preview);
           this.applyLocal({ ...d, hojaOrigen: d.hojaOrigen || hoja }, null);
         }
-        this.aviso.set(res.message);
+        this.feedback.success(res.message);
         this.dashboard.invalidateCache();
         if (failedIds.size) {
           this.waItems.set(items.filter((p) => failedIds.has(p.previewId)));
@@ -640,7 +641,7 @@ export class RegistroComponent {
       },
       error: (err) => {
         this.waConfirmando.set(false);
-        this.aviso.set(err?.error?.message || 'No se pudo guardar el lote en el Registro.');
+        this.feedback.error(err?.error?.message || 'No se pudo guardar el lote en el Registro.');
       },
     });
   }
@@ -697,7 +698,7 @@ export class RegistroComponent {
     this.waDrafts.set({});
     this.waErrors.set([]);
     this.waEstado.set('idle');
-    this.waError.set('');
+    
   }
 
   private draftFromWhatsapp(preview: WhatsappPreview): Draft {
@@ -761,7 +762,7 @@ export class RegistroComponent {
     if (this.saving()) return;
     const d = this.draft();
     if (!d.hojaOrigen) {
-      this.aviso.set('Elige la hoja del Excel.');
+      this.feedback.error('Elige la hoja del Excel.');
       return;
     }
     this.saving.set(true);
@@ -802,7 +803,7 @@ export class RegistroComponent {
       return;
     }
     this.deleting.set(true);
-    this.aviso.set('');
+    
     this.integrations
       .deleteSeguimiento({
         hojaOrigen: row.hojaOrigen,
@@ -820,12 +821,12 @@ export class RegistroComponent {
           if (this.original() && this.sameRow(this.original()!, row)) {
             this.cancelar();
           }
-          this.aviso.set(res.message || 'Fila eliminada del Excel.');
+          this.feedback.success(res.message || 'Fila eliminada del Excel.');
           this.dashboard.invalidateCache();
         },
         error: (err) => {
           this.deleting.set(false);
-          this.aviso.set(err?.message || 'No se pudo eliminar la fila.');
+          this.feedback.error(err?.message || 'No se pudo eliminar la fila.');
         },
       });
   }
@@ -841,7 +842,7 @@ export class RegistroComponent {
     this.modo.set('lista');
     this.original.set(null);
     this.aveUi.clearEntity();
-    this.aviso.set(message || (orig ? 'Fila actualizada en el Excel.' : 'Fila agregada al Excel.'));
+    this.feedback.success(message || (orig ? 'Fila actualizada en el Excel.' : 'Fila agregada al Excel.'));
     this.dashboard.invalidateCache();
   }
 

@@ -15,6 +15,8 @@ import {
   UsageLog
 } from '../../core/services/enterprise-ai.service';
 
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
+
 type AiTab = 'quote' | 'rules' | 'checklist' | 'providers' | 'whatsapp' | 'insights' | 'usage';
 
 @Component({
@@ -25,6 +27,8 @@ type AiTab = 'quote' | 'rules' | 'checklist' | 'providers' | 'whatsapp' | 'insig
   styleUrl: './ai.component.scss'
 })
 export class AiComponent implements OnInit {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly ai = inject(EnterpriseAiService);
 
   readonly tab = signal<AiTab>('quote');
@@ -183,6 +187,6 @@ export class AiComponent implements OnInit {
       (err as { error?: { message?: string } })?.error?.message ||
       (err as { message?: string })?.message ||
       'Error al llamar al Enterprise AI Engine';
-    this.error.set(msg);
+    this.feedback.error(msg);
   }
 }

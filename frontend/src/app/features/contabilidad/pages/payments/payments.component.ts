@@ -7,6 +7,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PaymentSummary, PaymentsApiService } from '../../services/payments-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
 import { formatCop, iconEstado, labelEstado, parseCopAmount, toneEstado } from '../../utils/contabilidad-labels';
+import { UiFeedbackService } from '../../../../core/services/ui-feedback.service';
 
 /** Estados desde los que el backend exige motivo reforzado (≥10 caracteres). */
 const ESTADOS_MOTIVO_REFORZADO = new Set([
@@ -29,6 +30,8 @@ const ESTADOS_MOTIVO_REFORZADO = new Set([
   styleUrl: './payments.component.scss',
 })
 export class PaymentsComponent implements OnInit {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly api = inject(PaymentsApiService);
   private readonly download = inject(ContabilidadDownloadService);
 
@@ -115,7 +118,7 @@ export class PaymentsComponent implements OnInit {
 
   cargar(): void {
     this.cargando = true;
-    this.error = '';
+    
     this.api
       .list({
         limit: 100,
@@ -129,7 +132,7 @@ export class PaymentsComponent implements OnInit {
           this.cargando = false;
         },
         error: (err) => {
-          this.error = this.msgError(err, 'No se pudieron cargar los pagos.');
+          this.feedback.error(this.msgError(err, 'No se pudieron cargar los pagos.'));
           this.cargando = false;
         },
       });
@@ -138,20 +141,20 @@ export class PaymentsComponent implements OnInit {
   crearDesdeCruce(): void {
     const id = Number(this.crossingIdNuevo);
     if (!id) {
-      this.error = 'Indique el ID del cruce aprobado.';
+      this.feedback.error('Indique el ID del cruce aprobado.');
       return;
     }
     if (!confirm(`¿Crear pago desde el cruce #${id}?`)) {
       return;
     }
-    this.error = '';
+    
     this.api.createFromCrossing(id).subscribe({
       next: () => {
         this.crossingIdNuevo = '';
         this.cargar();
       },
       error: (err) => {
-        this.error = this.msgError(err, 'No se pudo crear el pago.');
+        this.feedback.error(this.msgError(err, 'No se pudo crear el pago.'));
       },
     });
   }
@@ -167,7 +170,7 @@ export class PaymentsComponent implements OnInit {
     if (!confirm(msg)) {
       return;
     }
-    this.error = '';
+    
     this.accionEnCurso = p.id;
     this.api.approve(p.id).subscribe({
       next: () => {
@@ -176,7 +179,7 @@ export class PaymentsComponent implements OnInit {
       },
       error: (err) => {
         this.accionEnCurso = null;
-        this.error = this.msgError(err, 'Error al aprobar pago.');
+        this.feedback.error(this.msgError(err, 'Error al aprobar pago.'));
       },
     });
   }
@@ -194,7 +197,7 @@ export class PaymentsComponent implements OnInit {
       return;
     }
     const obs = prompt('Observaciones del pago manual (opcional):') || undefined;
-    this.error = '';
+    
     this.accionEnCurso = p.id;
     this.api.markPaid(p.id, obs).subscribe({
       next: () => {
@@ -203,7 +206,7 @@ export class PaymentsComponent implements OnInit {
       },
       error: (err) => {
         this.accionEnCurso = null;
-        this.error = this.msgError(err, 'Error al marcar como pagado.');
+        this.feedback.error(this.msgError(err, 'Error al marcar como pagado.'));
       },
     });
   }
@@ -219,7 +222,7 @@ export class PaymentsComponent implements OnInit {
     ) {
       return;
     }
-    this.error = '';
+    
     this.accionEnCurso = p.id;
     this.api.complete(p.id).subscribe({
       next: () => {
@@ -228,7 +231,7 @@ export class PaymentsComponent implements OnInit {
       },
       error: (err) => {
         this.accionEnCurso = null;
-        this.error = this.msgError(err, 'No se pudo completar el pago.');
+        this.feedback.error(this.msgError(err, 'No se pudo completar el pago.'));
       },
     });
   }
@@ -253,14 +256,14 @@ export class PaymentsComponent implements OnInit {
     }
     const motivo = (prompt('Motivo de la anulación (obligatorio):') || '').trim();
     if (!motivo) {
-      this.error = 'Debe indicar el motivo de la anulación.';
+      this.feedback.error('Debe indicar el motivo de la anulación.');
       return;
     }
     if (motivo.length < minLen) {
-      this.error = `El motivo debe tener al menos ${minLen} caracteres.`;
+      this.feedback.error(`El motivo debe tener al menos ${minLen} caracteres.`);
       return;
     }
-    this.error = '';
+    
     this.accionEnCurso = p.id;
     this.api.annul(p.id, motivo).subscribe({
       next: () => {
@@ -269,7 +272,7 @@ export class PaymentsComponent implements OnInit {
       },
       error: (err) => {
         this.accionEnCurso = null;
-        this.error = this.msgError(err, 'No se pudo anular el pago.');
+        this.feedback.error(this.msgError(err, 'No se pudo anular el pago.'));
       },
     });
   }
@@ -287,12 +290,12 @@ export class PaymentsComponent implements OnInit {
     }
     const valor = parseCopAmount(String(raw));
     if (valor == null || !Number.isFinite(valor) || valor <= 0) {
-      this.error = 'Indique un valor numérico mayor que cero (puede usar centavos).';
+      this.feedback.error('Indique un valor numérico mayor que cero (puede usar centavos).');
       return;
     }
     const motivo = (prompt('Motivo del ajuste de valor (obligatorio):') || '').trim();
     if (!motivo) {
-      this.error = 'Debe indicar el motivo del ajuste.';
+      this.feedback.error('Debe indicar el motivo del ajuste.');
       return;
     }
     if (
@@ -302,7 +305,7 @@ export class PaymentsComponent implements OnInit {
     ) {
       return;
     }
-    this.error = '';
+    
     this.accionEnCurso = p.id;
     this.api.adjust(p.id, valor, motivo).subscribe({
       next: () => {
@@ -311,7 +314,7 @@ export class PaymentsComponent implements OnInit {
       },
       error: (err) => {
         this.accionEnCurso = null;
-        this.error = this.msgError(err, 'No se pudo ajustar el valor.');
+        this.feedback.error(this.msgError(err, 'No se pudo ajustar el valor.'));
       },
     });
   }
@@ -324,7 +327,7 @@ export class PaymentsComponent implements OnInit {
     const file = input.files?.[0];
     if (!file) return;
     this.subiendo = true;
-    this.error = '';
+    
     const contramarcado = confirm('¿Comprobante contramarcado?');
     this.api.uploadReceipt(p.id, file, contramarcado).subscribe({
       next: () => {
@@ -334,18 +337,18 @@ export class PaymentsComponent implements OnInit {
       },
       error: (err) => {
         this.subiendo = false;
-        this.error = this.msgError(err, 'Error al subir comprobante.');
+        this.feedback.error(this.msgError(err, 'Error al subir comprobante.'));
       },
     });
   }
 
   async exportarPendientes(): Promise<void> {
     this.exportando = true;
-    this.error = '';
+    
     try {
       await this.download.download(this.api.exportPendingUrl(), 'pagos-pendientes.csv');
     } catch (e) {
-      this.error = e instanceof Error ? e.message : 'No se pudo descargar el reporte.';
+      this.feedback.error(e instanceof Error ? e.message : 'No se pudo descargar el reporte.');
     } finally {
       this.exportando = false;
     }

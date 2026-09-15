@@ -15,9 +15,7 @@
   <li>Inactivos {{ counts().inactive }}</li>
 </ul>
 
-@if (aviso()) {
-  <p class="users-aviso" [class.is-err]="avisoKind() === 'err'" role="status">{{ aviso() }}</p>
-}
+
 
 @if (confirmUser(); as doomed) {
   <div class="users-confirm" role="alertdialog" aria-label="Confirmar eliminación">

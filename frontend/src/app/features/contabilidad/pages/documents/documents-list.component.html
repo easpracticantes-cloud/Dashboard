@@ -213,15 +213,7 @@
     <button type="button" class="btn btn-secondary" (click)="cargar()">Filtrar</button>
   </div>
 
-  @if (error) {
-    <div class="alert error">
-      <mat-icon>error</mat-icon>
-      <div>
-        <strong>Error</strong>
-        <p>{{ error }}</p>
-      </div>
-    </div>
-  }
+  
 
   @if (cargando) {
     <div class="ap-skeleton-wrap">

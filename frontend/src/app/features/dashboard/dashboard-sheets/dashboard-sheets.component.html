@@ -31,10 +31,6 @@
       <button type="button" class="eas-btn-primary" (click)="refresh()">Reintentar</button>
     </eas-empty-state>
   } @else {
-    @if (error()) {
-      <p class="sheets-dash__warn">{{ error() }}</p>
-    }
-
     <div class="sheets-dash__kpis eas-stagger">
       @for (kpi of kpiCards(); track kpi.id) {
         <eas-kpi-card [kpi]="kpi"></eas-kpi-card>
@@ -305,12 +301,8 @@
       </button>
     </header>
 
-    @if (editError()) {
-      <p class="sheets-editor__error" role="alert">{{ editError() }}</p>
-    }
-    @if (editSuccess()) {
-      <p class="sheets-editor__ok" role="status">{{ editSuccess() }}</p>
-    }
+    
+    
 
     <div class="sheets-editor__body">
       @if (editingSeguimiento(); as row) {

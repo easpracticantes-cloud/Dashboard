@@ -11,6 +11,7 @@ import {
   WeekOption,
 } from '../../services/dashboard-api.service';
 import { OpsAlert, OpsApiService, OpsQueueGroup, alertDetail, alertSeverity, alertTitle, extractAlerts } from '../../services/ops-api.service';
+import { UiFeedbackService } from '../../../../core/services/ui-feedback.service';
 
 @Component({
   selector: 'eas-contabilidad-cola',
@@ -20,6 +21,8 @@ import { OpsAlert, OpsApiService, OpsQueueGroup, alertDetail, alertSeverity, ale
   styleUrl: './cola.component.scss',
 })
 export class ColaComponent implements OnInit {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly opsApi = inject(OpsApiService);
   private readonly dashboardApi = inject(DashboardApiService);
 
@@ -63,7 +66,7 @@ export class ColaComponent implements OnInit {
 
   cargar(): void {
     this.cargando = true;
-    this.error = '';
+    
     const period = this.periodParams();
 
     forkJoin({
@@ -80,7 +83,7 @@ export class ColaComponent implements OnInit {
         this.cargando = false;
       },
       error: () => {
-        this.error = 'No se pudo cargar la cola operativa.';
+        this.feedback.error('No se pudo cargar la cola operativa.');
         this.cargando = false;
       },
     });

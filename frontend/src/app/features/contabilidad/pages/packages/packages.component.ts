@@ -9,6 +9,7 @@ import {
   StorageStatus,
 } from '../../services/packages-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
+import { UiFeedbackService } from '../../../../core/services/ui-feedback.service';
 import {
   formatFechaContable,
   iconEstado,
@@ -24,6 +25,8 @@ import {
   styleUrl: './packages.component.scss',
 })
 export class PackagesComponent implements OnInit {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly api = inject(PackagesApiService);
   private readonly download = inject(ContabilidadDownloadService);
 
@@ -55,17 +58,19 @@ export class PackagesComponent implements OnInit {
 
   cargar(): void {
     this.cargando = true;
-    this.error = '';
+    
     this.api
       .list({ limit: 100, estado: this.filtroEstado || undefined })
       .subscribe({
         next: (res) => {
           this.paquetes = res.items;
           this.total = res.total;
+          this.error = '';
           this.cargando = false;
         },
         error: () => {
-          this.error = 'No se pudieron cargar los paquetes.';
+          this.feedback.error('No se pudieron cargar los paquetes.');
+          this.error = 'load';
           this.cargando = false;
         },
       });
@@ -74,7 +79,7 @@ export class PackagesComponent implements OnInit {
   crearPaquete(): void {
     const docId = Number(this.documentIdNuevo);
     if (!docId) {
-      this.error = 'Indique el ID del documento.';
+      this.feedback.error('Indique el ID del documento.');
       return;
     }
     this.api.create({ document_id: docId }).subscribe({
@@ -83,7 +88,7 @@ export class PackagesComponent implements OnInit {
         this.cargar();
       },
       error: (err) => {
-        this.error = err?.error?.detail || 'No se pudo crear el paquete.';
+        this.feedback.error(err?.error?.detail || 'No se pudo crear el paquete.');
       },
     });
   }
@@ -92,7 +97,7 @@ export class PackagesComponent implements OnInit {
     this.api.generate(p.id).subscribe({
       next: () => this.cargar(),
       error: () => {
-        this.error = 'Error al generar el ZIP.';
+        this.feedback.error('Error al generar el ZIP.');
       },
     });
   }
@@ -101,7 +106,7 @@ export class PackagesComponent implements OnInit {
     this.api.updateEstado(p.id, 'ENTREGADO', 'Entregado a Katherine').subscribe({
       next: () => this.cargar(),
       error: () => {
-        this.error = 'Error al marcar entregado.';
+        this.feedback.error('Error al marcar entregado.');
       },
     });
   }
@@ -110,17 +115,17 @@ export class PackagesComponent implements OnInit {
     this.api.updateEstado(p.id, 'CERRADO').subscribe({
       next: () => this.cargar(),
       error: () => {
-        this.error = 'Error al cerrar paquete.';
+        this.feedback.error('Error al cerrar paquete.');
       },
     });
   }
 
   async descargar(p: DigitalPackage): Promise<void> {
-    this.error = '';
+    
     try {
       await this.download.download(this.api.downloadUrl(p.id), `paquete-${p.id}.zip`);
     } catch (e) {
-      this.error = e instanceof Error ? e.message : 'No se pudo descargar el paquete.';
+      this.feedback.error(e instanceof Error ? e.message : 'No se pudo descargar el paquete.');
     }
   }
 }

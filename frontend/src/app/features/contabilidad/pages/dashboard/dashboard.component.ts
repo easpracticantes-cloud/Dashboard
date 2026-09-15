@@ -16,6 +16,7 @@ import { PeriodsApiService } from '../../services/periods-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
 import { formatCop } from '../../utils/contabilidad-labels';
 import { AuthService } from '../../../../core/services/auth.service';
+import { UiFeedbackService } from '../../../../core/services/ui-feedback.service';
 
 @Component({
   selector: 'eas-contabilidad-dashboard',
@@ -25,6 +26,8 @@ import { AuthService } from '../../../../core/services/auth.service';
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly api = inject(DashboardApiService);
   private readonly opsApi = inject(OpsApiService);
   private readonly periodsApi = inject(PeriodsApiService);
@@ -148,7 +151,7 @@ export class DashboardComponent implements OnInit {
 
   cargar(): void {
     this.cargando = true;
-    this.error = '';
+    
     const period = this.periodParams();
     const kpiParams: Record<string, unknown> = { ...period };
     if (this.filtroProveedor) kpiParams['proveedor'] = this.filtroProveedor;
@@ -172,7 +175,7 @@ export class DashboardComponent implements OnInit {
     }).subscribe({
       next: (res) => {
         if (!res.kpis) {
-          this.error = 'No se pudieron cargar los KPIs.';
+          this.feedback.error('No se pudieron cargar los KPIs.');
         } else {
           this.kpis = res.kpis;
         }
@@ -182,7 +185,7 @@ export class DashboardComponent implements OnInit {
         this.cargando = false;
       },
       error: () => {
-        this.error = 'No se pudieron cargar los indicadores.';
+        this.feedback.error('No se pudieron cargar los indicadores.');
         this.cargando = false;
       },
     });
@@ -190,11 +193,11 @@ export class DashboardComponent implements OnInit {
 
   async exportReport(kind: 'documents' | 'payments' | 'crossings' | 'remediations' | 'semanal' | 'ops-queue'): Promise<void> {
     this.exportando = true;
-    this.error = '';
+    
     try {
       await this.download.download(this.api.reportUrl(kind, this.periodParams()));
     } catch (e) {
-      this.error = e instanceof Error ? e.message : 'No se pudo exportar el reporte.';
+      this.feedback.error(e instanceof Error ? e.message : 'No se pudo exportar el reporte.');
     } finally {
       this.exportando = false;
     }
@@ -210,7 +213,7 @@ export class DashboardComponent implements OnInit {
     }
     const resumen = prompt('Resumen opcional del cierre:') || undefined;
     this.cerrandoPeriodo = true;
-    this.error = '';
+    
     const weekRef = this.filtroModo === 'semana' ? this.weekRef : undefined;
     this.periodsApi.close(weekRef, resumen).subscribe({
       next: () => {
@@ -219,14 +222,14 @@ export class DashboardComponent implements OnInit {
       },
       error: (err) => {
         this.cerrandoPeriodo = false;
-        this.error = err?.error?.detail || 'No se pudo cerrar el periodo.';
+        this.feedback.error(err?.error?.detail || 'No se pudo cerrar el periodo.');
       },
     });
   }
 
   reabrirPeriodo(): void {
     if (this.filtroModo !== 'semana' || !this.weekRef) {
-      this.error = 'Seleccione una semana para reabrir el periodo.';
+      this.feedback.error('Seleccione una semana para reabrir el periodo.');
       return;
     }
     const motivo = prompt('Motivo de reapertura (obligatorio):');
@@ -234,7 +237,7 @@ export class DashboardComponent implements OnInit {
       return;
     }
     this.cerrandoPeriodo = true;
-    this.error = '';
+    
     this.periodsApi.reopen(this.weekRef, motivo.trim()).subscribe({
       next: () => {
         this.cerrandoPeriodo = false;
@@ -242,7 +245,7 @@ export class DashboardComponent implements OnInit {
       },
       error: (err) => {
         this.cerrandoPeriodo = false;
-        this.error = err?.error?.detail || 'No se pudo reabrir el periodo.';
+        this.feedback.error(err?.error?.detail || 'No se pudo reabrir el periodo.');
       },
     });
   }

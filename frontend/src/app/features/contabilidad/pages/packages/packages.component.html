@@ -39,12 +39,10 @@
       <div class="skel tall"></div>
     </div>
   } @else if (error) {
-    <div class="alert error">
-      <mat-icon>error</mat-icon>
-      <div>
-        <strong>Error</strong>
-        <p>{{ error }}</p>
-      </div>
+    <div class="sheet empty-state">
+      <div class="empty-icon"><mat-icon>cloud_off</mat-icon></div>
+      <h2>No se pudo cargar</h2>
+      <p>Revisa la conexión e inténtalo de nuevo.</p>
     </div>
   } @else if (!paquetes.length) {
     <div class="sheet empty-state">

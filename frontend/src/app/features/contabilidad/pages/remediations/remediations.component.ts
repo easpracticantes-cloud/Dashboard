@@ -9,6 +9,7 @@ import {
 } from '../../services/remediations-api.service';
 import { ContabilidadUserContext } from '../../services/contabilidad-user-context';
 import { formatCop, labelEstado } from '../../utils/contabilidad-labels';
+import { UiFeedbackService } from '../../../../core/services/ui-feedback.service';
 
 @Component({
   selector: 'eas-contabilidad-remediations',
@@ -18,6 +19,8 @@ import { formatCop, labelEstado } from '../../utils/contabilidad-labels';
   styleUrl: './remediations.component.scss',
 })
 export class RemediationsComponent implements OnInit {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly api = inject(RemediationsApiService);
   private readonly userCtx = inject(ContabilidadUserContext);
 
@@ -59,7 +62,7 @@ export class RemediationsComponent implements OnInit {
         this.cargar();
       },
       error: () => {
-        this.error = 'No se pudo cargar el catálogo.';
+        this.feedback.error('No se pudo cargar el catálogo.');
         this.cargando = false;
       },
     });
@@ -67,7 +70,7 @@ export class RemediationsComponent implements OnInit {
 
   cargar(): void {
     this.cargando = true;
-    this.error = '';
+    
     this.api
       .list({
         limit: 100,
@@ -79,10 +82,12 @@ export class RemediationsComponent implements OnInit {
         next: (res) => {
           this.items = res.items;
           this.total = res.total;
+          this.error = '';
           this.cargando = false;
         },
         error: () => {
-          this.error = 'No se pudieron cargar las subsanaciones.';
+          this.feedback.error('No se pudieron cargar las subsanaciones.');
+          this.error = 'load';
           this.cargando = false;
         },
       });
@@ -125,7 +130,7 @@ export class RemediationsComponent implements OnInit {
 
   guardar(): void {
     this.guardando = true;
-    this.error = '';
+    
 
     if (this.editando) {
       this.api
@@ -148,7 +153,7 @@ export class RemediationsComponent implements OnInit {
           },
           error: () => {
             this.guardando = false;
-            this.error = 'Error al guardar la subsanación.';
+            this.feedback.error('Error al guardar la subsanación.');
           },
         });
       return;
@@ -157,7 +162,7 @@ export class RemediationsComponent implements OnInit {
     const docId = Number(this.form.document_id);
     if (!docId) {
       this.guardando = false;
-      this.error = 'Indique el ID del documento.';
+      this.feedback.error('Indique el ID del documento.');
       return;
     }
 
@@ -182,7 +187,7 @@ export class RemediationsComponent implements OnInit {
         },
         error: () => {
           this.guardando = false;
-          this.error = 'Error al crear la subsanación.';
+          this.feedback.error('Error al crear la subsanación.');
         },
       });
   }
@@ -191,7 +196,7 @@ export class RemediationsComponent implements OnInit {
     this.api.updateEstado(item.id, estado).subscribe({
       next: () => this.cargar(),
       error: () => {
-        this.error = 'No se pudo cambiar el estado.';
+        this.feedback.error('No se pudo cambiar el estado.');
       },
     });
   }
@@ -201,7 +206,7 @@ export class RemediationsComponent implements OnInit {
     this.api.delete(item.id).subscribe({
       next: () => this.cargar(),
       error: () => {
-        this.error = 'No se pudo eliminar.';
+        this.feedback.error('No se pudo eliminar.');
       },
     });
   }

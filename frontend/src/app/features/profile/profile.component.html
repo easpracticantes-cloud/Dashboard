@@ -107,13 +107,6 @@
           </div>
         </div>
 
-        @if (message(); as msg) {
-          <div [class]="msg.type === 'success' ? 'eas-alert-success' : 'eas-alert-error'" role="status">
-            <mat-icon>{{ msg.type === 'success' ? 'check_circle' : 'error' }}</mat-icon>
-            <span>{{ msg.text }}</span>
-          </div>
-        }
-
         <form [formGroup]="form" (ngSubmit)="save()" class="profile-form" novalidate>
           <div class="profile-form__row">
             <label class="field">

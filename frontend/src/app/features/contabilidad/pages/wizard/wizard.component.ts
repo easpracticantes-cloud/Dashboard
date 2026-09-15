@@ -19,6 +19,7 @@ import { FacturasApiService } from '../../services/facturas-api.service';
 import { FoldersApiService, InvoiceFolder } from '../../services/folders-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
 import { formatCop } from '../../utils/contabilidad-labels';
+import { UiFeedbackService } from '../../../../core/services/ui-feedback.service';
 
 const SESSION_KEY = 'contab-wizard-session';
 const FOLDER_KEY = 'contab-wizard-folder-id';
@@ -39,6 +40,8 @@ interface ChatMsg {
   styleUrl: './wizard.component.scss',
 })
 export class WizardComponent implements OnInit, OnDestroy {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly autobitsApi = inject(AutobitsApiService);
   private readonly docsApi = inject(DocumentsApiService);
   private readonly foldersApi = inject(FoldersApiService);
@@ -107,18 +110,14 @@ export class WizardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (h) => {
           if (h.ai_key_configured === false || h.ai === false) {
-            this.aiWarn.set(
-              h.hint ||
-                'Claude no está configurado (falta ANTHROPIC_API_KEY). Las facturas no mostrarán datos hasta reiniciar Contabilidad con la clave.'
-            );
+            this.feedback.error(h.hint ||
+                'Claude no está configurado (falta ANTHROPIC_API_KEY). Las facturas no mostrarán datos hasta reiniciar Contabilidad con la clave.');
           } else {
-            this.aiWarn.set('');
+            
           }
         },
         error: () => {
-          this.aiWarn.set(
-            'No se pudo verificar Claude/OCR. Revisa que Contabilidad esté arriba y con ANTHROPIC_API_KEY.'
-          );
+          this.feedback.error('No se pudo verificar Claude/OCR. Revisa que Contabilidad esté arriba y con ANTHROPIC_API_KEY.');
         },
       });
   }
@@ -205,17 +204,17 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (!name) {
       return;
     }
-    this.error.set('');
+    
     this.foldersApi.create(name).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (folder) => {
         this.nuevaCarpetaNombre = '';
-        this.aviso.set(`Carpeta «${folder.name}» creada.`);
+        this.feedback.success(`Carpeta «${folder.name}» creada.`);
         this.carpetas.update((list) => [folder, ...list]);
         this.aplicarCarpeta(folder);
         this.paso.set(1);
       },
       error: (err) => {
-        this.error.set(this.detalleError(err, 'No se pudo crear la carpeta.'));
+        this.feedback.error(this.detalleError(err, 'No se pudo crear la carpeta.'));
       },
     });
   }
@@ -223,7 +222,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   seleccionarCarpeta(id: number): void {
     this.foldersApi.get(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (folder) => this.aplicarCarpeta(folder),
-      error: (err) => this.error.set(this.detalleError(err, 'No se pudo abrir la carpeta.')),
+      error: (err) => this.feedback.error(this.detalleError(err, 'No se pudo abrir la carpeta.')),
     });
   }
 
@@ -239,7 +238,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (!ok) {
       return;
     }
-    this.error.set('');
+    
     this.foldersApi.delete(folder.id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: () => {
         this.carpetas.update((list) => list.filter((f) => f.id !== folder.id));
@@ -261,13 +260,13 @@ export class WizardComponent implements OnInit, OnDestroy {
             this.seleccionarCarpeta(next.id);
           } else {
             this.paso.set(1);
-            this.aviso.set(`Carpeta «${name}» eliminada.`);
+            this.feedback.success(`Carpeta «${name}» eliminada.`);
           }
         } else {
-          this.aviso.set(`Carpeta «${name}» eliminada.`);
+          this.feedback.success(`Carpeta «${name}» eliminada.`);
         }
       },
-      error: (err) => this.error.set(this.detalleError(err, 'No se pudo eliminar la carpeta.')),
+      error: (err) => this.feedback.error(this.detalleError(err, 'No se pudo eliminar la carpeta.')),
     });
   }
 
@@ -289,7 +288,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.confirmandoVaciar.set(false);
     this.restoreSeq += 1;
     this.limpiando.set(true);
-    this.error.set('');
+    
     this.autobitsApi
       .purgeExcels(true)
       .pipe(
@@ -299,10 +298,10 @@ export class WizardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.resetLocal();
-          this.aviso.set('Cargas anteriores vaciadas. Elige o crea una carpeta de facturas.');
+          this.feedback.success('Cargas anteriores vaciadas. Elige o crea una carpeta de facturas.');
         },
         error: (err) => {
-          this.error.set(this.detalleError(err, 'No se pudieron vaciar las cargas.'));
+          this.feedback.error(this.detalleError(err, 'No se pudieron vaciar las cargas.'));
         },
       });
   }
@@ -347,7 +346,7 @@ export class WizardComponent implements OnInit, OnDestroy {
       /\.(xlsx|xls|xlsm|csv)$/i.test(f.name)
     );
     if (!file) {
-      this.error.set('Suelta un Excel de Autobits (.xlsx, .xls, .csv).');
+      this.feedback.error('Suelta un Excel de Autobits (.xlsx, .xls, .csv).');
       return;
     }
     this.subirAutobits(file);
@@ -355,8 +354,8 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   private subirAutobits(file: File): void {
     this.restoreSeq += 1;
-    this.error.set('');
-    this.aviso.set('Leyendo el Excel de Autobits…');
+    
+    this.feedback.info('Leyendo el Excel de Autobits…');
     this.autobitsUpload?.unsubscribe();
     this.subiendoAutobits.set(true);
     this.autobitsUpload = this.autobitsApi
@@ -372,8 +371,8 @@ export class WizardComponent implements OnInit, OnDestroy {
           this.paso.set(2);
         },
         error: (err) => {
-          this.error.set(this.detalleError(err, 'No se pudo leer el Excel de Autobits.'));
-          this.aviso.set('');
+          this.feedback.error(this.detalleError(err, 'No se pudo leer el Excel de Autobits.'));
+          
         },
       });
   }
@@ -381,22 +380,22 @@ export class WizardComponent implements OnInit, OnDestroy {
   async generarExcel(): Promise<void> {
     if (this.generandoExcel() || !this.puedeGenerarExcel()) return;
     this.generandoExcel.set(true);
-    this.error.set('');
-    this.aviso.set('Generando Excel de cruce de la carpeta…');
+    
+    this.feedback.info('Generando Excel de cruce de la carpeta…');
     try {
       const today = new Date().toISOString().slice(0, 10);
       const documentIds = [...this.idsListosParaExcel()];
       if (!documentIds.length) {
-        this.error.set('Espere a que Claude termine de leer las facturas de la carpeta.');
+        this.feedback.error('Espere a que Claude termine de leer las facturas de la carpeta.');
         return;
       }
       await this.download.download(
         this.docsApi.exportExcelUrl(documentIds),
         `Cruce_Cuentas_${today}.xlsx`
       );
-      this.aviso.set('Excel de cruce descargado.');
+      this.feedback.success('Excel de cruce descargado.');
     } catch (err) {
-      this.error.set(err instanceof Error ? err.message : 'No se pudo generar el Excel.');
+      this.feedback.error(err instanceof Error ? err.message : 'No se pudo generar el Excel.');
     } finally {
       this.generandoExcel.set(false);
     }
@@ -442,13 +441,13 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.arrastrandoFacturas.set(false);
     if (this.subiendoFacturas() || !this.carpetaActiva()) {
       if (!this.carpetaActiva()) {
-        this.error.set('Crea o elige una carpeta antes de subir facturas.');
+        this.feedback.error('Crea o elige una carpeta antes de subir facturas.');
       }
       return;
     }
     const files = await this.collectDroppedInvoiceFiles(ev.dataTransfer);
     if (!files.length) {
-      this.error.set('Suelta facturas (PDF/JPG/PNG), una carpeta o un ZIP.');
+      this.feedback.error('Suelta facturas (PDF/JPG/PNG), una carpeta o un ZIP.');
       return;
     }
     await this.subirFacturas(files);
@@ -457,50 +456,44 @@ export class WizardComponent implements OnInit, OnDestroy {
   private async subirFacturas(files: File[]): Promise<void> {
     const selected = this.filterInvoiceUploads(files);
     if (!selected.length) {
-      this.error.set('No hay facturas ni ZIP válidos en la selección.');
+      this.feedback.error('No hay facturas ni ZIP válidos en la selección.');
       return;
     }
     const folder = this.carpetaActiva();
     if (!folder) {
-      this.error.set('Crea o elige una carpeta antes de subir facturas.');
+      this.feedback.error('Crea o elige una carpeta antes de subir facturas.');
       return;
     }
 
     this.subiendoFacturas.set(true);
-    this.error.set('');
-    this.aviso.set('Preparando archivos…');
+    
+    this.feedback.info('Preparando archivos…');
 
     let invoices: File[];
     try {
       invoices = await this.expandZipsToInvoices(selected);
     } catch (err) {
       this.subiendoFacturas.set(false);
-      this.error.set(
-        err instanceof Error ? err.message : 'No se pudo abrir el ZIP. Comprueba que sea un .zip válido.'
-      );
-      this.aviso.set('');
+      this.feedback.error(err instanceof Error ? err.message : 'No se pudo abrir el ZIP. Comprueba que sea un .zip válido.');
+      
       return;
     }
 
     if (!invoices.length) {
       this.subiendoFacturas.set(false);
-      this.error.set(
-        'No hay facturas PDF/JPG/PNG dentro de la selección (¿ZIP vacío o solo otros tipos?).'
-      );
-      this.aviso.set('');
+      this.feedback.error('No hay facturas PDF/JPG/PNG dentro de la selección (¿ZIP vacío o solo otros tipos?).');
+      
       return;
     }
 
     const tooBig = invoices.filter((f) => f.size > PACK_MAX_BYTES);
     if (tooBig.length) {
       this.subiendoFacturas.set(false);
-      this.error.set(
-        `Estas facturas pesan más de 18 MB y el proxy las bloquea: ${tooBig
+      this.feedback.error(`Estas facturas pesan más de 18 MB y el proxy las bloquea: ${tooBig
           .slice(0, 3)
           .map((f) => f.name)
-          .join(', ')}${tooBig.length > 3 ? '…' : ''}. Comprime o divide el PDF.`
-      );
-      this.aviso.set('');
+          .join(', ')}${tooBig.length > 3 ? '…' : ''}. Comprime o divide el PDF.`);
+      
       return;
     }
 
@@ -513,11 +506,9 @@ export class WizardComponent implements OnInit, OnDestroy {
     try {
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
-        this.aviso.set(
-          chunks.length > 1
+        this.feedback.info(chunks.length > 1
             ? `Integrando paquete ${i + 1}/${chunks.length} (${chunk.length} factura(s)) en «${folder.name}»…`
-            : `Integrando ${chunk.length} factura(s) en «${folder.name}»…`
-        );
+            : `Integrando ${chunk.length} factura(s) en «${folder.name}»…`);
         const res = await firstValueFrom(
           this.docsApi.uploadBatch(chunk, 'FACTURA', PACK_MAX).pipe(takeUntilDestroyed(this.destroyRef))
         );
@@ -526,13 +517,13 @@ export class WizardComponent implements OnInit, OnDestroy {
         lastMsg = res.mensaje || lastMsg;
       }
     } catch (err) {
-      this.error.set(
+      this.feedback.error(
         this.detalleError(
           err as { status?: number; error?: unknown; message?: string },
           'No se pudieron subir las facturas.'
         )
       );
-      this.aviso.set('');
+      
       this.facturaItems.set(allItems);
       this.subiendoFacturas.set(false);
       return;
@@ -547,8 +538,8 @@ export class WizardComponent implements OnInit, OnDestroy {
         lastMsg ||
         allItems.find((i) => i.error)?.error ||
         'No se integró ninguna factura.';
-      this.error.set(failMsg);
-      this.aviso.set('');
+      this.feedback.error(failMsg);
+      
       this.packMsg.set(failMsg);
       return;
     }
@@ -560,9 +551,7 @@ export class WizardComponent implements OnInit, OnDestroy {
       lastMsg ||
       `${nuevos.length} factura(s) integradas en «${folder.name}». Ya van ${merged.length} en la carpeta.`;
     this.packMsg.set(msg);
-    this.aviso.set(
-      `${nuevos.length} factura(s) añadidas a «${folder.name}». Total en carpeta: ${merged.length}.`
-    );
+    this.feedback.success(`${nuevos.length} factura(s) añadidas a «${folder.name}». Total en carpeta: ${merged.length}.`);
 
     this.foldersApi
       .addDocuments(folder.id, nuevos)
@@ -571,19 +560,15 @@ export class WizardComponent implements OnInit, OnDestroy {
         next: (r) => {
           this.aplicarCarpeta(r.folder);
           const total = r.folder.document_count || r.folder.document_ids?.length || merged.length;
-          this.aviso.set(
-            `${r.added ?? nuevos.length} factura(s) integradas en «${r.folder.name}». Total: ${total}.`
-          );
+          this.feedback.success(`${r.added ?? nuevos.length} factura(s) integradas en «${r.folder.name}». Total: ${total}.`);
           this.refrescarFacturas();
           this.startPoll();
         },
         error: (err) => {
-          this.error.set(
-            this.detalleError(
+          this.feedback.error(this.detalleError(
               err,
               'Las facturas se subieron pero no se pudieron vincular a la carpeta.'
-            )
-          );
+            ));
           this.refrescarFacturas();
           this.startPoll();
         },
@@ -622,7 +607,7 @@ export class WizardComponent implements OnInit, OnDestroy {
         continue;
       }
       zipCount += 1;
-      this.aviso.set(`Abriendo ZIP «${file.name}» en el navegador…`);
+      this.feedback.info(`Abriendo ZIP «${file.name}» en el navegador…`);
       const { unzipSync } = await import('fflate');
       const data = new Uint8Array(await file.arrayBuffer());
       let entries: Record<string, Uint8Array>;
@@ -654,7 +639,7 @@ export class WizardComponent implements OnInit, OnDestroy {
       }
     }
     if (zipCount) {
-      this.aviso.set(`ZIP listo: ${out.length} factura(s) para integrar.`);
+      this.feedback.success(`ZIP listo: ${out.length} factura(s) para integrar.`);
     }
     return out;
   }
@@ -741,7 +726,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (!pregunta || this.preguntando()) return;
     const folder = this.carpetaActiva();
     if (!folder) {
-      this.error.set('Elige una carpeta para preguntar a la IA.');
+      this.feedback.error('Elige una carpeta para preguntar a la IA.');
       return;
     }
     this.preguntando.set(true);
@@ -780,7 +765,7 @@ export class WizardComponent implements OnInit, OnDestroy {
         if (this.copiadoId() === docId) this.copiadoId.set(null);
       }, 1600);
     } catch {
-      this.error.set('No se pudo copiar el contramarcado.');
+      this.feedback.error('No se pudo copiar el contramarcado.');
     }
   }
 
@@ -804,7 +789,7 @@ export class WizardComponent implements OnInit, OnDestroy {
           }
         },
         error: () => {
-          this.aviso.set('No se pudieron cargar carpetas. Puedes crear una nueva.');
+          this.feedback.error('No se pudieron cargar carpetas. Puedes crear una nueva.');
         },
       });
   }
@@ -926,11 +911,11 @@ export class WizardComponent implements OnInit, OnDestroy {
         next: (updated) => {
           this.carpetaActiva.set(updated);
           this.carpetas.update((list) => list.map((f) => (f.id === updated.id ? updated : f)));
-          this.aviso.set(`Autobits vinculado a «${updated.name}». Ya puedes cruzar o preguntar a la IA.`);
+          this.feedback.success(`Autobits vinculado a «${updated.name}». Ya puedes cruzar o preguntar a la IA.`);
           this.startPoll();
         },
         error: () => {
-          this.aviso.set('Autobits cargado, pero no se pudo vincular a la carpeta.');
+          this.feedback.success('Autobits cargado, pero no se pudo vincular a la carpeta.');
         },
       });
   }
@@ -957,11 +942,9 @@ export class WizardComponent implements OnInit, OnDestroy {
     const linked = this.carpetaActiva()
       ? ' Se vinculan a la carpeta activa si está seleccionada.'
       : ' Puedes vincularlos luego eligiendo una carpeta.';
-    this.aviso.set(
-      res.aviso || `${res.imported_rows} filas de Autobits${reused}.${linked}`
-    );
+    this.feedback.success(res.aviso || `${res.imported_rows} filas de Autobits${reused}.${linked}`);
     if (res.parse_errors?.length) {
-      this.error.set(res.parse_errors.slice(0, 3).join(' · '));
+      this.feedback.error(res.parse_errors.slice(0, 3).join(' · '));
     }
   }
 
