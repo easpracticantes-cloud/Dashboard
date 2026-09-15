@@ -308,7 +308,12 @@ public class SheetsPayloadMapper {
                 continue;
             }
             if (value != null && value.isObject()
-                    && (value.has("fullData") || value.has("firstFewRows") || value.has("rawRowCount") || value.has("rowCount"))) {
+                    && (value.has("fullData")
+                    || value.has("firstFewRows")
+                    || value.has("values")
+                    || value.has("displayValues")
+                    || value.has("rawRowCount")
+                    || value.has("rowCount"))) {
                 byName.put(key, toRawSheet(key, value));
             }
         }
@@ -331,15 +336,26 @@ public class SheetsPayloadMapper {
     }
 
     private RawSheetDto toRawSheet(String nombre, JsonNode node) {
-        boolean hasFull = node.has("fullData") && node.get("fullData").isArray();
+        JsonNode matrixNode = firstArrayNode(node, "fullData", "displayValues", "values", "firstFewRows");
+        boolean hasFull = matrixNode != null
+                && (node.path("fullData").isArray()
+                || node.path("displayValues").isArray()
+                || node.path("values").isArray());
         boolean hasPreview = node.has("firstFewRows") && node.get("firstFewRows").isArray();
-        List<List<Object>> full = matrix(hasFull ? node.get("fullData") : node.path("firstFewRows"));
+        List<List<Object>> full = matrix(matrixNode != null ? matrixNode : node.path("firstFewRows"));
         long rawCount = node.path("rawRowCount").asLong(0);
         if (rawCount <= 0) {
             rawCount = node.path("rowCount").asLong(full.size());
         }
         if (rawCount <= 0) {
             rawCount = full.size();
+        }
+        if (!node.path("fullData").isArray() && (node.path("values").isArray() || node.path("displayValues").isArray())) {
+            log.info(
+                    "[SHEETS-MAP] Hoja '{}': usando {} como fullData (script legacy).",
+                    nombre,
+                    node.path("displayValues").isArray() ? "displayValues" : "values"
+            );
         }
         if (!hasFull && hasPreview) {
             log.warn(
@@ -361,6 +377,19 @@ public class SheetsPayloadMapper {
                     nombre, full.size(), rawCount, hasFull);
         }
         return new RawSheetDto(nombre, rawCount, full);
+    }
+
+    private static JsonNode firstArrayNode(JsonNode node, String... keys) {
+        if (node == null || keys == null) {
+            return null;
+        }
+        for (String key : keys) {
+            JsonNode child = node.get(key);
+            if (child != null && child.isArray()) {
+                return child;
+            }
+        }
+        return null;
     }
 
     /**
