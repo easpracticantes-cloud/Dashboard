@@ -167,16 +167,25 @@ export class AveQuoteReviewComponent {
     this.formError.set(null);
     this.downloading.set(true);
     const previewMode = this.editing();
+    const prevZoom = this.zoom();
     if (previewMode) {
       this.editing.set(false);
-      await new Promise((r) => setTimeout(r, 80));
     }
+    // Zoom con transform: scale rompe html2canvas; capturar siempre a 100%
+    this.zoom.set(100);
+    await new Promise((r) => setTimeout(r, 220));
     try {
-      await downloadQuotePdf(this.doc(), this.sheet()?.nativeElement() ?? null);
+      const root = this.sheet()?.nativeElement() ?? null;
+      if (!root) {
+        throw new Error('La hoja de cotización aún no está lista');
+      }
+      await downloadQuotePdf(this.doc(), root);
       this.flash('PDF descargado');
-    } catch {
-      this.formError.set('No se pudo generar el PDF. Intenta de nuevo.');
+    } catch (err) {
+      const detail = err instanceof Error && err.message ? ` ${err.message}` : '';
+      this.formError.set(`No se pudo generar el PDF.${detail}`);
     } finally {
+      this.zoom.set(prevZoom);
       if (previewMode) {
         this.editing.set(true);
       }
