@@ -89,11 +89,7 @@ export function draftToDocument(draft: QuoteDraft, now = new Date()): QuoteSheet
   const validUntil = draft.validUntil || addDays(issuedAt, 15);
   const items = resolveItems(draft);
   const people = Math.max(1, Number(draft.people) || items[0]?.quantity || 1);
-  const observations = [
-    draft.observations,
-    draft.notes,
-    draft.excludes ? `No incluye: ${draft.excludes}` : ''
-  ]
+  const observations = [draft.observations, draft.notes]
     .filter((part) => !!part && String(part).trim())
     .filter((part, i, all) => all.indexOf(part) === i)
     .join('\n');
@@ -116,10 +112,10 @@ export function draftToDocument(draft: QuoteDraft, now = new Date()): QuoteSheet
     currency: draft.currency || 'COP',
     code: draft.code,
     name: draft.name,
-    modality: draft.modality,
+    modality: normalizeModality(draft.modality),
     people,
-    pickup: draft.pickup,
-    serviceDate: draft.serviceDate || '',
+    pickup: draft.pickup || draft.clientCity || '',
+    serviceDate: draft.serviceDate || draft.date || '',
     includes: draft.includes,
     excludes: draft.excludes,
     notes: draft.notes,
@@ -234,6 +230,23 @@ function resolveItems(draft: QuoteDraft): QuoteSheetItem[] {
 function normalizeStatus(value?: string): QuoteSheetStatus {
   const upper = (value || 'DRAFT').toUpperCase();
   return (QUOTE_STATUSES as readonly string[]).includes(upper) ? (upper as QuoteSheetStatus) : 'DRAFT';
+}
+
+function normalizeModality(value?: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const upper = value.trim().toUpperCase();
+  if (upper.includes('COMPART')) {
+    return 'Compartido';
+  }
+  if (upper.includes('PRIV')) {
+    return 'Privado';
+  }
+  if (upper.includes('GRUPO')) {
+    return 'Grupo';
+  }
+  return value.trim();
 }
 
 function emptyToUndef(value?: string): string | undefined {

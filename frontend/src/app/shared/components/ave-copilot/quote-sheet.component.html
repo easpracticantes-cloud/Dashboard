@@ -49,6 +49,15 @@
       <div>
         <h1>COTIZACIÓN</h1>
         <p>{{ company.tagline }}</p>
+        @if (document().code || document().name) {
+          <p class="qs-title__pkg">
+            <span class="qs-title__pkg-mark" aria-hidden="true"></span>
+            {{ document().name || document().code }}
+            @if (document().code) {
+              <span class="qs-title__code">{{ document().code }}</span>
+            }
+          </p>
+        }
       </div>
     </div>
     <dl class="qs-meta">
@@ -352,6 +361,7 @@
   </section>
 
   <section class="qs-mid">
+    <div class="qs-mid__glow" aria-hidden="true"></div>
     <ul class="qs-trust">
       <li>
         <span class="qs-trust__ico"><i class="qs-ico qs-ico--binoc"></i></span>

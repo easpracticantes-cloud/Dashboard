@@ -10,7 +10,7 @@ import {
   previewItems,
   recalcItem
 } from './quote-sheet.model';
-import { QUOTE_PACKAGE_PRESETS, itemsFromPreset, type QuotePackagePreset } from './quote-sheet.presets';
+import { QUOTE_PACKAGE_PRESETS, itemsFromPreset, unitFromScale, type QuotePackagePreset } from './quote-sheet.presets';
 import {
   ESCUELA_AVES_COMPANY,
   addDays,
@@ -177,10 +177,13 @@ export class QuoteSheetComponent {
     this.documentChange.emit({
       ...this.document(),
       name: preset.label,
+      code: preset.code || this.document().code,
+      modality: preset.modality || this.document().modality,
       items: itemsFromPreset(preset),
       includes: preset.includes || this.document().includes,
       excludes: preset.excludes || this.document().excludes,
-      people: preset.items[0]?.quantity || this.document().people
+      people: preset.items[0]?.quantity || this.document().people,
+      priceScaleByPax: preset.priceScaleByPax || this.document().priceScaleByPax
     });
   }
 
@@ -195,9 +198,17 @@ export class QuoteSheetComponent {
 
   setPeople(raw: number | string): void {
     const people = Math.max(1, Number(raw) || 1);
-    const items = this.document().items.map((item, i) =>
-      i === 0 ? recalcItem({ ...item, quantity: people }) : item
-    );
+    const scaled = unitFromScale(this.document().priceScaleByPax, people);
+    const items = this.document().items.map((item, i) => {
+      if (i !== 0) {
+        return item;
+      }
+      return recalcItem({
+        ...item,
+        quantity: people,
+        unitPrice: scaled != null ? scaled : item.unitPrice
+      });
+    });
     this.documentChange.emit({ ...this.document(), people, items });
   }
 

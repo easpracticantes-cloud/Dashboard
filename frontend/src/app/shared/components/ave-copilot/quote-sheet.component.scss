@@ -233,11 +233,53 @@
 
 /* ——— Title ——— */
 .qs-title {
+  position: relative;
   display: flex;
   justify-content: space-between;
   gap: 1.25rem;
   align-items: flex-start;
   padding: 1.25rem 1.4rem 0.85rem;
+}
+
+.qs-title::before {
+  content: '';
+  position: absolute;
+  right: 12%;
+  top: -8px;
+  width: 120px;
+  height: 120px;
+  opacity: 0.05;
+  background: url('/assets/brand/mark-bird.svg') center / contain no-repeat;
+  pointer-events: none;
+}
+
+.qs-title__pkg {
+  margin-top: 0.45rem !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--forest);
+}
+
+.qs-title__pkg-mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, var(--gold-soft), var(--forest));
+  box-shadow: 0 0 0 3px rgba(232, 163, 26, 0.18);
+}
+
+.qs-title__code {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--mist);
+  border-radius: 999px;
+  padding: 0.15rem 0.45rem;
 }
 
 .qs-title__left {
@@ -340,14 +382,33 @@
 
 /* ——— Trip / servicio ——— */
 .qs-trip {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.55rem;
   margin: 0 1.4rem 0.95rem;
   padding: 0.7rem 0.8rem;
-  background: linear-gradient(180deg, #f6faf7, var(--mist));
+  background:
+    radial-gradient(ellipse at 90% 0%, rgba(232, 163, 26, 0.12), transparent 40%),
+    linear-gradient(180deg, #f6faf7, var(--mist));
   border: 1px solid rgba(10, 61, 46, 0.08);
   border-radius: 14px;
+  overflow: hidden;
+}
+
+.qs-trip::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  bottom: -24px;
+  width: 90px;
+  height: 90px;
+  opacity: 0.06;
+  background: url('/assets/brand/quote-hero-hummingbird.jpg') 40% 30% / cover no-repeat;
+  -webkit-mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+  mask-image: radial-gradient(circle, #000 20%, transparent 70%);
+  pointer-events: none;
+  filter: saturate(1.1);
 }
 
 .qs-trip > div {
@@ -432,15 +493,31 @@
 }
 
 .qs-card {
+  position: relative;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 0.85rem 0.95rem 0.95rem;
   box-shadow: 0 8px 22px rgba(10, 61, 46, 0.05);
+  overflow: hidden;
+}
+
+.qs-card::after {
+  content: '';
+  position: absolute;
+  right: -18px;
+  bottom: -22px;
+  width: 88px;
+  height: 88px;
+  opacity: 0.045;
+  background: url('/assets/brand/mark-bird.svg') center / contain no-repeat;
+  pointer-events: none;
 }
 
 .qs-card--soft {
-  background: linear-gradient(180deg, #fff, #f7fbf8);
+  background:
+    radial-gradient(ellipse at top left, rgba(232, 163, 26, 0.08), transparent 42%),
+    linear-gradient(180deg, #fff, #f7fbf8);
 }
 
 .qs-card h2 {
@@ -531,6 +608,7 @@
 }
 
 .qs-detail__head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -538,6 +616,18 @@
   color: #f7f1e4;
   padding: 0.62rem 0.9rem;
   border-radius: 12px 12px 0 0;
+  overflow: hidden;
+}
+
+.qs-detail__head::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 42%;
+  background: linear-gradient(100deg, transparent, rgba(232, 163, 26, 0.18));
+  pointer-events: none;
 }
 
 .qs-detail__head h2 {
@@ -696,11 +786,34 @@
 
 /* ——— Mid ——— */
 .qs-mid {
+  position: relative;
   display: grid;
   grid-template-columns: 1.4fr 0.9fr;
   gap: 1rem;
   padding: 0.35rem 1.4rem 0.95rem;
   align-items: end;
+  overflow: hidden;
+}
+
+.qs-mid__glow {
+  position: absolute;
+  left: 8%;
+  bottom: -20%;
+  width: 220px;
+  height: 180px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(20, 100, 69, 0.12), transparent 68%),
+    radial-gradient(circle at 70% 40%, rgba(232, 163, 26, 0.1), transparent 60%);
+  filter: blur(12px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.qs-trust,
+.qs-totals {
+  position: relative;
+  z-index: 1;
 }
 
 .qs-trust {

@@ -29,6 +29,12 @@ describe('ave-quote-intent', () => {
   it('reconoce experiencias Escuela Aves en el borrador', () => {
     const draft = seedQuoteDraft('Cotiza avistamiento de aves para 3 personas');
     expect(draft.people).toBe(3);
-    expect(draft.name).toMatch(/Avistamiento/i);
+    expect(draft.name).toMatch(/Aves/i);
+  });
+
+  it('extrae fecha y pickup del mensaje', () => {
+    const draft = seedQuoteDraft('Cotiza cocora para 2 personas mañana pickup Salento');
+    expect(draft.pickup).toBe('Salento');
+    expect(draft.serviceDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

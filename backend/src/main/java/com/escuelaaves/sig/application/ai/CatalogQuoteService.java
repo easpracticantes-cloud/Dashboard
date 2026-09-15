@@ -79,6 +79,9 @@ public class CatalogQuoteService {
         Map<String, BigDecimal> scale = new LinkedHashMap<>();
         product.priceScaleByPax().forEach((k, v) -> scale.put(String.valueOf(k), v));
 
+        String includes = CatalogExperienceCopy.includesFor(product.code(), product.name(), product.includes());
+        String excludes = CatalogExperienceCopy.excludesFor(product.code(), product.name(), product.excludes());
+
         StringBuilder markdown = new StringBuilder();
         markdown.append("**").append(product.name()).append("**");
         if (product.modality() != null) {
@@ -89,11 +92,17 @@ public class CatalogQuoteService {
         markdown.append("• Precio/persona (escala ").append(people).append(" pax): **")
                 .append(formatMoney(unit, currency)).append("**\n");
         markdown.append("• **Total: ").append(formatMoney(total, currency)).append("**\n");
-        if (product.includes() != null && !product.includes().isBlank()) {
-            markdown.append("\nIncluye: ").append(product.includes()).append("\n");
+        if (interpretation.date() != null && !interpretation.date().isBlank()) {
+            markdown.append("• Fecha sugerida: **").append(interpretation.date()).append("**\n");
         }
-        if (product.excludes() != null && !product.excludes().isBlank()) {
-            markdown.append("No incluye: ").append(product.excludes()).append("\n");
+        if (interpretation.pickup() != null && !interpretation.pickup().isBlank()) {
+            markdown.append("• Pickup: **").append(interpretation.pickup()).append("**\n");
+        }
+        if (includes != null && !includes.isBlank()) {
+            markdown.append("\nIncluye: ").append(includes).append("\n");
+        }
+        if (excludes != null && !excludes.isBlank()) {
+            markdown.append("No incluye: ").append(excludes).append("\n");
         }
         if (product.reviewFlag()) {
             markdown.append("\n⚠️ Tarifa marcada para revisión comercial.\n");
@@ -113,8 +122,8 @@ public class CatalogQuoteService {
                 product.reviewFlag(),
                 interpretation.date(),
                 interpretation.pickup(),
-                product.includes(),
-                product.excludes(),
+                includes,
+                excludes,
                 interpretation.rawNotes(),
                 scale
         );
@@ -132,10 +141,11 @@ public class CatalogQuoteService {
     }
 
     public QuoteDraftDto toDraft(QuoteResult q) {
-        String description = q.name() != null ? q.name() : "";
-        if (q.modality() != null && !q.modality().isBlank()) {
-            description = description + " · Modalidad " + q.modality().toLowerCase(Locale.ROOT);
-        }
+        String includes = CatalogExperienceCopy.includesFor(q.code(), q.name(), q.includes());
+        String excludes = CatalogExperienceCopy.excludesFor(q.code(), q.name(), q.excludes());
+        String description = CatalogExperienceCopy.lineDescription(
+                q.name(), q.modality(), q.people(), includes
+        );
         QuoteLineItemDto item = new QuoteLineItemDto(
                 description,
                 q.people(),
@@ -157,22 +167,22 @@ public class CatalogQuoteService {
                 q.pickup(),
                 null,
                 q.notes(),
-                q.includes(),
-                q.excludes(),
+                includes,
+                excludes,
                 q.reviewFlag(),
                 q.priceScaleByPax(),
                 List.of(item),
                 null,
                 null,
                 null,
+                q.pickup(),
                 null,
                 null,
                 null,
                 null,
                 null,
-                q.date(),
                 null,
-                q.notes(),
+                null,
                 null,
                 "DRAFT"
         );
@@ -188,8 +198,17 @@ public class CatalogQuoteService {
         String code = hint.tour() != null ? hint.tour() : "";
         String name = humanizeCode(code);
         int people = hint.people() != null && hint.people() > 0 ? hint.people() : 2;
+        String includes = code.isBlank()
+                ? null
+                : CatalogExperienceCopy.includesFor(code, name, null);
+        String excludes = code.isBlank()
+                ? null
+                : CatalogExperienceCopy.excludesFor(code, name, null);
+        String description = code.isBlank()
+                ? name
+                : CatalogExperienceCopy.lineDescription(name, "PRIVADO", people, includes);
         QuoteLineItemDto item = new QuoteLineItemDto(
-                name,
+                description,
                 people,
                 "pax",
                 BigDecimal.ZERO,
@@ -209,20 +228,20 @@ public class CatalogQuoteService {
                 hint.pickup(),
                 null,
                 "Completa tour, personas y precios en el panel para generar el PDF.",
-                null,
-                null,
+                includes,
+                excludes,
                 false,
                 Map.of(),
                 List.of(item),
                 null,
                 null,
                 null,
+                hint.pickup(),
                 null,
                 null,
                 null,
                 null,
                 null,
-                hint.date(),
                 null,
                 null,
                 null,
