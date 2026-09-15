@@ -132,6 +132,45 @@ class ContramarcadoService:
                 logger.exception("Fallo contramarcado doc=%s", getattr(doc, "id", None))
         return count
 
+    @staticmethod
+    def needs_com_retry(document: DocumentModel) -> bool:
+        """True si aún no tiene un COM resuelto (número de compra)."""
+        return normalize_com(getattr(document, "contramarcado_com", None)) is None
+
+    def apply_missing_for_documents(
+        self,
+        documents: list[DocumentModel],
+        *,
+        batch_id: int | None = None,
+    ) -> tuple[int, int, list[dict]]:
+        """Recontramarca solo documentos sin COM. Retorna (updated, skipped, items)."""
+        updated = 0
+        skipped = 0
+        items: list[dict] = []
+        for doc in documents:
+            if not doc.extracted_json and not doc.numero_documento:
+                skipped += 1
+                continue
+            if not self.needs_com_retry(doc):
+                skipped += 1
+                continue
+            try:
+                result = self.apply_for_document(doc, batch_id=batch_id)
+                updated += 1
+                items.append(
+                    {
+                        "id": doc.id,
+                        "status": result.status,
+                        "com": result.com,
+                        "value": result.value,
+                        "source": result.source,
+                    }
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("Fallo re-contramarcado doc=%s", getattr(doc, "id", None))
+                skipped += 1
+        return updated, skipped, items
+
     def _crossing_candidates(self, document: DocumentModel) -> list[ComCandidate]:
         out: list[ComCandidate] = []
         crossings: list = []

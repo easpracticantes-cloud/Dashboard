@@ -45,6 +45,12 @@ class FolderAskRequest(BaseModel):
     pregunta: str
 
 
+class FolderContramarcadoRequest(BaseModel):
+    """Recontramarca facturas de la carpeta usando Autobits vinculado."""
+
+    only_missing_com: bool = True
+
+
 def _parse_ids(raw: str | None) -> list[int]:
     if not raw:
         return []
@@ -236,6 +242,82 @@ def delete_folder(folder_id: int, db: Session = Depends(get_db)):
     db.delete(folder)
     db.commit()
     return {"ok": True}
+
+
+@router.post("/{folder_id}/contramarcado")
+def recontramarcado_folder(
+    folder_id: int,
+    body: FolderContramarcadoRequest | None = None,
+    db: Session = Depends(get_db),
+):
+    """Vuelve a generar CONTRAMARCADO con el Excel Autobits de la carpeta.
+
+    Por defecto solo toca facturas que aún no tienen COM (pendiente / ambiguo / vacío).
+    """
+    opts = body or FolderContramarcadoRequest()
+    folder = db.get(InvoiceFolderModel, folder_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Carpeta no encontrada.")
+    if not folder.autobits_batch_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Vincula primero el Excel de Autobits a esta carpeta.",
+        )
+    batch = AutobitsRepository(db).get_batch(folder.autobits_batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote Autobits no encontrado.")
+
+    ids = _parse_ids(folder.document_ids_json)
+    if not ids:
+        raise HTTPException(status_code=400, detail="La carpeta no tiene facturas.")
+
+    repo = DocumentRepository(db)
+    docs = []
+    for doc_id in ids:
+        doc = repo.get_by_id(doc_id)
+        if doc:
+            docs.append(doc)
+    if not docs:
+        raise HTTPException(status_code=400, detail="No hay facturas cargables en la carpeta.")
+
+    from application.services.contramarcado_service import ContramarcadoService
+
+    service = ContramarcadoService(db)
+    if opts.only_missing_com:
+        updated, skipped, items = service.apply_missing_for_documents(
+            docs, batch_id=folder.autobits_batch_id
+        )
+    else:
+        updated = service.apply_for_documents(docs, batch_id=folder.autobits_batch_id)
+        skipped = max(0, len(docs) - updated)
+        items = []
+        for doc in docs:
+            items.append(
+                {
+                    "id": doc.id,
+                    "status": doc.contramarcado_status,
+                    "com": doc.contramarcado_com,
+                    "value": doc.contramarcado,
+                    "source": doc.contramarcado_source,
+                }
+            )
+
+    db.commit()
+    return {
+        "ok": True,
+        "folder_id": folder.id,
+        "autobits_batch_id": folder.autobits_batch_id,
+        "only_missing_com": opts.only_missing_com,
+        "updated": updated,
+        "skipped": skipped,
+        "total": len(docs),
+        "items": items,
+        "folder": _serialize(folder, db),
+        "message": (
+            f"Contramarcado actualizado en {updated} factura(s)"
+            + (f"; {skipped} omitida(s)." if skipped else ".")
+        ),
+    }
 
 
 @router.post("/{folder_id}/ask")

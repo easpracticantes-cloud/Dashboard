@@ -95,6 +95,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   chatMsgs = signal<ChatMsg[]>([]);
   preguntando = signal(false);
   copiadoId = signal<number | null>(null);
+  recontramarcando = signal(false);
 
   private poll?: Subscription;
   private autobitsUpload?: Subscription;
@@ -768,6 +769,54 @@ export class WizardComponent implements OnInit, OnDestroy {
     } catch {
       this.feedback.error('No se pudo copiar el contramarcado.');
     }
+  }
+
+  volverAContramarcar(): void {
+    const folder = this.carpetaActiva();
+    if (!folder?.id) {
+      this.feedback.error('Elige una carpeta primero.');
+      return;
+    }
+    if (!folder.autobits_batch_id) {
+      this.feedback.error('Carga el Excel de Autobits y vincúlalo a la carpeta.');
+      return;
+    }
+    if (this.recontramarcando()) return;
+
+    const pendientes = this.documentos().filter((d) => {
+      const com = (d.contramarcado?.com || '').trim();
+      if (!com) return true;
+      const upper = com.toUpperCase().replace(/\s+/g, '');
+      return upper === 'COMPENDIENTE' || upper.includes('PENDIENTE');
+    }).length;
+
+    this.recontramarcando.set(true);
+    this.feedback.info(
+      pendientes
+        ? `Buscando COM en Autobits para ${pendientes} factura(s) sin COM…`
+        : 'Revisando facturas sin COM contra Autobits…'
+    );
+    this.foldersApi
+      .recontramarcado(folder.id, true)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.recontramarcando.set(false))
+      )
+      .subscribe({
+        next: (res) => {
+          if (res.folder) {
+            this.aplicarCarpeta(res.folder);
+          } else {
+            this.seleccionarCarpeta(folder.id);
+          }
+          this.feedback.success(
+            res.message ||
+              `Contramarcado: ${res.updated} actualizada(s), ${res.skipped} omitida(s).`
+          );
+        },
+        error: (err) =>
+          this.feedback.error(this.detalleError(err, 'No se pudo volver a contramarcar.')),
+      });
   }
 
   private cargarCarpetas(restoreActive = false): void {

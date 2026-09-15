@@ -107,4 +107,27 @@ export class FoldersApiService {
       error?: string | null;
     }>(`${this.base}/${id}/ask`, { pregunta });
   }
+
+  recontramarcado(
+    id: number,
+    onlyMissingCom = true
+  ): Observable<{
+    ok: boolean;
+    updated: number;
+    skipped: number;
+    total: number;
+    message: string;
+    folder: InvoiceFolder;
+    items?: Array<{ id: number; status?: string; com?: string | null; value?: string | null }>;
+  }> {
+    return this.http.post<{
+      ok: boolean;
+      updated: number;
+      skipped: number;
+      total: number;
+      message: string;
+      folder: InvoiceFolder;
+      items?: Array<{ id: number; status?: string; com?: string | null; value?: string | null }>;
+    }>(`${this.base}/${id}/contramarcado`, { only_missing_com: onlyMissingCom });
+  }
 }

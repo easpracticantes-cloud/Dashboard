@@ -202,7 +202,20 @@
         </ul>
       }
       @if (documentos().length) {
-        <h4 class="wiz__sub">Facturas en la carpeta</h4>
+        <div class="wiz__sub-row">
+          <h4 class="wiz__sub">Facturas en la carpeta</h4>
+          @if (carpetaActiva()?.autobits_batch_id) {
+            <button
+              type="button"
+              class="wiz__ghost wiz__ghost--tiny"
+              (click)="volverAContramarcar()"
+              [disabled]="recontramarcando() || limpiando() || !documentos().length"
+              title="Busca COM en Autobits solo para facturas que aún no lo tienen"
+            >
+              {{ recontramarcando() ? 'Contramarcar…' : 'Volver a contramarcar' }}
+            </button>
+          }
+        </div>
         <div class="wiz__table-wrap">
           <table class="wiz__table">
             <thead>

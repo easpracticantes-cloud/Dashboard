@@ -305,6 +305,19 @@
   font-size: 0.92rem;
 }
 
+.wiz__sub-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.85rem;
+  margin: 1rem 0 0.5rem;
+
+  .wiz__sub {
+    margin: 0;
+  }
+}
+
 .wiz__table-wrap {
   width: 100%;
   max-width: 100%;
