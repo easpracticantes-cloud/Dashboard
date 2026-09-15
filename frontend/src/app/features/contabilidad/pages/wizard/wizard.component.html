@@ -129,39 +129,57 @@
             }
           </span>
           <div class="wiz__drop-actions">
-            <label class="wiz__copy wiz__copy--primary">
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.webp"
-                multiple
-                (change)="onFacturas($event)"
-                [disabled]="subiendoFacturas()"
-                hidden
-              />
+            <button
+              type="button"
+              class="wiz__copy wiz__copy--primary"
+              (click)="facturasFileInput.click()"
+              [disabled]="subiendoFacturas()"
+            >
               Factura(s)
-            </label>
-            <label class="wiz__copy">
-              <input
-                type="file"
-                accept=".zip,application/zip"
-                (change)="onFacturasZip($event)"
-                [disabled]="subiendoFacturas()"
-                hidden
-              />
+            </button>
+            <input
+              #facturasFileInput
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+              multiple
+              (change)="onFacturas($event)"
+              [disabled]="subiendoFacturas()"
+              hidden
+            />
+            <button
+              type="button"
+              class="wiz__copy"
+              (click)="facturasZipInput.click()"
+              [disabled]="subiendoFacturas()"
+            >
               ZIP
-            </label>
-            <label class="wiz__copy">
-              <input
-                type="file"
-                multiple
-                (change)="onFacturasCarpeta($event)"
-                [disabled]="subiendoFacturas()"
-                hidden
-                [attr.webkitdirectory]="''"
-                [attr.directory]="''"
-              />
+            </button>
+            <input
+              #facturasZipInput
+              type="file"
+              accept=".zip,application/zip,application/x-zip-compressed"
+              (change)="onFacturasZip($event)"
+              [disabled]="subiendoFacturas()"
+              hidden
+            />
+            <button
+              type="button"
+              class="wiz__copy"
+              (click)="facturasCarpetaInput.click()"
+              [disabled]="subiendoFacturas()"
+            >
               Carpeta
-            </label>
+            </button>
+            <input
+              #facturasCarpetaInput
+              type="file"
+              multiple
+              (change)="onFacturasCarpeta($event)"
+              [disabled]="subiendoFacturas()"
+              hidden
+              [attr.webkitdirectory]="''"
+              [attr.directory]="''"
+            />
           </div>
         </div>
       </div>

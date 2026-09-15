@@ -3,15 +3,15 @@ package com.escuelaaves.sig.infrastructure.adapter.in.web;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -82,8 +82,11 @@ public class ContabilidadProxyController {
         copyRequestHeaders(request, headers);
 
         try {
-            if (request instanceof MultipartHttpServletRequest multipart) {
-                return forwardMultipart(target, method, headers, multipart);
+            String contentType = request.getContentType();
+            boolean multipart = contentType != null
+                    && contentType.toLowerCase().startsWith("multipart/");
+            if (multipart && request instanceof MultipartHttpServletRequest multi) {
+                return forwardMultipart(target, method, headers, multi);
             }
 
             byte[] payload = StreamUtils.copyToByteArray(request.getInputStream());
@@ -92,6 +95,10 @@ public class ContabilidadProxyController {
                     .method(method)
                     .uri(URI.create(target))
                     .headers(h -> h.addAll(headers));
+
+            if (contentType != null && !contentType.isBlank()) {
+                spec = spec.header(HttpHeaders.CONTENT_TYPE, contentType);
+            }
 
             ResponseEntity<byte[]> upstream = payload.length > 0
                     ? spec.body(payload).retrieve().toEntity(byte[].class)
@@ -102,15 +109,21 @@ public class ContabilidadProxyController {
                     .body(upstream.getBody());
         } catch (RestClientResponseException ex) {
             log.warn("[ContabilidadProxy] upstream {} → {}", target, ex.getStatusCode());
+            byte[] body = ex.getResponseBodyAsByteArray();
+            if (body == null || body.length == 0) {
+                String fallback = "{\"detail\":\"" + ex.getStatusCode().value()
+                        + " " + ex.getStatusText() + "\"}";
+                body = fallback.getBytes(StandardCharsets.UTF_8);
+            }
             return ResponseEntity.status(ex.getStatusCode())
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(ex.getResponseBodyAsByteArray());
+                    .body(body);
         } catch (Exception ex) {
-            log.error("[ContabilidadProxy] Error llamando {}: {}", target, ex.getMessage());
+            log.error("[ContabilidadProxy] Error llamando {}: {}", target, ex.getMessage(), ex);
             String hint = contableBase.contains("localhost")
                     ? " Arranca el servicio Contabilidad o define CONTABLE_API_BASE=http://contabilidad:8787 en Docker."
                     : " Revisa que el contenedor contabilidad esté healthy y CONTABLE_API_BASE apunte a la red Docker.";
-            String msg = "{\"message\":\"Servicio Contabilidad no disponible." + hint + "\"}";
+            String msg = "{\"detail\":\"Servicio Contabilidad no disponible." + hint + "\",\"message\":\"Servicio Contabilidad no disponible." + hint + "\"}";
             return ResponseEntity.status(502)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(msg.getBytes(StandardCharsets.UTF_8));
@@ -122,35 +135,76 @@ public class ContabilidadProxyController {
             HttpMethod method,
             HttpHeaders headers,
             MultipartHttpServletRequest multipart
-    ) {
+    ) throws IOException {
         headers.remove(HttpHeaders.CONTENT_TYPE);
-        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        int fileParts = 0;
+
         multipart.getParameterMap().forEach((key, values) -> {
-            if (values != null) {
-                for (String v : values) {
-                    form.add(key, v);
-                }
+            if (values == null) {
+                return;
+            }
+            for (String v : values) {
+                builder.part(key, v == null ? "" : v);
             }
         });
+
         for (Map.Entry<String, List<MultipartFile>> entry : multipart.getMultiFileMap().entrySet()) {
             List<MultipartFile> files = entry.getValue();
             if (files == null) {
                 continue;
             }
             for (MultipartFile file : files) {
-                if (file == null || file.isEmpty()) {
+                if (file == null) {
                     continue;
                 }
-                form.add(entry.getKey(), file.getResource());
+                byte[] bytes = file.getBytes();
+                if (bytes.length == 0) {
+                    log.warn("[ContabilidadProxy] Parte vacía ignorada: field={} name={}",
+                            entry.getKey(), file.getOriginalFilename());
+                    continue;
+                }
+                String filename = file.getOriginalFilename();
+                if (filename == null || filename.isBlank()) {
+                    filename = "archivo.bin";
+                }
+                final String partName = filename;
+                ByteArrayResource resource = new ByteArrayResource(bytes) {
+                    @Override
+                    public String getFilename() {
+                        return partName;
+                    }
+                };
+                MediaType partType = MediaType.APPLICATION_OCTET_STREAM;
+                String ct = file.getContentType();
+                if (ct != null && !ct.isBlank()) {
+                    try {
+                        partType = MediaType.parseMediaType(ct);
+                    } catch (Exception ignored) {
+                        // keep octet-stream
+                    }
+                }
+                builder.part(entry.getKey(), resource)
+                        .filename(partName)
+                        .contentType(partType);
+                fileParts++;
             }
         }
 
+        if (fileParts == 0 && target.contains("/upload")) {
+            log.warn("[ContabilidadProxy] Multipart sin archivos hacia {}", target);
+            return ResponseEntity.status(400)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body("{\"detail\":\"No se recibieron archivos en la subida (multipart vacío).\"}"
+                            .getBytes(StandardCharsets.UTF_8));
+        }
+
+        log.info("[ContabilidadProxy] multipart → {} ({} archivo(s))", target, fileParts);
         ResponseEntity<byte[]> upstream = restClientBuilder.build()
                 .method(method)
                 .uri(URI.create(target))
                 .headers(h -> h.addAll(headers))
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(form)
+                .body(builder.build())
                 .retrieve()
                 .toEntity(byte[].class);
 
@@ -166,7 +220,8 @@ public class ContabilidadProxyController {
             if (name == null) continue;
             String lower = name.toLowerCase();
             if (lower.equals("host") || lower.equals("content-length") || lower.equals("connection")
-                    || lower.equals("authorization")) {
+                    || lower.equals("authorization") || lower.equals("transfer-encoding")
+                    || lower.equals("content-type") || lower.equals("accept-encoding")) {
                 continue;
             }
             Enumeration<String> values = request.getHeaders(name);
@@ -175,7 +230,6 @@ public class ContabilidadProxyController {
             }
         }
         headers.setAccept(List.of(MediaType.ALL));
-        // Identidad real del JWT (FastAPI no tiene login propio).
         injectSigIdentity(headers);
     }
 

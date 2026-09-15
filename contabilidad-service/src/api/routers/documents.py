@@ -52,6 +52,19 @@ def _invoice_basename(path: str) -> str | None:
 
 def _expand_zip_invoices(filename: str, content: bytes) -> list[tuple[str, bytes]]:
     """Extrae facturas de un ZIP de carpeta; ignora basura de macOS/Windows."""
+    if not content:
+        raise DocumentUploadError(
+            code="EMPTY_ZIP",
+            message=f'El ZIP "{filename}" llegó vacío al servidor.',
+        )
+    if content[:2] != b"PK":
+        raise DocumentUploadError(
+            code="INVALID_ZIP",
+            message=(
+                f'"{filename}" no parece un ZIP (cabecera inválida). '
+                "Comprueba que sea .zip y no un acceso directo o .rar."
+            ),
+        )
     out: list[tuple[str, bytes]] = []
     try:
         with zipfile.ZipFile(io.BytesIO(content)) as zf:
@@ -67,6 +80,11 @@ def _expand_zip_invoices(filename: str, content: bytes) -> list[tuple[str, bytes
                     continue
                 if not raw:
                     continue
+                # Evitar choques de nombre entre subcarpetas
+                if any(name == base for name, _ in out):
+                    stem = PurePosixPath(base).stem
+                    ext = PurePosixPath(base).suffix
+                    base = f"{stem}_{len(out) + 1}{ext}"
                 out.append((base, raw))
     except zipfile.BadZipFile as e:
         raise DocumentUploadError(
@@ -347,14 +365,6 @@ async def upload_documents_batch(
         else:
             payloads.append((filename, content))
 
-    if len(payloads) > BATCH_PACK_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Máximo {BATCH_PACK_SIZE} facturas por carga "
-                f"(tras expandir ZIP: {len(payloads)}). Divide el lote."
-            ),
-        )
     if not payloads and expand_errors:
         return BatchUploadResponse(
             total_recibidos=0,
@@ -368,6 +378,17 @@ async def upload_documents_batch(
         )
     if not payloads:
         raise HTTPException(status_code=400, detail="No se recibieron facturas válidas.")
+
+    # Tras expandir ZIP se aceptan más de 25; el OCR sigue en paquetes de BATCH_PACK_SIZE.
+    max_total = BATCH_PACK_SIZE * 8
+    if len(payloads) > max_total:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Demasiadas facturas en esta carga ({len(payloads)}). "
+                f"Máximo {max_total} por vez; divide el ZIP o la carpeta."
+            ),
+        )
 
     service = DocumentService(db)
     items: list[BatchUploadItem] = list(expand_errors)

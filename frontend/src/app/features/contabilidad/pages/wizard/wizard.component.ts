@@ -423,12 +423,7 @@ export class WizardComponent implements OnInit, OnDestroy {
       );
       return;
     }
-    if (hasZip && looseCount > PACK_MAX) {
-      this.error.set(
-        `Máximo ${PACK_MAX} facturas por carga (sin contar el ZIP). Seleccionaste ${looseCount}.`
-      );
-      return;
-    }
+    // ZIP: el backend expande y procesa en paquetes; no bloquear aquí por looseCount.
     this.subiendoFacturas.set(true);
     this.error.set('');
     const label =
@@ -448,6 +443,16 @@ export class WizardComponent implements OnInit, OnDestroy {
         next: (res) => {
           this.facturaItems.set([...(res.items || [])]);
           const nuevos = this.idsDePaquete(res.queued_ids, res.items);
+          if (!nuevos.length) {
+            const failMsg =
+              res.mensaje ||
+              (res.items || []).find((i) => i.error)?.error ||
+              'No se integró ninguna factura (¿ZIP vacío o extensión no válida?).';
+            this.error.set(failMsg);
+            this.aviso.set('');
+            this.packMsg.set(failMsg);
+            return;
+          }
           const previos = [
             ...(folder.document_ids || []),
             ...this.idsFacturasOperacion(),
@@ -475,7 +480,13 @@ export class WizardComponent implements OnInit, OnDestroy {
                 this.refrescarFacturas();
                 this.startPoll();
               },
-              error: () => {
+              error: (err) => {
+                this.error.set(
+                  this.detalleError(
+                    err,
+                    'Las facturas se subieron pero no se pudieron vincular a la carpeta.'
+                  )
+                );
                 this.refrescarFacturas();
                 this.startPoll();
               },
@@ -484,6 +495,7 @@ export class WizardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.error.set(this.detalleError(err, 'No se pudieron subir las facturas.'));
+          this.aviso.set('');
         },
       });
   }
@@ -795,27 +807,83 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private detalleError(
-    err: { status?: number; error?: { detail?: unknown; message?: string; error?: string } },
+    err: {
+      status?: number;
+      statusText?: string;
+      message?: string;
+      error?: unknown;
+    },
     fallback: string
   ): string {
     const status = err?.status;
-    const d = err?.error?.detail ?? err?.error?.message ?? err?.error?.error;
+    const body = err?.error;
+
+    if (typeof body === 'string' && body.trim()) {
+      const trimmed = body.trim();
+      if (trimmed.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(trimmed) as { detail?: unknown; message?: string };
+          const nested = this.formatDetail(parsed.detail ?? parsed.message);
+          if (nested) return this.withStatus(status, nested);
+        } catch {
+          /* plain text */
+        }
+      }
+      if (!trimmed.startsWith('<')) {
+        return this.withStatus(status, trimmed);
+      }
+    }
+
+    if (body && typeof body === 'object') {
+      const obj = body as { detail?: unknown; message?: string; error?: string };
+      const nested = this.formatDetail(obj.detail ?? obj.message ?? obj.error);
+      if (nested) return this.withStatus(status, nested);
+    }
+
     if (status === 404) {
       return (
-        (typeof d === 'string' && d !== 'Not Found' ? d : null) ||
-        'API de carpetas no encontrada. Hay que reconstruir el servicio Contabilidad en el servidor (docker compose build contabilidad).'
+        'Endpoint no encontrado (404). Reconstruye contabilidad + backend en el servidor: '
+        + 'docker compose build contabilidad backend && docker compose up -d contabilidad backend'
       );
     }
-    if (typeof d === 'string') return d;
+    if (status === 413) {
+      return 'El archivo es demasiado grande para el servidor (413). Prueba un ZIP más pequeño o menos facturas.';
+    }
+    if (status === 502 || status === 503) {
+      return (
+        'Servicio Contabilidad no responde. En el servidor: '
+        + 'sudo docker compose ps contabilidad && sudo docker compose up -d contabilidad'
+      );
+    }
+    if (status === 401 || status === 403) {
+      return 'Sesión sin permiso para Contabilidad. Cierra sesión y vuelve a entrar.';
+    }
+    if (err?.message && !err.message.startsWith('Http failure')) {
+      return this.withStatus(status, err.message);
+    }
+    if (status) {
+      return `${fallback} (HTTP ${status}${err.statusText ? ' ' + err.statusText : ''}).`;
+    }
+    return fallback;
+  }
+
+  private formatDetail(d: unknown): string | null {
+    if (typeof d === 'string' && d.trim()) return d.trim();
     if (Array.isArray(d)) {
-      return d
+      const parts = d
         .map((x) => (typeof x === 'string' ? x : (x as { msg?: string })?.msg || ''))
-        .filter(Boolean)
-        .join(' ');
+        .filter(Boolean);
+      return parts.length ? parts.join(' ') : null;
     }
     if (d && typeof d === 'object' && 'message' in d) {
       return String((d as { message: string }).message);
     }
-    return fallback;
+    return null;
+  }
+
+  private withStatus(status: number | undefined, message: string): string {
+    if (!status || status === 400 || status === 409) return message;
+    if (message.includes(`HTTP ${status}`)) return message;
+    return `${message} (HTTP ${status})`;
   }
 }
