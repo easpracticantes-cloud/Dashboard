@@ -34,15 +34,15 @@
   margin: 0;
 }
 
-/* ——— Hero con ave ilustrada fundida ——— */
+/* ——— Hero: colibrí real fundido (máscara + velos), no sticker ——— */
 .qs-hero {
   position: relative;
   display: grid;
-  grid-template-columns: 1.05fr 1.2fr 0.95fr;
-  min-height: 214px;
+  grid-template-columns: 1.02fr 1.28fr 0.95fr;
+  min-height: 228px;
   background:
-    radial-gradient(ellipse 70% 80% at 18% 70%, rgba(20, 100, 69, 0.08), transparent 50%),
-    linear-gradient(108deg, #fbfaf6 0%, #f5f8f3 36.5%, #0c4635 36.7%, #0a3d2e 100%);
+    radial-gradient(ellipse 55% 70% at 48% 42%, rgba(26, 120, 78, 0.22), transparent 62%),
+    linear-gradient(108deg, #fbfaf6 0%, #f5f8f3 35.8%, #0c4635 36%, #0a3d2e 100%);
   overflow: hidden;
 }
 
@@ -76,27 +76,96 @@
   z-index: 4;
   display: grid;
   place-items: end center;
-  padding: 8px 0 0;
+  align-self: stretch;
+  padding: 0;
   pointer-events: none;
+  min-height: 0;
+}
+
+.qs-hero__bloom {
+  position: absolute;
+  inset: 8% 4% 12% 8%;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 42% 40%, rgba(180, 230, 90, 0.35), transparent 55%),
+    radial-gradient(ellipse at 55% 50%, rgba(10, 61, 46, 0.45), transparent 70%);
+  filter: blur(18px);
+  opacity: 0.85;
+  z-index: 0;
+}
+
+.qs-hero__bird-wrap {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 360px);
+  aspect-ratio: 4 / 5;
+  margin: 0 0 -36px;
+  padding: 0;
+  transform: translateX(4%);
+  animation: qs-bird-in 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+  -webkit-mask-image:
+    linear-gradient(to bottom, #000 0%, #000 58%, rgba(0, 0, 0, 0.55) 78%, transparent 100%),
+    radial-gradient(ellipse 72% 78% at 44% 38%, #000 28%, rgba(0, 0, 0, 0.75) 52%, transparent 78%);
+  mask-image:
+    linear-gradient(to bottom, #000 0%, #000 58%, rgba(0, 0, 0, 0.55) 78%, transparent 100%),
+    radial-gradient(ellipse 72% 78% at 44% 38%, #000 28%, rgba(0, 0, 0, 0.75) 52%, transparent 78%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  filter: drop-shadow(0 22px 36px rgba(4, 28, 18, 0.42));
 }
 
 .qs-hero__bird {
-  width: min(100%, 318px);
-  height: auto;
-  margin-bottom: -22px;
-  filter: drop-shadow(0 18px 32px rgba(4, 30, 20, 0.38));
-  transform: translateX(6%);
-  animation: qs-bird-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 42% 28%;
+  transform: scale(1.08);
+}
+
+.qs-hero__veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.qs-hero__veil--paper {
+  background: linear-gradient(
+    100deg,
+    rgba(251, 250, 246, 0.92) 0%,
+    rgba(245, 248, 243, 0.45) 22%,
+    transparent 48%
+  );
+  mix-blend-mode: lighten;
+  opacity: 0.9;
+}
+
+.qs-hero__veil--forest {
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(10, 61, 46, 0.35) 58%,
+    rgba(6, 38, 28, 0.72) 100%
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.95;
+}
+
+.qs-hero__veil--depth {
+  background:
+    radial-gradient(ellipse 55% 50% at 40% 32%, rgba(255, 255, 255, 0.18), transparent 55%),
+    radial-gradient(ellipse 80% 85% at 50% 45%, transparent 40%, rgba(6, 38, 28, 0.35) 100%);
+  mix-blend-mode: soft-light;
 }
 
 @keyframes qs-bird-in {
   from {
     opacity: 0;
-    transform: translateX(6%) translateY(14px) scale(0.95);
+    transform: translateX(4%) translateY(18px) scale(0.97);
   }
   to {
     opacity: 1;
-    transform: translateX(6%) translateY(0) scale(1);
+    transform: translateX(4%) translateY(0) scale(1);
   }
 }
 
@@ -1017,13 +1086,13 @@
 
   .qs-hero__creature {
     order: 2;
-    min-height: 150px;
+    min-height: 190px;
   }
 
-  .qs-hero__bird {
-    margin-bottom: -28px;
+  .qs-hero__bird-wrap {
+    width: min(280px, 78%);
+    margin-bottom: -42px;
     transform: none;
-    width: min(240px, 70%);
   }
 
   .qs-hero__services {
@@ -1074,7 +1143,14 @@
     display: none !important;
   }
 
-  .qs-hero__bird {
+  .qs-hero__bird-wrap {
     animation: none;
+  }
+
+  .qs-hero__veil--paper,
+  .qs-hero__veil--forest {
+    /* PDF engines a veces fallan con blend modes: opacidad un poco más baja */
+    mix-blend-mode: normal;
+    opacity: 0.55;
   }
 }

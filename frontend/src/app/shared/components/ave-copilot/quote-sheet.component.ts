@@ -17,11 +17,11 @@ import {
   buildQuoteNumber,
   formatCop,
   formatQuoteDate,
+  QUOTE_BIRD_ART,
   QUOTE_LOGO,
   toIsoDate
 } from './quote-template';
 
-const BIRD_ART = 'assets/brand/quote-bird-illustration.svg';
 const MODALITIES = ['Privado', 'Compartido', 'Grupo', 'A medida'] as const;
 
 @Component({
@@ -39,7 +39,7 @@ export class QuoteSheetComponent {
 
   readonly company = ESCUELA_AVES_COMPANY;
   readonly logo = QUOTE_LOGO;
-  readonly birdArt = BIRD_ART;
+  readonly birdArt = QUOTE_BIRD_ART;
   readonly presets = QUOTE_PACKAGE_PRESETS;
   readonly modalities = MODALITIES;
 
