@@ -49,7 +49,7 @@ export class HelpComponent {
     {
       icon: 'account_balance',
       title: 'Contabilidad',
-      body: 'Flujo semanal de Contabilidad: Autobits → paquete de facturas (hasta 25) → Generar Excel de cruce. Pagos y paquetes son pasos siguientes.',
+      body: 'Contabilidad es un solo módulo: crea la carpeta, añade facturas (hasta 25 por carga), carga Autobits cuando quieras y genera el Excel de cruce.',
       route: '/app/contabilidad',
       routeLabel: 'Abrir Contabilidad',
       steps: [

@@ -1,7 +1,7 @@
 <div class="wiz">
   <header class="wiz__hero">
     <p class="wiz__lead">
-      Facturas en carpetas (archivos, carpeta o ZIP) y Autobits cuando quieras: mismo módulo, sin bloquearse entre sí.
+      Crea una carpeta, mete las facturas ahí dentro y carga Autobits cuando quieras — todo en esta misma pantalla.
     </p>
     <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando()">
       {{ limpiando() ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
@@ -43,10 +43,10 @@
   <section class="wiz__card">
     <div class="wiz__row">
       <div>
-        <h3>1. Carpetas de facturas</h3>
+        <h3>1. Carpeta y facturas</h3>
         <p>
-          Crea una carpeta por semana y mete facturas sueltas, una carpeta del PC o un ZIP
-          (máx. {{ packMax }} facturas por carga). Autobits se carga aparte, cuando quieras.
+          Primero crea o elige la carpeta. Luego añade facturas ahí (archivos, carpeta del PC o ZIP;
+          máx. {{ packMax }} por carga).
         </p>
       </div>
       <button

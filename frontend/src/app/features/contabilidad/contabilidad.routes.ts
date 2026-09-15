@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 
+/** Contabilidad = un solo flujo (wizard). Rutas viejas redirigen aquí. */
 export const CONTABILIDAD_ROUTES: Routes = [
   {
     path: '',
@@ -11,63 +12,16 @@ export const CONTABILIDAD_ROUTES: Routes = [
         loadComponent: () =>
           import('./pages/wizard/wizard.component').then((m) => m.WizardComponent),
       },
-      {
-        path: 'documentos',
-        pathMatch: 'full',
-        loadComponent: () =>
-          import('./pages/documents/documents-list.component').then(
-            (m) => m.DocumentsListComponent,
-          ),
-      },
-      {
-        path: 'documentos/:id',
-        loadComponent: () =>
-          import('./pages/documents/document-detail.component').then(
-            (m) => m.DocumentDetailComponent,
-          ),
-      },
-      {
-        path: 'autobits',
-        loadComponent: () =>
-          import('./pages/autobits/autobits.component').then((m) => m.AutobitsComponent),
-      },
-      {
-        path: 'pagos',
-        loadComponent: () =>
-          import('./pages/payments/payments.component').then((m) => m.PaymentsComponent),
-      },
-      {
-        path: 'paquetes',
-        loadComponent: () =>
-          import('./pages/packages/packages.component').then((m) => m.PackagesComponent),
-      },
-      {
-        path: 'subsanaciones',
-        loadComponent: () =>
-          import('./pages/remediations/remediations.component').then(
-            (m) => m.RemediationsComponent,
-          ),
-      },
-      {
-        path: 'cruce',
-        pathMatch: 'full',
-        redirectTo: '',
-      },
-      {
-        path: 'cola',
-        pathMatch: 'full',
-        redirectTo: 'documentos',
-      },
-      {
-        path: 'dashboard',
-        pathMatch: 'full',
-        redirectTo: '',
-      },
-      {
-        path: 'pendientes',
-        pathMatch: 'full',
-        redirectTo: 'pagos',
-      },
+      { path: 'documentos', pathMatch: 'full', redirectTo: '' },
+      { path: 'documentos/:id', redirectTo: '' },
+      { path: 'autobits', pathMatch: 'full', redirectTo: '' },
+      { path: 'pagos', pathMatch: 'full', redirectTo: '' },
+      { path: 'paquetes', pathMatch: 'full', redirectTo: '' },
+      { path: 'subsanaciones', pathMatch: 'full', redirectTo: '' },
+      { path: 'cruce', pathMatch: 'full', redirectTo: '' },
+      { path: 'cola', pathMatch: 'full', redirectTo: '' },
+      { path: 'dashboard', pathMatch: 'full', redirectTo: '' },
+      { path: 'pendientes', pathMatch: 'full', redirectTo: '' },
     ],
   },
 ];
