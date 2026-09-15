@@ -23,6 +23,8 @@ import { formatCop } from '../../utils/contabilidad-labels';
 const SESSION_KEY = 'contab-wizard-session';
 const FOLDER_KEY = 'contab-wizard-folder-id';
 const PACK_MAX = 25;
+/** Por debajo del client_max_body_size típico del Nginx host Oracle (25m). */
+const PACK_MAX_BYTES = 18 * 1024 * 1024;
 
 interface ChatMsg {
   role: 'user' | 'ia';
@@ -441,10 +443,20 @@ export class WizardComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const chunks: File[][] = [];
-    for (let i = 0; i < invoices.length; i += PACK_MAX) {
-      chunks.push(invoices.slice(i, i + PACK_MAX));
+    const tooBig = invoices.filter((f) => f.size > PACK_MAX_BYTES);
+    if (tooBig.length) {
+      this.subiendoFacturas.set(false);
+      this.error.set(
+        `Estas facturas pesan más de 18 MB y el proxy las bloquea: ${tooBig
+          .slice(0, 3)
+          .map((f) => f.name)
+          .join(', ')}${tooBig.length > 3 ? '…' : ''}. Comprime o divide el PDF.`
+      );
+      this.aviso.set('');
+      return;
     }
+
+    const chunks = this.chunkFilesBySize(invoices, PACK_MAX, PACK_MAX_BYTES);
 
     const allItems: BatchUploadItem[] = [];
     const allNuevos: number[] = [];
@@ -529,6 +541,27 @@ export class WizardComponent implements OnInit, OnDestroy {
         },
       });
     this.paso.set(1);
+  }
+
+  /** Parte por cantidad y por peso para no superar el Nginx del host (~25m). */
+  private chunkFilesBySize(files: File[], maxCount: number, maxBytes: number): File[][] {
+    const chunks: File[][] = [];
+    let current: File[] = [];
+    let bytes = 0;
+    for (const file of files) {
+      const nextBytes = bytes + file.size;
+      if (current.length && (current.length >= maxCount || nextBytes > maxBytes)) {
+        chunks.push(current);
+        current = [];
+        bytes = 0;
+      }
+      current.push(file);
+      bytes += file.size;
+    }
+    if (current.length) {
+      chunks.push(current);
+    }
+    return chunks;
   }
 
   /** Expande ZIP en el navegador para evitar 413 por archivos grandes. */
@@ -935,9 +968,9 @@ export class WizardComponent implements OnInit, OnDestroy {
     }
     if (status === 413) {
       return (
-        'El archivo supera el límite del proxy (413). '
-        + 'Si usas Nginx en el host Oracle, pon client_max_body_size 250m; '
-        + 'el ZIP ahora se abre en el navegador y se sube por paquetes.'
+        'El proxy Nginx del servidor sigue limitando el tamaño (413). '
+        + 'En Ubuntu ejecuta: sudo sed -i "s/client_max_body_size.*/client_max_body_size 250m;/" '
+        + '/etc/nginx/sites-available/sig && sudo nginx -t && sudo systemctl reload nginx'
       );
     }
     if (status === 502 || status === 503) {
