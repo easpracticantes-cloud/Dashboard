@@ -16,11 +16,12 @@ import {
   DocumentsApiService,
 } from '../../services/documents-api.service';
 import { FacturasApiService } from '../../services/facturas-api.service';
+import { FoldersApiService, InvoiceFolder } from '../../services/folders-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
 import { formatCop } from '../../utils/contabilidad-labels';
 
 const SESSION_KEY = 'contab-wizard-session';
-const PACK_IDS_KEY = 'contab-wizard-pack-ids';
+const FOLDER_KEY = 'contab-wizard-folder-id';
 const PACK_MAX = 25;
 
 interface ChatMsg {
@@ -38,25 +39,25 @@ interface ChatMsg {
 export class WizardComponent implements OnInit, OnDestroy {
   private readonly autobitsApi = inject(AutobitsApiService);
   private readonly docsApi = inject(DocumentsApiService);
+  private readonly foldersApi = inject(FoldersApiService);
   private readonly crossingsApi = inject(CrossingsApiService);
   private readonly download = inject(ContabilidadDownloadService);
   private readonly facturasApi = inject(FacturasApiService);
   private readonly destroyRef = inject(DestroyRef);
 
-  /** Invalida restauraciones HTTP que lleguen después de una acción del usuario. */
   private restoreSeq = 0;
 
   readonly formatCop = formatCop;
   readonly packMax = PACK_MAX;
   readonly steps = [
-    { n: 1, title: 'Excel Autobits', hint: 'Compra, fecha, proveedor y valor de la semana.' },
-    { n: 2, title: 'Facturas + Claude', hint: `Hasta ${PACK_MAX} por paquete. Claude extrae y relaciona.` },
+    { n: 1, title: 'Carpetas + facturas', hint: 'Acumula facturas durante la semana.' },
+    { n: 2, title: 'Autobits + cruce', hint: 'Adjunta el Excel y cruza al final.' },
   ];
   readonly chatSugerencias = [
-    'Resume cada factura: proveedor, número, fecha y total.',
-    '¿Cuáles necesitan revisión y por qué? Lista ambigüedades.',
-    'Lista NIT, compra y reserva detectados.',
-    'Compara totales de facturas contra Autobits.',
+    'Cruza cada factura de la carpeta con Autobits (compra, reserva, valor).',
+    '¿Cuáles necesitan revisión y qué dato de Autobits les falta?',
+    'Lista NIT, compra y reserva detectados en facturas vs Autobits.',
+    'Resume diferencias de totales factura vs Autobits.',
   ];
 
   paso = signal(1);
@@ -65,6 +66,10 @@ export class WizardComponent implements OnInit, OnDestroy {
   error = signal('');
   aviso = signal('');
   aiWarn = signal('');
+
+  carpetas = signal<InvoiceFolder[]>([]);
+  carpetaActiva = signal<InvoiceFolder | null>(null);
+  nuevaCarpetaNombre = '';
 
   subiendoAutobits = signal(false);
   arrastrandoAutobits = signal(false);
@@ -77,12 +82,10 @@ export class WizardComponent implements OnInit, OnDestroy {
   subiendoFacturas = signal(false);
   arrastrandoFacturas = signal(false);
   facturaItems = signal<BatchUploadItem[]>([]);
-  /** IDs del paquete actual / última consulta IA. El Excel no usa el listado global. */
   idsFacturasOperacion = signal<number[]>([]);
   documentos = signal<DocumentSummary[]>([]);
   crossings = signal<CrossingSummary[]>([]);
   packMsg = signal('');
-  solicitud = '';
   chatInput = '';
   chatMsgs = signal<ChatMsg[]>([]);
   preguntando = signal(false);
@@ -92,8 +95,8 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     sessionStorage.setItem(SESSION_KEY, '1');
-    this.restaurarIdsPaquete();
-    this.restaurar();
+    this.cargarCarpetas(true);
+    this.restaurarAutobits();
     this.facturasApi
       .health()
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -126,7 +129,6 @@ export class WizardComponent implements OnInit, OnDestroy {
     return this.verTodosRecords() ? all : all.slice(0, 12);
   });
 
-  /** Solo cruces con factura del paquete + Autobits vinculado (no el lote completo). */
   readonly relaciones = computed(() => {
     const pack = new Set(this.idsFacturasOperacion());
     const docs = new Set(this.documentos().map((d) => d.id));
@@ -143,15 +145,17 @@ export class WizardComponent implements OnInit, OnDestroy {
   );
 
   readonly idsParaExcel = computed(() => {
+    const fromFolder = this.carpetaActiva()?.document_ids || [];
+    if (fromFolder.length) {
+      return fromFolder;
+    }
     const operacion = this.idsFacturasOperacion().filter(
-      (id): id is number => typeof id === 'number' && Number.isFinite(id),
+      (id): id is number => typeof id === 'number' && Number.isFinite(id)
     );
     if (operacion.length) {
       return operacion;
     }
-    return this.facturaItems()
-      .map((item) => item.document?.id)
-      .filter((id): id is number => typeof id === 'number' && Number.isFinite(id));
+    return this.documentos().map((d) => d.id);
   });
 
   readonly idsListosParaExcel = computed(() => {
@@ -185,10 +189,37 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   readonly kpis = computed(() => ({
     autobits: this.autobits()?.imported_rows || this.records().length,
-    facturas: this.documentos().length,
+    facturas: this.idsParaExcel().length || this.documentos().length,
     revision: this.facturasRevision().length,
-    pack: this.idsParaExcel().length,
+    carpetas: this.carpetas().length,
   }));
+
+  crearCarpeta(): void {
+    const name = this.nuevaCarpetaNombre.trim();
+    if (!name) {
+      return;
+    }
+    this.error.set('');
+    this.foldersApi.create(name).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (folder) => {
+        this.nuevaCarpetaNombre = '';
+        this.aviso.set(`Carpeta «${folder.name}» creada.`);
+        this.carpetas.update((list) => [folder, ...list]);
+        this.aplicarCarpeta(folder);
+        this.paso.set(1);
+      },
+      error: (err) => {
+        this.error.set(this.detalleError(err, 'No se pudo crear la carpeta.'));
+      },
+    });
+  }
+
+  seleccionarCarpeta(id: number): void {
+    this.foldersApi.get(id).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (folder) => this.aplicarCarpeta(folder),
+      error: (err) => this.error.set(this.detalleError(err, 'No se pudo abrir la carpeta.')),
+    });
+  }
 
   vaciarImportados(): void {
     if (this.limpiando()) {
@@ -209,18 +240,21 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.restoreSeq += 1;
     this.limpiando.set(true);
     this.error.set('');
-    this.autobitsApi.purgeExcels(true).pipe(
-      takeUntilDestroyed(this.destroyRef),
-      finalize(() => this.limpiando.set(false)),
-    ).subscribe({
-      next: () => {
-        this.resetLocal();
-        this.aviso.set('Cargas anteriores vaciadas. Empieza por Autobits.');
-      },
-      error: (err) => {
-        this.error.set(this.detalleError(err, 'No se pudieron vaciar las cargas.'));
-      },
-    });
+    this.autobitsApi
+      .purgeExcels(true)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.limpiando.set(false))
+      )
+      .subscribe({
+        next: () => {
+          this.resetLocal();
+          this.aviso.set('Cargas anteriores vaciadas. Elige o crea una carpeta de facturas.');
+        },
+        error: (err) => {
+          this.error.set(this.detalleError(err, 'No se pudieron vaciar las cargas.'));
+        },
+      });
   }
 
   @HostListener('document:keydown.escape')
@@ -241,7 +275,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   onAutobitsDragOver(ev: DragEvent): void {
     ev.preventDefault();
     ev.stopPropagation();
-    if (this.subiendoAutobits() || this.limpiando()) return;
+    if (this.subiendoAutobits() || this.limpiando() || !this.carpetaActiva()) return;
     this.arrastrandoAutobits.set(true);
     if (ev.dataTransfer) {
       ev.dataTransfer.dropEffect = 'copy';
@@ -258,7 +292,12 @@ export class WizardComponent implements OnInit, OnDestroy {
     ev.preventDefault();
     ev.stopPropagation();
     this.arrastrandoAutobits.set(false);
-    if (this.subiendoAutobits() || this.limpiando()) return;
+    if (this.subiendoAutobits() || this.limpiando() || !this.carpetaActiva()) {
+      if (!this.carpetaActiva()) {
+        this.error.set('Elige una carpeta antes de subir Autobits.');
+      }
+      return;
+    }
     const file = Array.from(ev.dataTransfer?.files ?? []).find((f) =>
       /\.(xlsx|xls|xlsm|csv)$/i.test(f.name)
     );
@@ -270,41 +309,49 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private subirAutobits(file: File): void {
+    if (!this.carpetaActiva()) {
+      this.error.set('Elige una carpeta antes de subir Autobits.');
+      return;
+    }
     this.restoreSeq += 1;
     this.error.set('');
     this.aviso.set('Leyendo el Excel de Autobits…');
     this.autobitsUpload?.unsubscribe();
     this.subiendoAutobits.set(true);
-    this.autobitsUpload = this.autobitsApi.uploadDirect(file, true).pipe(
-      takeUntilDestroyed(this.destroyRef),
-      finalize(() => this.subiendoAutobits.set(false)),
-    ).subscribe({
-      next: (res) => {
-        this.aplicarAutobits(res);
-        this.paso.set(2);
-      },
-      error: (err) => {
-        this.error.set(this.detalleError(err, 'No se pudo leer el Excel de Autobits.'));
-        this.aviso.set('');
-      },
-    });
+    this.autobitsUpload = this.autobitsApi
+      .uploadDirect(file, true)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.subiendoAutobits.set(false))
+      )
+      .subscribe({
+        next: (res) => {
+          this.aplicarAutobits(res);
+          this.vincularAutobitsACarpeta(res.batch?.id);
+          this.paso.set(2);
+        },
+        error: (err) => {
+          this.error.set(this.detalleError(err, 'No se pudo leer el Excel de Autobits.'));
+          this.aviso.set('');
+        },
+      });
   }
 
   async generarExcel(): Promise<void> {
     if (this.generandoExcel() || !this.puedeGenerarExcel()) return;
     this.generandoExcel.set(true);
     this.error.set('');
-    this.aviso.set('Generando Excel de cruce del paquete…');
+    this.aviso.set('Generando Excel de cruce de la carpeta…');
     try {
       const today = new Date().toISOString().slice(0, 10);
       const documentIds = [...this.idsListosParaExcel()];
       if (!documentIds.length) {
-        this.error.set('Espere a que Claude termine de leer las facturas del paquete.');
+        this.error.set('Espere a que Claude termine de leer las facturas de la carpeta.');
         return;
       }
       await this.download.download(
         this.docsApi.exportExcelUrl(documentIds),
-        `Cruce_Cuentas_${today}.xlsx`,
+        `Cruce_Cuentas_${today}.xlsx`
       );
       this.aviso.set('Excel de cruce descargado.');
     } catch (err) {
@@ -323,7 +370,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   onFacturasDragOver(ev: DragEvent): void {
     ev.preventDefault();
     ev.stopPropagation();
-    if (this.subiendoFacturas() || !this.autobits()) return;
+    if (this.subiendoFacturas() || !this.carpetaActiva()) return;
     this.arrastrandoFacturas.set(true);
     if (ev.dataTransfer) {
       ev.dataTransfer.dropEffect = 'copy';
@@ -340,9 +387,9 @@ export class WizardComponent implements OnInit, OnDestroy {
     ev.preventDefault();
     ev.stopPropagation();
     this.arrastrandoFacturas.set(false);
-    if (this.subiendoFacturas() || !this.autobits()) {
-      if (!this.autobits()) {
-        this.error.set('Carga Autobits antes de subir facturas.');
+    if (this.subiendoFacturas() || !this.carpetaActiva()) {
+      if (!this.carpetaActiva()) {
+        this.error.set('Crea o elige una carpeta antes de subir facturas.');
       }
       return;
     }
@@ -358,52 +405,53 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   private subirFacturas(files: File[]): void {
     if (!files.length) return;
-    if (!this.autobits()) {
-      this.error.set('Carga Autobits antes de subir facturas.');
+    const folder = this.carpetaActiva();
+    if (!folder) {
+      this.error.set('Crea o elige una carpeta antes de subir facturas.');
       return;
     }
     if (files.length > PACK_MAX) {
       this.error.set(
-        `Máximo ${PACK_MAX} facturas por paquete. Seleccionaste ${files.length}. Divide la carga.`
+        `Máximo ${PACK_MAX} facturas por carga. Seleccionaste ${files.length}. Divide la carga.`
       );
       return;
     }
     this.subiendoFacturas.set(true);
     this.error.set('');
-    this.aviso.set(`Subiendo ${files.length} factura(s) y encolando OCR/IA…`);
-    this.docsApi.uploadBatch(files, 'FACTURA', PACK_MAX, this.solicitud).pipe(
-      takeUntilDestroyed(this.destroyRef),
-      finalize(() => this.subiendoFacturas.set(false)),
-    ).subscribe({
-      next: (res) => {
-        this.facturaItems.set([...(res.items || [])]);
-        this.persistirIdsPaquete(this.idsDePaquete(res.queued_ids, res.items));
-        this.packMsg.set(res.mensaje);
-        if (res.total_duplicados) {
-          this.aviso.set(
-            `${res.total_recibidos} recibidas · ${res.total_duplicados} duplicado(s) rechazados.`
-          );
-        } else {
+    this.aviso.set(`Subiendo ${files.length} factura(s) a «${folder.name}»…`);
+    this.docsApi
+      .uploadBatch(files, 'FACTURA', PACK_MAX)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.subiendoFacturas.set(false))
+      )
+      .subscribe({
+        next: (res) => {
+          this.facturaItems.set([...(res.items || [])]);
+          const ids = this.idsDePaquete(res.queued_ids, res.items);
+          this.idsFacturasOperacion.set(ids);
+          this.packMsg.set(res.mensaje);
           this.aviso.set(res.mensaje);
-        }
-        if (this.solicitud.trim()) {
-          this.chatMsgs.update((msgs) => [
-            ...msgs,
-            { role: 'user', text: this.solicitud.trim() },
-            {
-              role: 'ia',
-              text: 'Pedido aplicado al paquete. Cuando termine el OCR te responderé con los datos extraídos.',
-            },
-          ]);
-        }
-        this.refrescarFacturas();
-        this.startPoll();
-        this.paso.set(2);
-      },
-      error: (err) => {
-        this.error.set(this.detalleError(err, 'No se pudieron subir las facturas.'));
-      },
-    });
+          this.foldersApi
+            .addDocuments(folder.id, ids)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: (r) => {
+                this.aplicarCarpeta(r.folder);
+                this.refrescarFacturas();
+                this.startPoll();
+              },
+              error: () => {
+                this.refrescarFacturas();
+                this.startPoll();
+              },
+            });
+          this.paso.set(1);
+        },
+        error: (err) => {
+          this.error.set(this.detalleError(err, 'No se pudieron subir las facturas.'));
+        },
+      });
   }
 
   usarSugerencia(texto: string): void {
@@ -414,21 +462,18 @@ export class WizardComponent implements OnInit, OnDestroy {
   preguntar(): void {
     const pregunta = this.chatInput.trim();
     if (!pregunta || this.preguntando()) return;
-    const ids = this.idsParaExcel().slice(0, PACK_MAX);
-    if (!ids.length) {
-      this.error.set('Sube el paquete de facturas para preguntar a la IA. El chat no usa el listado global.');
+    const folder = this.carpetaActiva();
+    if (!folder) {
+      this.error.set('Elige una carpeta para preguntar a la IA.');
       return;
     }
     this.preguntando.set(true);
     this.chatInput = '';
     this.chatMsgs.update((msgs) => [...msgs, { role: 'user', text: pregunta }]);
-    this.persistirIdsPaquete(ids);
-    this.docsApi.ask(pregunta, ids).subscribe({
+    this.foldersApi.ask(folder.id, pregunta).subscribe({
       next: (res) => {
         this.preguntando.set(false);
-        const texto = res.ok
-          ? res.respuesta
-          : res.error || 'La IA no pudo responder.';
+        const texto = res.ok ? res.respuesta : res.error || 'La IA no pudo responder.';
         this.chatMsgs.update((msgs) => [...msgs, { role: 'ia', text: texto }]);
       },
       error: (err) => {
@@ -449,55 +494,68 @@ export class WizardComponent implements OnInit, OnDestroy {
     return '';
   }
 
-  private anclarPaqueteSiFalta(items: DocumentSummary[]): void {
-    if (this.idsFacturasOperacion().length || this.facturaItems().length) {
+  private cargarCarpetas(restoreActive = false): void {
+    this.foldersApi
+      .list(40)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          const items = res.items || [];
+          this.carpetas.set(items);
+          if (!restoreActive) {
+            return;
+          }
+          const saved = this.leerFolderId();
+          const pick = items.find((f) => f.id === saved) || items[0];
+          if (pick) {
+            this.seleccionarCarpeta(pick.id);
+          } else {
+            this.paso.set(1);
+          }
+        },
+        error: () => {
+          this.aviso.set('No se pudieron cargar carpetas. Puedes crear una nueva.');
+        },
+      });
+  }
+
+  private aplicarCarpeta(folder: InvoiceFolder): void {
+    this.carpetaActiva.set(folder);
+    this.guardarFolderId(folder.id);
+    this.idsFacturasOperacion.set([...(folder.document_ids || [])]);
+    this.refrescarFacturas();
+    if (folder.autobits_batch_id) {
+      this.paso.set(2);
+      this.cargarRecords(folder.autobits_batch_id);
+    } else {
+      this.paso.set(1);
+    }
+  }
+
+  private vincularAutobitsACarpeta(batchId?: number): void {
+    const folder = this.carpetaActiva();
+    if (!folder || !batchId) {
       return;
     }
-    const blocked = new Set(['ANULADO', 'DUPLICADO', 'RECIBIDO', 'PROCESANDO']);
-    const ready = items
-      .filter((d) => typeof d.id === 'number' && !blocked.has((d.estado || '').toUpperCase()))
-      .map((d) => d.id)
-      .slice(0, PACK_MAX);
-    if (ready.length) {
-      this.persistirIdsPaquete(ready);
-    }
-  }
-
-  private persistirIdsPaquete(ids: number[]): void {
-    const clean = ids.filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0);
-    this.idsFacturasOperacion.set(clean);
-    try {
-      if (clean.length) {
-        sessionStorage.setItem(PACK_IDS_KEY, JSON.stringify(clean));
-      } else {
-        sessionStorage.removeItem(PACK_IDS_KEY);
-      }
-    } catch {
-      /* sessionStorage puede estar bloqueado en tests o modo privado */
-    }
-  }
-
-  private restaurarIdsPaquete(): void {
-    try {
-      const raw = sessionStorage.getItem(PACK_IDS_KEY);
-      if (!raw) {
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        return;
-      }
-      this.idsFacturasOperacion.set(
-        parsed.filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0),
-      );
-    } catch {
-      /* JSON inválido o storage no disponible */
-    }
+    this.foldersApi
+      .patch(folder.id, { autobits_batch_id: batchId, status: 'READY' })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.carpetaActiva.set(updated);
+          this.carpetas.update((list) => list.map((f) => (f.id === updated.id ? updated : f)));
+          this.aviso.set(`Autobits vinculado a «${updated.name}». Ya puedes cruzar o preguntar a la IA.`);
+          this.startPoll();
+        },
+        error: () => {
+          this.aviso.set('Autobits cargado, pero no se pudo vincular a la carpeta.');
+        },
+      });
   }
 
   private idsDePaquete(
     queued: number[] | undefined,
-    items: BatchUploadItem[] | undefined,
+    items: BatchUploadItem[] | undefined
   ): number[] {
     const fromQueued = (queued || []).filter((id) => Number.isFinite(id) && id > 0);
     if (fromQueued.length) {
@@ -513,12 +571,11 @@ export class WizardComponent implements OnInit, OnDestroy {
     const fromRes = [...(res.records || [])];
     this.records.set(fromRes);
     if (!fromRes.length) {
-      this.cargarRecords();
+      this.cargarRecords(res.batch?.id);
     }
-    const reused = res.reused ? ' (ya estaba importado; no se vació nada)' : '';
+    const reused = res.reused ? ' (ya estaba importado)' : '';
     this.aviso.set(
-      res.aviso ||
-        `${res.imported_rows} filas de Autobits${reused}. Fecha, cliente y compra listas.`
+      res.aviso || `${res.imported_rows} filas de Autobits${reused}. Listas para la carpeta.`
     );
     if (res.parse_errors?.length) {
       this.error.set(res.parse_errors.slice(0, 3).join(' · '));
@@ -529,44 +586,59 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.autobits.set(null);
     this.records.set([]);
     this.facturaItems.set([]);
-    this.persistirIdsPaquete([]);
+    this.idsFacturasOperacion.set([]);
     this.documentos.set([]);
     this.crossings.set([]);
     this.chatMsgs.set([]);
     this.packMsg.set('');
     this.paso.set(1);
+    const folder = this.carpetaActiva();
+    if (folder) {
+      this.seleccionarCarpeta(folder.id);
+    }
   }
 
-  private cargarRecords(): void {
+  private cargarRecords(batchId?: number): void {
     const seq = this.restoreSeq;
-    const batchId = this.autobits()?.batch?.id;
-    this.autobitsApi.listRecords({ batch_id: batchId, limit: 200 }).pipe(
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: (res) => {
-        if (seq !== this.restoreSeq) return;
-        this.records.set([...(res.items || [])]);
-      },
-      error: () => {
-        if (seq !== this.restoreSeq) return;
-        if (!this.records().length) this.records.set([]);
-      },
-    });
+    const id = batchId || this.autobits()?.batch?.id || this.carpetaActiva()?.autobits_batch_id;
+    this.autobitsApi
+      .listRecords({ batch_id: id ?? undefined, limit: 200 })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          if (seq !== this.restoreSeq) return;
+          this.records.set([...(res.items || [])]);
+        },
+        error: () => {
+          if (seq !== this.restoreSeq) return;
+          if (!this.records().length) this.records.set([]);
+        },
+      });
   }
 
   private refrescarFacturas(): void {
+    const ids = this.idsParaExcel();
     this.docsApi.list({ limit: 200 }).subscribe({
       next: (res) => {
-        const items = res.items || [];
-        this.documentos.set(items);
-        this.anclarPaqueteSiFalta(items);
+        const all = res.items || [];
+        if (ids.length) {
+          const set = new Set(ids);
+          this.documentos.set(all.filter((d) => set.has(d.id)));
+        } else {
+          this.documentos.set(all);
+        }
       },
       error: () => undefined,
     });
-    this.crossingsApi.list({ limit: 200, batch_id: this.autobits()?.batch?.id }).subscribe({
-      next: (res) => this.crossings.set(res.items || []),
-      error: () => undefined,
-    });
+    this.crossingsApi
+      .list({
+        limit: 200,
+        batch_id: this.carpetaActiva()?.autobits_batch_id || this.autobits()?.batch?.id,
+      })
+      .subscribe({
+        next: (res) => this.crossings.set(res.items || []),
+        error: () => undefined,
+      });
   }
 
   private startPoll(): void {
@@ -578,14 +650,17 @@ export class WizardComponent implements OnInit, OnDestroy {
       );
       if (!pending && this.documentos().length) {
         this.poll?.unsubscribe();
-        this.crossingsApi.runMatching(this.autobits()?.batch?.id).subscribe({
-          next: () => this.refrescarFacturas(),
-        });
+        const batchId = this.carpetaActiva()?.autobits_batch_id || this.autobits()?.batch?.id;
+        if (batchId) {
+          this.crossingsApi.runMatching(batchId).subscribe({
+            next: () => this.refrescarFacturas(),
+          });
+        }
       }
     });
   }
 
-  private restaurar(): void {
+  private restaurarAutobits(): void {
     const seq = this.restoreSeq;
     this.autobitsApi.getLatestBatch().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (batch) => {
@@ -597,18 +672,34 @@ export class WizardComponent implements OnInit, OnDestroy {
           skipped_empty: 0,
           parse_errors: [],
         });
-        this.cargarRecords();
-        this.paso.set(2);
-        this.refrescarFacturas();
+        this.cargarRecords(batch.id);
       },
-      error: () => {
-        if (seq !== this.restoreSeq) return;
-        this.paso.set(1);
-      },
+      error: () => undefined,
     });
   }
 
-  private detalleError(err: { error?: { detail?: unknown; message?: string } }, fallback: string): string {
+  private guardarFolderId(id: number): void {
+    try {
+      sessionStorage.setItem(FOLDER_KEY, String(id));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private leerFolderId(): number | null {
+    try {
+      const raw = sessionStorage.getItem(FOLDER_KEY);
+      const n = raw ? Number(raw) : NaN;
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private detalleError(
+    err: { error?: { detail?: unknown; message?: string } },
+    fallback: string
+  ): string {
     const d = err?.error?.detail ?? err?.error?.message;
     if (typeof d === 'string') return d;
     if (Array.isArray(d)) {

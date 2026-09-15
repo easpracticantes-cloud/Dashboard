@@ -1,3 +1,4 @@
+/** @vitest-environment jsdom */
 import { DestroyRef, provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
@@ -6,7 +7,17 @@ import { AutobitsApiService, AutobitsRecord, ImportResult } from '../../services
 import { CrossingsApiService } from '../../services/crossings-api.service';
 import { DocumentsApiService } from '../../services/documents-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
+import { FacturasApiService } from '../../services/facturas-api.service';
+import { FoldersApiService, InvoiceFolder } from '../../services/folders-api.service';
 import { WizardComponent } from './wizard.component';
+
+function clearSession(): void {
+  try {
+    sessionStorage.clear();
+  } catch {
+    /* ignore */
+  }
+}
 
 function xlsxEvent(name = 'semana.xlsx'): Event {
   const file = new File([new Uint8Array([0x50, 0x4b])], name, {
@@ -57,7 +68,18 @@ function importResult(rows: AutobitsRecord[], extra: Partial<ImportResult> = {})
   };
 }
 
-describe('WizardComponent Autobits Excel flow', () => {
+function folder(partial: Partial<InvoiceFolder> = {}): InvoiceFolder {
+  return {
+    id: 7,
+    name: 'Semana test',
+    status: 'OPEN',
+    document_ids: [],
+    document_count: 0,
+    ...partial,
+  };
+}
+
+describe('WizardComponent carpetas + Autobits', () => {
   let autobitsApi: {
     uploadDirect: ReturnType<typeof vi.fn>;
     getLatestBatch: ReturnType<typeof vi.fn>;
@@ -70,15 +92,35 @@ describe('WizardComponent Autobits Excel flow', () => {
     ask: ReturnType<typeof vi.fn>;
     exportExcelUrl: ReturnType<typeof vi.fn>;
   };
+  let foldersApi: {
+    list: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    patch: ReturnType<typeof vi.fn>;
+    addDocuments: ReturnType<typeof vi.fn>;
+    ask: ReturnType<typeof vi.fn>;
+  };
   let download: { download: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    sessionStorage.clear();
+    clearSession();
     autobitsApi = {
       uploadDirect: vi.fn(),
       getLatestBatch: vi.fn(() => throwError(() => ({ status: 404 }))),
       listRecords: vi.fn(() => of({ items: [], total: 0 })),
       purgeExcels: vi.fn(() => of({ ok: true, deleted: { batches: 1 } })),
+    };
+    foldersApi = {
+      list: vi.fn(() => of({ total: 0, items: [] })),
+      get: vi.fn((id: number) => of(folder({ id }))),
+      create: vi.fn((name: string) => of(folder({ name }))),
+      patch: vi.fn((_id: number, body: { autobits_batch_id?: number }) =>
+        of(folder({ autobits_batch_id: body.autobits_batch_id, status: 'READY' }))
+      ),
+      addDocuments: vi.fn((id: number, documentIds: number[]) =>
+        of({ ok: true, added: documentIds.length, folder: folder({ id, document_ids: documentIds }) })
+      ),
+      ask: vi.fn(() => of({ ok: true, respuesta: 'ok', documentos: 1, autobits: 1, folder_id: 7 })),
     };
 
     await TestBed.configureTestingModule({
@@ -93,9 +135,14 @@ describe('WizardComponent Autobits Excel flow', () => {
             uploadBatch: vi.fn(),
             ask: vi.fn(),
             exportExcelUrl: vi.fn((ids?: number[]) =>
-              `/contabilidad/documents/export-excel${ids?.length ? `?document_ids=${ids.join(',')}` : ''}`,
+              `/contabilidad/documents/export-excel${ids?.length ? `?document_ids=${ids.join(',')}` : ''}`
             ),
           }),
+        },
+        { provide: FoldersApiService, useValue: foldersApi },
+        {
+          provide: FacturasApiService,
+          useValue: { health: vi.fn(() => of({ ai: true, ai_key_configured: true })) },
         },
         {
           provide: CrossingsApiService,
@@ -113,7 +160,7 @@ describe('WizardComponent Autobits Excel flow', () => {
   });
 
   afterEach(() => {
-    sessionStorage.clear();
+    clearSession();
     TestBed.resetTestingModule();
   });
 
@@ -123,15 +170,16 @@ describe('WizardComponent Autobits Excel flow', () => {
     return fixture;
   }
 
-  function create(): WizardComponent {
-    return createFixture().componentInstance;
+  function withFolder(cmp: WizardComponent): void {
+    cmp.carpetaActiva.set(folder());
   }
 
-  it('selección de Excel: termina loading y deja filas sin otro clic', () => {
+  it('selección de Excel: termina loading y deja filas', () => {
     const rows = [record({ id: 1 }), record({ id: 2, proveedor: 'Acme' })];
     autobitsApi.uploadDirect.mockReturnValue(of(importResult(rows)));
     const fixture = createFixture();
     const cmp = fixture.componentInstance;
+    withFolder(cmp);
     cmp.onAutobits(xlsxEvent());
     fixture.detectChanges();
     expect(cmp.subiendoAutobits()).toBe(false);
@@ -139,54 +187,33 @@ describe('WizardComponent Autobits Excel flow', () => {
     expect(cmp.paso()).toBe(2);
   });
 
-  it('no pide adjuntar Excel de Cruce; solo 2 pasos y botón Generar Excel de cruce', () => {
-    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 1 })])));
+  it('solo 2 pasos y botón Generar Excel de cruce', () => {
     const fixture = createFixture();
     const cmp = fixture.componentInstance;
-    cmp.onAutobits(xlsxEvent());
-    fixture.detectChanges();
-
     const html = (fixture.nativeElement as HTMLElement).textContent || '';
     expect(html).toContain('Generar Excel de cruce');
-    expect(html).not.toContain('3. Cruce de Cuentas');
-    expect(html).not.toContain('Procesar');
-    expect(html).not.toContain('Soltar o elegir CRUCE DE CUENTAS');
+    expect(html).toContain('Carpetas de facturas');
+    expect(html).not.toContain('Chat con la IA sobre este paquete');
+    expect(html).not.toContain('Qué quieres que saque o revise');
     expect(cmp.steps.length).toBe(2);
-    const fileLabels = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('input[type="file"]')
-    ).map((el) => el.closest('label')?.textContent || '');
-    expect(fileLabels.some((t) => /CRUCE DE CUENTAS|hoja de cruce/i.test(t))).toBe(false);
   });
 
-  it('facturas se habilitan con Autobits', () => {
-    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 1 })])));
+  it('facturas se habilitan con carpeta (sin Autobits)', () => {
     const fixture = createFixture();
     const cmp = fixture.componentInstance;
-    cmp.onAutobits(xlsxEvent());
+    withFolder(cmp);
     fixture.detectChanges();
-
     const input = (fixture.nativeElement as HTMLElement).querySelector(
-      'input[accept*=".pdf"]',
+      'input[accept*=".pdf"]'
     ) as HTMLInputElement;
     expect(input).toBeTruthy();
     expect(input.disabled).toBe(false);
-    const card = input.closest('.wiz__card');
-    expect(card?.classList.contains('is-dim')).toBe(false);
   });
 
-  it('Generar Excel se habilita solo cuando hay facturas del paquete, no con Autobits solo', () => {
-    autobitsApi.uploadDirect.mockReturnValue(of(importResult([record({ id: 1 })])));
+  it('Generar Excel se habilita con facturas de carpeta', () => {
     const fixture = createFixture();
     const cmp = fixture.componentInstance;
-    cmp.onAutobits(xlsxEvent());
-    fixture.detectChanges();
-
-    const btn = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('button')
-    ).find((b) => (b.textContent || '').includes('Generar Excel de cruce')) as HTMLButtonElement;
-    expect(btn).toBeTruthy();
-    expect(btn.disabled).toBe(true);
-
+    cmp.carpetaActiva.set(folder({ document_ids: [44], document_count: 1 }));
     cmp.documentos.set([
       {
         id: 44,
@@ -198,34 +225,14 @@ describe('WizardComponent Autobits Excel flow', () => {
         received_at: '2026-09-11T00:00:00',
       },
     ]);
-    cmp.idsFacturasOperacion.set([44]);
     fixture.detectChanges();
     expect(cmp.puedeGenerarExcel()).toBe(true);
   });
 
-  it('Generar Excel no usa el listado global de facturas', () => {
+  it('generarExcel envía document_ids de la carpeta', async () => {
     const fixture = createFixture();
     const cmp = fixture.componentInstance;
-    cmp.documentos.set([
-      {
-        id: 99,
-        filename: 'otra.pdf',
-        tipo: 'FACTURA',
-        origen: 'CARGA_MANUAL',
-        estado: 'PROCESADO',
-        requiere_revision: false,
-        received_at: '2026-09-11T00:00:00',
-      },
-    ]);
-    fixture.detectChanges();
-    expect(cmp.idsParaExcel()).toEqual([]);
-    expect(cmp.puedeGenerarExcel()).toBe(false);
-  });
-
-  it('generarExcel envía document_ids del paquete', async () => {
-    const fixture = createFixture();
-    const cmp = fixture.componentInstance;
-    cmp.idsFacturasOperacion.set([44]);
+    cmp.carpetaActiva.set(folder({ document_ids: [44], document_count: 1 }));
     cmp.documentos.set([
       {
         id: 44,
@@ -242,14 +249,14 @@ describe('WizardComponent Autobits Excel flow', () => {
     expect(docsApi.exportExcelUrl).toHaveBeenCalledWith([44]);
     expect(download.download).toHaveBeenCalledWith(
       '/contabilidad/documents/export-excel?document_ids=44',
-      expect.stringMatching(/^Cruce_Cuentas_\d{4}-\d{2}-\d{2}\.xlsx$/),
+      expect.stringMatching(/^Cruce_Cuentas_\d{4}-\d{2}-\d{2}\.xlsx$/)
     );
   });
 
-  it('DestroyRef está disponible para el flujo (zoneless + unsubscribe)', () => {
-    const cmp = create();
+  it('DestroyRef está disponible', () => {
+    const fixture = createFixture();
     expect(TestBed.inject(DestroyRef)).toBeTruthy();
-    cmp.ngOnDestroy();
+    fixture.componentInstance.ngOnDestroy();
   });
 
   it('una restauración tardía no pisa una carga nueva del usuario', () => {
@@ -272,6 +279,7 @@ describe('WizardComponent Autobits Excel flow', () => {
 
     const fixture = createFixture();
     const cmp = fixture.componentInstance;
+    withFolder(cmp);
     cmp.onAutobits(xlsxEvent());
     fixture.detectChanges();
 

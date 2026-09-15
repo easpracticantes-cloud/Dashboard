@@ -141,16 +141,20 @@ export class DocumentsApiService {
 
   ask(
     pregunta: string,
-    documentIds?: number[]
-  ): Observable<{ ok: boolean; respuesta: string; documentos: number; error?: string | null }> {
+    documentIds?: number[],
+    opts?: { folderId?: number; autobitsBatchId?: number }
+  ): Observable<{ ok: boolean; respuesta: string; documentos: number; autobits?: number; error?: string | null }> {
     return this.http.post<{
       ok: boolean;
       respuesta: string;
       documentos: number;
+      autobits?: number;
       error?: string | null;
     }>(`${this.base}/ask`, {
       pregunta,
       document_ids: documentIds?.length ? documentIds : null,
+      folder_id: opts?.folderId ?? null,
+      autobits_batch_id: opts?.autobitsBatchId ?? null,
     });
   }
 

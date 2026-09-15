@@ -860,13 +860,13 @@ class DocumentProcessingService:
         return {"ok": True, "vinculos": limpios}
 
     def ask_about_documents(self, pregunta: str, documents: list, autobits_records: list | None = None) -> dict:
-        """Chat sobre un paquete de facturas ya extraídas (máx. 25)."""
+        """Chat sobre facturas de una carpeta/paquete + filas Autobits (contramarcado)."""
         pregunta = (pregunta or "").strip()
         if not pregunta:
-            return {"ok": False, "error": "Escribe qué necesitas de las facturas."}
-        lote = documents[:25]
-        if not lote:
-            return {"ok": False, "error": "No hay facturas para consultar. Súbelas primero."}
+            return {"ok": False, "error": "Escribe qué necesitas de las facturas y Autobits."}
+        lote = documents[:80]
+        if not lote and not (autobits_records or []):
+            return {"ok": False, "error": "No hay facturas ni Autobits para consultar."}
         bloques = []
         for doc in lote:
             extracted = {}
@@ -920,7 +920,7 @@ class DocumentProcessingService:
                 }
             )
         autobits = []
-        for rec in (autobits_records or [])[:80]:
+        for rec in (autobits_records or [])[:120]:
             autobits.append(
                 {
                     "autobits_record_id": rec.id,
@@ -933,14 +933,16 @@ class DocumentProcessingService:
                 }
             )
         payload = json.dumps({"facturas": bloques, "autobits": autobits}, ensure_ascii=False, default=str)
-        if len(payload) > 24000:
-            payload = payload[:24000] + "\n…[truncated]…"
+        if len(payload) > 32000:
+            payload = payload[:32000] + "\n…[truncated]…"
         instruccion = (
-            "Eres la IA contable de SIG-EAS. Analiza las facturas Y las filas Autobits del JSON. "
+            "Eres la IA contable de SIG-EAS para contramarcado / cruce de cuentas. "
+            "Analiza SIEMPRE juntos: facturas de la carpeta Y filas Autobits del JSON. "
+            "Las facturas suelen necesitar datos de Autobits (compra, reserva, proveedor, valor, fecha). "
             "Relaciona por proveedor/NIT, total vs valor y fechas cercanas. "
-            "Di si una factura ya tiene cruce o si falta vínculo. "
+            "Di qué factura ya tiene cruce, cuál falta vínculo y qué dato de Autobits usarías. "
             "No inventes facturas, COM ni cifras. Si un dato es inferido o ambiguo, dilo. "
-            "Formato preferido: Factura N — Proveedor / Número / Fecha / Total → COM / reserva / match.\n\n"
+            "Formato preferido: Factura N — Proveedor / Número / Fecha / Total → COM Autobits / reserva / match.\n\n"
             f"Pedido del usuario: {pregunta}"
         )
         ai_result = self.ai.extract_custom(payload, instruccion)

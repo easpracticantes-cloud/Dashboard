@@ -248,6 +248,21 @@ _FASE4_TABLAS: dict[str, str] = {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """,
+    "invoice_folders": """
+        CREATE TABLE IF NOT EXISTS invoice_folders (
+            id INTEGER PRIMARY KEY,
+            name VARCHAR(200) NOT NULL,
+            week_label VARCHAR(64),
+            period_start VARCHAR(32),
+            period_end VARCHAR(32),
+            status VARCHAR(32),
+            document_ids_json TEXT,
+            autobits_batch_id INTEGER,
+            notes TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """,
 }
 
 _FASE4_COLUMNAS: dict[str, dict[str, str]] = {

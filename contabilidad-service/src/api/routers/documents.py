@@ -1,5 +1,9 @@
 """Routers API — dominio documentos (Fase 2)."""
 
+from __future__ import annotations
+
+import json
+
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -383,41 +387,66 @@ async def upload_documents_batch(
 class AskRequest(BaseModel):
     pregunta: str
     document_ids: list[int] | None = None
+    folder_id: int | None = None
+    autobits_batch_id: int | None = None
 
 
 class AskResponse(BaseModel):
     ok: bool
     respuesta: str = ""
     documentos: int = 0
+    autobits: int = 0
     error: str | None = None
 
 
 @router.post("/ask", response_model=AskResponse)
 def ask_documents(body: AskRequest, db: Session = Depends(get_db)):
-    """Chat IA sobre facturas ya extraídas (paquete de hasta 25)."""
+    """Chat IA global: facturas (ids o carpeta) + Autobits del lote vinculado o el último."""
     pregunta = (body.pregunta or "").strip()
     if not pregunta:
-        raise HTTPException(status_code=400, detail="Escribe qué quieres saber de las facturas.")
+        raise HTTPException(status_code=400, detail="Escribe qué quieres saber de las facturas y Autobits.")
     service = DocumentService(db)
     docs = []
-    ids = [int(i) for i in (body.document_ids or []) if i][:BATCH_PACK_SIZE]
+    ids = [int(i) for i in (body.document_ids or []) if i][:80]
+    autobits_batch_id = body.autobits_batch_id
+
+    if body.folder_id:
+        from infrastructure.persistence.models import InvoiceFolderModel
+
+        folder = db.get(InvoiceFolderModel, int(body.folder_id))
+        if not folder:
+            raise HTTPException(status_code=404, detail="Carpeta no encontrada.")
+        try:
+            raw_ids = json.loads(folder.document_ids_json or "[]")
+        except json.JSONDecodeError:
+            raw_ids = []
+        ids = [int(i) for i in raw_ids if i][:80]
+        if autobits_batch_id is None and folder.autobits_batch_id:
+            autobits_batch_id = folder.autobits_batch_id
+
     if ids:
         for doc_id in ids:
             doc = service.get_document(doc_id)
             if doc:
                 docs.append(doc)
     else:
-        docs, _ = service.list_documents(limit=BATCH_PACK_SIZE, tipo="FACTURA")
+        docs, _ = service.list_documents(limit=40, tipo="FACTURA")
     processor = get_document_processing_service()
     from infrastructure.persistence.repositories import AutobitsRepository
 
-    latest = AutobitsRepository(db).get_latest_batch()
-    autobits = AutobitsRepository(db).list_records_for_batch(latest.id) if latest else []
+    ab_repo = AutobitsRepository(db)
+    batch = None
+    if autobits_batch_id:
+        batch = ab_repo.get_batch(int(autobits_batch_id))
+    if not batch:
+        batch = ab_repo.get_latest_batch()
+    autobits = ab_repo.list_records_for_batch(batch.id)[:120] if batch else []
     result = processor.ask_about_documents(pregunta, docs, autobits_records=autobits)
     return AskResponse(
         ok=bool(result.get("ok")),
         respuesta=result.get("respuesta") or "",
         documentos=int(result.get("documentos") or len(docs)),
+        autobits=len(autobits),
         error=result.get("error"),
     )
 

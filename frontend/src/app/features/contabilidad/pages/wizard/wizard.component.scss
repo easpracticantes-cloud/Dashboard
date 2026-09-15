@@ -69,7 +69,7 @@
 
 .wiz__steps {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.7rem;
   margin: 0;
   padding: 0;
@@ -551,6 +551,10 @@
   .wiz__ask {
     flex-direction: column;
   }
+
+  .wiz__folder-new {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 480px) {
@@ -558,6 +562,56 @@
   .wiz__kpis {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.wiz__folders {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.wiz__folder-new {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.wiz__folder-new .wiz__prompt {
+  flex: 1 1 14rem;
+}
+
+.wiz__folder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.wiz__folder-chip {
+  border: 1px solid var(--eas-line-soft);
+  background: var(--eas-surface);
+  color: var(--eas-ink);
+  border-radius: 12px;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 9rem;
+}
+
+.wiz__folder-chip strong {
+  font-size: 0.86rem;
+}
+
+.wiz__folder-chip small {
+  color: var(--eas-muted);
+  font-size: 0.72rem;
+}
+
+.wiz__folder-chip.is-on {
+  border-color: var(--eas-leaf);
+  background: var(--eas-tint-leaf);
 }
 
 @media (prefers-reduced-motion: reduce) {

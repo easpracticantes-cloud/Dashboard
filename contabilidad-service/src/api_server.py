@@ -21,6 +21,7 @@ from api.routers.packages import router as packages_router
 from api.routers.payments import router as payments_router
 from api.routers.periods import router as periods_router
 from api.routers.remediations import router as remediations_router
+from api.routers.folders import router as folders_router
 from application.services.period_service import PeriodClosedError
 from infrastructure.persistence.database import init_db
 
@@ -54,6 +55,7 @@ app.include_router(payments_router)
 app.include_router(packages_router)
 app.include_router(periods_router)
 app.include_router(ops_router)
+app.include_router(folders_router)
 
 
 @app.exception_handler(PeriodClosedError)

@@ -395,3 +395,25 @@ class PeriodClosureModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
+
+
+class InvoiceFolderModel(Base):
+    """Carpeta semanal de facturas: se van acumulando y al final se adjunta Autobits."""
+
+    __tablename__ = "invoice_folders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    week_label: Mapped[str | None] = mapped_column(String(64), index=True)
+    period_start: Mapped[str | None] = mapped_column(String(32))
+    period_end: Mapped[str | None] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(32), default="OPEN", index=True)
+    document_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    autobits_batch_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("autobits_import_batches.id"), index=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )

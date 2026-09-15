@@ -1,7 +1,7 @@
 <div class="wiz">
   <header class="wiz__hero">
     <p class="wiz__lead">
-      Carga Autobits, arma el paquete de facturas y genera el Excel de cruce.
+      Durante la semana acumulas facturas en una carpeta. Al final adjuntas Autobits, cruzas y consultas a la IA sobre ambos.
     </p>
     <button type="button" class="wiz__ghost" (click)="vaciarImportados()" [disabled]="limpiando()">
       {{ limpiando() ? 'Vaciando…' : 'Vaciar cargas y empezar de nuevo' }}
@@ -30,22 +30,175 @@
     }
   </ol>
 
-  @if (autobits() || documentos().length) {
+  @if (autobits() || documentos().length || carpetaActiva()) {
     <ul class="wiz__kpis">
+      <li><strong>{{ kpis().facturas }}</strong><span>Facturas carpeta</span></li>
       <li><strong>{{ kpis().autobits }}</strong><span>Autobits</span></li>
-      <li><strong>{{ kpis().facturas }}</strong><span>Facturas</span></li>
-      <li><strong>{{ kpis().pack }}</strong><span>En paquete</span></li>
       <li><strong>{{ kpis().revision }}</strong><span>A revisar</span></li>
+      <li><strong>{{ kpis().carpetas }}</strong><span>Carpetas</span></li>
     </ul>
   }
 
+  <!-- 1. Carpetas + facturas -->
   <section class="wiz__card">
-    <h3>1. Excel de Autobits</h3>
-    <p>Reporte de la semana. De aquí salen orden de compra, reserva, fecha, cliente y valor. La tabla se actualiza al terminar la lectura — no hace falta vaciar.</p>
+    <div class="wiz__row">
+      <div>
+        <h3>1. Carpetas de facturas</h3>
+        <p>
+          Crea una carpeta por semana y ve metiendo facturas (máx. {{ packMax }} por carga).
+          No necesitas Autobits todavía.
+        </p>
+      </div>
+      <button
+        type="button"
+        class="wiz__copy wiz__excel-btn"
+        (click)="generarExcel()"
+        [disabled]="!puedeGenerarExcel()"
+        title="Excel de cruce de la carpeta activa"
+      >
+        @if (generandoExcel()) {
+          Generando…
+        } @else if (!idsListosParaExcel().length && facturasEnProceso()) {
+          Esperando…
+        } @else {
+          Generar Excel de cruce
+        }
+      </button>
+    </div>
+
+    <div class="wiz__folders">
+      <div class="wiz__folder-new">
+        <input
+          type="text"
+          class="wiz__prompt"
+          [(ngModel)]="nuevaCarpetaNombre"
+          placeholder="Nombre de carpeta (ej. Semana 14–20 sep)"
+          (keydown.enter)="crearCarpeta()"
+        />
+        <button type="button" class="wiz__copy wiz__copy--primary" (click)="crearCarpeta()" [disabled]="!nuevaCarpetaNombre.trim()">
+          Crear carpeta
+        </button>
+      </div>
+      @if (carpetas().length) {
+        <div class="wiz__folder-list">
+          @for (f of carpetas(); track f.id) {
+            <button
+              type="button"
+              class="wiz__folder-chip"
+              [class.is-on]="carpetaActiva()?.id === f.id"
+              (click)="seleccionarCarpeta(f.id)"
+            >
+              <strong>{{ f.name }}</strong>
+              <small>{{ f.document_count || 0 }} fact. · {{ f.status }}</small>
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    @if (carpetaActiva(); as folder) {
+      <div class="wiz__meta">
+        <span>{{ folder.name }}</span>
+        @if (folder.week_label) {
+          <span>{{ folder.week_label }}</span>
+        }
+        <span>{{ folder.document_count || 0 }} facturas</span>
+        @if (folder.autobits_batch_id) {
+          <span>Autobits #{{ folder.autobits_batch_id }}</span>
+        }
+      </div>
+
+      <div
+        class="wiz__drop"
+        [class.is-drag]="arrastrandoFacturas()"
+        [class.is-disabled]="subiendoFacturas()"
+        (dragover)="onFacturasDragOver($event)"
+        (dragenter)="onFacturasDragOver($event)"
+        (dragleave)="onFacturasDragLeave($event)"
+        (drop)="onFacturasDrop($event)"
+      >
+        <label class="wiz__drop-inner">
+          <input
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            multiple
+            (change)="onFacturas($event)"
+            [disabled]="subiendoFacturas()"
+          />
+          <mat-icon>photo_library</mat-icon>
+          <span>
+            @if (subiendoFacturas()) {
+              Subiendo y encolando OCR…
+            } @else if (arrastrandoFacturas()) {
+              Suelta aquí las facturas
+            } @else {
+              Arrastra o elige hasta {{ packMax }} facturas para esta carpeta
+            }
+          </span>
+        </label>
+      </div>
+      @if (packMsg()) {
+        <p class="wiz__hint">{{ packMsg() }}</p>
+      }
+      @if (facturaItems().length) {
+        <ul class="wiz__files">
+          @for (it of facturaItems(); track it.filename) {
+            <li [class.is-bad]="!it.ok">
+              <strong>{{ it.filename }}</strong>
+              <small>{{ it.ok ? (it.document?.estado || 'en cola') : it.error }}</small>
+            </li>
+          }
+        </ul>
+      }
+      @if (documentos().length) {
+        <h4 class="wiz__sub">Facturas en la carpeta</h4>
+        <div class="wiz__table-wrap">
+          <table class="wiz__table">
+            <thead>
+              <tr>
+                <th>Archivo</th>
+                <th>N° factura</th>
+                <th>Proveedor</th>
+                <th>Total</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (d of documentos(); track d.id) {
+                <tr [class.is-miss]="d.requiere_revision">
+                  <td>{{ d.filename }}</td>
+                  <td>{{ d.numero_documento || '—' }}</td>
+                  <td>{{ d.proveedor_nombre || '—' }}</td>
+                  <td>{{ formatCop(d.total) }}</td>
+                  <td>
+                    <span class="wiz__chip" [class]="'is-' + tonoEstado(d.estado)">
+                      {{ d.estado }}
+                      @if (d.requiere_revision) {
+                        · revisar
+                      }
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    } @else {
+      <p class="wiz__hint">Crea o elige una carpeta para empezar a guardar facturas de la semana.</p>
+    }
+  </section>
+
+  <!-- 2. Autobits -->
+  <section class="wiz__card" [class.is-dim]="!carpetaActiva()">
+    <h3>2. Excel de Autobits</h3>
+    <p>
+      Al final de la semana adjunta el Autobits a la carpeta activa. Ahí salen orden de compra, reserva, fecha, cliente y valor para el cruce.
+    </p>
     <div
       class="wiz__drop"
       [class.is-drag]="arrastrandoAutobits()"
-      [class.is-disabled]="subiendoAutobits() || limpiando()"
+      [class.is-disabled]="subiendoAutobits() || limpiando() || !carpetaActiva()"
       (dragover)="onAutobitsDragOver($event)"
       (dragenter)="onAutobitsDragOver($event)"
       (dragleave)="onAutobitsDragLeave($event)"
@@ -56,11 +209,13 @@
           type="file"
           accept=".xlsx,.xls,.xlsm,.csv"
           (change)="onAutobits($event)"
-          [disabled]="subiendoAutobits() || limpiando()"
+          [disabled]="subiendoAutobits() || limpiando() || !carpetaActiva()"
         />
         <mat-icon>upload_file</mat-icon>
         <span>
-          @if (subiendoAutobits()) {
+          @if (!carpetaActiva()) {
+            Elige una carpeta primero
+          } @else if (subiendoAutobits()) {
             Leyendo Autobits…
           } @else if (arrastrandoAutobits()) {
             Suelta aquí el Excel
@@ -78,11 +233,8 @@
         @if (ab.reused) {
           <span>Reutilizado (mismo archivo)</span>
         }
-        @if (ab.skipped_duplicates) {
-          <span>Duplicados actualizados: {{ ab.skipped_duplicates }}</span>
-        }
-        @if (ab.sheet_name) {
-          <span>Hoja {{ ab.sheet_name }}</span>
+        @if (carpetaActiva()?.autobits_batch_id) {
+          <span>Vinculado a la carpeta</span>
         }
       </div>
     }
@@ -119,131 +271,27 @@
     }
   </section>
 
-  <section class="wiz__card" [class.is-dim]="paso() < 2">
-    <div class="wiz__row">
-      <div>
-        <h3>2. Facturas de la semana</h3>
-        <p>
-          Paquetes de máximo {{ packMax }} archivos (PDF, foto o escaneo).
-          El OCR + visión lee facturas físicas, electrónicas o borrosas; si algo es dudoso lo marca para revisión.
-        </p>
-      </div>
-      <button
-        type="button"
-        class="wiz__copy wiz__excel-btn"
-        (click)="generarExcel()"
-        [disabled]="!puedeGenerarExcel()"
-        title="Descarga el Excel de cruce del paquete actual"
-      >
-        @if (generandoExcel()) {
-          Generando…
-        } @else if (!idsListosParaExcel().length && facturasEnProceso()) {
-          Esperando…
-        } @else {
-          Generar Excel de cruce
-        }
-      </button>
-    </div>
-    <label class="wiz__label" for="solicitud-ia">Qué quieres que saque o revise (opcional)</label>
-    <textarea
-      id="solicitud-ia"
-      class="wiz__prompt"
-      rows="3"
-      [(ngModel)]="solicitud"
-      placeholder="Ej. Extrae NIT, número, total y compra. Si el total no cuadra o el sello tapó un dígito, asume y marca revisión."
-    ></textarea>
-    <div
-      class="wiz__drop"
-      [class.is-drag]="arrastrandoFacturas()"
-      [class.is-disabled]="subiendoFacturas() || !autobits()"
-      (dragover)="onFacturasDragOver($event)"
-      (dragenter)="onFacturasDragOver($event)"
-      (dragleave)="onFacturasDragLeave($event)"
-      (drop)="onFacturasDrop($event)"
-    >
-      <label class="wiz__drop-inner">
-        <input
-          type="file"
-          accept=".pdf,.jpg,.jpeg,.png,.webp"
-          multiple
-          (change)="onFacturas($event)"
-          [disabled]="subiendoFacturas() || !autobits()"
-        />
-        <mat-icon>photo_library</mat-icon>
-        <span>
-          @if (subiendoFacturas()) {
-            Subiendo y encolando OCR…
-          } @else if (arrastrandoFacturas()) {
-            Suelta aquí las facturas
-          } @else {
-            Arrastra o elige hasta {{ packMax }} facturas (PDF o foto)
-          }
-        </span>
-      </label>
-    </div>    @if (packMsg()) {
-      <p class="wiz__hint">{{ packMsg() }}</p>
-    }
-    @if (facturaItems().length) {
-      <ul class="wiz__files">
-        @for (it of facturaItems(); track it.filename) {
-          <li [class.is-bad]="!it.ok">
-            <strong>{{ it.filename }}</strong>
-            <small>{{ it.ok ? (it.document?.estado || 'en cola') : it.error }}</small>
-          </li>
-        }
-      </ul>
-    }
-    @if (documentos().length) {
-      <h4 class="wiz__sub">Ya importadas</h4>
-      <div class="wiz__table-wrap">
-        <table class="wiz__table">
-          <thead>
-            <tr>
-              <th>Archivo</th>
-              <th>N° factura</th>
-              <th>Proveedor</th>
-              <th>Total</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (d of documentos(); track d.id) {
-              <tr [class.is-miss]="d.requiere_revision">
-                <td>{{ d.filename }}</td>
-                <td>{{ d.numero_documento || '—' }}</td>
-                <td>{{ d.proveedor_nombre || '—' }}</td>
-                <td>{{ formatCop(d.total) }}</td>
-                <td>
-                  <span class="wiz__chip" [class]="'is-' + tonoEstado(d.estado)">
-                    {{ d.estado }}
-                    @if (d.requiere_revision) {
-                      · revisar
-                    }
-                  </span>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    }
-  </section>
-
-  <section class="wiz__card wiz__chat" [class.is-dim]="paso() < 2">
-    <h3>Chat con la IA sobre este paquete</h3>
+  <!-- Chat global único -->
+  <section class="wiz__card wiz__chat" [class.is-dim]="!carpetaActiva()">
+    <h3>Chat con la IA (carpeta + Autobits)</h3>
     <p class="wiz__hint">
-      Claude responde con las facturas del paquete y las filas Autobits de la semana (máx. {{ packMax }}).
+      Un solo chat: analiza las facturas de la carpeta activa y las filas Autobits vinculadas (ideal para contramarcado).
     </p>
     <div class="wiz__chips">
       @for (s of chatSugerencias; track s) {
-        <button type="button" class="wiz__chip-btn" (click)="usarSugerencia(s)" [disabled]="preguntando() || !idsParaExcel().length">
+        <button
+          type="button"
+          class="wiz__chip-btn"
+          (click)="usarSugerencia(s)"
+          [disabled]="preguntando() || !carpetaActiva()"
+        >
           {{ s }}
         </button>
       }
     </div>
     <div class="wiz__msgs" aria-live="polite">
       @if (!chatMsgs().length) {
-        <p class="wiz__hint">Aún no hay mensajes. Sube el paquete y pregunta.</p>
+        <p class="wiz__hint">Aún no hay mensajes. Pregunta sobre la carpeta y/o Autobits.</p>
       }
       @for (m of chatMsgs(); track $index) {
         <article class="wiz__msg" [class.is-user]="m.role === 'user'">
@@ -261,10 +309,15 @@
         class="wiz__prompt"
         [(ngModel)]="chatInput"
         (keydown.enter)="preguntar()"
-        placeholder="Escribe el pedido y pulsa Preguntar"
-        [disabled]="preguntando()"
+        placeholder="Ej. Cruza estas facturas con Autobits y dime qué falta"
+        [disabled]="preguntando() || !carpetaActiva()"
       />
-      <button type="button" class="wiz__copy wiz__copy--primary" (click)="preguntar()" [disabled]="preguntando() || !chatInput.trim()">
+      <button
+        type="button"
+        class="wiz__copy wiz__copy--primary"
+        (click)="preguntar()"
+        [disabled]="preguntando() || !chatInput.trim() || !carpetaActiva()"
+      >
         Preguntar
       </button>
     </div>
@@ -273,9 +326,7 @@
   @if (relaciones().length) {
     <section class="wiz__card">
       <h3>Relación factura ↔ Autobits</h3>
-      <p class="wiz__hint">
-        Solo el Autobits vinculado a cada factura del paquete (no el lote completo).
-      </p>
+      <p class="wiz__hint">Solo facturas de la carpeta con Autobits vinculado.</p>
       <div class="wiz__table-wrap">
         <table class="wiz__table">
           <thead>
@@ -320,7 +371,7 @@
     >
       <h3 id="wiz-vaciar-title">¿Vaciar registros?</h3>
       <p id="wiz-vaciar-desc">
-        Los registros cargados se eliminarán: Autobits y las facturas importadas. El módulo Autobits no se desactiva.
+        Se eliminarán Autobits y facturas importadas. Las carpetas quedan sin esos documentos vinculados.
       </p>
       <div class="wiz__modal-actions">
         <button type="button" class="wiz__ghost" (click)="cancelarVaciar(); $event.stopPropagation()">Cancelar</button>
