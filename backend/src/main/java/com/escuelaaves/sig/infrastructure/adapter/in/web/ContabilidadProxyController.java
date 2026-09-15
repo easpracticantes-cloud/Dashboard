@@ -4,15 +4,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -146,8 +145,10 @@ public class ContabilidadProxyController {
             HttpHeaders headers,
             MultipartHttpServletRequest multipart
     ) throws IOException {
+        // Usar MultiValueMap + ByteArrayResource (stack servlet). Evitar MultipartBodyBuilder:
+        // en este classpath dispara NoClassDefFoundError: org/reactivestreams/Publisher.
         headers.remove(HttpHeaders.CONTENT_TYPE);
-        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         int fileParts = 0;
 
         multipart.getParameterMap().forEach((key, values) -> {
@@ -155,7 +156,7 @@ public class ContabilidadProxyController {
                 return;
             }
             for (String v : values) {
-                builder.part(key, v == null ? "" : v);
+                form.add(key, v == null ? "" : v);
             }
         });
 
@@ -185,18 +186,7 @@ public class ContabilidadProxyController {
                         return partName;
                     }
                 };
-                MediaType partType = MediaType.APPLICATION_OCTET_STREAM;
-                String ct = file.getContentType();
-                if (ct != null && !ct.isBlank()) {
-                    try {
-                        partType = MediaType.parseMediaType(ct);
-                    } catch (Exception ignored) {
-                        // keep octet-stream
-                    }
-                }
-                builder.part(entry.getKey(), resource)
-                        .filename(partName)
-                        .contentType(partType);
+                form.add(entry.getKey(), resource);
                 fileParts++;
             }
         }
@@ -210,13 +200,12 @@ public class ContabilidadProxyController {
         }
 
         log.info("[ContabilidadProxy] multipart → {} ({} archivo(s))", target, fileParts);
-        MultiValueMap<String, HttpEntity<?>> parts = builder.build();
         ResponseEntity<byte[]> upstream = restClientBuilder.build()
                 .method(method)
                 .uri(URI.create(target))
                 .headers(h -> h.addAll(headers))
                 .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(parts)
+                .body(form)
                 .retrieve()
                 .toEntity(byte[].class);
 
