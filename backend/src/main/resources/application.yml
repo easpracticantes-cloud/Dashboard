@@ -40,8 +40,8 @@ spring:
     default-property-inclusion: non_null
   servlet:
     multipart:
-      max-file-size: 80MB
-      max-request-size: 100MB
+      max-file-size: 250MB
+      max-request-size: 300MB
 
 springdoc:
   swagger-ui:

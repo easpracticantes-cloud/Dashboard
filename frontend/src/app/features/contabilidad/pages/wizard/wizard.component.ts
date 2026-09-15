@@ -3,7 +3,7 @@ import { Component, DestroyRef, HostListener, OnDestroy, OnInit, computed, injec
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { Subscription, finalize, interval } from 'rxjs';
+import { Subscription, finalize, firstValueFrom, interval } from 'rxjs';
 import {
   AutobitsApiService,
   AutobitsRecord,
@@ -405,8 +405,8 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private async subirFacturas(files: File[]): Promise<void> {
-    const payload = this.filterInvoiceUploads(files);
-    if (!payload.length) {
+    const selected = this.filterInvoiceUploads(files);
+    if (!selected.length) {
       this.error.set('No hay facturas ni ZIP válidos en la selección.');
       return;
     }
@@ -415,89 +415,176 @@ export class WizardComponent implements OnInit, OnDestroy {
       this.error.set('Crea o elige una carpeta antes de subir facturas.');
       return;
     }
-    const hasZip = payload.some((f) => /\.zip$/i.test(f.name));
-    const looseCount = payload.filter((f) => !/\.zip$/i.test(f.name)).length;
-    if (!hasZip && payload.length > PACK_MAX) {
-      this.error.set(
-        `Máximo ${PACK_MAX} facturas por carga. Seleccionaste ${payload.length}. Divide la carga.`
-      );
-      return;
-    }
-    // ZIP: el backend expande y procesa en paquetes; no bloquear aquí por looseCount.
+
     this.subiendoFacturas.set(true);
     this.error.set('');
-    const label =
-      payload.length === 1 && !hasZip
-        ? `Integrando 1 factura en «${folder.name}»…`
-        : hasZip
-          ? `Integrando ${payload.length} ítem(s) (archivos/ZIP) en «${folder.name}»…`
-          : `Integrando ${payload.length} factura(s) en «${folder.name}»…`;
-    this.aviso.set(label);
-    this.docsApi
-      .uploadBatch(payload, 'FACTURA', PACK_MAX)
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.subiendoFacturas.set(false))
-      )
+    this.aviso.set('Preparando archivos…');
+
+    let invoices: File[];
+    try {
+      invoices = await this.expandZipsToInvoices(selected);
+    } catch (err) {
+      this.subiendoFacturas.set(false);
+      this.error.set(
+        err instanceof Error ? err.message : 'No se pudo abrir el ZIP. Comprueba que sea un .zip válido.'
+      );
+      this.aviso.set('');
+      return;
+    }
+
+    if (!invoices.length) {
+      this.subiendoFacturas.set(false);
+      this.error.set(
+        'No hay facturas PDF/JPG/PNG dentro de la selección (¿ZIP vacío o solo otros tipos?).'
+      );
+      this.aviso.set('');
+      return;
+    }
+
+    const chunks: File[][] = [];
+    for (let i = 0; i < invoices.length; i += PACK_MAX) {
+      chunks.push(invoices.slice(i, i + PACK_MAX));
+    }
+
+    const allItems: BatchUploadItem[] = [];
+    const allNuevos: number[] = [];
+    let lastMsg = '';
+
+    try {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        this.aviso.set(
+          chunks.length > 1
+            ? `Integrando paquete ${i + 1}/${chunks.length} (${chunk.length} factura(s)) en «${folder.name}»…`
+            : `Integrando ${chunk.length} factura(s) en «${folder.name}»…`
+        );
+        const res = await firstValueFrom(
+          this.docsApi.uploadBatch(chunk, 'FACTURA', PACK_MAX).pipe(takeUntilDestroyed(this.destroyRef))
+        );
+        allItems.push(...(res.items || []));
+        allNuevos.push(...this.idsDePaquete(res.queued_ids, res.items));
+        lastMsg = res.mensaje || lastMsg;
+      }
+    } catch (err) {
+      this.error.set(
+        this.detalleError(
+          err as { status?: number; error?: unknown; message?: string },
+          'No se pudieron subir las facturas.'
+        )
+      );
+      this.aviso.set('');
+      this.facturaItems.set(allItems);
+      this.subiendoFacturas.set(false);
+      return;
+    } finally {
+      this.subiendoFacturas.set(false);
+    }
+
+    this.facturaItems.set(allItems);
+    const nuevos = [...new Set(allNuevos.filter((id) => id > 0))];
+    if (!nuevos.length) {
+      const failMsg =
+        lastMsg ||
+        allItems.find((i) => i.error)?.error ||
+        'No se integró ninguna factura.';
+      this.error.set(failMsg);
+      this.aviso.set('');
+      this.packMsg.set(failMsg);
+      return;
+    }
+
+    const previos = [...(folder.document_ids || []), ...this.idsFacturasOperacion()];
+    const merged = [...new Set([...previos, ...nuevos].filter((id) => id > 0))];
+    this.idsFacturasOperacion.set(merged);
+    const msg =
+      lastMsg ||
+      `${nuevos.length} factura(s) integradas en «${folder.name}». Ya van ${merged.length} en la carpeta.`;
+    this.packMsg.set(msg);
+    this.aviso.set(
+      `${nuevos.length} factura(s) añadidas a «${folder.name}». Total en carpeta: ${merged.length}.`
+    );
+
+    this.foldersApi
+      .addDocuments(folder.id, nuevos)
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (res) => {
-          this.facturaItems.set([...(res.items || [])]);
-          const nuevos = this.idsDePaquete(res.queued_ids, res.items);
-          if (!nuevos.length) {
-            const failMsg =
-              res.mensaje ||
-              (res.items || []).find((i) => i.error)?.error ||
-              'No se integró ninguna factura (¿ZIP vacío o extensión no válida?).';
-            this.error.set(failMsg);
-            this.aviso.set('');
-            this.packMsg.set(failMsg);
-            return;
-          }
-          const previos = [
-            ...(folder.document_ids || []),
-            ...this.idsFacturasOperacion(),
-          ];
-          const merged = [...new Set([...previos, ...nuevos].filter((id) => id > 0))];
-          this.idsFacturasOperacion.set(merged);
-          const integradas = nuevos.length || (res.items || []).filter((i) => i.ok).length;
-          const msg =
-            res.mensaje ||
-            `${integradas} factura(s) integradas en «${folder.name}». Ya van ${merged.length} en la carpeta.`;
-          this.packMsg.set(msg);
+        next: (r) => {
+          this.aplicarCarpeta(r.folder);
+          const total = r.folder.document_count || r.folder.document_ids?.length || merged.length;
           this.aviso.set(
-            `${integradas} factura(s) añadidas a «${folder.name}». Total en carpeta: ${merged.length}.`
+            `${r.added ?? nuevos.length} factura(s) integradas en «${r.folder.name}». Total: ${total}.`
           );
-          this.foldersApi
-            .addDocuments(folder.id, nuevos)
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-              next: (r) => {
-                this.aplicarCarpeta(r.folder);
-                const total = r.folder.document_count || r.folder.document_ids?.length || merged.length;
-                this.aviso.set(
-                  `${r.added ?? integradas} factura(s) integradas en «${r.folder.name}». Total: ${total}.`
-                );
-                this.refrescarFacturas();
-                this.startPoll();
-              },
-              error: (err) => {
-                this.error.set(
-                  this.detalleError(
-                    err,
-                    'Las facturas se subieron pero no se pudieron vincular a la carpeta.'
-                  )
-                );
-                this.refrescarFacturas();
-                this.startPoll();
-              },
-            });
-          this.paso.set(1);
+          this.refrescarFacturas();
+          this.startPoll();
         },
         error: (err) => {
-          this.error.set(this.detalleError(err, 'No se pudieron subir las facturas.'));
-          this.aviso.set('');
+          this.error.set(
+            this.detalleError(
+              err,
+              'Las facturas se subieron pero no se pudieron vincular a la carpeta.'
+            )
+          );
+          this.refrescarFacturas();
+          this.startPoll();
         },
       });
+    this.paso.set(1);
+  }
+
+  /** Expande ZIP en el navegador para evitar 413 por archivos grandes. */
+  private async expandZipsToInvoices(files: File[]): Promise<File[]> {
+    const out: File[] = [];
+    let zipCount = 0;
+    for (const file of files) {
+      if (!/\.zip$/i.test(file.name)) {
+        out.push(file);
+        continue;
+      }
+      zipCount += 1;
+      this.aviso.set(`Abriendo ZIP «${file.name}» en el navegador…`);
+      const { unzipSync } = await import('fflate');
+      const data = new Uint8Array(await file.arrayBuffer());
+      let entries: Record<string, Uint8Array>;
+      try {
+        entries = unzipSync(data);
+      } catch {
+        throw new Error(`«${file.name}» no es un ZIP válido o está dañado.`);
+      }
+      let extracted = 0;
+      for (const [path, bytes] of Object.entries(entries)) {
+        const normalized = path.replace(/\\/g, '/');
+        if (normalized.includes('__MACOSX/') || normalized.endsWith('/')) continue;
+        const base = normalized.split('/').pop() || '';
+        if (!base || base.startsWith('.')) continue;
+        if (!/\.(jpe?g|png|pdf|webp)$/i.test(base)) continue;
+        const unique =
+          out.some((f) => f.name === base) ? `${base.replace(/(\.[^.]+)$/, `_${extracted}$1`)}` : base;
+        out.push(
+          new File([bytes.slice()], unique, {
+            type: this.mimeForInvoiceName(unique),
+          })
+        );
+        extracted += 1;
+      }
+      if (!extracted) {
+        throw new Error(
+          `El ZIP «${file.name}» no contiene facturas PDF/JPG/PNG.`
+        );
+      }
+    }
+    if (zipCount) {
+      this.aviso.set(`ZIP listo: ${out.length} factura(s) para integrar.`);
+    }
+    return out;
+  }
+
+  private mimeForInvoiceName(name: string): string {
+    const lower = name.toLowerCase();
+    if (lower.endsWith('.pdf')) return 'application/pdf';
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+    return 'application/octet-stream';
   }
 
   private filterInvoiceUploads(files: File[]): File[] {
@@ -847,7 +934,11 @@ export class WizardComponent implements OnInit, OnDestroy {
       );
     }
     if (status === 413) {
-      return 'El archivo es demasiado grande para el servidor (413). Prueba un ZIP más pequeño o menos facturas.';
+      return (
+        'El archivo supera el límite del proxy (413). '
+        + 'Si usas Nginx en el host Oracle, pon client_max_body_size 250m; '
+        + 'el ZIP ahora se abre en el navegador y se sube por paquetes.'
+      );
     }
     if (status === 502 || status === 503) {
       return (
