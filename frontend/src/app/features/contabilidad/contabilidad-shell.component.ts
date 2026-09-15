@@ -11,7 +11,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
       <eas-page-header
         eyebrow="Escuela Aves Salento"
         title="Contabilidad"
-        subtitle="Facturas en carpetas → Autobits → Excel de cruce."
+        subtitle="Facturas (archivos, carpeta o ZIP) y Autobits en el mismo módulo → Excel de cruce."
       />
       <nav class="contab__nav" aria-label="Secciones de Contabilidad">
         <a

@@ -275,7 +275,7 @@ export class WizardComponent implements OnInit, OnDestroy {
   onAutobitsDragOver(ev: DragEvent): void {
     ev.preventDefault();
     ev.stopPropagation();
-    if (this.subiendoAutobits() || this.limpiando() || !this.carpetaActiva()) return;
+    if (this.subiendoAutobits() || this.limpiando()) return;
     this.arrastrandoAutobits.set(true);
     if (ev.dataTransfer) {
       ev.dataTransfer.dropEffect = 'copy';
@@ -292,12 +292,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     ev.preventDefault();
     ev.stopPropagation();
     this.arrastrandoAutobits.set(false);
-    if (this.subiendoAutobits() || this.limpiando() || !this.carpetaActiva()) {
-      if (!this.carpetaActiva()) {
-        this.error.set('Elige una carpeta antes de subir Autobits.');
-      }
-      return;
-    }
+    if (this.subiendoAutobits() || this.limpiando()) return;
     const file = Array.from(ev.dataTransfer?.files ?? []).find((f) =>
       /\.(xlsx|xls|xlsm|csv)$/i.test(f.name)
     );
@@ -309,10 +304,6 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private subirAutobits(file: File): void {
-    if (!this.carpetaActiva()) {
-      this.error.set('Elige una carpeta antes de subir Autobits.');
-      return;
-    }
     this.restoreSeq += 1;
     this.error.set('');
     this.aviso.set('Leyendo el Excel de Autobits…');
@@ -364,7 +355,13 @@ export class WizardComponent implements OnInit, OnDestroy {
   onFacturas(ev: Event): void {
     const files = Array.from((ev.target as HTMLInputElement).files || []);
     (ev.target as HTMLInputElement).value = '';
-    this.subirFacturas(files);
+    void this.subirFacturas(files);
+  }
+
+  onFacturasCarpeta(ev: Event): void {
+    const files = Array.from((ev.target as HTMLInputElement).files || []);
+    (ev.target as HTMLInputElement).value = '';
+    void this.subirFacturas(files);
   }
 
   onFacturasDragOver(ev: DragEvent): void {
@@ -383,7 +380,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.arrastrandoFacturas.set(false);
   }
 
-  onFacturasDrop(ev: DragEvent): void {
+  async onFacturasDrop(ev: DragEvent): Promise<void> {
     ev.preventDefault();
     ev.stopPropagation();
     this.arrastrandoFacturas.set(false);
@@ -393,34 +390,47 @@ export class WizardComponent implements OnInit, OnDestroy {
       }
       return;
     }
-    const files = Array.from(ev.dataTransfer?.files ?? []).filter((f) =>
-      /\.(jpe?g|png|pdf|webp)$/i.test(f.name)
-    );
+    const files = await this.collectDroppedInvoiceFiles(ev.dataTransfer);
     if (!files.length) {
-      this.error.set('Suelta facturas en PDF, JPG o PNG.');
+      this.error.set('Suelta facturas (PDF/JPG/PNG), una carpeta o un ZIP.');
       return;
     }
-    this.subirFacturas(files);
+    await this.subirFacturas(files);
   }
 
-  private subirFacturas(files: File[]): void {
-    if (!files.length) return;
+  private async subirFacturas(files: File[]): Promise<void> {
+    const payload = this.filterInvoiceUploads(files);
+    if (!payload.length) {
+      this.error.set('No hay facturas ni ZIP válidos en la selección.');
+      return;
+    }
     const folder = this.carpetaActiva();
     if (!folder) {
       this.error.set('Crea o elige una carpeta antes de subir facturas.');
       return;
     }
-    if (files.length > PACK_MAX) {
+    const hasZip = payload.some((f) => /\.zip$/i.test(f.name));
+    const looseCount = payload.filter((f) => !/\.zip$/i.test(f.name)).length;
+    if (!hasZip && payload.length > PACK_MAX) {
       this.error.set(
-        `Máximo ${PACK_MAX} facturas por carga. Seleccionaste ${files.length}. Divide la carga.`
+        `Máximo ${PACK_MAX} facturas por carga. Seleccionaste ${payload.length}. Divide la carga.`
+      );
+      return;
+    }
+    if (hasZip && looseCount > PACK_MAX) {
+      this.error.set(
+        `Máximo ${PACK_MAX} facturas por carga (sin contar el ZIP). Seleccionaste ${looseCount}.`
       );
       return;
     }
     this.subiendoFacturas.set(true);
     this.error.set('');
-    this.aviso.set(`Subiendo ${files.length} factura(s) a «${folder.name}»…`);
+    const label = hasZip
+      ? `Subiendo ${payload.length} ítem(s) (archivos/ZIP) a «${folder.name}»…`
+      : `Subiendo ${payload.length} factura(s) a «${folder.name}»…`;
+    this.aviso.set(label);
     this.docsApi
-      .uploadBatch(files, 'FACTURA', PACK_MAX)
+      .uploadBatch(payload, 'FACTURA', PACK_MAX)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.subiendoFacturas.set(false))
@@ -452,6 +462,69 @@ export class WizardComponent implements OnInit, OnDestroy {
           this.error.set(this.detalleError(err, 'No se pudieron subir las facturas.'));
         },
       });
+  }
+
+  private filterInvoiceUploads(files: File[]): File[] {
+    return files.filter((f) => {
+      const name = (f.name || '').split(/[/\\]/).pop() || '';
+      if (!name || name.startsWith('.')) return false;
+      return /\.(jpe?g|png|pdf|webp|zip)$/i.test(name);
+    });
+  }
+
+  private async collectDroppedInvoiceFiles(dt: DataTransfer | null): Promise<File[]> {
+    if (!dt) return [];
+    const items = dt.items;
+    if (items?.length) {
+      const collected: File[] = [];
+      const walks: Promise<void>[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry?.();
+        if (entry) {
+          walks.push(this.walkFileSystemEntry(entry, collected));
+        }
+      }
+      if (walks.length) {
+        await Promise.all(walks);
+        return this.filterInvoiceUploads(collected);
+      }
+    }
+    return this.filterInvoiceUploads(Array.from(dt.files || []));
+  }
+
+  private walkFileSystemEntry(entry: FileSystemEntry, out: File[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (entry.isFile) {
+        (entry as FileSystemFileEntry).file(
+          (file) => {
+            out.push(file);
+            resolve();
+          },
+          (err) => reject(err)
+        );
+        return;
+      }
+      if (entry.isDirectory) {
+        const reader = (entry as FileSystemDirectoryEntry).createReader();
+        const readBatch = (): void => {
+          reader.readEntries(
+            (entries) => {
+              if (!entries.length) {
+                resolve();
+                return;
+              }
+              Promise.all(entries.map((child) => this.walkFileSystemEntry(child, out)))
+                .then(() => readBatch())
+                .catch(reject);
+            },
+            (err) => reject(err)
+          );
+        };
+        readBatch();
+        return;
+      }
+      resolve();
+    });
   }
 
   usarSugerencia(texto: string): void {
@@ -574,8 +647,11 @@ export class WizardComponent implements OnInit, OnDestroy {
       this.cargarRecords(res.batch?.id);
     }
     const reused = res.reused ? ' (ya estaba importado)' : '';
+    const linked = this.carpetaActiva()
+      ? ' Se vinculan a la carpeta activa si está seleccionada.'
+      : ' Puedes vincularlos luego eligiendo una carpeta.';
     this.aviso.set(
-      res.aviso || `${res.imported_rows} filas de Autobits${reused}. Listas para la carpeta.`
+      res.aviso || `${res.imported_rows} filas de Autobits${reused}.${linked}`
     );
     if (res.parse_errors?.length) {
       this.error.set(res.parse_errors.slice(0, 3).join(' · '));

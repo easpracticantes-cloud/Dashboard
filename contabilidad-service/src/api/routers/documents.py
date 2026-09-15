@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import io
 import json
+import zipfile
+from pathlib import PurePosixPath
 
 from fastapi import (
     APIRouter,
@@ -20,7 +23,11 @@ from sqlalchemy.orm import Session
 
 from api.deps import resolve_usuario
 from application.services.document_processing_service import get_document_processing_service
-from application.services.document_service import DocumentService, DocumentUploadError
+from application.services.document_service import (
+    ALLOWED_EXTENSIONS,
+    DocumentService,
+    DocumentUploadError,
+)
 from application.services.factura_excel_service import (
     FacturaExcelService,
     FacturaExcelServiceError,
@@ -28,6 +35,53 @@ from application.services.factura_excel_service import (
 from infrastructure.cruce.xlsx_integrity import XlsxIntegrityError
 from domain.enums import DocumentOrigin
 from infrastructure.persistence.database import get_db
+
+
+def _invoice_basename(path: str) -> str | None:
+    normalized = (path or "").replace("\\", "/")
+    if "__MACOSX/" in normalized or normalized.startswith("__MACOSX"):
+        return None
+    base = PurePosixPath(normalized).name
+    if not base or base.startswith("."):
+        return None
+    ext = PurePosixPath(base).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        return None
+    return base
+
+
+def _expand_zip_invoices(filename: str, content: bytes) -> list[tuple[str, bytes]]:
+    """Extrae facturas de un ZIP de carpeta; ignora basura de macOS/Windows."""
+    out: list[tuple[str, bytes]] = []
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as zf:
+            for info in zf.infolist():
+                if info.is_dir():
+                    continue
+                base = _invoice_basename(info.filename)
+                if not base:
+                    continue
+                try:
+                    raw = zf.read(info)
+                except Exception:
+                    continue
+                if not raw:
+                    continue
+                out.append((base, raw))
+    except zipfile.BadZipFile as e:
+        raise DocumentUploadError(
+            code="INVALID_ZIP",
+            message=f'El archivo "{filename}" no es un ZIP válido.',
+        ) from e
+    if not out:
+        raise DocumentUploadError(
+            code="EMPTY_ZIP",
+            message=(
+                f'El ZIP "{filename}" no contiene facturas '
+                f"({', '.join(sorted(ALLOWED_EXTENSIONS))})."
+            ),
+        )
+    return out
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -273,25 +327,56 @@ async def upload_documents_batch(
     solicitud: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
-    """Sube hasta 25 facturas y las procesa en un paquete."""
+    """Sube hasta 25 facturas (o un ZIP/carpeta expandida) y las procesa en un paquete."""
     if not archivos:
         raise HTTPException(status_code=400, detail="No se recibieron archivos.")
-    if len(archivos) > BATCH_PACK_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Máximo {BATCH_PACK_SIZE} facturas por carga. Divide el lote en paquetes.",
-        )
 
-    service = DocumentService(db)
-    items: list[BatchUploadItem] = []
-    queued_ids: list[int] = []
-    dup_count = 0
-    err_count = 0
-
+    payloads: list[tuple[str, bytes]] = []
+    expand_errors: list[BatchUploadItem] = []
     for archivo in archivos:
         filename = archivo.filename or "documento.jpg"
+        content = await archivo.read()
+        lower = filename.lower()
+        if lower.endswith(".zip"):
+            try:
+                payloads.extend(_expand_zip_invoices(filename, content))
+            except DocumentUploadError as e:
+                expand_errors.append(
+                    BatchUploadItem(filename=filename, ok=False, error=e.message)
+                )
+        else:
+            payloads.append((filename, content))
+
+    if len(payloads) > BATCH_PACK_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Máximo {BATCH_PACK_SIZE} facturas por carga "
+                f"(tras expandir ZIP: {len(payloads)}). Divide el lote."
+            ),
+        )
+    if not payloads and expand_errors:
+        return BatchUploadResponse(
+            total_recibidos=0,
+            total_errores=len(expand_errors),
+            total_duplicados=0,
+            pack_size=max(1, min(int(pack_size or BATCH_PACK_SIZE), BATCH_PACK_SIZE)),
+            packs=0,
+            queued_ids=[],
+            items=expand_errors,
+            mensaje=expand_errors[0].error or "No se pudieron leer los ZIP.",
+        )
+    if not payloads:
+        raise HTTPException(status_code=400, detail="No se recibieron facturas válidas.")
+
+    service = DocumentService(db)
+    items: list[BatchUploadItem] = list(expand_errors)
+    queued_ids: list[int] = []
+    dup_count = 0
+    err_count = len(expand_errors)
+
+    for filename, content in payloads:
         try:
-            content = await archivo.read()
             doc, dup = service.save_upload(
                 content,
                 filename,

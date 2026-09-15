@@ -17,7 +17,7 @@ from infrastructure.persistence.models import DocumentModel
 from infrastructure.persistence.repositories import AuditRepository, DocumentRepository
 
 settings = get_settings()
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf"}
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf", ".webp"}
 STORAGE_ROOT = settings.storage_root
 
 
