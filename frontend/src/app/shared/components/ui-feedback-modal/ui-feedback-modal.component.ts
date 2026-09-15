@@ -6,7 +6,11 @@ import { UiFeedbackService } from '../../../core/services/ui-feedback.service';
   standalone: true,
   template: `
     @if (feedback.current(); as fb) {
-      <div class="ufm" role="presentation" (click)="feedback.clear()">
+      <div
+        class="ufm"
+        role="presentation"
+        (click)="fb.kind === 'confirm' ? feedback.dismissConfirm() : feedback.clear()"
+      >
         <div
           class="ufm__panel"
           role="alertdialog"
@@ -17,7 +21,18 @@ import { UiFeedbackService } from '../../../core/services/ui-feedback.service';
         >
           <p class="ufm__eyebrow" id="ufm-title">{{ fb.title }}</p>
           <p class="ufm__msg">{{ fb.message }}</p>
-          <button type="button" class="ufm__btn" (click)="feedback.clear()">Entendido</button>
+          @if (fb.kind === 'confirm') {
+            <div class="ufm__actions">
+              <button type="button" class="ufm__btn ufm__btn--ghost" (click)="feedback.dismissConfirm()">
+                {{ fb.cancelLabel || 'Cancelar' }}
+              </button>
+              <button type="button" class="ufm__btn ufm__btn--danger" (click)="feedback.acceptConfirm()">
+                {{ fb.confirmLabel || 'Aceptar' }}
+              </button>
+            </div>
+          } @else {
+            <button type="button" class="ufm__btn" (click)="feedback.clear()">Entendido</button>
+          }
         </div>
       </div>
     }
@@ -47,7 +62,8 @@ import { UiFeedbackService } from '../../../core/services/ui-feedback.service';
         gap: 0.85rem;
       }
 
-      .ufm__panel[data-kind='error'] {
+      .ufm__panel[data-kind='error'],
+      .ufm__panel[data-kind='confirm'] {
         border-color: rgba(176, 48, 48, 0.35);
         background: #fff8f7;
       }
@@ -71,7 +87,8 @@ import { UiFeedbackService } from '../../../core/services/ui-feedback.service';
         color: #1f7a4c;
       }
 
-      .ufm__panel[data-kind='error'] .ufm__eyebrow {
+      .ufm__panel[data-kind='error'] .ufm__eyebrow,
+      .ufm__panel[data-kind='confirm'] .ufm__eyebrow {
         color: #a12828;
       }
 
@@ -91,6 +108,14 @@ import { UiFeedbackService } from '../../../core/services/ui-feedback.service';
         overflow: auto;
       }
 
+      .ufm__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+        margin-top: 0.15rem;
+      }
+
       .ufm__btn {
         justify-self: end;
         margin-top: 0.15rem;
@@ -102,6 +127,21 @@ import { UiFeedbackService } from '../../../core/services/ui-feedback.service';
         cursor: pointer;
         color: #fff;
         background: #1f7a4c;
+      }
+
+      .ufm__actions .ufm__btn {
+        margin-top: 0;
+        justify-self: auto;
+      }
+
+      .ufm__btn--ghost {
+        background: transparent;
+        color: #31483c;
+        border: 1px solid rgba(26, 46, 36, 0.22);
+      }
+
+      .ufm__btn--danger {
+        background: #a12828;
       }
 
       .ufm__panel[data-kind='error'] .ufm__btn {
@@ -133,8 +173,9 @@ export class UiFeedbackModalComponent {
 
   @HostListener('document:keydown.escape')
   onEsc(): void {
-    if (this.feedback.current()) {
-      this.feedback.clear();
-    }
+    const cur = this.feedback.current();
+    if (!cur) return;
+    if (cur.kind === 'confirm') this.feedback.dismissConfirm();
+    else this.feedback.clear();
   }
 }

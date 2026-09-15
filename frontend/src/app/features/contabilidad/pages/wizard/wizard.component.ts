@@ -226,14 +226,15 @@ export class WizardComponent implements OnInit, OnDestroy {
     });
   }
 
-  eliminarCarpeta(ev: Event, folder: InvoiceFolder): void {
+  async eliminarCarpeta(ev: Event, folder: InvoiceFolder): Promise<void> {
     ev.stopPropagation();
     ev.preventDefault();
     const name = folder.name || `Carpeta #${folder.id}`;
-    const ok = window.confirm(
+    const ok = await this.feedback.confirm(
       `¿Eliminar la carpeta «${name}»?\n\n` +
         `Se quita la carpeta de la lista. Las facturas subidas no se borran del sistema; ` +
-        `solo dejan de estar agrupadas aquí.`
+        `solo dejan de estar agrupadas aquí.`,
+      { title: 'Eliminar carpeta', confirmLabel: 'Eliminar' }
     );
     if (!ok) {
       return;

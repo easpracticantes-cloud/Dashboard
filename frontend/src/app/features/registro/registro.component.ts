@@ -796,10 +796,14 @@ export class RegistroComponent {
     });
   }
 
-  eliminar(row: SeguimientoWhatsapp): void {
+  async eliminar(row: SeguimientoWhatsapp): Promise<void> {
     if (this.deleting() || this.saving()) return;
     const quien = row.cliente || row.celular || 'esta fila';
-    if (!confirm(`¿Eliminar del Excel la fila de ${quien}? Esta acción no se puede deshacer.`)) {
+    const ok = await this.feedback.confirm(
+      `¿Eliminar del Excel la fila de ${quien}? Esta acción no se puede deshacer.`,
+      { title: 'Eliminar fila', confirmLabel: 'Eliminar' }
+    );
+    if (!ok) {
       return;
     }
     this.deleting.set(true);

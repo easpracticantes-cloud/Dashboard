@@ -9,6 +9,7 @@ import { OpsService } from '../../core/services/ops.service';
 import { Client } from '../../core/models/client.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 @Component({
   selector: 'eas-sales',
@@ -18,6 +19,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
   styleUrl: '../quotes/commercial-page.scss'
 })
 export class SalesComponent {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly commercial = inject(CommercialService);
   private readonly clientsService = inject(ClientsService);
   private readonly liveSync = inject(LiveSyncService);
@@ -81,8 +84,12 @@ export class SalesComponent {
       });
   }
 
-  remove(id: string): void {
-    if (!confirm('¿Eliminar esta venta?')) return;
+  async remove(id: string): Promise<void> {
+    const ok = await this.feedback.confirm('¿Eliminar esta venta?', {
+      title: 'Eliminar',
+      confirmLabel: 'Eliminar',
+    });
+    if (!ok) return;
     this.commercial.deleteSale(id).subscribe((ok) => ok && this.reload());
   }
 }

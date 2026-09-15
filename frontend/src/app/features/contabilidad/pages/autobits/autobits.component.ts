@@ -145,10 +145,11 @@ export class AutobitsComponent implements OnInit {
     });
   }
 
-  limpiarExcels(): void {
-    const ok = window.confirm(
+  async limpiarExcels(): Promise<void> {
+    const ok = await this.feedback.confirm(
       '¿Limpiar todos los Excels de Autobits ya subidos?\n\n' +
-        'También se borran las facturas importadas y los pagos derivados.'
+        'También se borran las facturas importadas y los pagos derivados.',
+      { title: 'Limpiar Autobits', confirmLabel: 'Limpiar' }
     );
     if (!ok) return;
     this.limpiando = true;

@@ -27,6 +27,7 @@ import {
 } from '../conversation-form-dialog/conversation-form-dialog.component';
 import { ConversationEditDialogComponent } from '../conversation-edit-dialog/conversation-edit-dialog.component';
 import { buildYearOptions, calendarMonth, calendarYear } from '../../../shared/utils/year-options';
+import { UiFeedbackService } from '../../../core/services/ui-feedback.service';
 
 const IMPORTANCE_TO_PRIORITY: Record<string, ConversationPriority> = {
   Baja: 'LOW',
@@ -56,6 +57,8 @@ type SmartView = 'ALL' | 'MINE' | 'UNASSIGNED' | 'HIGH' | 'STALE';
   styleUrl: './conversations-list.component.scss'
 })
 export class ConversationsListComponent implements AfterViewInit {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly conversationsService = inject(ConversationsService);
   private readonly clientsService = inject(ClientsService);
   private readonly usersService = inject(UsersService);
@@ -416,9 +419,13 @@ export class ConversationsListComponent implements AfterViewInit {
     });
   }
 
-  removeRow(row: Conversation, event: Event): void {
+  async removeRow(row: Conversation, event: Event): Promise<void> {
     event.stopPropagation();
-    if (!confirm(`¿Eliminar la conversación de ${row.clientName}?`)) return;
+    const ok = await this.feedback.confirm(`¿Eliminar la conversación de ${row.clientName}?`, {
+      title: 'Eliminar',
+      confirmLabel: 'Eliminar',
+    });
+    if (!ok) return;
     this.conversationsService.remove(row.id).subscribe((ok) => ok && this.reload());
   }
 

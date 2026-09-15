@@ -10,6 +10,7 @@ import { OpsService } from '../../core/services/ops.service';
 import { Client } from '../../core/models/client.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 @Component({
   selector: 'eas-reservations',
@@ -19,6 +20,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
   styleUrl: '../quotes/commercial-page.scss'
 })
 export class ReservationsComponent {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly commercial = inject(CommercialService);
   private readonly clientsService = inject(ClientsService);
   private readonly liveSync = inject(LiveSyncService);
@@ -84,8 +87,12 @@ export class ReservationsComponent {
       });
   }
 
-  convertToSale(r: ReservationDto): void {
-    if (!confirm(`¿Convertir ${r.code} en venta?`)) return;
+  async convertToSale(r: ReservationDto): Promise<void> {
+    const ok = await this.feedback.confirm(`¿Convertir ${r.code} en venta?`, {
+      title: 'Convertir',
+      confirmLabel: 'Convertir',
+    });
+    if (!ok) return;
     this.ops
       .convertReservationToSale(r.id, {
         concept: r.experienceName,
@@ -99,13 +106,21 @@ export class ReservationsComponent {
       });
   }
 
-  cancel(r: ReservationDto): void {
-    if (!confirm(`¿Cancelar la reserva ${r.code}?`)) return;
+  async cancel(r: ReservationDto): Promise<void> {
+    const ok = await this.feedback.confirm(`¿Cancelar la reserva ${r.code}?`, {
+      title: 'Cancelar reserva',
+      confirmLabel: 'Cancelar reserva',
+    });
+    if (!ok) return;
     this.ops.cancelReservation(r.id).subscribe((ok) => ok && this.reload());
   }
 
-  remove(id: string): void {
-    if (!confirm('¿Eliminar esta reserva?')) return;
+  async remove(id: string): Promise<void> {
+    const ok = await this.feedback.confirm('¿Eliminar esta reserva?', {
+      title: 'Eliminar',
+      confirmLabel: 'Eliminar',
+    });
+    if (!ok) return;
     this.commercial.deleteReservation(id).subscribe((ok) => ok && this.reload());
   }
 }

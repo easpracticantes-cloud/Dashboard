@@ -27,6 +27,7 @@ import { StatusBadgeComponent } from '../../../shared/components/status-badge/st
 import { PriorityChipComponent } from '../../../shared/components/priority-chip/priority-chip.component';
 import { TimeAgoPipe } from '../../../shared/pipes/time-ago.pipe';
 import { AiQuoteDialogComponent } from '../ai-quote-dialog/ai-quote-dialog.component';
+import { UiFeedbackService } from '../../../core/services/ui-feedback.service';
 
 @Component({
   selector: 'eas-conversation-detail',
@@ -46,6 +47,8 @@ import { AiQuoteDialogComponent } from '../ai-quote-dialog/ai-quote-dialog.compo
   styleUrl: './conversation-detail.component.scss'
 })
 export class ConversationDetailComponent {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly conversationsService = inject(ConversationsService);
   private readonly usersService = inject(UsersService);
   private readonly ops = inject(OpsService);
@@ -231,12 +234,16 @@ export class ConversationDetailComponent {
     this.conversationsService.assign(conversation.id, assignedUserId).subscribe();
   }
 
-  transferTo(userId: string): void {
+  async transferTo(userId: string): Promise<void> {
     const conversation = this.conversation();
     this.transferUserId.set('');
     if (!conversation || !userId || this.actionBusy()) return;
     const advisor = this.advisors().find((u) => u.id === userId);
-    if (!confirm(`¿Transferir esta conversación a ${advisor?.fullName ?? 'otro asesor'}?`)) return;
+    const ok = await this.feedback.confirm(
+      `¿Transferir esta conversación a ${advisor?.fullName ?? 'otro asesor'}?`,
+      { title: 'Transferir', confirmLabel: 'Transferir' }
+    );
+    if (!ok) return;
     this.actionBusy.set(true);
     this.ops.transferConversation(conversation.id, userId).subscribe((ok) => {
       this.actionBusy.set(false);

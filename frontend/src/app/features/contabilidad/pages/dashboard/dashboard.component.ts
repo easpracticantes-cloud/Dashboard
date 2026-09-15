@@ -203,12 +203,12 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  cerrarPeriodo(): void {
-    if (
-      !confirm(
-        '¿Cerrar el periodo contable seleccionado? No podrá registrar movimientos hasta reabrirlo.'
-      )
-    ) {
+  async cerrarPeriodo(): Promise<void> {
+    const ok = await this.feedback.confirm(
+      '¿Cerrar el periodo contable seleccionado? No podrá registrar movimientos hasta reabrirlo.',
+      { title: 'Cerrar periodo', confirmLabel: 'Cerrar' }
+    );
+    if (!ok) {
       return;
     }
     const resumen = prompt('Resumen opcional del cierre:') || undefined;

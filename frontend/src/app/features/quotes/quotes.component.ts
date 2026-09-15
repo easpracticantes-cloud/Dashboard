@@ -10,6 +10,7 @@ import { OpsService } from '../../core/services/ops.service';
 import { Client } from '../../core/models/client.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { UiFeedbackService } from '../../core/services/ui-feedback.service';
 
 @Component({
   selector: 'eas-quotes',
@@ -19,6 +20,8 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
   styleUrl: './commercial-page.scss'
 })
 export class QuotesComponent {
+  private readonly feedback = inject(UiFeedbackService);
+
   private readonly commercial = inject(CommercialService);
   private readonly clientsService = inject(ClientsService);
   private readonly liveSync = inject(LiveSyncService);
@@ -105,8 +108,12 @@ export class QuotesComponent {
     });
   }
 
-  convertToReservation(q: QuoteDto): void {
-    if (!confirm(`¿Convertir ${q.code} en reserva?`)) return;
+  async convertToReservation(q: QuoteDto): Promise<void> {
+    const ok = await this.feedback.confirm(`¿Convertir ${q.code} en reserva?`, {
+      title: 'Convertir',
+      confirmLabel: 'Convertir',
+    });
+    if (!ok) return;
     const date = new Date();
     date.setDate(date.getDate() + 7);
     this.ops
@@ -141,8 +148,12 @@ export class QuotesComponent {
     )[s] ?? s;
   }
 
-  remove(id: string): void {
-    if (!confirm('¿Eliminar esta cotización?')) return;
+  async remove(id: string): Promise<void> {
+    const ok = await this.feedback.confirm('¿Eliminar esta cotización?', {
+      title: 'Eliminar',
+      confirmLabel: 'Eliminar',
+    });
+    if (!ok) return;
     this.commercial.deleteQuote(id).subscribe((ok) => ok && this.reload());
   }
 }

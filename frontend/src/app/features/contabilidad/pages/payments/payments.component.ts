@@ -138,13 +138,17 @@ export class PaymentsComponent implements OnInit {
       });
   }
 
-  crearDesdeCruce(): void {
+  async crearDesdeCruce(): Promise<void> {
     const id = Number(this.crossingIdNuevo);
     if (!id) {
       this.feedback.error('Indique el ID del cruce aprobado.');
       return;
     }
-    if (!confirm(`¿Crear pago desde el cruce #${id}?`)) {
+    const ok = await this.feedback.confirm(`¿Crear pago desde el cruce #${id}?`, {
+      title: 'Crear pago',
+      confirmLabel: 'Crear',
+    });
+    if (!ok) {
       return;
     }
     
@@ -159,7 +163,7 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
-  aprobar(p: PaymentSummary): void {
+  async aprobar(p: PaymentSummary): Promise<void> {
     if (!this.puedeAprobar(p)) {
       return;
     }
@@ -167,7 +171,8 @@ export class PaymentsComponent implements OnInit {
       `¿Aprobar el pago a ${p.proveedor || 'proveedor'}` +
       (p.valor != null ? ` por ${formatCop(p.valor)}` : '') +
       '?';
-    if (!confirm(msg)) {
+    const ok = await this.feedback.confirm(msg, { title: 'Aprobar pago', confirmLabel: 'Aprobar' });
+    if (!ok) {
       return;
     }
     
@@ -184,16 +189,16 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
-  marcarPagado(p: PaymentSummary): void {
+  async marcarPagado(p: PaymentSummary): Promise<void> {
     if (!this.puedeMarcarPagado(p)) {
       return;
     }
-    if (
-      !confirm(
-        '¿Confirmar que la transferencia bancaria ya fue ejecutada en Bancolombia? ' +
-          'Esta acción indica pago confirmado en banco.'
-      )
-    ) {
+    const ok = await this.feedback.confirm(
+      '¿Confirmar que la transferencia bancaria ya fue ejecutada en Bancolombia? ' +
+        'Esta acción indica pago confirmado en banco.',
+      { title: 'Marcar pagado', confirmLabel: 'Confirmar' }
+    );
+    if (!ok) {
       return;
     }
     const obs = prompt('Observaciones del pago manual (opcional):') || undefined;
@@ -211,15 +216,15 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
-  completar(p: PaymentSummary): void {
+  async completar(p: PaymentSummary): Promise<void> {
     if (!this.puedeCompletar(p)) {
       return;
     }
-    if (
-      !confirm(
-        `¿Completar el pago #${p.id}? Requiere comprobante cargado y confirma el cierre operativo del pago.`
-      )
-    ) {
+    const ok = await this.feedback.confirm(
+      `¿Completar el pago #${p.id}? Requiere comprobante cargado y confirma el cierre operativo del pago.`,
+      { title: 'Completar pago', confirmLabel: 'Completar' }
+    );
+    if (!ok) {
       return;
     }
     
@@ -236,7 +241,7 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
-  anular(p: PaymentSummary): void {
+  async anular(p: PaymentSummary): Promise<void> {
     if (!this.puedeAnular(p)) {
       return;
     }
@@ -244,14 +249,14 @@ export class PaymentsComponent implements OnInit {
     const avisoBanco = ESTADOS_MOTIVO_REFORZADO.has(p.estado)
       ? '\n\nEste pago ya figura como ejecutado en banco: el motivo debe ser detallado (mín. 10 caracteres).'
       : '';
-    if (
-      !confirm(
-        `¿Anular el pago #${p.id} a ${p.proveedor || 'proveedor'}` +
-          (p.valor != null ? ` (${formatCop(p.valor)})` : '') +
-          '?\n\nEl registro no se elimina: queda en estado Anulado con auditoría.' +
-          avisoBanco
-      )
-    ) {
+    const ok = await this.feedback.confirm(
+      `¿Anular el pago #${p.id} a ${p.proveedor || 'proveedor'}` +
+        (p.valor != null ? ` (${formatCop(p.valor)})` : '') +
+        '?\n\nEl registro no se elimina: queda en estado Anulado con auditoría.' +
+        avisoBanco,
+      { title: 'Anular pago', confirmLabel: 'Anular' }
+    );
+    if (!ok) {
       return;
     }
     const motivo = (prompt('Motivo de la anulación (obligatorio):') || '').trim();
@@ -277,7 +282,7 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
-  ajustarValor(p: PaymentSummary): void {
+  async ajustarValor(p: PaymentSummary): Promise<void> {
     if (!this.puedeAjustar(p)) {
       return;
     }
@@ -299,9 +304,10 @@ export class PaymentsComponent implements OnInit {
       return;
     }
     if (
-      !confirm(
-        `¿Ajustar el valor del pago #${p.id} de ${formatCop(p.valor)} a ${formatCop(valor)}?\nMotivo: ${motivo}`
-      )
+      !(await this.feedback.confirm(
+        `¿Ajustar el valor del pago #${p.id} de ${formatCop(p.valor)} a ${formatCop(valor)}?\nMotivo: ${motivo}`,
+        { title: 'Ajustar valor', confirmLabel: 'Ajustar' }
+      ))
     ) {
       return;
     }
@@ -319,7 +325,7 @@ export class PaymentsComponent implements OnInit {
     });
   }
 
-  onReceiptSelected(p: PaymentSummary, event: Event): void {
+  async onReceiptSelected(p: PaymentSummary, event: Event): Promise<void> {
     if (!this.puedeSubirComprobante(p)) {
       return;
     }
@@ -328,7 +334,11 @@ export class PaymentsComponent implements OnInit {
     if (!file) return;
     this.subiendo = true;
     
-    const contramarcado = confirm('¿Comprobante contramarcado?');
+    const contramarcado = await this.feedback.confirm('¿Comprobante contramarcado?', {
+      title: 'Comprobante',
+      confirmLabel: 'Sí',
+      cancelLabel: 'No',
+    });
     this.api.uploadReceipt(p.id, file, contramarcado).subscribe({
       next: () => {
         this.subiendo = false;

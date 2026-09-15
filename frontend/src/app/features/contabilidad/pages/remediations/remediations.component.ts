@@ -201,8 +201,12 @@ export class RemediationsComponent implements OnInit {
     });
   }
 
-  eliminar(item: RemediationSummary): void {
-    if (!confirm(`¿Eliminar subsanación #${item.id}?`)) return;
+  async eliminar(item: RemediationSummary): Promise<void> {
+    const ok = await this.feedback.confirm(`¿Eliminar subsanación #${item.id}?`, {
+      title: 'Eliminar',
+      confirmLabel: 'Eliminar',
+    });
+    if (!ok) return;
     this.api.delete(item.id).subscribe({
       next: () => this.cargar(),
       error: () => {
