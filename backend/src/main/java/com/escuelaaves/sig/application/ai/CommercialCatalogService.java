@@ -172,6 +172,33 @@ public class CommercialCatalogService {
         return List.copyOf(providers);
     }
 
+    /** Códigos destacados en meta.packages (relatedCode / relatedCodes). */
+    public List<String> featuredPackageCodes() {
+        List<String> codes = new ArrayList<>();
+        if (root == null || !root.has("packages") || !root.get("packages").isArray()) {
+            return codes;
+        }
+        for (JsonNode n : root.get("packages")) {
+            String related = text(n, "relatedCode");
+            if (related != null && !related.isBlank()) {
+                codes.add(related.trim());
+            }
+            JsonNode relatedCodes = n.get("relatedCodes");
+            if (relatedCodes != null && relatedCodes.isArray()) {
+                for (JsonNode c : relatedCodes) {
+                    if (c != null && !c.isNull() && !c.asText().isBlank()) {
+                        codes.add(c.asText().trim());
+                    }
+                }
+            }
+        }
+        return codes;
+    }
+
+    public String catalogVersion() {
+        return text(root, "version");
+    }
+
     public Optional<CatalogProduct> findByCode(String code) {
         if (code == null || code.isBlank()) {
             return Optional.empty();

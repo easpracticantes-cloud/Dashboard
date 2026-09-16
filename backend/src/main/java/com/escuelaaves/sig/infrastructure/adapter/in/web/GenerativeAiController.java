@@ -1,8 +1,12 @@
 package com.escuelaaves.sig.infrastructure.adapter.in.web;
 
+import com.escuelaaves.sig.application.ai.CommercialCatalogService;
+import com.escuelaaves.sig.application.ai.CommercialCatalogService.CatalogProduct;
 import com.escuelaaves.sig.application.ai.IntelligenceService;
 import com.escuelaaves.sig.application.ai.QuoteDocumentService;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionExecuteRequest;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.CatalogPackageOptionDto;
+import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.CatalogPackagesResponse;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionExecuteResponse;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ActionStepDto;
 import com.escuelaaves.sig.application.dto.ai.AiModuleDtos.ChatRequest;
@@ -40,8 +44,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Controlador HTTP del Enterprise AI Engine.
@@ -57,6 +67,7 @@ public class GenerativeAiController {
     private final AIUseCase aiUseCase;
     private final IntelligenceService intelligenceService;
     private final QuoteDocumentService quoteDocumentService;
+    private final CommercialCatalogService commercialCatalog;
 
     @PostMapping("/chat")
     @Operation(summary = "Chat libre con el proveedor IA activo")
@@ -207,6 +218,43 @@ public class GenerativeAiController {
             @RequestParam(defaultValue = "false") boolean save
     ) {
         return ResponseEntity.ok(quoteDocumentService.process(body, save));
+    }
+
+    @GetMapping("/catalog/packages")
+    @Operation(summary = "Paquetes/tours activos del catálogo comercial para el desplegable de cotización")
+    public ResponseEntity<CatalogPackagesResponse> catalogPackages() {
+        Set<String> featured = new HashSet<>(commercialCatalog.featuredPackageCodes());
+        List<CatalogPackageOptionDto> packages = commercialCatalog.products().stream()
+                .filter(CatalogProduct::active)
+                .sorted(Comparator
+                        .comparing((CatalogProduct p) -> !featured.contains(p.code()))
+                        .thenComparing(p -> p.modality() == null ? "" : p.modality())
+                        .thenComparing(p -> p.name() == null ? "" : p.name().toLowerCase(Locale.ROOT)))
+                .map(p -> toPackageOption(p, featured.contains(p.code())))
+                .toList();
+        return ResponseEntity.ok(new CatalogPackagesResponse(commercialCatalog.catalogVersion(), packages));
+    }
+
+    private static CatalogPackageOptionDto toPackageOption(CatalogProduct p, boolean featured) {
+        Map<String, BigDecimal> scale = new LinkedHashMap<>();
+        if (p.priceScaleByPax() != null) {
+            p.priceScaleByPax().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .forEach(e -> scale.put(String.valueOf(e.getKey()), e.getValue()));
+        }
+        return new CatalogPackageOptionDto(
+                p.code(),
+                p.name(),
+                p.modality(),
+                p.currency(),
+                p.pricePerPerson1Pax(),
+                scale,
+                p.includes(),
+                p.excludes(),
+                p.notes(),
+                p.reviewFlag(),
+                featured
+        );
     }
 
     @PostMapping("/copilot")

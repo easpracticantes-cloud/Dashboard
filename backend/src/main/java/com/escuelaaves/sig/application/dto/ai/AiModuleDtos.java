@@ -268,4 +268,26 @@ public final class AiModuleDtos {
             this(sessionId, reply, mode, toolsUsed, provider, success, null);
         }
     }
+
+    /** Opción seleccionable en el desplegable de cotización (catálogo comercial). */
+    public record CatalogPackageOptionDto(
+            String code,
+            String name,
+            String modality,
+            String currency,
+            java.math.BigDecimal pricePerPerson1Pax,
+            java.util.Map<String, java.math.BigDecimal> priceScaleByPax,
+            String includes,
+            String excludes,
+            String notes,
+            boolean reviewFlag,
+            boolean featured
+    ) {
+    }
+
+    public record CatalogPackagesResponse(
+            String version,
+            java.util.List<CatalogPackageOptionDto> packages
+    ) {
+    }
 }

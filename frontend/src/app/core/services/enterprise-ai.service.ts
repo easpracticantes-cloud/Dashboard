@@ -187,6 +187,10 @@ export class EnterpriseAiService {
     return this.api.post(`/ai/quotes/document${q}`, document);
   }
 
+  catalogPackages(): Observable<CatalogPackagesResponse> {
+    return this.api.get('/ai/catalog/packages');
+  }
+
   memoryMessages(sessionId: string): Observable<Array<{ role: string; content: string }>> {
     return this.api.get(`/ai/memory/${encodeURIComponent(sessionId)}/messages`);
   }
@@ -328,6 +332,25 @@ export interface QuoteDocumentResponse {
   document: QuoteDraft;
   errors: string[];
   valid: boolean;
+}
+
+export interface CatalogPackageOption {
+  code: string;
+  name: string;
+  modality?: string;
+  currency?: string;
+  pricePerPerson1Pax?: number;
+  priceScaleByPax?: Record<string, number>;
+  includes?: string | null;
+  excludes?: string | null;
+  notes?: string | null;
+  reviewFlag?: boolean;
+  featured?: boolean;
+}
+
+export interface CatalogPackagesResponse {
+  version?: string;
+  packages: CatalogPackageOption[];
 }
 
 export interface ActionExecuteResponse {

@@ -1,5 +1,6 @@
-import { Component, ElementRef, computed, input, output, viewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { EnterpriseAiService, type CatalogPackageOption } from '../../../core/services/enterprise-ai.service';
 import { documentTotals } from './quote-sheet.math';
 import {
   type QuoteSheetDocument,
@@ -31,7 +32,9 @@ const MODALITIES = ['Privado', 'Compartido', 'Grupo', 'A medida'] as const;
   templateUrl: './quote-sheet.component.html',
   styleUrl: './quote-sheet.component.scss'
 })
-export class QuoteSheetComponent {
+export class QuoteSheetComponent implements OnInit {
+  private readonly enterpriseAi = inject(EnterpriseAiService);
+
   readonly document = input.required<QuoteSheetDocument>();
   readonly editing = input(false);
   readonly documentChange = output<QuoteSheetDocument>();
@@ -42,6 +45,28 @@ export class QuoteSheetComponent {
   readonly birdArt = QUOTE_BIRD_ART;
   readonly presets = QUOTE_PACKAGE_PRESETS;
   readonly modalities = MODALITIES;
+
+  readonly catalogPackages = signal<CatalogPackageOption[]>([]);
+  readonly catalogLoading = signal(false);
+  readonly catalogError = signal('');
+  readonly selectedPackageCode = signal('');
+
+  readonly featuredPackages = computed(() => this.catalogPackages().filter((p) => p.featured));
+  readonly privadoPackages = computed(() =>
+    this.catalogPackages().filter((p) => !p.featured && (p.modality || '').toUpperCase() === 'PRIVADO')
+  );
+  readonly compartidoPackages = computed(() =>
+    this.catalogPackages().filter((p) => !p.featured && (p.modality || '').toUpperCase() === 'COMPARTIDO')
+  );
+  readonly otherPackages = computed(() =>
+    this.catalogPackages().filter((p) => {
+      if (p.featured) {
+        return false;
+      }
+      const m = (p.modality || '').toUpperCase();
+      return m !== 'PRIVADO' && m !== 'COMPARTIDO';
+    })
+  );
 
   readonly rows = computed(() => previewItems(this.document().items, this.editing()));
   readonly money = computed(() => documentTotals(this.document().items));
@@ -98,6 +123,29 @@ export class QuoteSheetComponent {
 
   dash = displayDash;
   dateText = formatQuoteDate;
+
+  ngOnInit(): void {
+    this.loadCatalogPackages();
+  }
+
+  loadCatalogPackages(): void {
+    this.catalogLoading.set(true);
+    this.catalogError.set('');
+    this.enterpriseAi.catalogPackages().subscribe({
+      next: (res) => {
+        this.catalogPackages.set(res.packages || []);
+        const current = this.document().code || '';
+        if (current && (res.packages || []).some((p) => p.code === current)) {
+          this.selectedPackageCode.set(current);
+        }
+        this.catalogLoading.set(false);
+      },
+      error: () => {
+        this.catalogError.set('No se pudieron cargar los paquetes del catálogo.');
+        this.catalogLoading.set(false);
+      }
+    });
+  }
 
   nativeElement(): HTMLElement | null {
     return this.sheetRoot()?.nativeElement ?? null;
@@ -174,6 +222,7 @@ export class QuoteSheetComponent {
   }
 
   applyPreset(preset: QuotePackagePreset): void {
+    this.selectedPackageCode.set(preset.code || '');
     this.documentChange.emit({
       ...this.document(),
       name: preset.label,
@@ -185,6 +234,86 @@ export class QuoteSheetComponent {
       people: preset.items[0]?.quantity || this.document().people,
       priceScaleByPax: preset.priceScaleByPax || this.document().priceScaleByPax
     });
+  }
+
+  onPackageSelected(code: string): void {
+    this.selectedPackageCode.set(code || '');
+    if (!code) {
+      return;
+    }
+    const pkg = this.catalogPackages().find((p) => p.code === code);
+    if (pkg) {
+      this.applyCatalogPackage(pkg);
+    }
+  }
+
+  applyCatalogPackage(pkg: CatalogPackageOption): void {
+    const people = Math.max(1, Number(this.document().people) || 2);
+    const scale = this.normalizeScale(pkg.priceScaleByPax);
+    const unit = unitFromScale(scale, people) ?? (Number(pkg.pricePerPerson1Pax) || 0);
+    const modality = this.displayModality(pkg.modality);
+    const lines = [
+      pkg.name,
+      `Modalidad ${modality.toLowerCase()} · ${people} personas · Tarifa catálogo EAS`,
+      pkg.includes ? `Incluye: ${pkg.includes}` : '',
+      pkg.excludes ? `No incluye: ${pkg.excludes}` : '',
+      pkg.notes ? `Notas: ${pkg.notes}` : ''
+    ].filter(Boolean);
+
+    this.selectedPackageCode.set(pkg.code);
+    this.documentChange.emit({
+      ...this.document(),
+      name: pkg.name,
+      code: pkg.code,
+      modality,
+      people,
+      currency: pkg.currency || this.document().currency || 'COP',
+      includes: pkg.includes || this.document().includes,
+      excludes: pkg.excludes || this.document().excludes,
+      notes: pkg.notes || this.document().notes,
+      priceScaleByPax: scale,
+      items: [
+        recalcItem({
+          ...emptyQuoteItem(),
+          id: newItemId(),
+          description: lines.join('\n'),
+          quantity: people,
+          unit: 'pax',
+          unitPrice: unit
+        })
+      ]
+    });
+  }
+
+  packageOptionLabel(pkg: CatalogPackageOption): string {
+    const price = Number(pkg.pricePerPerson1Pax) || 0;
+    const priceText = price > 0 ? ` · desde ${formatCop(price, pkg.currency || 'COP')}` : '';
+    return `${pkg.name}${priceText}`;
+  }
+
+  private displayModality(raw?: string): string {
+    const m = (raw || '').trim().toUpperCase();
+    if (m === 'PRIVADO') {
+      return 'Privado';
+    }
+    if (m === 'COMPARTIDO') {
+      return 'Compartido';
+    }
+    return raw || this.document().modality || 'Privado';
+  }
+
+  private normalizeScale(scale?: Record<string, number>): Record<string, number> {
+    const out: Record<string, number> = {};
+    if (!scale) {
+      return out;
+    }
+    for (const [k, v] of Object.entries(scale)) {
+      const n = Number(v);
+      if (!Number.isNaN(n) && n > 0) {
+        out[String(k)] = n;
+      }
+    }
+    return out;
   }
 
   extendValidity(days: number): void {

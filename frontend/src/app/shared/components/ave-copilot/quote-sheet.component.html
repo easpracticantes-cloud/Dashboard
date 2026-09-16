@@ -143,8 +143,60 @@
 
   @if (editing()) {
     <section class="qs-tools" aria-label="Acciones rápidas">
+      <div class="qs-tools__catalog">
+        <label class="qs-tools__label" for="qs-package-select">Paquete disponible</label>
+        <div class="qs-tools__select-row">
+          <select
+            id="qs-package-select"
+            class="qs-in qs-in--select"
+            [ngModel]="selectedPackageCode()"
+            (ngModelChange)="onPackageSelected($event)"
+            [disabled]="catalogLoading()"
+          >
+            <option value="">
+              {{ catalogLoading() ? 'Cargando paquetes…' : 'Selecciona un paquete del catálogo' }}
+            </option>
+            @if (featuredPackages().length) {
+              <optgroup label="Destacados">
+                @for (pkg of featuredPackages(); track pkg.code) {
+                  <option [value]="pkg.code">{{ packageOptionLabel(pkg) }}</option>
+                }
+              </optgroup>
+            }
+            @if (privadoPackages().length) {
+              <optgroup label="Privados">
+                @for (pkg of privadoPackages(); track pkg.code) {
+                  <option [value]="pkg.code">{{ packageOptionLabel(pkg) }}</option>
+                }
+              </optgroup>
+            }
+            @if (compartidoPackages().length) {
+              <optgroup label="Compartidos">
+                @for (pkg of compartidoPackages(); track pkg.code) {
+                  <option [value]="pkg.code">{{ packageOptionLabel(pkg) }}</option>
+                }
+              </optgroup>
+            }
+            @if (otherPackages().length) {
+              <optgroup label="Otros">
+                @for (pkg of otherPackages(); track pkg.code) {
+                  <option [value]="pkg.code">{{ packageOptionLabel(pkg) }}</option>
+                }
+              </optgroup>
+            }
+          </select>
+          @if (catalogError()) {
+            <button type="button" class="qs-chip qs-chip--ghost" (click)="loadCatalogPackages()">Reintentar</button>
+          }
+        </div>
+        @if (catalogError()) {
+          <p class="qs-tools__hint qs-tools__hint--error">{{ catalogError() }}</p>
+        } @else if (!catalogLoading() && catalogPackages().length) {
+          <p class="qs-tools__hint">{{ catalogPackages().length }} paquetes del catálogo · al elegir se cargan tarifa e ítem</p>
+        }
+      </div>
       <div class="qs-tools__presets">
-        <span class="qs-tools__label">Paquete rápido</span>
+        <span class="qs-tools__label">Accesos rápidos</span>
         <div class="qs-tools__chips">
           @for (preset of presets; track preset.id) {
             <button type="button" class="qs-chip" [title]="preset.blurb" (click)="applyPreset(preset)">
