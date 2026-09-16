@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from domain.autobits.fields import AUTOBITS_FIELDS, suggest_mapping
+from domain.autobits.fields import AUTOBITS_FIELDS, prefer_canonical_columns, suggest_mapping
 from infrastructure.ai.anthropic_client import AnthropicClient, AnthropicClientError
 
 
@@ -229,12 +229,12 @@ Reglas:
                 "NO_MAPPING",
             )
 
-        # Completar huecos con heurística: la IA a veces deja null Codigo Reserva / COM
-        # y eso rompe el cruce (RESERVA vacío).
+        # Completar huecos y forzar Codigo Reserva / Orden de compra canónicos
         heuristic = suggest_mapping(columns)
         for field in AUTOBITS_FIELDS:
             if not mapping.get(field) and heuristic.get(field):
                 mapping[field] = heuristic[field]
+        mapping = prefer_canonical_columns(mapping, columns)
 
         return ExcelAIAnalysis(
             mapping=mapping,

@@ -1028,9 +1028,8 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.autobits.set({ ...res, records: [...(res.records || [])] });
     const fromRes = [...(res.records || [])];
     this.records.set(fromRes);
-    if (!fromRes.length) {
-      this.cargarRecords(res.batch?.id);
-    }
+    // Siempre refrescar desde API: recupera Codigo Reserva si el lote viejo lo tenía vacío
+    this.cargarRecords(res.batch?.id);
     if (res.parse_errors?.length) {
       this.feedback.error(res.parse_errors.slice(0, 3).join(' · '));
     } else if (res.aviso && /reserva|COM/i.test(res.aviso)) {

@@ -157,6 +157,65 @@ def normalize_header(value: str) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
+# Encabezados canónicos del export Autobits real: siempre tienen prioridad sobre la IA.
+CANONICAL_COLUMN_PREFERENCES: dict[str, tuple[str, ...]] = {
+    "numero_compra": (
+        "codigo orden de compra",
+        "código orden de compra",
+    ),
+    "numero_reserva": (
+        "codigo reserva",
+        "código reserva",
+    ),
+    "proveedor": ("nombre proveedor (orden de compra)",),
+    "nit": ("nit/cc proveedor (orden de compra)",),
+    "fecha": (
+        "fecha de ejecución (reserva)",
+        "fecha de ejecucion (reserva)",
+    ),
+    "concepto": ("nombre concepto",),
+    "valor": ("total",),
+    "estado_compra": ("estado de la compra",),
+    "observaciones": ("observaciones",),
+}
+
+
+def prefer_canonical_columns(
+    mapping: dict[str, str | None], columns: list[str]
+) -> dict[str, str | None]:
+    """Fuerza Codigo Reserva / Codigo Orden de compra si existen en el Excel."""
+    out = dict(mapping or {})
+    by_norm = {normalize_header(c): c for c in columns if c}
+    for field, preferred in CANONICAL_COLUMN_PREFERENCES.items():
+        for needle in preferred:
+            col = by_norm.get(normalize_header(needle))
+            if col:
+                out[field] = col
+                break
+    return out
+
+
+def value_from_row_dict(row_dict: dict, *needles: str):
+    """Lee un valor del Excel por nombre de encabezado, sin depender del mapeo IA."""
+    if not isinstance(row_dict, dict) or not row_dict:
+        return None
+    norms = [normalize_header(n) for n in needles if n]
+    for key, value in row_dict.items():
+        if value is None or str(value).strip() == "":
+            continue
+        if normalize_header(str(key)) in norms:
+            return value
+    for needle in sorted(norms, key=len, reverse=True):
+        if len(needle) < 5:
+            continue
+        for key, value in row_dict.items():
+            if value is None or str(value).strip() == "":
+                continue
+            if needle in normalize_header(str(key)):
+                return value
+    return None
+
+
 def suggest_mapping(columns: list[str]) -> dict[str, str | None]:
     """Sugiere mapeo columna Excel → campo interno."""
     normalized = {normalize_header(col): col for col in columns}

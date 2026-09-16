@@ -11,7 +11,12 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from config.settings import get_settings
-from domain.autobits.fields import AUTOBITS_FIELDS, FIELD_LABELS, suggest_mapping
+from domain.autobits.fields import (
+    AUTOBITS_FIELDS,
+    FIELD_LABELS,
+    prefer_canonical_columns,
+    suggest_mapping,
+)
 from domain.enums import AutobitsRecordStatus
 from infrastructure.autobits.excel_adapter import (
     AutobitsImportError,
@@ -150,11 +155,12 @@ class AutobitsService:
                 raise AutobitsServiceError(exc.message, exc.code) from exc
 
             mapping = analysis.mapping
-            # Refuerzo: nunca perder Codigo Reserva / COM aunque la IA los omita
+            # Forzar Codigo Reserva / Codigo Orden de compra del Excel Autobits real
             heuristic = suggest_mapping(preview.columns)
             for field in AUTOBITS_FIELDS:
                 if not mapping.get(field) and heuristic.get(field):
                     mapping[field] = heuristic[field]
+            mapping = prefer_canonical_columns(mapping, preview.columns)
             mapped = [v for v in mapping.values() if v]
             if not mapped:
                 path.unlink(missing_ok=True)
@@ -289,6 +295,11 @@ class AutobitsService:
         self.db.commit()
         self.db.refresh(batch)
 
+        # Recuperar reserva/COM aunque el mapeo previo haya fallado
+        self.repair_records_from_raw(batch.id)
+        if batch.storage_path:
+            self.repair_records_from_storage(batch)
+
         preview_path.unlink(missing_ok=True)
 
         records = [self.to_record_dict(r) for r in self.repo.list_records_for_batch(batch.id)]
@@ -306,9 +317,11 @@ class AutobitsService:
 
     def _result_from_existing_batch(self, batch: ImportBatchModel, *, aviso: str) -> dict:
         repaired = self.repair_records_from_raw(batch.id)
+        if batch.storage_path:
+            repaired += self.repair_records_from_storage(batch)
         if repaired:
             aviso = (
-                f"{aviso} Se recuperaron {repaired} código(s) de reserva/COM "
+                f"{aviso} Se recuperaron códigos de reserva/COM "
                 "desde el Excel original."
             )
         records = [self.to_record_dict(r) for r in self.repo.list_records_for_batch(batch.id)]
@@ -394,6 +407,51 @@ class AutobitsService:
             self.db.commit()
         return fixed
 
+    def repair_records_from_storage(self, batch: ImportBatchModel) -> int:
+        """Relee el Excel guardado y completa reserva/COM faltantes fila a fila."""
+        path = Path(batch.storage_path) if batch.storage_path else None
+        if not path or not path.exists():
+            return 0
+        mapping = prefer_canonical_columns(
+            mapping_from_json(batch.column_mapping_json),
+            [],
+        )
+        try:
+            preview = self.adapter.preview(path)
+            mapping = prefer_canonical_columns(
+                {**suggest_mapping(preview.columns), **{k: v for k, v in mapping.items() if v}},
+                preview.columns,
+            )
+            parsed = self.adapter.parse(path, mapping, validate=False)
+        except AutobitsImportError:
+            return 0
+
+        by_row = {p.row_number: p for p in parsed.rows}
+        records = self.repo.list_records_for_batch(batch.id)
+        fixed = 0
+        for record in records:
+            parsed_row = by_row.get(record.row_number)
+            if not parsed_row:
+                # Fallback por hash / orden si cambió la numeración
+                continue
+            changed = False
+            if not (record.numero_reserva or "").strip() and parsed_row.numero_reserva:
+                record.numero_reserva = parsed_row.numero_reserva
+                changed = True
+            if not (record.numero_compra or "").strip() and parsed_row.numero_compra:
+                record.numero_compra = parsed_row.numero_compra
+                changed = True
+            if parsed_row.raw and not record.raw_json:
+                record.raw_json = json.dumps(parsed_row.raw, ensure_ascii=False)
+                changed = True
+            if changed:
+                fixed += 1
+        if fixed:
+            # Actualizar mapeo persistido para próximas lecturas
+            batch.column_mapping_json = mapping_to_json(mapping)
+            self.db.commit()
+        return fixed
+
     def list_batches(self, limit: int = 50, offset: int = 0) -> tuple[list[dict], int]:
         items, total = self.repo.list_batches(limit=limit, offset=offset)
         return [self.to_batch_dict(b) for b in items], total
@@ -415,6 +473,14 @@ class AutobitsService:
     ) -> tuple[list[dict], int]:
         if batch_id:
             self.repair_records_from_raw(batch_id)
+            batch = self.repo.get_batch(batch_id)
+            if batch and batch.storage_path:
+                missing = any(
+                    not (r.numero_reserva or "").strip()
+                    for r in self.repo.list_records_for_batch(batch_id)[:20]
+                )
+                if missing:
+                    self.repair_records_from_storage(batch)
         items, total = self.repo.list_records(
             limit=limit,
             offset=offset,

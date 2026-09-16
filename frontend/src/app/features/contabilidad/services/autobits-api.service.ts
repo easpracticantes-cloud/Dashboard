@@ -74,10 +74,11 @@ export class AutobitsApiService {
   constructor(private readonly http: HttpClient) {}
 
   /** Importación automática en un solo paso (sin mapeo ni fechas). */
-  uploadDirect(file: File, autoCruzar = true): Observable<ImportResult> {
+  uploadDirect(file: File, autoCruzar = true, force = false): Observable<ImportResult> {
     const form = new FormData();
     form.append('archivo', file, file.name);
     form.append('auto_cruzar', autoCruzar ? 'true' : 'false');
+    form.append('force', force ? 'true' : 'false');
     return this.http.post<ImportResult>(`${this.base}/upload`, form);
   }
 

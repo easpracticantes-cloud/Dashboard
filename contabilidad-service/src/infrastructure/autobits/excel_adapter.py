@@ -10,7 +10,9 @@ from pathlib import Path
 from domain.autobits.fields import (
     AUTOBITS_FIELDS,
     ParsedAutobitsRow,
+    prefer_canonical_columns,
     suggest_mapping,
+    value_from_row_dict,
 )
 from openpyxl import load_workbook
 
@@ -267,6 +269,7 @@ class ExcelAutobitsAdapter:
                 raise AutobitsImportError("El Excel está vacío o sin encabezados.", "EMPTY_SHEET")
 
             mapping = _normalize_mapping(mapping, columns)
+            mapping = prefer_canonical_columns(mapping, columns)
             active_mapping = {k: v for k, v in mapping.items() if v and v in columns}
             if validate and not active_mapping.get("valor") and not active_mapping.get("proveedor"):
                 raise AutobitsImportError(
@@ -317,12 +320,29 @@ class ExcelAutobitsAdapter:
 
             estado_compra = extract_estado_compra_from_raw(raw)
 
+        # Si el mapeo IA apunta a una columna vacía/incorrecta, leer directo del Excel
+        numero_compra = _to_str(get("numero_compra")) or _to_str(
+            value_from_row_dict(
+                row_dict,
+                "codigo orden de compra",
+                "código orden de compra",
+                "orden de compra",
+            )
+        )
+        numero_reserva = _to_str(get("numero_reserva")) or _to_str(
+            value_from_row_dict(
+                row_dict,
+                "codigo reserva",
+                "código reserva",
+            )
+        )
+
         parsed = ParsedAutobitsRow(
             row_number=row_number,
             proveedor=_to_str(get("proveedor")),
             nit=_to_str(get("nit")),
-            numero_compra=_to_str(get("numero_compra")),
-            numero_reserva=_to_str(get("numero_reserva")),
+            numero_compra=numero_compra,
+            numero_reserva=numero_reserva,
             numero_documento=_to_str(get("numero_documento")),
             valor=valor,
             fecha=_to_date_str(get("fecha")),
