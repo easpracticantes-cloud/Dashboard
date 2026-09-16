@@ -7,6 +7,7 @@ Cuentas permitidas actualmente:
 - `escuelaavescomercial@gmail.com`
 - `easpracticantes@gmail.com`
 - `escuelaavesdesalento@gmail.com`
+- `escuelaavescontabilidad@gmail.com`
 
 ## 1. Crear el OAuth Client ID en Google Cloud Console
 
@@ -16,11 +17,13 @@ Cuentas permitidas actualmente:
    - Tipo de usuario: **Externo**.
    - Nombre de la app: `SIG Escuela Aves Salento`.
    - Correo de asistencia y de contacto del desarrollador.
-   - En **Usuarios de prueba** agrega:
+   - En **Usuarios de prueba** agrega (mientras la app esté en modo *Testing*):
      - `escuelaavescomercial@gmail.com`
      - `easpracticantes@gmail.com`
      - `escuelaavesdesalento@gmail.com`
-     mientras la app esté en modo *Testing*. (En producción puedes publicarla).
+     - `escuelaavescontabilidad@gmail.com`
+     Si falta alguno aquí, Google bloquea el acceso **antes** de llegar al SIG.
+     (En producción puedes publicar la app y ya no hace falta la lista de prueba).
 4. Menú → **APIs y servicios → Credenciales → Crear credenciales → ID de cliente de OAuth**:
    - Tipo de aplicación: **Aplicación web**.
    - Nombre: `SIG Web`.
