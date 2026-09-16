@@ -54,7 +54,7 @@ export async function downloadQuotePdf(
     }
 
     const jpeg = await canvasToJpeg(canvas, 0.92);
-    const blob = jpegToPdf(jpeg, canvas.width, canvas.height);
+    const blob = buildJpegPdf(jpeg, canvas.width, canvas.height);
     const code = (('code' in data && data.code) || ('quoteNumber' in data && data.quoteNumber) || 'EAS')
       .toString()
       .replace(/[^\w.-]+/g, '_');
@@ -150,9 +150,14 @@ function dataUrlToBytes(dataUrl: string): Uint8Array {
   return out;
 }
 
+/** Construye un PDF válido (con cabecera %PDF-) que embebe un JPEG a página completa. */
+export function buildJpegPdf(jpeg: Uint8Array, imgW: number, imgH: number): Blob {
+  return jpegToPdf(jpeg, imgW, imgH);
+}
+
 function jpegToPdf(jpeg: Uint8Array, imgW: number, imgH: number): Blob {
   const pageW = 595;
-  const pageH = Math.max(1, Math.round((imgH / imgW) * pageW));
+  const pageH = Math.max(1, Math.round((imgH / Math.max(imgW, 1)) * pageW));
   const objects: Uint8Array[] = [];
   objects.push(ascii('1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'));
   objects.push(ascii('2 0 obj\n<< /Type /Pages /Kids [ 3 0 R ] /Count 1 >>\nendobj\n'));
@@ -161,19 +166,21 @@ function jpegToPdf(jpeg: Uint8Array, imgW: number, imgH: number): Blob {
       `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`
     )
   );
+  // Longitud exacta del stream JPEG (sin bytes extra) para que Chrome pueda abrir el PDF
   objects.push(
     concat(
       ascii(
         `4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imgW} /Height ${imgH} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`
       ),
       jpeg,
-      ascii('\nendstream\nendobj\n')
+      ascii('endstream\nendobj\n')
     )
   );
   const content = `q\n${pageW} 0 0 ${pageH} 0 0 cm\n/Im0 Do\nQ\n`;
-  objects.push(ascii(`5 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`));
+  objects.push(ascii(`5 0 obj\n<< /Length ${content.length} >>\nstream\n${content}endstream\nendobj\n`));
 
-  let body = new Uint8Array(0) as Uint8Array<ArrayBuffer>;
+  // Cabecera obligatoria: sin %PDF- Chrome muestra "error al cargar el documento PDF"
+  let body = ascii('%PDF-1.4\n') as Uint8Array<ArrayBuffer>;
   const offsets = [0];
   for (const obj of objects) {
     offsets.push(body.length);
