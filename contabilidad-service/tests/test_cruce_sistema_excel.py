@@ -213,7 +213,7 @@ def test_export_xlsx_estructura_estandar(client):
     wb = load_workbook(io.BytesIO(export.content))
     assert wb.sheetnames == [SINGLE_SHEET_NAME]
     ws = wb[SINGLE_SHEET_NAME]
-    headers = [(ws.cell(1, c).value or "").strip() for c in range(1, 9)]
+    headers = [(ws.cell(1, c).value or "").strip() for c in range(1, len(SINGLE_SHEET_HEADERS) + 1)]
     assert tuple(headers) == SINGLE_SHEET_HEADERS
     dumped = _xlsx_text(export.content)
     assert "COM001" not in dumped
@@ -252,7 +252,7 @@ def test_workbook_builder_escribe_datos_sin_fantasmas_del_maestro():
     wb = load_workbook(io.BytesIO(content))
     assert wb.sheetnames == [SINGLE_SHEET_NAME]
     ws = wb[SINGLE_SHEET_NAME]
-    assert tuple(ws.cell(1, c).value for c in range(1, 9)) == SINGLE_SHEET_HEADERS
+    assert tuple(ws.cell(1, c).value for c in range(1, len(SINGLE_SHEET_HEADERS) + 1)) == SINGLE_SHEET_HEADERS
     # Orden alfabético por proveedor
     assert ws["A2"].value == "Hotel Nuevo SAS"
     assert ws["D2"].value == "COM777001"
@@ -496,7 +496,7 @@ def test_export_usa_plantilla_maestra_sin_datos_historicos():
     assert "COM005691" not in joined
     assert "FV POS" not in joined
     ws = wb[SINGLE_SHEET_NAME]
-    assert tuple(ws.cell(1, c).value for c in range(1, 9)) == SINGLE_SHEET_HEADERS
+    assert tuple(ws.cell(1, c).value for c in range(1, len(SINGLE_SHEET_HEADERS) + 1)) == SINGLE_SHEET_HEADERS
     assert ws["D2"].value == "COM-NUEVO-1"
     assert ws["G2"].value == "FE-4589"
 

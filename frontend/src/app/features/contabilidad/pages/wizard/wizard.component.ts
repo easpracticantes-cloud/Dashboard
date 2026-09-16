@@ -209,7 +209,6 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.foldersApi.create(name).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (folder) => {
         this.nuevaCarpetaNombre = '';
-        this.feedback.success(`Carpeta «${folder.name}» creada.`);
         this.carpetas.update((list) => [folder, ...list]);
         this.aplicarCarpeta(folder);
         this.paso.set(1);
@@ -262,10 +261,7 @@ export class WizardComponent implements OnInit, OnDestroy {
             this.seleccionarCarpeta(next.id);
           } else {
             this.paso.set(1);
-            this.feedback.success(`Carpeta «${name}» eliminada.`);
           }
-        } else {
-          this.feedback.success(`Carpeta «${name}» eliminada.`);
         }
       },
       error: (err) => this.feedback.error(this.detalleError(err, 'No se pudo eliminar la carpeta.')),
@@ -300,7 +296,6 @@ export class WizardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.resetLocal();
-          this.feedback.success('Cargas anteriores vaciadas. Elige o crea una carpeta de facturas.');
         },
         error: (err) => {
           this.feedback.error(this.detalleError(err, 'No se pudieron vaciar las cargas.'));
@@ -356,8 +351,6 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   private subirAutobits(file: File): void {
     this.restoreSeq += 1;
-    
-    this.feedback.info('Leyendo el Excel de Autobits…');
     this.autobitsUpload?.unsubscribe();
     this.subiendoAutobits.set(true);
     this.autobitsUpload = this.autobitsApi
@@ -382,8 +375,6 @@ export class WizardComponent implements OnInit, OnDestroy {
   async generarExcel(): Promise<void> {
     if (this.generandoExcel() || !this.puedeGenerarExcel()) return;
     this.generandoExcel.set(true);
-    
-    this.feedback.info('Generando Excel de cruce de la carpeta…');
     try {
       const today = new Date().toISOString().slice(0, 10);
       const documentIds = [...this.idsListosParaExcel()];
@@ -395,7 +386,6 @@ export class WizardComponent implements OnInit, OnDestroy {
         this.docsApi.exportExcelUrl(documentIds),
         `Cruce_Cuentas_${today}.xlsx`
       );
-      this.feedback.success('Excel de cruce descargado.');
     } catch (err) {
       this.feedback.error(err instanceof Error ? err.message : 'No se pudo generar el Excel.');
     } finally {
@@ -468,8 +458,6 @@ export class WizardComponent implements OnInit, OnDestroy {
     }
 
     this.subiendoFacturas.set(true);
-    
-    this.feedback.info('Preparando archivos…');
 
     let invoices: File[];
     try {
@@ -508,9 +496,6 @@ export class WizardComponent implements OnInit, OnDestroy {
     try {
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
-        this.feedback.info(chunks.length > 1
-            ? `Integrando paquete ${i + 1}/${chunks.length} (${chunk.length} factura(s)) en «${folder.name}»…`
-            : `Integrando ${chunk.length} factura(s) en «${folder.name}»…`);
         const res = await firstValueFrom(
           this.docsApi.uploadBatch(chunk, 'FACTURA', PACK_MAX).pipe(takeUntilDestroyed(this.destroyRef))
         );
@@ -553,7 +538,6 @@ export class WizardComponent implements OnInit, OnDestroy {
       lastMsg ||
       `${nuevos.length} factura(s) integradas en «${folder.name}». Ya van ${merged.length} en la carpeta.`;
     this.packMsg.set(msg);
-    this.feedback.success(`${nuevos.length} factura(s) añadidas a «${folder.name}». Total en carpeta: ${merged.length}.`);
 
     this.foldersApi
       .addDocuments(folder.id, nuevos)
@@ -561,8 +545,6 @@ export class WizardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (r) => {
           this.aplicarCarpeta(r.folder);
-          const total = r.folder.document_count || r.folder.document_ids?.length || merged.length;
-          this.feedback.success(`${r.added ?? nuevos.length} factura(s) integradas en «${r.folder.name}». Total: ${total}.`);
           this.refrescarFacturas();
           this.startPoll();
         },
@@ -609,7 +591,6 @@ export class WizardComponent implements OnInit, OnDestroy {
         continue;
       }
       zipCount += 1;
-      this.feedback.info(`Abriendo ZIP «${file.name}» en el navegador…`);
       const { unzipSync } = await import('fflate');
       const data = new Uint8Array(await file.arrayBuffer());
       let entries: Record<string, Uint8Array>;
@@ -641,7 +622,7 @@ export class WizardComponent implements OnInit, OnDestroy {
       }
     }
     if (zipCount) {
-      this.feedback.success(`ZIP listo: ${out.length} factura(s) para integrar.`);
+      this.packMsg.set(`ZIP listo: ${out.length} factura(s) para integrar.`);
     }
     return out;
   }
@@ -790,32 +771,19 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (this.reanalizando()) return;
 
     const batchId = this.batchIdAutobits();
-    const sinCom = this.facturasSinCom();
-
     if (batchId) {
-      this.reanalizarConAutobits(folder, batchId, sinCom.length);
+      this.reanalizarConAutobits(folder, batchId);
       return;
     }
 
     const pendientesOcr = this.facturasPendientesAnalisis();
     if (!pendientesOcr.length) {
       this.feedback.error(
-        'Carga el Excel de Autobits para buscar COM en facturas sin contramarcado.'
+        'Carga el Excel de Autobits para cruzar facturas y sacar el COM del contramarcado.'
       );
       return;
     }
     this.reanalizarOcr(pendientesOcr.map((d) => d.id));
-  }
-
-  private facturasSinCom(): DocumentSummary[] {
-    return this.documentos().filter((d) => this.documentoSinCom(d));
-  }
-
-  private documentoSinCom(d: DocumentSummary): boolean {
-    const com = (d.contramarcado?.com || '').trim();
-    if (!com) return true;
-    const upper = com.toUpperCase().replace(/\s+/g, '');
-    return upper === 'COMPENDIENTE' || upper.includes('PENDIENTE');
   }
 
   private facturasPendientesAnalisis(): DocumentSummary[] {
@@ -825,19 +793,23 @@ export class WizardComponent implements OnInit, OnDestroy {
     });
   }
 
-  private reanalizarConAutobits(
-    folder: InvoiceFolder,
-    batchId: number,
-    sinComCount: number
-  ): void {
+  /** Limpia COM/contramarcado en pantalla y vuelve a cruzar TODAS las facturas vs Autobits. */
+  private reanalizarConAutobits(folder: InvoiceFolder, batchId: number): void {
     this.reanalizando.set(true);
-    this.feedback.info(
-      sinComCount
-        ? `Analizando COM en Autobits para ${sinComCount} factura(s)…`
-        : 'Revisando facturas sin COM contra Autobits…'
+    this.documentos.update((docs) =>
+      docs.map((d) => ({
+        ...d,
+        contramarcado: null,
+        requiere_revision: false,
+      }))
     );
+
     this.foldersApi
-      .recontramarcado(folder.id, true, batchId)
+      .recontramarcado(folder.id, {
+        onlyMissingCom: false,
+        reset: true,
+        autobitsBatchId: batchId,
+      })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.reanalizando.set(false))
@@ -849,14 +821,10 @@ export class WizardComponent implements OnInit, OnDestroy {
           } else {
             this.seleccionarCarpeta(folder.id);
           }
-          const msg =
+          this.feedback.success(
             res.message ||
-            `Análisis: ${res.updated} actualizada(s), ${res.skipped} omitida(s).`;
-          if (res.updated > 0) {
-            this.feedback.success(msg);
-          } else {
-            this.feedback.info(msg || 'Todas las facturas ya tienen COM.');
-          }
+              `Reanálisis: ${res.updated} factura(s) actualizada(s) con Autobits.`
+          );
         },
         error: (err) =>
           this.feedback.error(this.detalleError(err, 'No se pudo analizar las facturas.')),
@@ -865,7 +833,20 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   private reanalizarOcr(documentIds: number[]): void {
     this.reanalizando.set(true);
-    this.feedback.info(`Reprocesando ${documentIds.length} factura(s) pendientes…`);
+    this.documentos.update((docs) =>
+      docs.map((d) =>
+        documentIds.includes(d.id)
+          ? {
+              ...d,
+              estado: 'PENDIENTE',
+              proveedor_nombre: undefined,
+              numero_documento: undefined,
+              total: undefined,
+              contramarcado: null,
+            }
+          : d
+      )
+    );
     this.docsApi
       .processBatch(documentIds)
       .pipe(
@@ -1024,11 +1005,10 @@ export class WizardComponent implements OnInit, OnDestroy {
         next: (updated) => {
           this.carpetaActiva.set(updated);
           this.carpetas.update((list) => list.map((f) => (f.id === updated.id ? updated : f)));
-          this.feedback.success(`Autobits vinculado a «${updated.name}». Ya puedes cruzar o preguntar a la IA.`);
           this.startPoll();
         },
         error: () => {
-          this.feedback.success('Autobits cargado, pero no se pudo vincular a la carpeta.');
+          this.feedback.error('Autobits cargado, pero no se pudo vincular a la carpeta.');
         },
       });
   }
@@ -1051,11 +1031,6 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (!fromRes.length) {
       this.cargarRecords(res.batch?.id);
     }
-    const reused = res.reused ? ' (ya estaba importado)' : '';
-    const linked = this.carpetaActiva()
-      ? ' Se vinculan a la carpeta activa si está seleccionada.'
-      : ' Puedes vincularlos luego eligiendo una carpeta.';
-    this.feedback.success(res.aviso || `${res.imported_rows} filas de Autobits${reused}.${linked}`);
     if (res.parse_errors?.length) {
       this.feedback.error(res.parse_errors.slice(0, 3).join(' · '));
     }

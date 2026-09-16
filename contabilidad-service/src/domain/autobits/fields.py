@@ -76,6 +76,14 @@ FIELD_ALIASES: dict[str, list[str]] = {
         "compra",
         "purchase",
         "id compra",
+        "com",
+        "codigo com",
+        "código com",
+        "nº com",
+        "no com",
+        "nro com",
+        "numero com",
+        "número com",
     ],
     "numero_reserva": [
         "codigo reserva",
@@ -167,7 +175,10 @@ def suggest_mapping(columns: list[str]) -> dict[str, str | None]:
                 continue
             if field != "estado_compra" and "estado de la compra" in norm_col:
                 continue
-            if any(normalize_header(a) in norm_col for a in aliases):
+            if any(
+                len(normalize_header(a)) >= 4 and normalize_header(a) in norm_col
+                for a in aliases
+            ):
                 mapping[field] = original
                 used_columns.add(original)
                 break

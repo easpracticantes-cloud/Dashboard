@@ -112,15 +112,24 @@ class CruceWorkbookBuilder:
             ),
         )
         for i, row in enumerate(ordered, start=2):
+            # Preferir COM del contramarcado; nunca rellenar OC con el nº de factura
+            oc_com = row.contramarcado_com or row.numero_compra
             values = [
                 row.proveedor,
                 row.nit,
                 _as_date(row.fecha_ejecucion),
-                row.numero_compra,
+                oc_com,
                 row.numero_reserva,
                 _as_number(row.valor),
                 row.factura_cdc,
                 _as_date(row.fecha_pago),
+                row.contramarcado,
+                row.contramarcado_status,
+                row.contramarcado_source,
+                row.concepto,
+                row.estado_compra,
+                row.match_type,
+                row.observaciones,
             ]
             for col, value in enumerate(values, start=1):
                 cell = ws.cell(i, col, value)
@@ -130,8 +139,9 @@ class CruceWorkbookBuilder:
                 if col == 6 and value is not None:
                     cell.number_format = _MONEY_FMT
 
-        widths = (28, 14, 14, 16, 14, 12, 16, 14)
+        widths = (28, 14, 14, 18, 14, 12, 16, 14, 42, 12, 12, 22, 14, 12, 28)
         for col, width in enumerate(widths, start=1):
             ws.column_dimensions[get_column_letter(col)].width = width
         ws.freeze_panes = "A2"
-        ws.auto_filter.ref = f"A1:H{max(1, 1 + len(ordered))}"
+        last_col = get_column_letter(len(SINGLE_SHEET_HEADERS))
+        ws.auto_filter.ref = f"A1:{last_col}{max(1, 1 + len(ordered))}"

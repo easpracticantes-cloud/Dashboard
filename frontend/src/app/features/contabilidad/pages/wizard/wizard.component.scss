@@ -322,11 +322,16 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  overflow-x: visible;
+  overflow-x: auto;
   overflow-y: visible;
   border: 1px solid var(--eas-line-soft);
   border-radius: 12px;
   background: var(--eas-surface);
+}
+
+.wiz__table--autobits {
+  table-layout: auto;
+  min-width: 920px;
 }
 
 .wiz__table {

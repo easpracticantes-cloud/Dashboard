@@ -35,6 +35,10 @@ class CruceExportRow:
     comprador: str | None = None
     vendedor: str | None = None
     cantidad: Decimal | None = None
+    contramarcado: str | None = None
+    contramarcado_com: str | None = None
+    contramarcado_status: str | None = None
+    contramarcado_source: str | None = None
 
     def is_guia(self) -> bool:
         texto = fold(self.concepto or "")

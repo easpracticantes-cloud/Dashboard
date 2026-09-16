@@ -209,7 +209,7 @@
             class="wiz__ghost wiz__ghost--tiny"
             (click)="volverAAnalizarFacturas()"
             [disabled]="reanalizando() || limpiando() || !documentos().length"
-            [title]="batchIdAutobits() ? 'Busca COM en Autobits para facturas que aún no lo tienen' : 'Reprocesa facturas pendientes de análisis OCR'"
+            title="Limpia el contramarcado y vuelve a cruzar todas las facturas con el Excel de Autobits para sacar el COM"
           >
             {{ reanalizando() ? 'Analizando…' : 'Volver a analizar facturas' }}
           </button>
@@ -322,7 +322,7 @@
             class="wiz__ghost wiz__ghost--tiny"
             (click)="volverAAnalizarFacturas()"
             [disabled]="reanalizando() || limpiando()"
-            title="Busca COM en Autobits para facturas que aún no lo tienen"
+            title="Limpia el contramarcado y vuelve a cruzar todas las facturas con el Excel de Autobits"
           >
             {{ reanalizando() ? 'Analizando…' : 'Volver a analizar facturas' }}
           </button>
@@ -331,24 +331,30 @@
     }
     @if (records().length) {
       <div class="wiz__table-wrap">
-        <table class="wiz__table">
+        <table class="wiz__table wiz__table--autobits">
           <thead>
             <tr>
               <th>Proveedor</th>
-              <th>Compra</th>
+              <th>NIT</th>
+              <th>COM / Orden compra</th>
               <th>Reserva</th>
               <th>Fecha</th>
               <th>Valor</th>
+              <th>Concepto</th>
+              <th>Estado compra</th>
             </tr>
           </thead>
           <tbody>
             @for (r of recordsVista(); track r.id) {
               <tr>
                 <td>{{ r.proveedor || '—' }}</td>
-                <td>{{ r.numero_compra || '—' }}</td>
+                <td>{{ r.nit || '—' }}</td>
+                <td><code class="wiz__cm-code">{{ r.numero_compra || '—' }}</code></td>
                 <td>{{ r.numero_reserva || '—' }}</td>
                 <td>{{ r.fecha || '—' }}</td>
                 <td>{{ formatCop(r.valor) }}</td>
+                <td>{{ r.concepto || '—' }}</td>
+                <td>{{ r.estado_compra || '—' }}</td>
               </tr>
             }
           </tbody>

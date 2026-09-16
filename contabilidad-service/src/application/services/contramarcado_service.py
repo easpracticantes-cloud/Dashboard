@@ -132,6 +132,44 @@ class ContramarcadoService:
                 logger.exception("Fallo contramarcado doc=%s", getattr(doc, "id", None))
         return count
 
+    def clear_for_documents(self, documents: list[DocumentModel]) -> int:
+        """Borra contramarcado previo para forzar un reanálisis limpio."""
+        cleared = 0
+        for doc in documents:
+            had = bool(
+                doc.contramarcado
+                or doc.contramarcado_com
+                or doc.contramarcado_status
+                or doc.contramarcado_source
+            )
+            doc.contramarcado = None
+            doc.contramarcado_status = None
+            doc.contramarcado_com = None
+            doc.contramarcado_source = None
+            doc.contramarcado_confidence = None
+            if doc.extracted_json:
+                try:
+                    data = json.loads(doc.extracted_json)
+                except json.JSONDecodeError:
+                    data = None
+                if isinstance(data, dict):
+                    for key in (
+                        "contramarcado",
+                        "contramarcadoStatus",
+                        "contramarcadoCom",
+                        "contramarcadoSource",
+                        "contramarcadoConfidence",
+                        "contramarcadoWarning",
+                        "contramarcadoCandidates",
+                        "_contramarcado",
+                    ):
+                        data.pop(key, None)
+                    doc.extracted_json = json.dumps(data, ensure_ascii=False)
+            if had:
+                cleared += 1
+        self.db.flush()
+        return cleared
+
     @staticmethod
     def needs_com_retry(document: DocumentModel) -> bool:
         """True si aún no tiene un COM resuelto (número de compra)."""
@@ -217,7 +255,15 @@ class ContramarcadoService:
         ctx = extract_document_context(document)
         out: list[ComCandidate] = []
         for record in records:
-            com = normalize_com(record.numero_compra)
+            raw_compra = (record.numero_compra or "").strip()
+            com = normalize_com(raw_compra)
+            if not com and raw_compra:
+                # Autobits a veces trae OC sin prefijo COM; usarla igual como candidato
+                digits = "".join(ch for ch in raw_compra if ch.isdigit())
+                if len(digits) >= 4:
+                    com = normalize_com(digits) or raw_compra.upper().replace(" ", "")
+                elif len(raw_compra) >= 3:
+                    com = raw_compra.upper().replace(" ", "")
             if not com:
                 continue
             scored = self.matcher.score_pair(ctx, record)

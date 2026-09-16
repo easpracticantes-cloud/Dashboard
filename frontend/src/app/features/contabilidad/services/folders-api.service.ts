@@ -110,8 +110,11 @@ export class FoldersApiService {
 
   recontramarcado(
     id: number,
-    onlyMissingCom = true,
-    autobitsBatchId?: number | null
+    opts: {
+      onlyMissingCom?: boolean;
+      reset?: boolean;
+      autobitsBatchId?: number | null;
+    } = {}
   ): Observable<{
     ok: boolean;
     updated: number;
@@ -130,8 +133,9 @@ export class FoldersApiService {
       folder: InvoiceFolder;
       items?: Array<{ id: number; status?: string; com?: string | null; value?: string | null }>;
     }>(`${this.base}/${id}/contramarcado`, {
-      only_missing_com: onlyMissingCom,
-      autobits_batch_id: autobitsBatchId ?? null,
+      only_missing_com: opts.onlyMissingCom ?? false,
+      reset: opts.reset ?? true,
+      autobits_batch_id: opts.autobitsBatchId ?? null,
     });
   }
 }

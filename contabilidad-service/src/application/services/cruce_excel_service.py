@@ -632,11 +632,14 @@ class CruceExcelService:
             except json.JSONDecodeError:
                 reasons = [crossing.match_reasons]
         extras = extras_from_record(record) if record else {}
+        # OC/COM: Autobits → cruce → contramarcado del documento (nunca nº de factura)
         compra = None
         if record and record.numero_compra:
             compra = record.numero_compra
         elif crossing and crossing.numero_compra:
             compra = crossing.numero_compra
+        elif getattr(doc, "contramarcado_com", None):
+            compra = doc.contramarcado_com
         # FECHA DE EJECUCIÓN del estándar = reserva Autobits; si no hay match, factura.
         fecha_ejecucion = None
         if record and (record.fecha or "").strip():
@@ -664,7 +667,7 @@ class CruceExcelService:
         return CruceExportRow(
             proveedor=proveedor,
             nit=nit,
-            numero_compra=compra or numero,
+            numero_compra=compra,
             numero_reserva=reserva,
             fecha_ejecucion=fecha_ejecucion,
             valor=valor,
@@ -685,6 +688,10 @@ class CruceExcelService:
             comprador=extras.get("comprador") if record else None,
             vendedor=extras.get("vendedor") if record else None,
             cantidad=extras.get("cantidad") if record else None,
+            contramarcado=getattr(doc, "contramarcado", None),
+            contramarcado_com=getattr(doc, "contramarcado_com", None) or compra,
+            contramarcado_status=getattr(doc, "contramarcado_status", None),
+            contramarcado_source=getattr(doc, "contramarcado_source", None),
         )
 
     def _proveedor_desde_factura(self, doc: DocumentModel) -> tuple[str | None, str | None]:

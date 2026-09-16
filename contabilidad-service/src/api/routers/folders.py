@@ -46,9 +46,14 @@ class FolderAskRequest(BaseModel):
 
 
 class FolderContramarcadoRequest(BaseModel):
-    """Recontramarca facturas de la carpeta usando Autobits vinculado."""
+    """Recontramarca facturas de la carpeta usando Autobits vinculado.
 
-    only_missing_com: bool = True
+    reset=True limpia el contramarcado previo y vuelve a cruzar todas las
+    facturas contra el Excel (match / posible match → COM).
+    """
+
+    only_missing_com: bool = False
+    reset: bool = True
     autobits_batch_id: int | None = None
 
 
@@ -289,6 +294,9 @@ def recontramarcado_folder(
     from application.services.contramarcado_service import ContramarcadoService
 
     service = ContramarcadoService(db)
+    if opts.reset and not opts.only_missing_com:
+        service.clear_for_documents(docs)
+
     if opts.only_missing_com:
         updated, skipped, items = service.apply_missing_for_documents(
             docs, batch_id=batch_id
@@ -314,14 +322,15 @@ def recontramarcado_folder(
         "folder_id": folder.id,
         "autobits_batch_id": batch_id,
         "only_missing_com": opts.only_missing_com,
+        "reset": opts.reset,
         "updated": updated,
         "skipped": skipped,
         "total": len(docs),
         "items": items,
         "folder": _serialize(folder, db),
         "message": (
-            f"Contramarcado actualizado en {updated} factura(s)"
-            + (f"; {skipped} omitida(s)." if skipped else ".")
+            f"Reanálisis Autobits: {updated} factura(s) actualizada(s)"
+            + (f"; {skipped} sin datos suficientes." if skipped else ".")
         ),
     }
 

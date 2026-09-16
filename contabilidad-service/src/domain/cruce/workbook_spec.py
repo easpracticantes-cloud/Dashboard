@@ -20,17 +20,24 @@ PRECIO_TERC_FILL = "00FFFF"
 FONT_NAME = "Ubuntu"
 FONT_NAME_TABLE = "Calibri"
 
-# Exporto de resultado: UNA sola hoja tabular (organización del estándar).
+# Exporto de resultado: UNA sola hoja tabular (organización del estándar + COM).
 SINGLE_SHEET_NAME = "Cruce de cuentas"
 SINGLE_SHEET_HEADERS: tuple[str, ...] = (
     "PROVEEDOR",
     "NIT",
     "FECHA DE EJECUCIÓN",
-    "ORDEN DE COMPRA",
+    "ORDEN DE COMPRA / COM",
     "REF.",
     "VALOR",
     "FACTURA/CDC",
     "FECHA DE PAGO",
+    "CONTRAMARCADO",
+    "ESTADO COM",
+    "FUENTE COM",
+    "CONCEPTO",
+    "ESTADO COMPRA",
+    "MATCH",
+    "OBSERVACIONES",
 )
 
 PERIOD_BLOCK_HEADERS: tuple[str, ...] = (
@@ -142,11 +149,23 @@ def standard_sheet_names(year: int) -> tuple[str, ...]:
 # campo_excel: (entidad, atributo, nota)
 FIELD_SOURCES: dict[str, tuple[str, str, str]] = {
     "FECHA DE EJECUCIÓN": ("account_crossings / autobits_records", "fecha_ejecucion / fecha", ""),
+    "ORDEN DE COMPRA / COM": (
+        "autobits_records / documents",
+        "numero_compra / contramarcado_com",
+        "Nunca se rellena con el número de factura",
+    ),
     "ORDEN DE COMPRA": ("account_crossings / autobits_records", "numero_compra", ""),
     "REF.": ("account_crossings / autobits_records", "numero_reserva", ""),
     "VALOR": ("account_crossings / autobits_records", "valor_autobits / valor", "Decimal; vacío si no hay valor"),
     "FACTURA/CDC": ("documents", "numero_documento", "vacío si falta; no Autobits"),
     "FECHA DE PAGO": ("account_crossings", "fecha_pago", "no se usa payments.paid_at: es confirmación bancaria distinta"),
+    "CONTRAMARCADO": ("documents", "contramarcado", ""),
+    "ESTADO COM": ("documents", "contramarcado_status", ""),
+    "FUENTE COM": ("documents", "contramarcado_source", ""),
+    "CONCEPTO": ("documents / autobits_records", "concepto", ""),
+    "ESTADO COMPRA": ("autobits_records", "estado_compra", ""),
+    "MATCH": ("account_crossings", "match_type", ""),
+    "OBSERVACIONES": ("documents", "observaciones", ""),
     "Nombre proveedor (bloque)": ("account_crossings / autobits_records / providers", "proveedor_nombre / proveedor / nombre", ""),
     "NIT/CC": ("autobits_records / providers", "nit", "no asumir igualdad con NIT de factura sin matching"),
     "estado de la compra": ("autobits_records", "estado_compra", ""),
