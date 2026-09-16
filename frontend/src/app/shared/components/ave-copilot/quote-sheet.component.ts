@@ -133,12 +133,16 @@ export class QuoteSheetComponent implements OnInit {
     this.catalogError.set('');
     this.enterpriseAi.catalogPackages().subscribe({
       next: (res) => {
-        this.catalogPackages.set(res.packages || []);
+        const packages = res.packages || [];
+        this.catalogPackages.set(packages);
         const current = this.document().code || '';
-        if (current && (res.packages || []).some((p) => p.code === current)) {
+        if (current && packages.some((p) => p.code === current)) {
           this.selectedPackageCode.set(current);
         }
         this.catalogLoading.set(false);
+        if (!packages.length) {
+          this.catalogError.set('El catálogo no tiene paquetes disponibles.');
+        }
       },
       error: () => {
         this.catalogError.set('No se pudieron cargar los paquetes del catálogo.');

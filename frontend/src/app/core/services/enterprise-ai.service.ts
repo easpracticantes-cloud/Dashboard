@@ -1,5 +1,6 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, catchError, of } from 'rxjs';
 import { ApiService } from './api.service';
 import { AppConfigService } from './app-config.service';
 import { AuthService } from './auth.service';
@@ -108,6 +109,7 @@ export interface AnalyticsInsight {
 @Injectable({ providedIn: 'root' })
 export class EnterpriseAiService {
   private readonly api = inject(ApiService);
+  private readonly http = inject(HttpClient);
   private readonly appConfig = inject(AppConfigService);
   private readonly auth = inject(AuthService);
 
@@ -188,7 +190,13 @@ export class EnterpriseAiService {
   }
 
   catalogPackages(): Observable<CatalogPackagesResponse> {
-    return this.api.get('/ai/catalog/packages');
+    return this.api.get<CatalogPackagesResponse>('/ai/catalog/packages').pipe(
+      catchError(() =>
+        this.http.get<CatalogPackagesResponse>('/catalogo/packages.json').pipe(
+          catchError(() => of({ version: undefined, packages: [] as CatalogPackageOption[] }))
+        )
+      )
+    );
   }
 
   memoryMessages(sessionId: string): Observable<Array<{ role: string; content: string }>> {
