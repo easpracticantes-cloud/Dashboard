@@ -354,7 +354,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.autobitsUpload?.unsubscribe();
     this.subiendoAutobits.set(true);
     this.autobitsUpload = this.autobitsApi
-      .uploadDirect(file, true)
+      .uploadDirect(file, true, true)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.subiendoAutobits.set(false))
