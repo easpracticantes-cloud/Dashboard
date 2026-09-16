@@ -21,6 +21,10 @@ export interface QuoteSheetItem {
   unitPrice: number;
   discount: number;
   total: number;
+  /** Código de catálogo cuando la línea viene de un paquete. */
+  packageCode?: string;
+  /** Escala COP/pax para recalcular al cambiar cantidad. */
+  priceScaleByPax?: Record<string, number>;
 }
 
 export interface QuoteSheetDocument {
@@ -68,7 +72,9 @@ export function emptyQuoteItem(): QuoteSheetItem {
     unit: 'pax',
     unitPrice: 0,
     discount: 0,
-    total: 0
+    total: 0,
+    packageCode: undefined,
+    priceScaleByPax: undefined
   };
 }
 

@@ -11,7 +11,7 @@ import {
   previewItems,
   recalcItem
 } from './quote-sheet.model';
-import { QUOTE_PACKAGE_PRESETS, itemsFromPreset, unitFromScale, type QuotePackagePreset } from './quote-sheet.presets';
+import { QUOTE_PACKAGE_PRESETS, unitFromScale, type QuotePackagePreset } from './quote-sheet.presets';
 import {
   ESCUELA_AVES_COMPANY,
   addDays,
@@ -67,6 +67,22 @@ export class QuoteSheetComponent implements OnInit {
       return m !== 'PRIVADO' && m !== 'COMPARTIDO';
     })
   );
+  readonly packageGroups = computed(() => {
+    const groups: Array<{ label: string; items: CatalogPackageOption[] }> = [];
+    if (this.featuredPackages().length) {
+      groups.push({ label: 'Destacados', items: this.featuredPackages() });
+    }
+    if (this.privadoPackages().length) {
+      groups.push({ label: 'Privados', items: this.privadoPackages() });
+    }
+    if (this.compartidoPackages().length) {
+      groups.push({ label: 'Compartidos', items: this.compartidoPackages() });
+    }
+    if (this.otherPackages().length) {
+      groups.push({ label: 'Otros', items: this.otherPackages() });
+    }
+    return groups;
+  });
 
   readonly rows = computed(() => previewItems(this.document().items, this.editing()));
   readonly money = computed(() => documentTotals(this.document().items));
@@ -183,9 +199,19 @@ export class QuoteSheetComponent implements OnInit {
   }
 
   patchItem(index: number, partial: Partial<QuoteSheetItem>): void {
-    const items = this.document().items.map((item, i) =>
-      i === index ? recalcItem({ ...item, ...partial }) : item
-    );
+    const items = this.document().items.map((item, i) => {
+      if (i !== index) {
+        return item;
+      }
+      const next = { ...item, ...partial };
+      if (partial.quantity != null && next.priceScaleByPax) {
+        const scaled = unitFromScale(next.priceScaleByPax, Math.max(1, Number(next.quantity) || 1));
+        if (scaled != null) {
+          next.unitPrice = scaled;
+        }
+      }
+      return recalcItem(next);
+    });
     this.documentChange.emit({ ...this.document(), items });
   }
 
@@ -226,17 +252,47 @@ export class QuoteSheetComponent implements OnInit {
   }
 
   applyPreset(preset: QuotePackagePreset): void {
-    this.selectedPackageCode.set(preset.code || '');
+    const people = Math.max(1, preset.items[0]?.quantity || Number(this.document().people) || 2);
+    const unit =
+      unitFromScale(preset.priceScaleByPax, people) ?? (Number(preset.items[0]?.unitPrice) || 0);
+    const line = recalcItem({
+      ...emptyQuoteItem(),
+      description:
+        preset.items[0]?.description ||
+        `${preset.label}\nModalidad ${(preset.modality || 'Privado').toLowerCase()} · tarifa catálogo EAS`,
+      quantity: people,
+      unit: 'pax',
+      unitPrice: unit,
+      packageCode: preset.code,
+      priceScaleByPax: preset.priceScaleByPax
+    });
+    const items = [...this.document().items];
+    const last = items[items.length - 1];
+    const lastEmpty =
+      !!last &&
+      !(last.description || '').trim() &&
+      !last.packageCode &&
+      !(Number(last.unitPrice) > 0);
+    if (lastEmpty) {
+      items[items.length - 1] = { ...line, id: last.id };
+    } else {
+      items.push(line);
+    }
+    const onlyOne = items.filter((it) => (it.description || '').trim() || it.packageCode).length <= 1;
     this.documentChange.emit({
       ...this.document(),
-      name: preset.label,
-      code: preset.code || this.document().code,
-      modality: preset.modality || this.document().modality,
-      items: itemsFromPreset(preset),
-      includes: preset.includes || this.document().includes,
-      excludes: preset.excludes || this.document().excludes,
-      people: preset.items[0]?.quantity || this.document().people,
-      priceScaleByPax: preset.priceScaleByPax || this.document().priceScaleByPax
+      ...(onlyOne
+        ? {
+            name: preset.label,
+            code: preset.code || this.document().code,
+            modality: preset.modality || this.document().modality,
+            includes: preset.includes || this.document().includes,
+            excludes: preset.excludes || this.document().excludes,
+            priceScaleByPax: preset.priceScaleByPax || this.document().priceScaleByPax
+          }
+        : { name: this.document().name || 'Paquetes varios' }),
+      people,
+      items
     });
   }
 
@@ -245,14 +301,101 @@ export class QuoteSheetComponent implements OnInit {
     if (!code) {
       return;
     }
+    this.addPackageToCart(code);
+    // Permite volver a elegir el mismo u otro paquete seguido.
+    queueMicrotask(() => this.selectedPackageCode.set(''));
+  }
+
+  /** Agrega un paquete como nueva línea (carrito), sin borrar las existentes. */
+  addPackageToCart(code: string): void {
     const pkg = this.catalogPackages().find((p) => p.code === code);
-    if (pkg) {
-      this.applyCatalogPackage(pkg);
+    if (!pkg) {
+      return;
     }
+    const people = Math.max(1, Number(this.document().people) || 2);
+    const line = this.buildItemFromPackage(pkg, people);
+    const items = [...this.document().items];
+    const last = items[items.length - 1];
+    const lastEmpty =
+      !!last &&
+      !(last.description || '').trim() &&
+      !last.packageCode &&
+      !(Number(last.unitPrice) > 0);
+
+    if (lastEmpty) {
+      items[items.length - 1] = { ...line, id: last.id };
+    } else {
+      items.push(line);
+    }
+
+    const isFirstReal = items.filter((it) => (it.description || '').trim() || it.packageCode).length <= 1;
+    this.documentChange.emit({
+      ...this.document(),
+      ...(isFirstReal
+        ? {
+            name: pkg.name,
+            code: pkg.code,
+            modality: this.displayModality(pkg.modality),
+            people,
+            currency: pkg.currency || this.document().currency || 'COP',
+            includes: pkg.includes || this.document().includes,
+            excludes: pkg.excludes || this.document().excludes,
+            priceScaleByPax: this.normalizeScale(pkg.priceScaleByPax)
+          }
+        : {
+            name: this.document().name || 'Paquetes varios',
+            people
+          }),
+      items
+    });
+  }
+
+  /** Asigna un paquete del catálogo a una línea concreta del detalle. */
+  applyPackageToItem(index: number, code: string): void {
+    if (!code) {
+      this.patchItem(index, {
+        packageCode: undefined,
+        priceScaleByPax: undefined
+      });
+      return;
+    }
+    const pkg = this.catalogPackages().find((p) => p.code === code);
+    if (!pkg) {
+      return;
+    }
+    const current = this.document().items[index];
+    const people = Math.max(
+      1,
+      Number(current?.quantity) || Number(this.document().people) || 2
+    );
+    const line = this.buildItemFromPackage(pkg, people, current?.id, current?.discount || 0);
+    const items = this.document().items.map((item, i) => (i === index ? line : item));
+    const patchHeader =
+      index === 0
+        ? {
+            name: pkg.name,
+            code: pkg.code,
+            modality: this.displayModality(pkg.modality),
+            people,
+            currency: pkg.currency || this.document().currency || 'COP',
+            includes: pkg.includes || this.document().includes,
+            excludes: pkg.excludes || this.document().excludes,
+            priceScaleByPax: this.normalizeScale(pkg.priceScaleByPax)
+          }
+        : {};
+    this.documentChange.emit({ ...this.document(), ...patchHeader, items });
   }
 
   applyCatalogPackage(pkg: CatalogPackageOption): void {
-    const people = Math.max(1, Number(this.document().people) || 2);
+    this.addPackageToCart(pkg.code);
+  }
+
+  private buildItemFromPackage(
+    pkg: CatalogPackageOption,
+    people: number,
+    id?: string,
+    discount = 0
+  ): QuoteSheetItem {
     const scale = this.normalizeScale(pkg.priceScaleByPax);
     const unit = unitFromScale(scale, people) ?? (Number(pkg.pricePerPerson1Pax) || 0);
     const modality = this.displayModality(pkg.modality);
@@ -263,29 +406,16 @@ export class QuoteSheetComponent implements OnInit {
       pkg.excludes ? `No incluye: ${pkg.excludes}` : '',
       pkg.notes ? `Notas: ${pkg.notes}` : ''
     ].filter(Boolean);
-
-    this.selectedPackageCode.set(pkg.code);
-    this.documentChange.emit({
-      ...this.document(),
-      name: pkg.name,
-      code: pkg.code,
-      modality,
-      people,
-      currency: pkg.currency || this.document().currency || 'COP',
-      includes: pkg.includes || this.document().includes,
-      excludes: pkg.excludes || this.document().excludes,
-      notes: pkg.notes || this.document().notes,
-      priceScaleByPax: scale,
-      items: [
-        recalcItem({
-          ...emptyQuoteItem(),
-          id: newItemId(),
-          description: lines.join('\n'),
-          quantity: people,
-          unit: 'pax',
-          unitPrice: unit
-        })
-      ]
+    return recalcItem({
+      id: id || newItemId(),
+      description: lines.join('\n'),
+      quantity: people,
+      unit: 'pax',
+      unitPrice: unit,
+      discount,
+      total: 0,
+      packageCode: pkg.code,
+      priceScaleByPax: scale
     });
   }
 

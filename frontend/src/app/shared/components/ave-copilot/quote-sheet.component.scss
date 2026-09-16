@@ -476,6 +476,16 @@
   color: #9b2c2c;
 }
 
+.qs-line-cart {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.qs-in--line-pkg {
+  width: 100%;
+  font-size: 0.78rem;
+}
+
 .qs-tools__row {
   display: grid;
   grid-template-columns: 1fr 1fr;

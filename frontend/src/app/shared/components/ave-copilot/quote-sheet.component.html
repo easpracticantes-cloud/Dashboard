@@ -144,7 +144,7 @@
   @if (editing()) {
     <section class="qs-tools" aria-label="Acciones rápidas">
       <div class="qs-tools__catalog">
-        <label class="qs-tools__label" for="qs-package-select">Paquete disponible</label>
+        <label class="qs-tools__label" for="qs-package-select">Agregar paquete al carrito</label>
         <div class="qs-tools__select-row">
           <select
             id="qs-package-select"
@@ -154,32 +154,11 @@
             [disabled]="catalogLoading()"
           >
             <option value="">
-              {{ catalogLoading() ? 'Cargando paquetes…' : 'Selecciona un paquete del catálogo' }}
+              {{ catalogLoading() ? 'Cargando paquetes…' : 'Selecciona un paquete para agregarlo' }}
             </option>
-            @if (featuredPackages().length) {
-              <optgroup label="Destacados">
-                @for (pkg of featuredPackages(); track pkg.code) {
-                  <option [value]="pkg.code">{{ packageOptionLabel(pkg) }}</option>
-                }
-              </optgroup>
-            }
-            @if (privadoPackages().length) {
-              <optgroup label="Privados">
-                @for (pkg of privadoPackages(); track pkg.code) {
-                  <option [value]="pkg.code">{{ packageOptionLabel(pkg) }}</option>
-                }
-              </optgroup>
-            }
-            @if (compartidoPackages().length) {
-              <optgroup label="Compartidos">
-                @for (pkg of compartidoPackages(); track pkg.code) {
-                  <option [value]="pkg.code">{{ packageOptionLabel(pkg) }}</option>
-                }
-              </optgroup>
-            }
-            @if (otherPackages().length) {
-              <optgroup label="Otros">
-                @for (pkg of otherPackages(); track pkg.code) {
+            @for (group of packageGroups(); track group.label) {
+              <optgroup [label]="group.label">
+                @for (pkg of group.items; track pkg.code) {
                   <option [value]="pkg.code">{{ packageOptionLabel(pkg) }}</option>
                 }
               </optgroup>
@@ -192,7 +171,7 @@
         @if (catalogError()) {
           <p class="qs-tools__hint qs-tools__hint--error">{{ catalogError() }}</p>
         } @else if (!catalogLoading() && catalogPackages().length) {
-          <p class="qs-tools__hint">{{ catalogPackages().length }} paquetes del catálogo · al elegir se cargan tarifa e ítem</p>
+          <p class="qs-tools__hint">Cada selección agrega una línea al detalle · también puedes elegir paquete por ítem abajo</p>
         }
       </div>
       <div class="qs-tools__presets">
@@ -340,13 +319,31 @@
               </td>
               <td>
                 @if (editing()) {
-                  <textarea
-                    class="qs-in qs-in--area"
-                    rows="2"
-                    [ngModel]="item.description"
-                    (ngModelChange)="patchItem(i, { description: $event })"
-                    placeholder="Servicio o paquete&#10;Detalles, duración, incluye…"
-                  ></textarea>
+                  <div class="qs-line-cart">
+                    <select
+                      class="qs-in qs-in--select qs-in--line-pkg"
+                      [ngModel]="item.packageCode || ''"
+                      (ngModelChange)="applyPackageToItem(i, $event)"
+                      [disabled]="catalogLoading() || !catalogPackages().length"
+                      [attr.aria-label]="'Paquete de la línea ' + (i + 1)"
+                    >
+                      <option value="">Elegir paquete para este ítem…</option>
+                      @for (group of packageGroups(); track group.label) {
+                        <optgroup [label]="group.label">
+                          @for (pkg of group.items; track pkg.code) {
+                            <option [value]="pkg.code">{{ packageOptionLabel(pkg) }}</option>
+                          }
+                        </optgroup>
+                      }
+                    </select>
+                    <textarea
+                      class="qs-in qs-in--area"
+                      rows="2"
+                      [ngModel]="item.description"
+                      (ngModelChange)="patchItem(i, { description: $event })"
+                      placeholder="Servicio o paquete&#10;Detalles, duración, incluye…"
+                    ></textarea>
+                  </div>
                 } @else if (item.description) {
                   <span class="qs-desc">
                     <strong class="qs-desc__title">{{ descTitle(item.description) }}</strong>
@@ -389,7 +386,7 @@
       </table>
     </div>
     @if (editing()) {
-      <button type="button" class="qs-add" (click)="addItem()">+ Agregar producto o servicio</button>
+      <button type="button" class="qs-add" (click)="addItem()">+ Agregar línea al carrito</button>
     }
   </section>
 
