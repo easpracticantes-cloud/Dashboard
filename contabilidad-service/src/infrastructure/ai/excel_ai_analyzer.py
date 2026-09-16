@@ -180,6 +180,8 @@ Reglas:
 - No mapees SI, NO ni Moneda a campos internos.
 - SÍ mapea OBSERVACIONES → observaciones y estado de la compra → estado_compra.
 - Prioriza Total → valor, Nombre Proveedor → proveedor, NIT/CC → nit.
+- SIEMPRE mapea "Codigo Reserva" → numero_reserva (es obligatorio para el cruce).
+- SIEMPRE mapea "Codigo Orden de compra" → numero_compra.
 """
 
     def _analyze_with_ai(
@@ -226,6 +228,13 @@ Reglas:
                 "La IA no pudo relacionar ninguna columna del Excel con campos contables.",
                 "NO_MAPPING",
             )
+
+        # Completar huecos con heurística: la IA a veces deja null Codigo Reserva / COM
+        # y eso rompe el cruce (RESERVA vacío).
+        heuristic = suggest_mapping(columns)
+        for field in AUTOBITS_FIELDS:
+            if not mapping.get(field) and heuristic.get(field):
+                mapping[field] = heuristic[field]
 
         return ExcelAIAnalysis(
             mapping=mapping,

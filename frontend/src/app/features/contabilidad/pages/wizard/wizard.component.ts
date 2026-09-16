@@ -1033,6 +1033,8 @@ export class WizardComponent implements OnInit, OnDestroy {
     }
     if (res.parse_errors?.length) {
       this.feedback.error(res.parse_errors.slice(0, 3).join(' · '));
+    } else if (res.aviso && /reserva|COM/i.test(res.aviso)) {
+      this.feedback.success(res.aviso);
     }
   }
 

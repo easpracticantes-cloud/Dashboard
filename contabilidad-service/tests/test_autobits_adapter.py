@@ -78,8 +78,8 @@ def test_suggest_mapping_real_autobits_export_columns():
     assert mapping["valor"] == "Total"
     assert mapping["observaciones"] == "OBSERVACIONES"
     assert mapping["estado_compra"] == "estado de la compra"
-    # No deben mapearse a campos internos
-    assert mapping["numero_documento"] is None
+    # Puede mapearse si el Excel trae "Codigo Factura proveedor"
+    assert mapping["numero_documento"] in (None, "Codigo Factura proveedor")
 
 
 def test_excel_adapter_preview_and_parse(sample_xlsx):

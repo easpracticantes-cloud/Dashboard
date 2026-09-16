@@ -29,13 +29,21 @@ FIELD_LABELS: dict[str, str] = {
     "estado_compra": "Estado de la compra",
 }
 
-# Columnas reales del export Autobits (referencia del usuario)
+# Columnas reales del export Autobits (Orden de compra + Reserva)
 AUTOBITS_EXPORT_COLUMNS: tuple[str, ...] = (
     "NIT/CC Proveedor (Orden de Compra)",
     "Nombre Proveedor (Orden de Compra)",
     "Codigo Orden de compra",
+    "Comprador (Orden de Compra)",
+    "Referencia (Orden de Compra)",
+    "Fecha de compra",
+    "NIT/CC Cliente (Reserva)",
+    "Nombre Cliente (Reserva)",
     "Codigo Reserva",
+    "Vendedor (Reserva)",
+    "Referencia (Reserva)",
     "Fecha de ejecución (Reserva)",
+    "Codigo Factura proveedor",
     "estado de la compra",
     "Nombre concepto",
     "Moneda",

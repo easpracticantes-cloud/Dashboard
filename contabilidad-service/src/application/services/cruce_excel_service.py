@@ -469,6 +469,10 @@ class CruceExcelService:
         """
         ids = self._normalize_document_ids(document_ids)
         # batch_id es solo compatibilidad/matching. NUNCA reconstruye document_ids.
+        if batch_id:
+            from application.services.autobits_service import AutobitsService
+
+            AutobitsService(self.db).repair_records_from_raw(batch_id)
         if ids:
             self._assert_documents_ready(ids)
             self._vincular_facturas(ids, batch_id, usuario)
@@ -632,10 +636,26 @@ class CruceExcelService:
             except json.JSONDecodeError:
                 reasons = [crossing.match_reasons]
         extras = extras_from_record(record) if record else {}
-        # OC/COM: Autobits → cruce → contramarcado del documento (nunca nº de factura)
         compra = None
         if record and record.numero_compra:
             compra = record.numero_compra
+        elif record and getattr(record, "raw_json", None):
+            try:
+                raw_c = json.loads(record.raw_json)
+            except json.JSONDecodeError:
+                raw_c = {}
+            if isinstance(raw_c, dict):
+                for key, val in raw_c.items():
+                    key_n = " ".join(str(key).strip().lower().split())
+                    if key_n in {
+                        "codigo orden de compra",
+                        "código orden de compra",
+                        "orden de compra",
+                    }:
+                        text = str(val or "").strip()
+                        if text:
+                            compra = text
+                            break
         elif crossing and crossing.numero_compra:
             compra = crossing.numero_compra
         elif getattr(doc, "contramarcado_com", None):
@@ -651,7 +671,20 @@ class CruceExcelService:
         reserva = None
         if record and (record.numero_reserva or "").strip():
             reserva = record.numero_reserva.strip()
-        elif crossing and (crossing.numero_reserva or "").strip():
+        elif record and getattr(record, "raw_json", None):
+            try:
+                raw = json.loads(record.raw_json)
+            except json.JSONDecodeError:
+                raw = {}
+            if isinstance(raw, dict):
+                for key, val in raw.items():
+                    key_n = " ".join(str(key).strip().lower().split())
+                    if key_n == "codigo reserva" or key_n == "código reserva":
+                        text = str(val or "").strip()
+                        if text:
+                            reserva = text
+                            break
+        if not reserva and crossing and (crossing.numero_reserva or "").strip():
             reserva = crossing.numero_reserva.strip()
         if not proveedor and crossing and (crossing.proveedor_nombre or "").strip():
             proveedor = crossing.proveedor_nombre.strip()

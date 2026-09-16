@@ -11,7 +11,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from config.settings import get_settings
-from domain.autobits.fields import AUTOBITS_FIELDS, FIELD_LABELS
+from domain.autobits.fields import AUTOBITS_FIELDS, FIELD_LABELS, suggest_mapping
 from domain.enums import AutobitsRecordStatus
 from infrastructure.autobits.excel_adapter import (
     AutobitsImportError,
@@ -150,6 +150,11 @@ class AutobitsService:
                 raise AutobitsServiceError(exc.message, exc.code) from exc
 
             mapping = analysis.mapping
+            # Refuerzo: nunca perder Codigo Reserva / COM aunque la IA los omita
+            heuristic = suggest_mapping(preview.columns)
+            for field in AUTOBITS_FIELDS:
+                if not mapping.get(field) and heuristic.get(field):
+                    mapping[field] = heuristic[field]
             mapped = [v for v in mapping.values() if v]
             if not mapped:
                 path.unlink(missing_ok=True)
@@ -300,6 +305,12 @@ class AutobitsService:
         }
 
     def _result_from_existing_batch(self, batch: ImportBatchModel, *, aviso: str) -> dict:
+        repaired = self.repair_records_from_raw(batch.id)
+        if repaired:
+            aviso = (
+                f"{aviso} Se recuperaron {repaired} código(s) de reserva/COM "
+                "desde el Excel original."
+            )
         records = [self.to_record_dict(r) for r in self.repo.list_records_for_batch(batch.id)]
         mapping = mapping_from_json(batch.column_mapping_json)
         return {
@@ -317,6 +328,71 @@ class AutobitsService:
             "ai_notes": aviso,
             "crossing": None,
         }
+
+    @staticmethod
+    def _value_from_raw(raw: dict, *needles: str) -> str | None:
+        """Busca en raw_json por encabezado (p. ej. Codigo Reserva) aunque no se mapeó."""
+        if not isinstance(raw, dict) or not raw:
+            return None
+        norms = [" ".join(n.strip().lower().split()) for n in needles if n]
+        # 1) coincidencia exacta del encabezado
+        for key, value in raw.items():
+            if value is None or str(value).strip() == "":
+                continue
+            key_n = " ".join(str(key).strip().lower().split())
+            if key_n in norms:
+                return str(value).strip()
+        # 2) el encabezado contiene el alias (solo alias largos, evita "com"→concepto)
+        for needle in sorted(norms, key=len, reverse=True):
+            if len(needle) < 5:
+                continue
+            for key, value in raw.items():
+                if value is None or str(value).strip() == "":
+                    continue
+                key_n = " ".join(str(key).strip().lower().split())
+                if needle in key_n:
+                    return str(value).strip()
+        return None
+
+    def repair_records_from_raw(self, batch_id: int) -> int:
+        """Rellena numero_reserva / numero_compra vacíos desde raw_json del Excel."""
+        records = self.repo.list_records_for_batch(batch_id)
+        fixed = 0
+        for record in records:
+            changed = False
+            try:
+                raw = json.loads(record.raw_json) if record.raw_json else {}
+            except json.JSONDecodeError:
+                raw = {}
+            if not isinstance(raw, dict):
+                continue
+            if not (record.numero_reserva or "").strip():
+                reserva = self._value_from_raw(
+                    raw,
+                    "codigo reserva",
+                    "código reserva",
+                    "numero reserva",
+                    "número reserva",
+                )
+                if reserva:
+                    record.numero_reserva = reserva
+                    changed = True
+            if not (record.numero_compra or "").strip():
+                compra = self._value_from_raw(
+                    raw,
+                    "codigo orden de compra",
+                    "código orden de compra",
+                    "orden de compra",
+                    "com",
+                )
+                if compra:
+                    record.numero_compra = compra
+                    changed = True
+            if changed:
+                fixed += 1
+        if fixed:
+            self.db.commit()
+        return fixed
 
     def list_batches(self, limit: int = 50, offset: int = 0) -> tuple[list[dict], int]:
         items, total = self.repo.list_batches(limit=limit, offset=offset)
@@ -337,6 +413,8 @@ class AutobitsService:
         search: str | None = None,
         estado: str | None = None,
     ) -> tuple[list[dict], int]:
+        if batch_id:
+            self.repair_records_from_raw(batch_id)
         items, total = self.repo.list_records(
             limit=limit,
             offset=offset,
