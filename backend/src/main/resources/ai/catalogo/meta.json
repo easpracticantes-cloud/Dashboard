@@ -1,7 +1,7 @@
 {
-  "version": "2026.1",
-  "generatedAt": "2026-08-18T21:53:40.186Z",
-  "sourceDocument": "informe_completo_acuerdos_tarifas_proveedores_2026.pdf",
+  "version": "2026.2",
+  "generatedAt": "2026-09-16T17:00:00.000Z",
+  "sourceDocument": "Tarifas_y_Proveedores_2026_SIG.docx",
   "organization": "Escuela Aves de Salento / Kuara Expeditions",
   "currency": "COP",
   "pricingRules": {
@@ -92,7 +92,7 @@
     {
       "code": "POL_CANOPY",
       "appliesTo": "CANOPY_EXTREMO_EN_EL_QUINDIO",
-      "rule": "Costo proveedor 75000 COP/pax; comisión 10%=7500. Depende del clima."
+      "rule": "Proveedor 2026: Bosque del Samán Alcalá COP 45.000/pax (imagen). También Caracolies. Comisión típica 10%. Depende del clima. No usar costo proveedor como precio de venta del tour privado."
     },
     {
       "code": "POL_RAFTING",
@@ -112,12 +112,32 @@
     {
       "code": "POL_MORELIA",
       "appliesTo": "CAFE_LA_MORELIA",
-      "rule": "Agencias: tarifas 2025/2026 sin incremento documentado (confirmar vigencia)."
+      "rule": "Agencias 2026 (catación/filtrados): 1 pax $170.000; 2–4 $140.000; 5–9 $120.000; 10+ $105.000. No usar tarifas 2025."
     },
     {
       "code": "POL_MARIA_OCAMPOS",
       "appliesTo": "RESTAURANTE_MARIA_OCAMPOS",
       "rule": "Carne 33000; trucha 36000. Vigencia doc. hasta 01/06/2026 [REVISAR]."
+    },
+    {
+      "code": "POL_BOSQUE_PALMAS",
+      "appliesTo": "BOSQUE_DE_PALMAS",
+      "rule": "2026 desde 01-feb: pública $30.000; acuerdo/precompra EAS $25.000. No mezclar con precio de venta del tour Cócora."
+    },
+    {
+      "code": "POL_SANTA_RITA",
+      "appliesTo": "SENDERISMO_SANTA_RITA",
+      "rule": "Costos proveedor 2026: pasadía $11.000; camping $28.000; habitación pareja $140.000; desayuno $12.000; calentado $14.000; almuerzo $18.000; trucha $28.000."
+    },
+    {
+      "code": "POL_OTUN",
+      "appliesTo": "SENDERISMO_OTUN_QUIMBAYA",
+      "rule": "Costos Otún 2026: camping $36.000; alojamiento $70.000; pasadía cascada $60.000; recorrido programado $32.000; guianza personalizada $225.000; póliza $9.000."
+    },
+    {
+      "code": "POL_GUIAS_2026",
+      "appliesTo": "GUIDE",
+      "rule": "Tarifas de guianza 2025 ($190k–$250k) son HISTÓRICAS. No cotizar guianza 2026 sin fuente confirmada 2026."
     }
   ],
   "checklists": {
@@ -157,21 +177,18 @@
     ]
   },
   "pendingReviews": [
-    "Transcribir 6 audios OGG",
-    "Revisar 20 imágenes con OCR insuficiente",
-    "Confirmar Recorrido Cafetero Tradicional: 599000 vs 488000",
-    "Actualizar María Ocampos (vigencia terminó 01/06/2026)",
-    "Confirmar tarifa 2026 Finca El Ocaso",
-    "Confirmar tarifa definitiva Rural Cocina",
-    "Confirmar tarifas Finca Evelyza",
-    "Confirmar tarifas Santa Rita",
-    "Confirmar tarifas Paratrike Salento",
-    "Confirmar tarifas Los Pérez / Mi Tierra / Cootracocora / Buses Armenia",
-    "Separar PRIVATE/SHARED/B2B/B2C/NET/COMMISSIONABLE/PUBLIC",
-    "Modelar temporada, nacionalidad, origen y min/max pax"
+    "Caféina: asociar exactamente $100.000 y $160.000 con el producto correspondiente",
+    "Finca La Alejandra: mantener relación exacta adulto/niño por producto (Agencias 2026)",
+    "Finca El Ocaso: no aplicar incremento de chat hasta valor definitivo",
+    "Finca Evelyza: diferenciar comisión $10.000 confirmada de comentarios de aumento",
+    "Guías: obtener tarifas 2026 (hoy solo evidencia 2025)",
+    "Jeep Julio César: confirmar incremento (solo audio/chat)",
+    "Rural Cocina: confirmar tarifa definitiva 2026",
+    "Cualquier imagen/audio sin precio inequívoco debe quedar pendiente, no inferido",
+    "Separar PRIVATE/SHARED/B2B/B2C/NET/COMMISSIONABLE/PUBLIC en cotizador"
   ],
   "counts": {
-    "products": 83,
-    "providers": 78
+    "products": 85,
+    "providers": 113
   }
 }

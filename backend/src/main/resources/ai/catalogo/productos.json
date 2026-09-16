@@ -2324,6 +2324,67 @@
       "active": true,
       "reviewFlag": false,
       "sourceFile": "TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx"
+    },
+    {
+      "code": "CAFE_LA_MORELIA_CATACION_AGENCIAS",
+      "name": "Café La Morelia – Tour catación y filtrados (tarifa agencias)",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 170000,
+      "priceScaleByPax": {
+        "1": 170000,
+        "2": 140000,
+        "3": 140000,
+        "4": 140000,
+        "5": 120000,
+        "6": 120000,
+        "7": 120000,
+        "8": 120000,
+        "9": 120000,
+        "10": 105000
+      },
+      "minPriceBeforeVat1Pax": null,
+      "includes": "Tour de catación y filtrados según programa Morelia.",
+      "excludes": null,
+      "notes": "Tarifa AGENCIAS 2026 confirmada en Tarifas_y_Proveedores_2026_SIG.docx. No confundir con precio de venta de combos EAS (RECORRIDO_CAFETERO_CON_CATACION).",
+      "keywords": [
+        "morelia",
+        "catacion",
+        "filtrados",
+        "cafe",
+        "agencias"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "Tarifas_y_Proveedores_2026_SIG.docx"
+    },
+    {
+      "code": "ENTRADA_BOSQUE_DE_PALMAS_EAS",
+      "name": "Entrada Bosque de Palmas (acuerdo EAS)",
+      "modality": "PRIVADO",
+      "currency": "COP",
+      "pricePerPerson1Pax": 25000,
+      "priceScaleByPax": {
+        "1": 25000,
+        "2": 25000,
+        "3": 25000,
+        "4": 25000,
+        "5": 25000,
+        "6": 25000
+      },
+      "minPriceBeforeVat1Pax": null,
+      "includes": "Entrada al Parque Natural Bosque de Palmas (tarifa acuerdo/precompra).",
+      "excludes": "Transporte, guianza, alimentación y demás componentes del tour Cócora.",
+      "notes": "Acuerdo EAS $25.000 (pública $30.000). Vigencia desde 01-feb-2026. No reemplaza el tour Salento/Cócora.",
+      "keywords": [
+        "bosque de palmas",
+        "entrada",
+        "cocora",
+        "palma"
+      ],
+      "active": true,
+      "reviewFlag": false,
+      "sourceFile": "Tarifas_y_Proveedores_2026_SIG.docx"
     }
   ]
 }
