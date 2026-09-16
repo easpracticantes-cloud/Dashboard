@@ -1,7 +1,7 @@
 {
-  "version": "2026.2",
-  "generatedAt": "2026-09-16T17:00:00.000Z",
-  "sourceDocument": "Tarifas_y_Proveedores_2026_SIG.docx",
+  "version": "2026.3",
+  "generatedAt": "2026-09-16T21:46:42.000Z",
+  "sourceDocument": "Tarifas_y_Proveedores_2026_SIG.docx + ACUERDOS_TARIFAS_PROVEEDORES_2026 (PORTAFOLIO DE COSTOS TOURS  PRIVADOS 2026.xlsx; TARIFAS CIVITATIS 2026 - TOURS COMPARTIDOS 2026.xlsx)",
   "organization": "Escuela Aves de Salento / Kuara Expeditions",
   "currency": "COP",
   "pricingRules": {
@@ -63,6 +63,12 @@
       "relatedCode": "PEREIRA_PROGRAMA_DE_TERMALES_DE_COMP"
     },
     {
+      "name": "Filandia + Salento + Valle Cócora",
+      "priceFromCop": 1177000,
+      "modality": "PRIVADO",
+      "relatedCode": "FILANDIA_SALENTO_Y_VALLE_DE_COCORA"
+    },
+    {
       "name": "Pijao + Aves + Comunidad",
       "priceSharedCop": 730000,
       "pricePrivate1PaxCop": 780000,
@@ -70,12 +76,6 @@
         "PIJAO_AVES_Y_COMUNIDAD_COMP",
         "PIJAO_AVES_Y_COMUNIDAD"
       ]
-    },
-    {
-      "name": "Filandia + Salento + Valle Cócora",
-      "priceFromCop": 1177000,
-      "modality": "PRIVADO",
-      "relatedCode": "FILANDIA_SALENTO_Y_VALLE_DE_COCORA"
     }
   ],
   "policies": [

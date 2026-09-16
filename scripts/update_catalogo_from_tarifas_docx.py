@@ -611,6 +611,6 @@ extract = base / "documentos" / "_tarifas_extract.txt"
 if extract.exists():
     extract.unlink()
 
-print(f"providers total={len(providers_list)} updated≈{updated} added={added}")
+print(f"providers total={len(providers_list)} updated~={updated} added={added}")
 print(f"products total={len(prods['products'])}")
 print("meta version", meta["version"])
