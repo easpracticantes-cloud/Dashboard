@@ -92,10 +92,15 @@ export class AutobitsApiService {
     form.append('archivo', file, file.name);
     form.append('auto_cruzar', autoCruzar ? 'true' : 'false');
     form.append('force', force ? 'true' : 'false');
+    const qs = new URLSearchParams();
+    qs.set('auto_cruzar', autoCruzar ? 'true' : 'false');
+    qs.set('force', force ? 'true' : 'false');
     if (folderId && folderId > 0) {
       form.append('folder_id', String(folderId));
+      qs.set('folder_id', String(folderId));
     }
-    return this.http.post<ImportResult>(`${this.base}/upload`, form);
+    const headers = folderId && folderId > 0 ? { 'X-Folder-Id': String(folderId) } : undefined;
+    return this.http.post<ImportResult>(`${this.base}/upload?${qs.toString()}`, form, { headers });
   }
 
   preview(file: File): Observable<AutobitsPreview> {

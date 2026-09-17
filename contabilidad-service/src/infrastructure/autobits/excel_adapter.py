@@ -335,6 +335,13 @@ class ExcelAutobitsAdapter:
                 "código reserva",
             )
         )
+        numero_documento = _to_str(
+            value_from_row_dict(
+                row_dict,
+                "codigo factura proveedor",
+                "código factura proveedor",
+            )
+        ) or _to_str(get("numero_documento"))
 
         parsed = ParsedAutobitsRow(
             row_number=row_number,
@@ -342,7 +349,7 @@ class ExcelAutobitsAdapter:
             nit=_to_str(get("nit")),
             numero_compra=numero_compra,
             numero_reserva=numero_reserva,
-            numero_documento=_to_str(get("numero_documento")),
+            numero_documento=numero_documento,
             valor=valor,
             fecha=_to_date_str(get("fecha")),
             concepto=_to_str(get("concepto")),

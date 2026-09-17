@@ -123,20 +123,25 @@ class MatchingEngine:
         doc_compra = ctx.compra
         doc_num = ctx.numero_documento
 
-        from domain.autobits.fields import com_from_excel_record, excel_compra_reserva
+        from domain.autobits.fields import com_from_excel_record, excel_compra_reserva, excel_factura_proveedor
 
         excel_oc, excel_reserva = excel_compra_reserva(record)
         excel_com = com_from_excel_record(record)
+        excel_factura = excel_factura_proveedor(record)
 
+        # La factura se localiza por Codigo Factura proveedor; el COM sale de esa misma fila.
+        if doc_num and excel_factura and normalize_id(doc_num) == normalize_id(excel_factura):
+            score += 50
+            reasons.append("documento_exacto")
+        elif doc_num and record.numero_documento and normalize_id(doc_num) == normalize_id(record.numero_documento):
+            score += 50
+            reasons.append("documento_exacto")
         if doc_compra and excel_com and normalize_id(doc_compra) == normalize_id(excel_com):
             score += 40
             reasons.append("compra_exacta")
         elif doc_compra and excel_oc and normalize_id(doc_compra) == normalize_id(excel_oc):
             score += 40
             reasons.append("compra_exacta")
-        elif doc_num and record.numero_documento and normalize_id(doc_num) == normalize_id(record.numero_documento):
-            score += 40
-            reasons.append("documento_exacto")
         # Nunca tratar el número de factura como COM: solo sirve para localizar la fila.
         elif doc_num and excel_oc and normalize_id(doc_num) == normalize_id(excel_oc):
             score += 25

@@ -43,6 +43,7 @@ def _record(**kwargs) -> AutobitsRecordModel:
         numero_documento=kwargs.get("numero_documento", "FE-7788"),
         valor=kwargs.get("valor", 850000.0),
         fecha=kwargs.get("fecha", "2026-08-20"),
+        raw_json=kwargs.get("raw_json"),
     )
 
 
@@ -117,3 +118,24 @@ def test_match_factura_contra_cruce_no_autobits():
     assert candidate.cruce_record_id == 7
     assert candidate.autobits_record_id == 0
     assert "factura_cdc" in candidate.reasons or "compra_exacta" in candidate.reasons
+
+
+def test_match_invoice_number_from_excel_factura_uses_com():
+    import json
+
+    engine = MatchingEngine()
+    doc = _doc(numero_documento="FE-6920", extracted_json="{}")
+    record = _record(
+        numero_compra="COM007441",
+        numero_documento=None,
+        raw_json=json.dumps(
+            {
+                "Codigo Orden de compra": "COM007441",
+                "Codigo Factura proveedor": "FE-6920",
+            }
+        ),
+    )
+    candidate = engine.find_best_match(doc, [record])
+    assert candidate is not None
+    assert candidate.numero_compra == "COM007441"
+    assert "documento_exacto" in candidate.reasons

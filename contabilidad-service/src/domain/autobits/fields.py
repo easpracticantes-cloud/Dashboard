@@ -179,6 +179,10 @@ CANONICAL_COLUMN_PREFERENCES: dict[str, tuple[str, ...]] = {
     "valor": ("total",),
     "estado_compra": ("estado de la compra",),
     "observaciones": ("observaciones",),
+    "numero_documento": (
+        "codigo factura proveedor",
+        "código factura proveedor",
+    ),
 }
 
 
@@ -319,6 +323,23 @@ def excel_compra_reserva(record) -> tuple[str | None, str | None]:
     if canon_reserva is not None and str(canon_reserva).strip():
         reserva = str(canon_reserva).strip()
     return compra, reserva
+
+
+def excel_factura_proveedor(record) -> str | None:
+    """Número de factura del Excel Autobits (Codigo Factura proveedor)."""
+    raw = _parse_raw_json(getattr(record, "raw_json", None) or getattr(record, "raw", None))
+    if raw:
+        found = value_from_row_dict(
+            raw,
+            "codigo factura proveedor",
+            "código factura proveedor",
+            "codigo factura",
+        )
+        text = str(found).strip() if found is not None else ""
+        if text:
+            return text
+    doc = (getattr(record, "numero_documento", None) or "").strip()
+    return doc or None
 
 
 def suggest_mapping(columns: list[str]) -> dict[str, str | None]:

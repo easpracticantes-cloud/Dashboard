@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { Subscription, finalize, firstValueFrom, interval } from 'rxjs';
 import {
   AutobitsApiService,
+  AutobitsBatch,
   AutobitsRecord,
   ImportResult,
 } from '../../services/autobits-api.service';
@@ -23,6 +24,7 @@ import { UiFeedbackService } from '../../../../core/services/ui-feedback.service
 
 const SESSION_KEY = 'contab-wizard-session';
 const FOLDER_KEY = 'contab-wizard-folder-id';
+const BATCH_KEY_PREFIX = 'contab-autobits-batch-';
 const PACK_MAX = 25;
 /** Por debajo del client_max_body_size típico del Nginx host Oracle (25m). */
 const PACK_MAX_BYTES = 18 * 1024 * 1024;
@@ -104,7 +106,6 @@ export class WizardComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     sessionStorage.setItem(SESSION_KEY, '1');
     this.cargarCarpetas(true);
-    this.restaurarAutobits();
     this.facturasApi
       .health()
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -362,9 +363,13 @@ export class WizardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.aplicarAutobits(res);
+          const batchId = res.batch?.id;
+          const folderId = this.carpetaActiva()?.id;
+          if (folderId && batchId) {
+            this.guardarBatchId(folderId, batchId);
+          }
           if (res.folder?.id) {
             this.aplicarCarpetaVinculada(res.folder as InvoiceFolder);
-            const batchId = res.batch?.id;
             if (batchId && (res.folder.document_ids || []).length) {
               this.reanalizarConAutobits(res.folder as InvoiceFolder, batchId);
             }
@@ -372,7 +377,7 @@ export class WizardComponent implements OnInit, OnDestroy {
             if (res.folder_error) {
               this.feedback.error(res.folder_error);
             }
-            this.vincularAutobitsACarpeta(res.batch?.id);
+            this.vincularAutobitsACarpeta(batchId);
           }
           this.paso.set(2);
         },
@@ -892,6 +897,7 @@ export class WizardComponent implements OnInit, OnDestroy {
             this.seleccionarCarpeta(pick.id);
           } else {
             this.paso.set(1);
+            this.restaurarAutobits();
           }
         },
         error: () => {
@@ -919,9 +925,15 @@ export class WizardComponent implements OnInit, OnDestroy {
     // Pintar de inmediato lo que vino en GET /folders/{id} (evita ver facturas de otra carpeta)
     this.documentos.set(this.docsFromFolderSummary(folder));
 
-    if (folder.autobits_batch_id) {
+    const storedBatch = this.leerBatchId(folder.id);
+    const batchId = storedBatch || folder.autobits_batch_id || undefined;
+    if (batchId) {
       this.paso.set(2);
-      this.cargarRecords(folder.autobits_batch_id);
+      this.fijarBatchSesion(batchId);
+      this.cargarRecords(batchId);
+      if (storedBatch && storedBatch !== folder.autobits_batch_id) {
+        this.vincularAutobitsACarpeta(storedBatch);
+      }
     } else {
       this.paso.set(1);
       if (switching) {
@@ -979,7 +991,7 @@ export class WizardComponent implements OnInit, OnDestroy {
       error: () => undefined,
     });
 
-    const batchId = folder?.autobits_batch_id || this.autobits()?.batch?.id;
+    const batchId = this.batchIdAutobits();
     this.crossingsApi
       .list({
         limit: 200,
@@ -1037,6 +1049,10 @@ export class WizardComponent implements OnInit, OnDestroy {
       const rest = list.filter((f) => f.id !== updated.id);
       return [updated, ...rest];
     });
+    if (updated.autobits_batch_id) {
+      this.guardarBatchId(updated.id, updated.autobits_batch_id);
+      this.fijarBatchSesion(updated.autobits_batch_id);
+    }
   }
 
   private idsDePaquete(
@@ -1109,7 +1125,7 @@ export class WizardComponent implements OnInit, OnDestroy {
       );
       if (!pending && this.documentos().length) {
         this.poll?.unsubscribe();
-        const batchId = this.carpetaActiva()?.autobits_batch_id || this.autobits()?.batch?.id;
+        const batchId = this.batchIdAutobits();
         // Solo cruzar facturas que aún no tienen vínculo; no reasignar COM del Excel.
         const needsMatch = this.documentos().some((d) => {
           const st = (d.estado || '').toUpperCase();
@@ -1159,6 +1175,54 @@ export class WizardComponent implements OnInit, OnDestroy {
     } catch {
       return null;
     }
+  }
+
+  private guardarBatchId(folderId: number, batchId: number): void {
+    try {
+      sessionStorage.setItem(`${BATCH_KEY_PREFIX}${folderId}`, String(batchId));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private leerBatchId(folderId: number): number | undefined {
+    try {
+      const raw = sessionStorage.getItem(`${BATCH_KEY_PREFIX}${folderId}`);
+      const n = raw ? Number(raw) : NaN;
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private fijarBatchSesion(batchId: number): void {
+    const current = this.autobits();
+    const batch = {
+      ...(current?.batch || {
+        filename: '',
+        period_start: '',
+        period_end: '',
+        total_rows: 0,
+        imported_rows: 0,
+        skipped_rows: 0,
+        error_count: 0,
+        status: '',
+        imported_by: '',
+        imported_at: '',
+        column_mapping: {},
+      }),
+      id: batchId,
+    } as AutobitsBatch;
+    this.autobits.set({
+      batch,
+      imported_rows: current?.imported_rows ?? 0,
+      skipped_duplicates: current?.skipped_duplicates ?? 0,
+      skipped_empty: current?.skipped_empty ?? 0,
+      parse_errors: current?.parse_errors ?? [],
+      records: current?.records,
+      reused: current?.reused,
+      aviso: current?.aviso,
+    });
   }
 
   private detalleError(

@@ -151,15 +151,6 @@ public class ContabilidadProxyController {
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         int fileParts = 0;
 
-        multipart.getParameterMap().forEach((key, values) -> {
-            if (values == null) {
-                return;
-            }
-            for (String v : values) {
-                form.add(key, v == null ? "" : v);
-            }
-        });
-
         for (Map.Entry<String, List<MultipartFile>> entry : multipart.getMultiFileMap().entrySet()) {
             List<MultipartFile> files = entry.getValue();
             if (files == null) {
@@ -188,6 +179,19 @@ public class ContabilidadProxyController {
                 };
                 form.add(entry.getKey(), resource);
                 fileParts++;
+            }
+        }
+
+        // Los campos de texto (folder_id, force) a veces no aparecen hasta parsear los archivos.
+        Enumeration<String> paramNames = multipart.getParameterNames();
+        while (paramNames != null && paramNames.hasMoreElements()) {
+            String key = paramNames.nextElement();
+            String[] values = multipart.getParameterValues(key);
+            if (values == null) {
+                continue;
+            }
+            for (String v : values) {
+                form.add(key, v == null ? "" : v);
             }
         }
 

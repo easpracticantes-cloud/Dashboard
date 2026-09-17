@@ -72,6 +72,28 @@ def list_fields(db: Session = Depends(get_db)):
     return {"fields": service.field_catalog()}
 
 
+def _first_int(*vals) -> int | None:
+    for raw in vals:
+        if raw in (None, ""):
+            continue
+        try:
+            n = int(str(raw).strip())
+        except (TypeError, ValueError):
+            continue
+        if n > 0:
+            return n
+    return None
+
+
+def _flag(*vals) -> bool:
+    for raw in vals:
+        if raw is True:
+            return True
+        if str(raw).strip().lower() in ("1", "true", "yes", "on"):
+            return True
+    return False
+
+
 def _attach_upload_to_folder(db: Session, result: dict, folder_id: int | None) -> dict:
     """Guarda el lote en la carpeta en el mismo request del Excel."""
     result.setdefault("folder", None)
@@ -113,20 +135,22 @@ async def upload_and_import(
     """Importa Excel: Ollama analiza la estructura y deduce campos automáticamente."""
     content = await archivo.read()
     service = AutobitsService(db)
-    parsed_folder_id = None
-    if folder_id not in (None, ""):
-        try:
-            parsed_folder_id = int(folder_id)
-        except (TypeError, ValueError):
-            parsed_folder_id = None
+    query = request.query_params
+    parsed_folder_id = _first_int(
+        folder_id,
+        request.headers.get("x-folder-id"),
+        query.get("folder_id"),
+    )
+    force_flag = _flag(force, query.get("force"))
+    auto_flag = _flag(auto_cruzar, query.get("auto_cruzar"))
     try:
         result = service.import_file_direct(
             content,
             archivo.filename or "autobits.xlsx",
             imported_by=resolve_usuario(request, imported_by),
-            auto_cruzar=auto_cruzar,
-            force=force,
-            skip_duplicates=not force,
+            auto_cruzar=auto_flag,
+            force=force_flag,
+            skip_duplicates=not force_flag,
         )
     except AutobitsServiceError as exc:
         raise HTTPException(

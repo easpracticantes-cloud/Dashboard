@@ -408,6 +408,16 @@ class AutobitsService:
             elif not canon and looks_like_invoice_code(current):
                 record.numero_compra = None
                 changed = True
+            factura = self._value_from_raw(
+                raw,
+                "codigo factura proveedor",
+                "código factura proveedor",
+            )
+            if factura:
+                text = str(factura).strip()
+                if text and (record.numero_documento or "").strip() != text:
+                    record.numero_documento = text
+                    changed = True
             if changed:
                 fixed += 1
         if fixed:
