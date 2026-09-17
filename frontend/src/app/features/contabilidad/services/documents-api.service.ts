@@ -81,6 +81,17 @@ export interface BatchUploadItem {
   error?: string | null;
 }
 
+/** Respuesta real de POST /documents/process-batch (ProcessBatchResponse del backend). */
+export interface ProcessBatchResponse {
+  ok: boolean;
+  queued: number;
+  pack_size: number;
+  packs: number;
+  /** IDs que el backend aceptó encolar (tienen archivo en disco). */
+  document_ids: number[];
+  mensaje: string;
+}
+
 export interface BatchUploadResponse {
   total_recibidos: number;
   total_errores: number;
@@ -170,16 +181,12 @@ export class DocumentsApiService {
     });
   }
 
-  processBatch(documentIds: number[], packSize = 25): Observable<{
-    ok: boolean;
-    queued: number;
-    packs: number;
-    mensaje: string;
-  }> {
-    return this.http.post<{ ok: boolean; queued: number; packs: number; mensaje: string }>(
-      `${this.base}/process-batch`,
-      { document_ids: documentIds, pack_size: packSize }
-    );
+  /** Reprocesa documentos ya cargados. Contrato real de POST /documents/process-batch. */
+  processBatch(documentIds: number[], packSize = 25): Observable<ProcessBatchResponse> {
+    return this.http.post<ProcessBatchResponse>(`${this.base}/process-batch`, {
+      document_ids: documentIds,
+      pack_size: packSize,
+    });
   }
 
   process(id: number, solicitud?: string): Observable<{ ok: boolean; error?: string; estado?: string }> {

@@ -208,10 +208,10 @@
             type="button"
             class="wiz__ghost wiz__ghost--tiny"
             (click)="volverAAnalizarFacturas()"
-            [disabled]="reanalizando() || limpiando() || !documentos().length"
-            title="Reasigna el contramarcado con los COM del Excel Autobits (el Excel no cambia)"
+            [disabled]="reanalizando() || analizandoFacturas() || limpiando() || !documentos().length"
+            title="Vuelve a leer las facturas pendientes o con error y les reasigna el COM del Excel Autobits (el Excel no cambia)"
           >
-            {{ reanalizando() ? 'Analizando…' : 'Volver a analizar facturas' }}
+            {{ reanalizando() || analizandoFacturas() ? 'Analizando…' : 'Volver a analizar facturas' }}
           </button>
         </div>
         <div class="wiz__table-wrap">
@@ -321,10 +321,10 @@
             type="button"
             class="wiz__ghost wiz__ghost--tiny"
             (click)="volverAAnalizarFacturas()"
-            [disabled]="reanalizando() || limpiando()"
-            title="Reasigna el contramarcado con los COM del Excel Autobits (el Excel no cambia)"
+            [disabled]="reanalizando() || analizandoFacturas() || limpiando()"
+            title="Vuelve a leer las facturas pendientes o con error y les reasigna el COM del Excel Autobits (el Excel no cambia)"
           >
-            {{ reanalizando() ? 'Analizando…' : 'Volver a analizar facturas' }}
+            {{ reanalizando() || analizandoFacturas() ? 'Analizando…' : 'Volver a analizar facturas' }}
           </button>
         }
       </div>

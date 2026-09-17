@@ -5,10 +5,11 @@ import { of, Subject, throwError } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AutobitsApiService, AutobitsRecord, ImportResult } from '../../services/autobits-api.service';
 import { CrossingsApiService } from '../../services/crossings-api.service';
-import { DocumentsApiService } from '../../services/documents-api.service';
+import { DocumentSummary, DocumentsApiService } from '../../services/documents-api.service';
 import { ContabilidadDownloadService } from '../../services/contabilidad-download.service';
 import { FacturasApiService } from '../../services/facturas-api.service';
 import { FoldersApiService, InvoiceFolder } from '../../services/folders-api.service';
+import { UiFeedbackService } from '../../../../core/services/ui-feedback.service';
 import { WizardComponent } from './wizard.component';
 
 function clearSession(): void {
@@ -89,6 +90,7 @@ describe('WizardComponent carpetas + Autobits', () => {
   let docsApi: {
     list: ReturnType<typeof vi.fn>;
     uploadBatch: ReturnType<typeof vi.fn>;
+    processBatch: ReturnType<typeof vi.fn>;
     ask: ReturnType<typeof vi.fn>;
     exportExcelUrl: ReturnType<typeof vi.fn>;
   };
@@ -148,6 +150,16 @@ describe('WizardComponent carpetas + Autobits', () => {
           useValue: (docsApi = {
             list: vi.fn(() => of({ items: [], total: 0 })),
             uploadBatch: vi.fn(),
+            processBatch: vi.fn((ids: number[]) =>
+              of({
+                ok: true,
+                queued: ids.length,
+                pack_size: 25,
+                packs: 1,
+                document_ids: ids,
+                mensaje: `${ids.length} documento(s) en 1 paquete(s).`,
+              })
+            ),
             ask: vi.fn(),
             exportExcelUrl: vi.fn((ids?: number[]) =>
               `/contabilidad/documents/export-excel${ids?.length ? `?document_ids=${ids.join(',')}` : ''}`
@@ -316,5 +328,128 @@ describe('WizardComponent carpetas + Autobits', () => {
 
     expect(cmp.records()[0].id).toBe(77);
     expect(cmp.autobits()?.batch.filename).toBe('semana.xlsx');
+  });
+
+  describe('volver a analizar facturas', () => {
+    function doc(partial: Partial<DocumentSummary> & { id: number }): DocumentSummary {
+      return {
+        filename: `factura-${partial.id}.pdf`,
+        tipo: 'FACTURA',
+        origen: 'CARGA_MANUAL',
+        estado: 'EXTRAIDO',
+        numero_documento: 'FE-100',
+        total: 1000,
+        requiere_revision: false,
+        received_at: '2026-09-10T00:00:00',
+        ...partial,
+      };
+    }
+
+    function conFacturas(cmp: WizardComponent, docs: DocumentSummary[]): void {
+      cmp.carpetaActiva.set(folder({ document_ids: docs.map((d) => d.id) }));
+      cmp.documentos.set(docs);
+    }
+
+    it('Caso A: una factura con error se reenvía al procesamiento y queda PROCESANDO', () => {
+      const pendiente = new Subject<never>();
+      docsApi.processBatch.mockReturnValue(pendiente.asObservable());
+      const fixture = createFixture();
+      const cmp = fixture.componentInstance;
+      conFacturas(cmp, [doc({ id: 1, estado: 'ERROR' }), doc({ id: 2 })]);
+
+      cmp.volverAAnalizarFacturas();
+
+      expect(docsApi.processBatch).toHaveBeenCalledWith([1]);
+      expect(cmp.documentos().find((d) => d.id === 1)?.estado).toBe('PROCESANDO');
+      expect(cmp.documentos().find((d) => d.id === 2)?.estado).toBe('EXTRAIDO');
+    });
+
+    it('Caso B: varias pendientes entran todas, nunca una lista vacía', () => {
+      docsApi.processBatch.mockReturnValue(new Subject<never>().asObservable());
+      const fixture = createFixture();
+      const cmp = fixture.componentInstance;
+      conFacturas(cmp, [
+        doc({ id: 1, estado: 'ERROR' }),
+        doc({ id: 2, estado: 'RECIBIDO' }),
+        doc({ id: 3, numero_documento: undefined }),
+        doc({ id: 4 }),
+      ]);
+
+      cmp.volverAAnalizarFacturas();
+
+      expect(docsApi.processBatch).toHaveBeenCalledWith([1, 2, 3]);
+    });
+
+    it('Caso C: sin pendientes ni Excel avisa y no llama al backend', () => {
+      const feedback = TestBed.inject(UiFeedbackService);
+      const avisar = vi.spyOn(feedback, 'error');
+      const fixture = createFixture();
+      const cmp = fixture.componentInstance;
+      conFacturas(cmp, [doc({ id: 1 }), doc({ id: 2 })]);
+
+      cmp.volverAAnalizarFacturas();
+
+      expect(docsApi.processBatch).not.toHaveBeenCalled();
+      expect(foldersApi.recontramarcado).not.toHaveBeenCalled();
+      expect(avisar.mock.calls[0][0]).toContain('No hay facturas pendientes');
+    });
+
+    it('Caso D: si el backend falla, la factura no queda marcada como procesada', () => {
+      docsApi.processBatch.mockReturnValue(
+        throwError(() => ({ status: 503, error: { detail: 'OCR no disponible' } }))
+      );
+      const feedback = TestBed.inject(UiFeedbackService);
+      const avisar = vi.spyOn(feedback, 'error');
+      const fixture = createFixture();
+      const cmp = fixture.componentInstance;
+      conFacturas(cmp, [doc({ id: 1, estado: 'ERROR' })]);
+
+      cmp.volverAAnalizarFacturas();
+
+      expect(avisar.mock.calls[0][0]).toContain('OCR no disponible');
+      expect(cmp.reanalizando()).toBe(false);
+      expect(cmp.analizandoFacturas()).toBe(false);
+    });
+
+    it('Caso E: doble clic dispara un solo procesamiento', () => {
+      docsApi.processBatch.mockReturnValue(new Subject<never>().asObservable());
+      const fixture = createFixture();
+      const cmp = fixture.componentInstance;
+      conFacturas(cmp, [doc({ id: 1, estado: 'ERROR' })]);
+
+      cmp.volverAAnalizarFacturas();
+      cmp.volverAAnalizarFacturas();
+
+      expect(docsApi.processBatch).toHaveBeenCalledTimes(1);
+    });
+
+    it('con todas las facturas leídas y Excel cargado, reasigna el COM', () => {
+      const fixture = createFixture();
+      const cmp = fixture.componentInstance;
+      cmp.carpetaActiva.set(folder({ document_ids: [1], autobits_batch_id: 11 }));
+      cmp.documentos.set([doc({ id: 1 })]);
+
+      cmp.volverAAnalizarFacturas();
+
+      expect(docsApi.processBatch).not.toHaveBeenCalled();
+      expect(foldersApi.recontramarcado).toHaveBeenCalledWith(7, {
+        onlyMissingCom: false,
+        reset: true,
+        autobitsBatchId: 11,
+      });
+    });
+
+    it('no reprocesa facturas pagadas ni duplicadas', () => {
+      const fixture = createFixture();
+      const cmp = fixture.componentInstance;
+      conFacturas(cmp, [
+        doc({ id: 1, estado: 'PAGADO', numero_documento: undefined }),
+        doc({ id: 2, estado: 'DUPLICADO', total: undefined }),
+      ]);
+
+      cmp.volverAAnalizarFacturas();
+
+      expect(docsApi.processBatch).not.toHaveBeenCalled();
+    });
   });
 });

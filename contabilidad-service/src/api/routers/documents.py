@@ -33,7 +33,7 @@ from application.services.factura_excel_service import (
     FacturaExcelServiceError,
 )
 from infrastructure.cruce.xlsx_integrity import XlsxIntegrityError
-from domain.enums import DocumentOrigin
+from domain.enums import DocumentOrigin, DocumentStatus
 from infrastructure.persistence.database import get_db
 
 
@@ -296,6 +296,15 @@ class ProcessBatchResponse(BaseModel):
 BATCH_PACK_SIZE = 25
 BATCH_MAX_WORKERS = 4
 
+# Estados cerrados: reprocesarlos pisaría datos contables ya confirmados.
+ESTADOS_NO_REPROCESABLES = {
+    DocumentStatus.PAGADO,
+    DocumentStatus.FINALIZADO,
+    DocumentStatus.ENTREGADO,
+    DocumentStatus.ANULADO,
+    DocumentStatus.DUPLICADO,
+}
+
 
 def _process_document_ids_in_packs(
     document_ids: list[int],
@@ -322,11 +331,9 @@ def _process_document_ids_in_packs(
             repo = DocumentRepository(db)
             for doc_id in pack:
                 doc = repo.get_by_id(doc_id)
-                if doc and doc.estado in {
-                    DocumentStatus.RECIBIDO,
-                    DocumentStatus.ERROR,
-                    DocumentStatus.REQUIERE_REVISION,
-                }:
+                # Todo el pack entra a PROCESANDO: es lo que hará process_by_id y
+                # así la UI ve el estado real mientras dura el análisis.
+                if doc and doc.estado not in ESTADOS_NO_REPROCESABLES:
                     doc.estado = DocumentStatus.PROCESANDO
             db.commit()
         except Exception:
@@ -583,13 +590,25 @@ def process_documents_batch(
 
     service = DocumentService(db)
     valid: list[int] = []
+    validos: list = []
+    cerrados = 0
     for doc_id in ids:
         doc = service.get_document(doc_id)
-        if doc and doc.storage_path:
-            valid.append(doc_id)
+        if not doc or not doc.storage_path:
+            continue
+        if doc.estado in ESTADOS_NO_REPROCESABLES:
+            cerrados += 1
+            continue
+        valid.append(doc_id)
+        validos.append(doc)
 
     if not valid:
-        raise HTTPException(status_code=404, detail="Ningún documento válido para procesar.")
+        detail = (
+            "Las facturas ya están cerradas (pagadas o anuladas) y no se vuelven a analizar."
+            if cerrados
+            else "Estas facturas ya no tienen su archivo en el servidor: vuelve a subirlas."
+        )
+        raise HTTPException(status_code=404, detail=detail)
 
     processor = get_document_processing_service()
     errores = processor.verify_dependencies()
@@ -598,6 +617,13 @@ def process_documents_batch(
 
     size = max(1, min(int(body.pack_size or BATCH_PACK_SIZE), BATCH_PACK_SIZE))
     packs = (len(valid) + size - 1) // size
+
+    # Antes de responder: el análisis corre en background y la UI necesita ver
+    # el estado real (si no, el polling cree que ya terminó y corta enseguida).
+    for doc in validos:
+        doc.estado = DocumentStatus.PROCESANDO
+    db.commit()
+
     background_tasks.add_task(_process_document_ids_in_packs, list(valid), size)
     return ProcessBatchResponse(
         ok=True,

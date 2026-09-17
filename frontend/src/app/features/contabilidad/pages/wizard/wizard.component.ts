@@ -26,6 +26,8 @@ const SESSION_KEY = 'contab-wizard-session';
 const FOLDER_KEY = 'contab-wizard-folder-id';
 const BATCH_KEY_PREFIX = 'contab-autobits-batch-';
 const PACK_MAX = 25;
+/** Tope del polling de análisis (2s por tick): ~5 min para un paquete de 25 facturas. */
+const POLL_MAX_TICKS = 150;
 /** Por debajo del client_max_body_size típico del Nginx host Oracle (25m). */
 const PACK_MAX_BYTES = 18 * 1024 * 1024;
 
@@ -98,10 +100,14 @@ export class WizardComponent implements OnInit, OnDestroy {
   preguntando = signal(false);
   copiadoId = signal<number | null>(null);
   reanalizando = signal(false);
+  /** Reanálisis lanzado desde esta pantalla y aún en curso en el backend. */
+  analizandoFacturas = signal(false);
 
   private poll?: Subscription;
   private autobitsUpload?: Subscription;
   private folderSeq = 0;
+  /** Cruce con el Excel que queda pendiente hasta que el OCR del reanálisis termine. */
+  private recontramarcadoPendiente: { folderId: number; batchId: number; seq: number } | null = null;
 
   ngOnInit(): void {
     sessionStorage.setItem(SESSION_KEY, '1');
@@ -127,6 +133,8 @@ export class WizardComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.poll?.unsubscribe();
     this.autobitsUpload?.unsubscribe();
+    this.analizandoFacturas.set(false);
+    this.recontramarcadoPendiente = null;
   }
 
   readonly recordsVista = computed(() => {
@@ -383,7 +391,6 @@ export class WizardComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.feedback.error(this.detalleError(err, 'No se pudo leer el Excel de Autobits.'));
-          
         },
       });
   }
@@ -775,6 +782,8 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   volverAAnalizarFacturas(): void {
+    if (this.reanalizando() || this.analizandoFacturas()) return;
+
     const folder = this.carpetaActiva();
     if (!folder?.id) {
       this.feedback.error('Elige una carpeta primero.');
@@ -784,28 +793,60 @@ export class WizardComponent implements OnInit, OnDestroy {
       this.feedback.error('La carpeta no tiene facturas.');
       return;
     }
-    if (this.reanalizando()) return;
 
     const batchId = this.batchIdAutobits();
+    const pendientes = this.facturasPendientesAnalisis();
+    console.info(
+      '[CONTABILIDAD][REANALISIS] documentos seleccionados:',
+      pendientes.map((d) => d.id)
+    );
+
+    // 1) Facturas sin leer (ERROR / recién subidas / sin datos): OCR + IA real.
+    //    Al terminar el polling se les asigna el COM del Excel Autobits.
+    if (pendientes.length) {
+      this.reanalizarOcr(
+        pendientes.map((d) => d.id),
+        folder,
+        batchId
+      );
+      return;
+    }
+
+    // 2) Todas están leídas: falta cruzarlas contra el Excel para sacar el COM.
     if (batchId) {
       this.reanalizarConAutobits(folder, batchId);
       return;
     }
 
-    const pendientesOcr = this.facturasPendientesAnalisis();
-    if (!pendientesOcr.length) {
-      this.feedback.error(
-        'Carga el Excel de Autobits para cruzar facturas y sacar el COM del contramarcado.'
-      );
-      return;
-    }
-    this.reanalizarOcr(pendientesOcr.map((d) => d.id));
+    this.feedback.error(
+      'No hay facturas pendientes para volver a analizar. ' +
+        'Carga el Excel de Autobits para asignar el COM del contramarcado.'
+    );
   }
+
+  /** Estados finales: reprocesarlos rompería datos contables ya confirmados. */
+  private static readonly ESTADOS_NO_REPROCESABLES = [
+    'DUPLICADO',
+    'ANULADO',
+    'PAGADO',
+    'FINALIZADO',
+    'ENTREGADO',
+  ];
+
+  /**
+   * Estados reales (DocumentStatus) en los que la factura no quedó analizada.
+   * PROCESANDO entra aquí a propósito: recupera facturas colgadas. El doble
+   * procesamiento lo evita `analizandoFacturas`, no este filtro.
+   */
+  private static readonly ESTADOS_SIN_ANALISIS = ['RECIBIDO', 'PROCESANDO', 'ERROR'];
 
   private facturasPendientesAnalisis(): DocumentSummary[] {
     return this.documentos().filter((d) => {
       const st = (d.estado || '').toUpperCase();
-      return st === 'PENDIENTE' || st === 'EN_PROCESO' || st === 'ERROR' || !d.numero_documento;
+      if (WizardComponent.ESTADOS_NO_REPROCESABLES.includes(st)) return false;
+      if (WizardComponent.ESTADOS_SIN_ANALISIS.includes(st)) return true;
+      // Procesada, pero sin los datos que el contramarcado necesita: hay que releerla.
+      return !d.numero_documento || d.total == null;
     });
   }
 
@@ -838,32 +879,30 @@ export class WizardComponent implements OnInit, OnDestroy {
             this.documentos.set(this.docsFromFolderSummary(res.folder));
           }
           this.refrescarFacturas(this.folderSeq);
+          console.info('[CONTABILIDAD][REANALISIS] resultado final:', res);
           this.feedback.success(
             res.message ||
               `Contramarcado actualizado con COM del Excel: ${res.updated} factura(s).`
           );
+          if (res.skipped) {
+            this.feedback.error(
+              `${res.skipped} factura(s) siguen sin COM: no tienen fila en el Excel de Autobits.`
+            );
+          }
         },
         error: (err) =>
           this.feedback.error(this.detalleError(err, 'No se pudo analizar las facturas.')),
       });
   }
 
-  private reanalizarOcr(documentIds: number[]): void {
+  /** Reproceso real (OCR + IA) por el mismo endpoint que usa la carga inicial. */
+  private reanalizarOcr(documentIds: number[], folder: InvoiceFolder, batchId?: number): void {
     this.reanalizando.set(true);
+    // Estado optimista con el valor real del backend (DocumentStatus.PROCESANDO).
     this.documentos.update((docs) =>
-      docs.map((d) =>
-        documentIds.includes(d.id)
-          ? {
-              ...d,
-              estado: 'PENDIENTE',
-              proveedor_nombre: undefined,
-              numero_documento: undefined,
-              total: undefined,
-              contramarcado: null,
-            }
-          : d
-      )
+      docs.map((d) => (documentIds.includes(d.id) ? { ...d, estado: 'PROCESANDO' } : d))
     );
+
     this.docsApi
       .processBatch(documentIds)
       .pipe(
@@ -872,11 +911,33 @@ export class WizardComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res) => {
-          this.feedback.success(res.mensaje || `${res.queued} factura(s) en cola de análisis.`);
+          console.info('[CONTABILIDAD][REANALISIS] respuesta backend:', res);
+          const aceptados = res.document_ids?.length ? res.document_ids : documentIds;
+          const rechazados = documentIds.filter((id) => !aceptados.includes(id));
+
+          // El COM del Excel se asigna cuando el OCR termine (no antes: aún no hay datos).
+          this.recontramarcadoPendiente = batchId
+            ? { folderId: folder.id, batchId, seq: this.folderSeq }
+            : null;
+          this.analizandoFacturas.set(aceptados.length > 0);
+
+          this.feedback.success(res.mensaje || `${res.queued} factura(s) en análisis.`);
+          if (rechazados.length) {
+            this.feedback.error(
+              `${rechazados.length} factura(s) no se pudieron reprocesar (sin archivo en el servidor).`
+            );
+          }
+          // Devolver a su estado real las que el backend no aceptó.
+          this.refrescarFacturas(this.folderSeq);
           this.startPoll();
         },
-        error: (err) =>
-          this.feedback.error(this.detalleError(err, 'No se pudo reprocesar las facturas.')),
+        error: (err) => {
+          this.recontramarcadoPendiente = null;
+          this.analizandoFacturas.set(false);
+          // Nada quedó en cola: recuperar el estado real en vez de dejar un PROCESANDO falso.
+          this.refrescarFacturas(this.folderSeq);
+          this.feedback.error(this.detalleError(err, 'No se pudo reprocesar las facturas.'));
+        },
       });
   }
 
@@ -911,6 +972,10 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.folderSeq += 1;
     const seq = this.folderSeq;
     this.poll?.unsubscribe();
+    if (switching) {
+      this.analizandoFacturas.set(false);
+      this.recontramarcadoPendiente = null;
+    }
 
     this.carpetaActiva.set(folder);
     this.guardarFolderId(folder.id);
@@ -988,7 +1053,7 @@ export class WizardComponent implements OnInit, OnDestroy {
           this.documentos.set(all);
         }
       },
-      error: () => undefined,
+      error: (err) => console.warn('[CONTABILIDAD][REANALISIS] no se pudo refrescar facturas', err),
     });
 
     const batchId = this.batchIdAutobits();
@@ -1013,7 +1078,7 @@ export class WizardComponent implements OnInit, OnDestroy {
             this.crossings.set(items);
           }
         },
-        error: () => undefined,
+        error: (err) => console.warn('[CONTABILIDAD][REANALISIS] no se pudieron leer los cruces', err),
       });
   }
 
@@ -1117,14 +1182,37 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   private startPoll(): void {
     this.poll?.unsubscribe();
+    let ticks = 0;
     this.poll = interval(2000).subscribe(() => {
       const seq = this.folderSeq;
       this.refrescarFacturas(seq);
       const pending = this.documentos().some((d) =>
         ['RECIBIDO', 'PROCESANDO'].includes((d.estado || '').toUpperCase())
       );
+      if (pending && ++ticks > POLL_MAX_TICKS) {
+        // El backend dejó facturas colgadas: liberar el botón para poder reintentar.
+        this.poll?.unsubscribe();
+        this.recontramarcadoPendiente = null;
+        this.analizandoFacturas.set(false);
+        this.feedback.error(
+          'El análisis está tardando demasiado. Vuelve a intentarlo con las facturas que sigan pendientes.'
+        );
+        return;
+      }
       if (!pending && this.documentos().length) {
         this.poll?.unsubscribe();
+        this.analizandoFacturas.set(false);
+
+        // El reanálisis dejó pendiente asignar el COM del Excel: ya hay datos extraídos.
+        const pendienteCom = this.recontramarcadoPendiente;
+        this.recontramarcadoPendiente = null;
+        const folder = this.carpetaActiva();
+        if (pendienteCom && folder?.id === pendienteCom.folderId && seq === pendienteCom.seq) {
+          console.info('[CONTABILIDAD][REANALISIS] OCR terminado, asignando COM del Excel');
+          this.reanalizarConAutobits(folder, pendienteCom.batchId);
+          return;
+        }
+
         const batchId = this.batchIdAutobits();
         // Solo cruzar facturas que aún no tienen vínculo; no reasignar COM del Excel.
         const needsMatch = this.documentos().some((d) => {
@@ -1135,6 +1223,8 @@ export class WizardComponent implements OnInit, OnDestroy {
         if (batchId && needsMatch) {
           this.crossingsApi.runMatching(batchId).subscribe({
             next: () => this.refrescarFacturas(this.folderSeq),
+            error: (err) =>
+              console.warn('[CONTABILIDAD][REANALISIS] fallo el cruce automático', err),
           });
         }
       }
