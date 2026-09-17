@@ -793,15 +793,15 @@ export class WizardComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Solo regenera contramarcado de facturas; el Excel Autobits no se toca. */
+  /** Reasigna contramarcado con COM del Excel; la tabla Autobits no se toca. */
   private reanalizarConAutobits(folder: InvoiceFolder, batchId: number): void {
     this.reanalizando.set(true);
     const frozenRecords = [...this.records()];
 
     this.foldersApi
       .recontramarcado(folder.id, {
-        onlyMissingCom: true,
-        reset: false,
+        onlyMissingCom: false,
+        reset: true,
         autobitsBatchId: batchId,
       })
       .pipe(
@@ -810,11 +810,9 @@ export class WizardComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res) => {
-          // No recargar Autobits ni reordenar la tabla del Excel.
           if (frozenRecords.length) {
             this.records.set(frozenRecords);
           }
-          // Solo refrescar facturas / carpeta, sin startPoll que vuelva a cruzar.
           if (res.folder) {
             this.carpetaActiva.set(res.folder);
             this.carpetas.update((list) => {
@@ -826,7 +824,7 @@ export class WizardComponent implements OnInit, OnDestroy {
           this.refrescarFacturas(this.folderSeq);
           this.feedback.success(
             res.message ||
-              `COM del Excel conservados. ${res.updated} factura(s) actualizada(s).`
+              `Contramarcado actualizado con COM del Excel: ${res.updated} factura(s).`
           );
         },
         error: (err) =>

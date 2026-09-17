@@ -36,12 +36,35 @@ class ContramarcadoService:
         self.crossing_repo = CrossingRepository(db)
         self.matcher = MatchingEngine()
 
-    def locked_com_for_document(self, document: DocumentModel) -> tuple[str | None, str | None, int | None]:
-        """COM congelado desde cruce Excel / Autobits. Nunca inventa uno nuevo."""
+    def locked_com_for_document(
+        self,
+        document: DocumentModel,
+        *,
+        excel_com_only: bool = False,
+    ) -> tuple[str | None, str | None, int | None]:
+        """COM desde cruce / Excel Autobits.
+
+        Si excel_com_only=True ignora el COM viejo del documento (puede estar mal)
+        y solo usa el de la fila Autobits/cruce.
+        """
+        from domain.autobits.fields import excel_compra_reserva
+
         for x in self._crossing_rows(document):
+            rid = getattr(x, "autobits_record_id", None)
+            if rid:
+                record = self.autobits_repo.get_record(int(rid))
+                if record:
+                    compra, _ = excel_compra_reserva(record)
+                    com = normalize_com(compra) or normalize_com(compra if compra else None)
+                    # normalize_com may fail for non-COM codes like FE-788; keep raw Excel value
+                    if compra:
+                        return (normalize_com(compra) or str(compra).strip().upper()), SOURCE_CROSSING, int(rid)
             com = normalize_com(getattr(x, "numero_compra", None))
-            if com:
-                return com, SOURCE_CROSSING, getattr(x, "autobits_record_id", None)
+            raw = (getattr(x, "numero_compra", None) or "").strip()
+            if com or raw:
+                return (com or raw.upper()), SOURCE_CROSSING, rid
+        if excel_com_only:
+            return None, None, None
         existing = normalize_com(getattr(document, "contramarcado_com", None))
         source = (getattr(document, "contramarcado_source", None) or "").upper() or None
         if existing and source in _LOCKED_SOURCES:
@@ -61,6 +84,7 @@ class ContramarcadoService:
         exclude_record_ids: set[int] | None = None,
         exclude_coms: set[str] | None = None,
         preserve_locked_com: bool = True,
+        excel_com_only: bool = False,
     ) -> ContramarcadoResult:
         """Calcula y persiste el contramarcado para un documento ya analizado."""
         data = extracted
@@ -88,17 +112,18 @@ class ContramarcadoService:
         text = ocr_text if ocr_text is not None else document.ocr_text
 
         locked_com, locked_source, locked_record_id = (None, None, None)
-        if preserve_locked_com:
-            locked_com, locked_source, locked_record_id = self.locked_com_for_document(document)
+        if preserve_locked_com or excel_com_only:
+            locked_com, locked_source, locked_record_id = self.locked_com_for_document(
+                document, excel_com_only=excel_com_only
+            )
 
         if locked_com:
-            # Excel / cruce ya decidió el COM: solo regenera el texto, no rematch.
             candidates = [
                 ComCandidate(
                     com=locked_com,
                     source=locked_source or SOURCE_CROSSING,
                     score=100.0,
-                    reasons=["com_bloqueado_excel"],
+                    reasons=["com_excel_autobits"],
                     proveedor=proveedor,
                     numero_documento=numero,
                     record_id=locked_record_id,
@@ -204,12 +229,13 @@ class ContramarcadoService:
         *,
         batch_id: int | None = None,
         preserve_locked_com: bool = True,
+        excel_com_only: bool = False,
     ) -> int:
-        """Aplica contramarcado respetando COM ya fijados por el Excel."""
+        """Aplica contramarcado. Con excel_com_only toma COM solo del Excel/cruce."""
         used_record_ids: set[int] = set()
         used_coms: set[str] = set()
         for doc in documents:
-            locked, _, rid = self.locked_com_for_document(doc)
+            locked, _, rid = self.locked_com_for_document(doc, excel_com_only=excel_com_only)
             if locked:
                 used_coms.add(locked)
             if rid:
@@ -226,6 +252,7 @@ class ContramarcadoService:
                     exclude_record_ids=used_record_ids,
                     exclude_coms=used_coms,
                     preserve_locked_com=preserve_locked_com,
+                    excel_com_only=excel_com_only,
                 )
                 count += 1
                 if result.record_id:
@@ -370,9 +397,21 @@ class ContramarcadoService:
         return crossings
 
     def _crossing_candidates(self, document: DocumentModel) -> list[ComCandidate]:
+        from domain.autobits.fields import excel_compra_reserva
+
         out: list[ComCandidate] = []
         for x in self._crossing_rows(document):
-            com = normalize_com(getattr(x, "numero_compra", None))
+            com = None
+            rid = getattr(x, "autobits_record_id", None)
+            if rid:
+                record = self.autobits_repo.get_record(int(rid))
+                if record:
+                    compra, _ = excel_compra_reserva(record)
+                    if compra:
+                        com = normalize_com(compra) or str(compra).strip().upper()
+            if not com:
+                raw = (getattr(x, "numero_compra", None) or "").strip()
+                com = normalize_com(raw) or (raw.upper() if raw else None)
             if not com:
                 continue
             out.append(
@@ -380,10 +419,10 @@ class ContramarcadoService:
                     com=com,
                     source=SOURCE_CROSSING,
                     score=100.0,
-                    reasons=["crossing_existente"],
+                    reasons=["crossing_excel"],
                     proveedor=getattr(x, "proveedor_nombre", None),
                     numero_documento=document.numero_documento,
-                    record_id=getattr(x, "autobits_record_id", None),
+                    record_id=rid,
                 )
             )
         return out
@@ -396,6 +435,8 @@ class ContramarcadoService:
         exclude_record_ids: set[int] | None = None,
         exclude_coms: set[str] | None = None,
     ) -> list[ComCandidate]:
+        from domain.autobits.fields import excel_compra_reserva
+
         if batch_id:
             records = self.autobits_repo.list_records_for_batch(batch_id)
         else:
@@ -411,14 +452,9 @@ class ContramarcadoService:
         for record in records:
             if record.id in blocked_ids:
                 continue
-            raw_compra = (record.numero_compra or "").strip()
-            com = normalize_com(raw_compra)
-            if not com and raw_compra:
-                digits = "".join(ch for ch in raw_compra if ch.isdigit())
-                if len(digits) >= 4:
-                    com = normalize_com(digits) or raw_compra.upper().replace(" ", "")
-                elif len(raw_compra) >= 3:
-                    com = raw_compra.upper().replace(" ", "")
+            compra, _ = excel_compra_reserva(record)
+            raw_compra = (compra or record.numero_compra or "").strip()
+            com = normalize_com(raw_compra) or (raw_compra.upper() if raw_compra else None)
             if not com:
                 continue
             if com in blocked_coms:

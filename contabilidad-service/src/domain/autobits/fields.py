@@ -215,6 +215,38 @@ def value_from_row_dict(row_dict: dict, *needles: str):
     return None
 
 
+def excel_compra_reserva(record) -> tuple[str | None, str | None]:
+    """COM y reserva canónicos del Excel (raw_json), con fallback a columnas densas."""
+    compra = (getattr(record, "numero_compra", None) or "").strip() or None
+    reserva = (getattr(record, "numero_reserva", None) or "").strip() or None
+    raw_json = getattr(record, "raw_json", None)
+    if not raw_json:
+        return compra, reserva
+    try:
+        import json
+
+        raw = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+    except Exception:  # noqa: BLE001
+        return compra, reserva
+    if not isinstance(raw, dict):
+        return compra, reserva
+    canon_compra = value_from_row_dict(
+        raw,
+        "codigo orden de compra",
+        "código orden de compra",
+    )
+    canon_reserva = value_from_row_dict(
+        raw,
+        "codigo reserva",
+        "código reserva",
+    )
+    if canon_compra is not None and str(canon_compra).strip():
+        compra = str(canon_compra).strip()
+    if canon_reserva is not None and str(canon_reserva).strip():
+        reserva = str(canon_reserva).strip()
+    return compra, reserva
+
+
 def suggest_mapping(columns: list[str]) -> dict[str, str | None]:
     """Sugiere mapeo columna Excel → campo interno."""
     normalized = {normalize_header(col): col for col in columns}

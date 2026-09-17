@@ -105,15 +105,49 @@ class CrossingService:
             valor_nuevo=f"{created} cruces generados",
             usuario=usuario,
         )
-        # Regenerar contramarcado con COM de Autobits recién cruzado
+        # Regenerar contramarcado con COM del Excel Autobits recién cruzado
         try:
             from application.services.contramarcado_service import ContramarcadoService
 
-            ContramarcadoService(self.db).apply_for_documents(documents, batch_id=batch_id)
+            ContramarcadoService(self.db).apply_for_documents(
+                documents,
+                batch_id=batch_id,
+                preserve_locked_com=True,
+                excel_com_only=True,
+            )
         except Exception:  # noqa: BLE001
             pass
         self.db.commit()
         return {"created": created, "items": results}
+
+    def resync_excel_com_for_batch(self, batch_id: int) -> int:
+        """Copia COM/reserva canónicos del Excel a los cruces del lote (sin tocar filas Autobits)."""
+        from domain.autobits.fields import excel_compra_reserva
+
+        records = self.autobits_repo.list_records_for_batch(batch_id)
+        synced = 0
+        for record in records:
+            compra, reserva = excel_compra_reserva(record)
+            if compra and (record.numero_compra or "").strip() != compra:
+                record.numero_compra = compra
+            if reserva and (record.numero_reserva or "").strip() != reserva:
+                record.numero_reserva = reserva
+            crossing = self.crossing_repo.get_by_autobits_record(record.id)
+            if not crossing:
+                continue
+            changed = False
+            if compra and (crossing.numero_compra or "").strip() != compra:
+                crossing.numero_compra = compra
+                changed = True
+            if reserva and (crossing.numero_reserva or "").strip() != (crossing.numero_reserva or ""):
+                if reserva != (crossing.numero_reserva or "").strip():
+                    crossing.numero_reserva = reserva
+                    changed = True
+            if changed:
+                synced += 1
+        if synced:
+            self.db.flush()
+        return synced
 
     def _run_matching_cruce(
         self,
@@ -286,6 +320,13 @@ class CrossingService:
         if candidate and candidate.autobits_record_id:
             record = next((r for r in records if r.id == candidate.autobits_record_id), None)
             if record:
+                from domain.autobits.fields import excel_compra_reserva
+
+                compra, reserva = excel_compra_reserva(record)
+                if compra:
+                    candidate.numero_compra = compra
+                if reserva:
+                    candidate.numero_reserva = reserva
                 existing = self.crossing_repo.get_by_autobits_record(record.id)
                 if existing and existing.document_id and existing.document_id != doc.id:
                     # Otra factura ya ocupó esa fila del Excel.
@@ -306,6 +347,15 @@ class CrossingService:
         if existing:
             # La fila ya existía desde el Excel: la factura la completa.
             crossing = self._attach_document(existing, doc, candidate, estado, obs)
+            # Fuerza COM del Excel en el cruce (fuente de verdad).
+            if record:
+                from domain.autobits.fields import excel_compra_reserva
+
+                compra, reserva = excel_compra_reserva(record)
+                if compra:
+                    crossing.numero_compra = compra
+                if reserva:
+                    crossing.numero_reserva = reserva
         else:
             crossing = self.crossing_repo.create_crossing(
                 document_id=doc.id,
@@ -366,8 +416,8 @@ class CrossingService:
             crossing.valor_autobits = candidate.valor_autobits
         if candidate.proveedor:
             crossing.proveedor_nombre = candidate.proveedor
-        # El COM del Excel Autobits es inmutable una vez sembrado en la fila.
-        if candidate.numero_compra and not (crossing.numero_compra or "").strip():
+        # COM del Excel Autobits: siempre el de la fila cruzada.
+        if candidate.numero_compra:
             crossing.numero_compra = candidate.numero_compra
         if candidate.numero_reserva:
             crossing.numero_reserva = candidate.numero_reserva
