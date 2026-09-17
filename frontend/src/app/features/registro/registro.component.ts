@@ -21,7 +21,16 @@ import {
   sheetDateKey,
 } from '../../core/utils/sheet-date';
 
-const TIPO_BASE = ['B2B', 'B2C', 'AGENCIA', 'PARTICULAR'];
+const TIPO_BASE = ['B2B', 'B2C'];
+
+function normalizeTipo(raw?: string | null): string {
+  const t = (raw || '').trim().toUpperCase();
+  if (!t) return '';
+  if (t === 'B2B' || t === 'AGENCIA') return 'B2B';
+  if (t === 'B2C' || t === 'PARTICULAR') return 'B2C';
+  if (TIPO_BASE.includes(t)) return t;
+  return '';
+}
 const CANAL_BASE = ['RESERVAS', 'WHATSAPP', 'INSTAGRAM', 'WEB', 'EMAIL', 'TELEFONO'];
 const DISC_OPTIONS = [
   { value: 'N/A', label: 'N/A', tone: 'na' },
@@ -103,7 +112,7 @@ function fromRow(row: SeguimientoWhatsapp): Draft {
   return {
     hojaOrigen: row.hojaOrigen || '',
     fecha: sheetContactFecha(row.fecha),
-    tipo: row.tipo || '',
+    tipo: normalizeTipo(row.tipo) || 'B2C',
     canal: row.canal || '',
     cliente: row.cliente || '',
     celular: row.celular || '',
@@ -242,7 +251,7 @@ export class RegistroComponent {
         const rowFecha = sheetContactFecha(r.fecha);
         if (fecha && rowFecha !== fecha) return false;
         if (mes && rowFecha.slice(0, 7) !== mes) return false;
-        if (tipo && (r.tipo || '') !== tipo) return false;
+        if (tipo && normalizeTipo(r.tipo) !== tipo) return false;
         if (semaforo && (r.semaforo || '') !== semaforo) return false;
         if (prox && sheetCalendarDate(r.proximoSeguimiento) !== prox) return false;
         if (prioridad && (r.priorizar || '') !== prioridad) return false;
@@ -279,7 +288,7 @@ export class RegistroComponent {
     return list;
   });
 
-  readonly opcionesTipo = computed(() => this.mergeOpts(TIPO_BASE, (r) => r.tipo));
+  readonly opcionesTipo = computed(() => [...TIPO_BASE]);
   readonly opcionesCanal = computed(() => this.mergeOpts(CANAL_BASE, (r) => r.canal));
   readonly opcionesDisc = DISC_OPTIONS;
 
@@ -346,8 +355,9 @@ export class RegistroComponent {
   }
 
   patch(key: keyof Draft, value: string): void {
+    const normalized = key === 'tipo' ? normalizeTipo(value) || 'B2C' : value;
     this.draft.update((d) => {
-      const next = { ...d, [key]: value };
+      const next = { ...d, [key]: normalized };
       const preview = this.waPreview();
       if (preview) {
         this.waDrafts.update((m) => ({ ...m, [preview.previewId]: next }));
@@ -385,7 +395,7 @@ export class RegistroComponent {
   }
 
   setFiltroTipo(value: string): void {
-    this.tipoFiltro.set(value);
+    this.tipoFiltro.set(normalizeTipo(value));
     this.pagina.set(1);
   }
 
@@ -713,7 +723,7 @@ export class RegistroComponent {
     return {
       ...emptyDraft(this.hojaFiltro() || this.hojas()[0] || ''),
       fecha: (v('fecha') || '').slice(0, 10) || new Date().toISOString().slice(0, 10),
-      tipo: v('tipo') || 'B2C',
+      tipo: normalizeTipo(v('tipo')) || 'B2C',
       canal: 'WHATSAPP',
       cliente: v('cliente'),
       celular: v('celular'),
@@ -855,7 +865,7 @@ export class RegistroComponent {
     if (!current) return;
     const mapped: SeguimientoWhatsapp = {
       fecha: d.fecha,
-      tipo: d.tipo,
+      tipo: normalizeTipo(d.tipo) || 'B2C',
       canal: d.canal,
       cliente: d.cliente,
       celular: d.celular,
