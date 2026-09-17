@@ -209,7 +209,7 @@
             class="wiz__ghost wiz__ghost--tiny"
             (click)="volverAAnalizarFacturas()"
             [disabled]="reanalizando() || limpiando() || !documentos().length"
-            title="Limpia el contramarcado y vuelve a cruzar todas las facturas con el Excel de Autobits para sacar el COM"
+            title="Conserva los COM del Excel Autobits; solo completa facturas sin COM"
           >
             {{ reanalizando() ? 'Analizando…' : 'Volver a analizar facturas' }}
           </button>
@@ -322,7 +322,7 @@
             class="wiz__ghost wiz__ghost--tiny"
             (click)="volverAAnalizarFacturas()"
             [disabled]="reanalizando() || limpiando()"
-            title="Limpia el contramarcado y vuelve a cruzar todas las facturas con el Excel de Autobits"
+            title="Conserva los COM del Excel Autobits; solo completa facturas sin COM"
           >
             {{ reanalizando() ? 'Analizando…' : 'Volver a analizar facturas' }}
           </button>

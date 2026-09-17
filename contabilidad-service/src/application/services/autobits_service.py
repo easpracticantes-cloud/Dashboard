@@ -395,8 +395,6 @@ class AutobitsService:
                     raw,
                     "codigo orden de compra",
                     "código orden de compra",
-                    "orden de compra",
-                    "com",
                 )
                 if compra:
                     record.numero_compra = compra

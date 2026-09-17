@@ -366,7 +366,8 @@ class CrossingService:
             crossing.valor_autobits = candidate.valor_autobits
         if candidate.proveedor:
             crossing.proveedor_nombre = candidate.proveedor
-        if candidate.numero_compra:
+        # El COM del Excel Autobits es inmutable una vez sembrado en la fila.
+        if candidate.numero_compra and not (crossing.numero_compra or "").strip():
             crossing.numero_compra = candidate.numero_compra
         if candidate.numero_reserva:
             crossing.numero_reserva = candidate.numero_reserva

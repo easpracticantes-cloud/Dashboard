@@ -13,6 +13,7 @@ from domain.services.contramarcado import (
     STATUS_GENERADO,
     STATUS_PENDIENTE,
     SOURCE_AUTOBITS,
+    SOURCE_CROSSING,
     SOURCE_INVOICE,
     ComCandidate,
     build_contramarcado,
@@ -105,6 +106,30 @@ def test_com_factura_coincide_con_autobits():
     )
     assert result.source == SOURCE_INVOICE
     assert result.com == "COM007244"
+
+
+def test_candidato_crossing_bloquea_ocr():
+    """Cruce Excel a score 100 debe ganar sobre un COM inventado en OCR."""
+    result = build_contramarcado(
+        fecha_emision="02/08/2026",
+        tipo_documento="FE",
+        numero_factura="FAC-1",
+        proveedor="RESTAURANTE",
+        total=17000,
+        extracted={},
+        ocr_text="texto basura COM009999",
+        autobits_candidates=[
+            ComCandidate(
+                com="COM007441",
+                source=SOURCE_CROSSING,
+                score=100.0,
+                reasons=["com_bloqueado_excel"],
+                record_id=3,
+            )
+        ],
+    )
+    assert result.com == "COM007441"
+    assert result.source == SOURCE_CROSSING
 
 
 def test_com_en_ocr_texto():

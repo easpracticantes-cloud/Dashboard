@@ -46,14 +46,14 @@ class FolderAskRequest(BaseModel):
 
 
 class FolderContramarcadoRequest(BaseModel):
-    """Recontramarca facturas de la carpeta usando Autobits vinculado.
+    """Regenera contramarcado conservando COM del Excel Autobits.
 
-    reset=True limpia el contramarcado previo y vuelve a cruzar todas las
-    facturas contra el Excel (match / posible match → COM).
+    reset se ignora a propósito: nunca se deshacen los COM ya fijados por el Excel.
+    Solo se completan facturas sin COM y se regenera el texto del contramarcado.
     """
 
-    only_missing_com: bool = False
-    reset: bool = True
+    only_missing_com: bool = True
+    reset: bool = False
     autobits_batch_id: int | None = None
 
 
@@ -256,11 +256,12 @@ def recontramarcado_folder(
     body: FolderContramarcadoRequest | None = None,
     db: Session = Depends(get_db),
 ):
-    """Vuelve a generar CONTRAMARCADO con el Excel Autobits de la carpeta.
+    """Regenera CONTRAMARCADO sin cambiar los COM ya fijados por el Excel Autobits.
 
-    Por defecto solo toca facturas que aún no tienen COM (pendiente / ambiguo / vacío).
-    Con reset=True hace rematch exclusivo 1:1 (igual que el cruce post-OCR) para
-    no reasignar el mismo COM a varias facturas.
+    El Excel es la fuente de verdad: una vez asignado un COM (cruce / Autobits),
+    este endpoint NO vuelve a cruzar ni reasigna códigos. Solo:
+    - regenera el texto del contramarcado conservando el COM bloqueado
+    - completa facturas que aún no tienen COM (filas Autobits libres)
     """
     opts = body or FolderContramarcadoRequest()
     folder = db.get(InvoiceFolderModel, folder_id)
@@ -294,77 +295,31 @@ def recontramarcado_folder(
         raise HTTPException(status_code=400, detail="No hay facturas cargables en la carpeta.")
 
     from application.services.contramarcado_service import ContramarcadoService
-    from application.services.crossing_service import CrossingService
-    from infrastructure.persistence.repositories import CrossingRepository
 
     service = ContramarcadoService(db)
-    if opts.reset and not opts.only_missing_com:
-        # Limpia contramarcado + vínculos previos y vuelve a cruzar 1:1 vs Autobits
-        service.clear_for_documents(docs)
-        CrossingRepository(db).detach_documents([d.id for d in docs if d.id])
-        CrossingService(db).run_matching(
-            batch_id=batch_id,
-            document_ids=[d.id for d in docs if d.id],
-            force=True,
-            usuario="SISTEMA",
-        )
-        # run_matching ya regenera contramarcado y hace commit; refrescar docs
-        docs = []
-        for doc_id in ids:
-            doc = repo.get_by_id(doc_id)
-            if doc:
-                docs.append(doc)
-        updated = sum(1 for d in docs if d.contramarcado_com)
-        skipped = max(0, len(docs) - updated)
-        items = [
-            {
-                "id": doc.id,
-                "status": doc.contramarcado_status,
-                "com": doc.contramarcado_com,
-                "value": doc.contramarcado,
-                "source": doc.contramarcado_source,
-            }
-            for doc in docs
-        ]
-    elif opts.only_missing_com:
-        updated, skipped, items = service.apply_missing_for_documents(
-            docs, batch_id=batch_id
-        )
-        db.commit()
-    else:
-        updated = service.apply_for_documents(docs, batch_id=batch_id)
-        skipped = max(0, len(docs) - updated)
-        items = [
-            {
-                "id": doc.id,
-                "status": doc.contramarcado_status,
-                "com": doc.contramarcado_com,
-                "value": doc.contramarcado,
-                "source": doc.contramarcado_source,
-            }
-            for doc in docs
-        ]
-        db.commit()
+    # Nunca detach/rematch: reset ya no borra COM del Excel.
+    updated, skipped, items = service.apply_missing_for_documents(
+        docs, batch_id=batch_id
+    )
+    db.commit()
 
-    # Persistir vínculo folder↔batch si se asignó arriba
-    try:
-        db.commit()
-    except Exception:  # noqa: BLE001
-        db.rollback()
-
+    preserved = sum(1 for it in items if it.get("preserved"))
     return {
         "ok": True,
         "folder_id": folder.id,
         "autobits_batch_id": batch_id,
-        "only_missing_com": opts.only_missing_com,
-        "reset": opts.reset,
+        "only_missing_com": True,
+        "reset": False,
+        "com_locked": True,
         "updated": updated,
         "skipped": skipped,
+        "preserved": preserved,
         "total": len(docs),
         "items": items,
         "folder": _serialize(folder, db),
         "message": (
-            f"Reanálisis Autobits: {updated} factura(s) actualizada(s)"
+            f"COM del Excel conservados ({preserved}). "
+            f"Actualizadas {updated} factura(s)"
             + (f"; {skipped} sin datos suficientes." if skipped else ".")
         ),
     }

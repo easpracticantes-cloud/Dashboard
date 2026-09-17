@@ -793,21 +793,14 @@ export class WizardComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Limpia COM/contramarcado en pantalla y vuelve a cruzar TODAS las facturas vs Autobits. */
+  /** Conserva los COM del Excel; solo completa faltantes / regenera texto. */
   private reanalizarConAutobits(folder: InvoiceFolder, batchId: number): void {
     this.reanalizando.set(true);
-    this.documentos.update((docs) =>
-      docs.map((d) => ({
-        ...d,
-        contramarcado: null,
-        requiere_revision: false,
-      }))
-    );
 
     this.foldersApi
       .recontramarcado(folder.id, {
-        onlyMissingCom: false,
-        reset: true,
+        onlyMissingCom: true,
+        reset: false,
         autobitsBatchId: batchId,
       })
       .pipe(
@@ -821,9 +814,11 @@ export class WizardComponent implements OnInit, OnDestroy {
           } else {
             this.seleccionarCarpeta(folder.id);
           }
+          // El Excel Autobits no se reimporta: refrescar la misma tabla del lote.
+          this.cargarRecords(batchId);
           this.feedback.success(
             res.message ||
-              `Reanálisis: ${res.updated} factura(s) actualizada(s) con Autobits.`
+              `COM del Excel conservados. ${res.updated} factura(s) actualizada(s).`
           );
         },
         error: (err) =>
@@ -1082,7 +1077,13 @@ export class WizardComponent implements OnInit, OnDestroy {
       if (!pending && this.documentos().length) {
         this.poll?.unsubscribe();
         const batchId = this.carpetaActiva()?.autobits_batch_id || this.autobits()?.batch?.id;
-        if (batchId) {
+        // Solo cruzar facturas que aún no tienen vínculo; no reasignar COM del Excel.
+        const needsMatch = this.documentos().some((d) => {
+          const st = (d.estado || '').toUpperCase();
+          const com = d.contramarcado?.com || (d as { contramarcado_com?: string }).contramarcado_com;
+          return !com && ['EXTRAIDO', 'PROCESADO', 'VALIDANDO', 'REQUIERE_REVISION', 'CRUZANDO'].includes(st);
+        });
+        if (batchId && needsMatch) {
           this.crossingsApi.runMatching(batchId).subscribe({
             next: () => this.refrescarFacturas(this.folderSeq),
           });

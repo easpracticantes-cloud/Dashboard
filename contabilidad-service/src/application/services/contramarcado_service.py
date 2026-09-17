@@ -25,6 +25,8 @@ from infrastructure.persistence.repositories import (
 
 logger = logging.getLogger(__name__)
 
+_LOCKED_SOURCES = frozenset({SOURCE_AUTOBITS, SOURCE_CROSSING, "INVOICE"})
+
 
 class ContramarcadoService:
     def __init__(self, db: Session):
@@ -33,6 +35,20 @@ class ContramarcadoService:
         self.autobits_repo = AutobitsRepository(db)
         self.crossing_repo = CrossingRepository(db)
         self.matcher = MatchingEngine()
+
+    def locked_com_for_document(self, document: DocumentModel) -> tuple[str | None, str | None, int | None]:
+        """COM congelado desde cruce Excel / Autobits. Nunca inventa uno nuevo."""
+        for x in self._crossing_rows(document):
+            com = normalize_com(getattr(x, "numero_compra", None))
+            if com:
+                return com, SOURCE_CROSSING, getattr(x, "autobits_record_id", None)
+        existing = normalize_com(getattr(document, "contramarcado_com", None))
+        source = (getattr(document, "contramarcado_source", None) or "").upper() or None
+        if existing and source in _LOCKED_SOURCES:
+            return existing, source, None
+        if existing:
+            return existing, source or SOURCE_CROSSING, None
+        return None, None, None
 
     def apply_for_document(
         self,
@@ -44,6 +60,7 @@ class ContramarcadoService:
         commit: bool = False,
         exclude_record_ids: set[int] | None = None,
         exclude_coms: set[str] | None = None,
+        preserve_locked_com: bool = True,
     ) -> ContramarcadoResult:
         """Calcula y persiste el contramarcado para un documento ya analizado."""
         data = extracted
@@ -70,18 +87,34 @@ class ContramarcadoService:
         total = document.total if document.total is not None else data.get("total")
         text = ocr_text if ocr_text is not None else document.ocr_text
 
-        # Si ya hay cruce 1:1 con COM, no reabrir matching fuzzy del lote completo
-        # (eso es lo que descuadraba «Volver a analizar facturas»).
-        crossing_cands = self._crossing_candidates(document)
-        if crossing_cands:
-            candidates = list(crossing_cands)
+        locked_com, locked_source, locked_record_id = (None, None, None)
+        if preserve_locked_com:
+            locked_com, locked_source, locked_record_id = self.locked_com_for_document(document)
+
+        if locked_com:
+            # Excel / cruce ya decidió el COM: solo regenera el texto, no rematch.
+            candidates = [
+                ComCandidate(
+                    com=locked_com,
+                    source=locked_source or SOURCE_CROSSING,
+                    score=100.0,
+                    reasons=["com_bloqueado_excel"],
+                    proveedor=proveedor,
+                    numero_documento=numero,
+                    record_id=locked_record_id,
+                )
+            ]
         else:
-            candidates = self._autobits_candidates(
-                document,
-                batch_id=batch_id,
-                exclude_record_ids=exclude_record_ids,
-                exclude_coms=exclude_coms,
-            )
+            crossing_cands = self._crossing_candidates(document)
+            if crossing_cands:
+                candidates = list(crossing_cands)
+            else:
+                candidates = self._autobits_candidates(
+                    document,
+                    batch_id=batch_id,
+                    exclude_record_ids=exclude_record_ids,
+                    exclude_coms=exclude_coms,
+                )
 
         result = build_contramarcado(
             fecha_emision=fecha,
@@ -94,6 +127,45 @@ class ContramarcadoService:
             autobits_candidates=candidates,
         )
 
+        # Si había COM bloqueado, forzar que no lo cambie un OCR falso.
+        if locked_com and result.com != locked_com:
+            from domain.services.contramarcado import (
+                STATUS_GENERADO,
+                build_contramarcado_string,
+                format_fecha_ddmmyyyy,
+                format_valor_tag,
+                normalize_empresa,
+                normalize_tipo_documento,
+            )
+
+            fecha_fmt = format_fecha_ddmmyyyy(fecha)
+            tipo_n = normalize_tipo_documento(tipo)
+            empresa = normalize_empresa(proveedor)
+            valor_tag = format_valor_tag(total)
+            value = build_contramarcado_string(
+                fecha_ddmmyyyy=fecha_fmt,
+                tipo=tipo_n,
+                numero=(numero or "").strip() or None,
+                empresa=empresa,
+                valor_tag=valor_tag,
+                com=locked_com,
+            )
+            result = ContramarcadoResult(
+                value=value,
+                status=STATUS_GENERADO,
+                com=locked_com,
+                source=locked_source or SOURCE_CROSSING,
+                confidence=1.0,
+                warning=None,
+                candidates=result.candidates,
+                tipo=tipo_n,
+                numero=(numero or "").strip() or None,
+                empresa=empresa,
+                fecha_ddmmyyyy=fecha_fmt,
+                valor_tag=valor_tag,
+                record_id=locked_record_id,
+            )
+
         # Persistir en extracted_json + columnas densas
         data.update(result.persist_fields())
         document.extracted_json = json.dumps(data, ensure_ascii=False)
@@ -104,7 +176,6 @@ class ContramarcadoService:
         document.contramarcado_confidence = result.confidence
 
         if result.status in ("PENDIENTE", "AMBIGUO") and result.warning:
-            # No pisar observaciones de OCR; anexar aviso corto si falta
             note = result.warning
             if document.observaciones and note not in document.observaciones:
                 document.observaciones = f"{document.observaciones}; {note}"
@@ -118,11 +189,12 @@ class ContramarcadoService:
             self.db.commit()
 
         logger.info(
-            "Contramarcado doc=%s status=%s source=%s com=%s",
+            "Contramarcado doc=%s status=%s source=%s com=%s locked=%s",
             document.id,
             result.status,
             result.source,
             result.com,
+            bool(locked_com),
         )
         return result
 
@@ -131,10 +203,18 @@ class ContramarcadoService:
         documents: list[DocumentModel],
         *,
         batch_id: int | None = None,
+        preserve_locked_com: bool = True,
     ) -> int:
-        """Aplica contramarcado con consumo exclusivo de filas Autobits (1 factura → 1 COM)."""
+        """Aplica contramarcado respetando COM ya fijados por el Excel."""
         used_record_ids: set[int] = set()
         used_coms: set[str] = set()
+        for doc in documents:
+            locked, _, rid = self.locked_com_for_document(doc)
+            if locked:
+                used_coms.add(locked)
+            if rid:
+                used_record_ids.add(int(rid))
+
         count = 0
         for doc in documents:
             if not doc.extracted_json and not doc.numero_documento:
@@ -145,6 +225,7 @@ class ContramarcadoService:
                     batch_id=batch_id,
                     exclude_record_ids=used_record_ids,
                     exclude_coms=used_coms,
+                    preserve_locked_com=preserve_locked_com,
                 )
                 count += 1
                 if result.record_id:
@@ -156,7 +237,7 @@ class ContramarcadoService:
         return count
 
     def clear_for_documents(self, documents: list[DocumentModel]) -> int:
-        """Borra contramarcado previo para forzar un reanálisis limpio."""
+        """Borra contramarcado previo. No tocar si quieres conservar el COM del Excel."""
         cleared = 0
         for doc in documents:
             had = bool(
@@ -204,11 +285,15 @@ class ContramarcadoService:
         *,
         batch_id: int | None = None,
     ) -> tuple[int, int, list[dict]]:
-        """Recontramarca solo documentos sin COM. Retorna (updated, skipped, items)."""
+        """Recontramarca solo documentos sin COM. Los que ya tienen COM del Excel no se tocan."""
         used_record_ids: set[int] = set()
         used_coms: set[str] = set()
-        # Reservar COM ya asignados en la carpeta para no reutilizarlos
         for doc in documents:
+            locked, _, rid = self.locked_com_for_document(doc)
+            if locked:
+                used_coms.add(locked)
+            if rid:
+                used_record_ids.add(int(rid))
             com = normalize_com(getattr(doc, "contramarcado_com", None))
             if com:
                 used_coms.add(com)
@@ -221,7 +306,27 @@ class ContramarcadoService:
                 skipped += 1
                 continue
             if not self.needs_com_retry(doc):
-                skipped += 1
+                # Ya tiene COM: regenerar texto sin cambiar el código.
+                try:
+                    result = self.apply_for_document(
+                        doc,
+                        batch_id=batch_id,
+                        preserve_locked_com=True,
+                    )
+                    updated += 1
+                    items.append(
+                        {
+                            "id": doc.id,
+                            "status": result.status,
+                            "com": result.com,
+                            "value": result.value,
+                            "source": result.source,
+                            "preserved": True,
+                        }
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception("Fallo rebuild COM bloqueado doc=%s", getattr(doc, "id", None))
+                    skipped += 1
                 continue
             try:
                 result = self.apply_for_document(
@@ -229,6 +334,7 @@ class ContramarcadoService:
                     batch_id=batch_id,
                     exclude_record_ids=used_record_ids,
                     exclude_coms=used_coms,
+                    preserve_locked_com=True,
                 )
                 updated += 1
                 if result.record_id:
@@ -242,6 +348,7 @@ class ContramarcadoService:
                         "com": result.com,
                         "value": result.value,
                         "source": result.source,
+                        "preserved": False,
                     }
                 )
             except Exception:  # noqa: BLE001
@@ -249,8 +356,7 @@ class ContramarcadoService:
                 skipped += 1
         return updated, skipped, items
 
-    def _crossing_candidates(self, document: DocumentModel) -> list[ComCandidate]:
-        out: list[ComCandidate] = []
+    def _crossing_rows(self, document: DocumentModel) -> list:
         crossings: list = []
         try:
             one = self.crossing_repo.get_for_document(document.id)
@@ -261,7 +367,11 @@ class ContramarcadoService:
                 crossings.append(active)
         except Exception:  # noqa: BLE001
             crossings = list(getattr(document, "crossings", None) or [])
-        for x in crossings:
+        return crossings
+
+    def _crossing_candidates(self, document: DocumentModel) -> list[ComCandidate]:
+        out: list[ComCandidate] = []
+        for x in self._crossing_rows(document):
             com = normalize_com(getattr(x, "numero_compra", None))
             if not com:
                 continue
@@ -289,7 +399,6 @@ class ContramarcadoService:
         if batch_id:
             records = self.autobits_repo.list_records_for_batch(batch_id)
         else:
-            # Preferir batch del folder si existe; si no, todos
             records = self.autobits_repo.list_all_records()
 
         if not records:
@@ -305,7 +414,6 @@ class ContramarcadoService:
             raw_compra = (record.numero_compra or "").strip()
             com = normalize_com(raw_compra)
             if not com and raw_compra:
-                # Autobits a veces trae OC sin prefijo COM; usarla igual como candidato
                 digits = "".join(ch for ch in raw_compra if ch.isdigit())
                 if len(digits) >= 4:
                     com = normalize_com(digits) or raw_compra.upper().replace(" ", "")
@@ -316,7 +424,6 @@ class ContramarcadoService:
             if com in blocked_coms:
                 continue
             scored = self.matcher.score_pair(ctx, record)
-            # Refuerzo: coincidencia exacta de número de factura / referencia
             reasons = list(scored.reasons)
             score = scored.score
             if document.numero_documento and record.numero_documento:
@@ -328,8 +435,6 @@ class ContramarcadoService:
                         reasons.append("documento_exacto")
             if score <= 0:
                 continue
-            # Misma regla de ambigüedad que CrossingService: no anclar en silencio
-            # si hay otro candidato casi igual de fuerte con otro COM.
             out.append(
                 ComCandidate(
                     com=com,

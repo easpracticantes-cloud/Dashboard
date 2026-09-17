@@ -84,7 +84,6 @@ FIELD_ALIASES: dict[str, list[str]] = {
         "compra",
         "purchase",
         "id compra",
-        "com",
         "codigo com",
         "código com",
         "nº com",
