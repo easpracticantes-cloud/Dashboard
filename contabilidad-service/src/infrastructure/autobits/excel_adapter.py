@@ -351,6 +351,9 @@ class ExcelAutobitsAdapter:
             raw=raw,
             errors=errors or None,
         )
+        from domain.autobits.fields import canonical_numero_compra
+
+        parsed.numero_compra = canonical_numero_compra(parsed.numero_compra, raw)
         return parsed
 
     def export_rows_csv(self, rows: list[dict]) -> str:

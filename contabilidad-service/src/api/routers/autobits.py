@@ -33,6 +33,8 @@ class ImportResponse(BaseModel):
     records: list[dict] = []
     reused: bool = False
     aviso: str | None = None
+    folder: dict | None = None
+    folder_error: str | None = None
 
 
 class PreviewResponse(BaseModel):
@@ -70,6 +72,34 @@ def list_fields(db: Session = Depends(get_db)):
     return {"fields": service.field_catalog()}
 
 
+def _attach_upload_to_folder(db: Session, result: dict, folder_id: int | None) -> dict:
+    """Guarda el lote en la carpeta en el mismo request del Excel."""
+    result.setdefault("folder", None)
+    result.setdefault("folder_error", None)
+    if not folder_id:
+        return result
+    from api.routers.folders import attach_autobits_batch, serialize_folder
+    from infrastructure.persistence.models import InvoiceFolderModel
+
+    folder = db.get(InvoiceFolderModel, int(folder_id))
+    if not folder:
+        result["folder_error"] = "Carpeta no encontrada."
+        return result
+    batch_id = (result.get("batch") or {}).get("id")
+    if not batch_id:
+        result["folder_error"] = "El Excel se importó sin lote persistido."
+        return result
+    try:
+        attach_autobits_batch(folder, int(batch_id), db)
+        result["folder"] = serialize_folder(folder, db)
+        result["folder_error"] = None
+    except HTTPException as exc:
+        result["folder_error"] = str(exc.detail)
+    except Exception as exc:  # noqa: BLE001
+        result["folder_error"] = f"No se pudo guardar el Excel en la carpeta: {exc}"
+    return result
+
+
 @router.post("/upload", response_model=ImportResponse)
 async def upload_and_import(
     request: Request,
@@ -77,11 +107,18 @@ async def upload_and_import(
     imported_by: str | None = Form(None),
     auto_cruzar: bool = Form(True),
     force: bool = Form(False),
+    folder_id: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     """Importa Excel: Ollama analiza la estructura y deduce campos automáticamente."""
     content = await archivo.read()
     service = AutobitsService(db)
+    parsed_folder_id = None
+    if folder_id not in (None, ""):
+        try:
+            parsed_folder_id = int(folder_id)
+        except (TypeError, ValueError):
+            parsed_folder_id = None
     try:
         result = service.import_file_direct(
             content,
@@ -89,12 +126,14 @@ async def upload_and_import(
             imported_by=resolve_usuario(request, imported_by),
             auto_cruzar=auto_cruzar,
             force=force,
+            skip_duplicates=not force,
         )
     except AutobitsServiceError as exc:
         raise HTTPException(
             status_code=getattr(exc, "status_code", 400) or 400,
             detail=exc.message,
         ) from exc
+    result = _attach_upload_to_folder(db, result, parsed_folder_id)
     return ImportResponse(**result)
 
 

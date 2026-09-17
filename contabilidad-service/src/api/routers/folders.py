@@ -7,6 +7,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from application.services.document_service import DocumentService
@@ -35,6 +36,10 @@ class FolderPatch(BaseModel):
     notes: str | None = None
     autobits_batch_id: int | None = None
     clear_autobits: bool = False
+
+
+class FolderLinkAutobits(BaseModel):
+    batch_id: int
 
 
 class FolderAddDocuments(BaseModel):
@@ -127,6 +132,36 @@ def _serialize(folder: InvoiceFolderModel, db: Session | None = None) -> dict:
     }
 
 
+def attach_autobits_batch(folder: InvoiceFolderModel, batch_id: int, db: Session) -> InvoiceFolderModel:
+    """Pega el lote Autobits a la carpeta y lo deja persistido."""
+    batch = AutobitsRepository(db).get_batch(int(batch_id))
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote Autobits no encontrado.")
+    folder.autobits_batch_id = int(batch_id)
+    if (folder.status or "").upper() in ("", "OPEN"):
+        folder.status = "READY"
+    try:
+        db.commit()
+        db.refresh(folder)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pudo guardar el Excel en la carpeta: {exc.orig if getattr(exc, 'orig', None) else exc}",
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error guardando Autobits en la carpeta: {exc}") from exc
+    return folder
+
+
+def serialize_folder(folder: InvoiceFolderModel, db: Session | None = None) -> dict:
+    try:
+        return _serialize(folder, db)
+    except Exception:  # noqa: BLE001
+        return _serialize(folder, None)
+
+
 def _default_week() -> tuple[str, str, str]:
     start, end = week_bounds_saturday(date.today())
     label = f"Semana {start.isoformat()} → {end.isoformat()}"
@@ -191,16 +226,33 @@ def patch_folder(folder_id: int, body: FolderPatch, db: Session = Depends(get_db
         folder.notes = body.notes.strip() or None
     if body.clear_autobits:
         folder.autobits_batch_id = None
-    elif body.autobits_batch_id is not None:
-        batch = AutobitsRepository(db).get_batch(body.autobits_batch_id)
-        if not batch:
-            raise HTTPException(status_code=404, detail="Lote Autobits no encontrado.")
-        folder.autobits_batch_id = body.autobits_batch_id
-        if body.autobits_batch_id and folder.status == "OPEN":
-            folder.status = "READY"
-    db.commit()
-    db.refresh(folder)
-    return _serialize(folder, db)
+        try:
+            db.commit()
+            db.refresh(folder)
+        except SQLAlchemyError as exc:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Error actualizando la carpeta: {exc}") from exc
+        return serialize_folder(folder, db)
+    if body.autobits_batch_id is not None:
+        attach_autobits_batch(folder, body.autobits_batch_id, db)
+        return serialize_folder(folder, db)
+    try:
+        db.commit()
+        db.refresh(folder)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error actualizando la carpeta: {exc}") from exc
+    return serialize_folder(folder, db)
+
+
+@router.post("/{folder_id}/autobits")
+def link_autobits(folder_id: int, body: FolderLinkAutobits, db: Session = Depends(get_db)):
+    """Vincula un lote Autobits a la carpeta (POST, no PATCH: Nginx/proxy no lo bloquea)."""
+    folder = db.get(InvoiceFolderModel, folder_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Carpeta no encontrada.")
+    attach_autobits_batch(folder, body.batch_id, db)
+    return serialize_folder(folder, db)
 
 
 @router.post("/{folder_id}/documents")
@@ -283,9 +335,9 @@ def recontramarcado_folder(
     batch = ab_service.repo.get_batch(batch_id)
     if not batch:
         raise HTTPException(status_code=404, detail="Lote Autobits no encontrado.")
-    if not folder.autobits_batch_id:
+    if folder.autobits_batch_id != batch_id:
         folder.autobits_batch_id = batch_id
-        if folder.status == "OPEN":
+        if (folder.status or "").upper() in ("", "OPEN"):
             folder.status = "READY"
 
     ids = _parse_ids(folder.document_ids_json)
@@ -356,7 +408,7 @@ def recontramarcado_folder(
         "skipped": skipped,
         "total": len(docs),
         "items": items,
-        "folder": _serialize(folder, db),
+        "folder": serialize_folder(folder, db),
         "message": (
             f"Contramarcado con COM del Excel: {updated}/{len(docs)} factura(s). "
             f"Cruce 1:1 de {match.get('created', 0) if isinstance(match, dict) else 0} fila(s)."

@@ -125,3 +125,75 @@ def test_autobits_rejects_non_excel(client):
         files={"archivo": ("bad.txt", b"hola", "text/plain")},
     )
     assert response.status_code == 400
+
+
+def test_autobits_upload_binds_folder_and_persists_com(client):
+    from unittest.mock import patch
+
+    from infrastructure.ai.excel_ai_analyzer import ExcelAIAnalysis
+
+    folder = client.post("/api/folders", json={"name": "Semana COM persist"}).json()
+    folder_id = folder["id"]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(
+        [
+            "Codigo Orden de compra",
+            "Codigo Factura proveedor",
+            "Nombre Proveedor (Orden de Compra)",
+            "NIT/CC Proveedor (Orden de Compra)",
+            "Total",
+        ]
+    )
+    ws.append(["COM007441", "FE-6920", "Hotel Demo", "9001", 17000])
+    buf = io.BytesIO()
+    wb.save(buf)
+    xlsx = buf.getvalue()
+
+    fake = ExcelAIAnalysis(
+        mapping={
+            "proveedor": "Nombre Proveedor (Orden de Compra)",
+            "nit": "NIT/CC Proveedor (Orden de Compra)",
+            "numero_compra": "Codigo Factura proveedor",
+            "numero_reserva": None,
+            "numero_documento": "Codigo Factura proveedor",
+            "valor": "Total",
+            "fecha": None,
+            "concepto": None,
+        },
+        period_start="2026-09-13",
+        period_end="2026-09-19",
+        sheet_notes="Mock IA",
+        mode="ia",
+    )
+    with patch(
+        "application.services.autobits_service.ExcelAIAnalyzer.analyze",
+        return_value=fake,
+    ):
+        response = client.post(
+            "/api/autobits/upload",
+            files={
+                "archivo": (
+                    "autobits.xlsx",
+                    xlsx,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"auto_cruzar": "false", "force": "true", "folder_id": str(folder_id)},
+        )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["folder"]
+    assert data["folder"]["id"] == folder_id
+    assert data["folder"]["autobits_batch_id"] == data["batch"]["id"]
+    assert data["folder_error"] is None
+    assert data["records"][0]["numero_compra"] == "COM007441"
+
+    got = client.get(f"/api/folders/{folder_id}")
+    assert got.status_code == 200
+    assert got.json()["autobits_batch_id"] == data["batch"]["id"]
+
+    records = client.get(f"/api/autobits/records?batch_id={data['batch']['id']}")
+    assert records.status_code == 200
+    assert records.json()["items"][0]["numero_compra"] == "COM007441"

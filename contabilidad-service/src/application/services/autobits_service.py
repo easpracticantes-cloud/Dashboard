@@ -124,6 +124,8 @@ class AutobitsService:
         force: bool = False,
     ) -> dict:
         """Importa Excel: la IA analiza la estructura, deduce campos y luego importa."""
+        if force:
+            skip_duplicates = False
         if not content:
             raise AutobitsServiceError("El archivo llegó vacío.", "EMPTY_FILE")
 
@@ -221,6 +223,8 @@ class AutobitsService:
         preview_path = self.get_preview_path(preview_id)
         if not preview_path or not preview_path.exists():
             raise AutobitsServiceError("La vista previa expiró o no existe.", "PREVIEW_NOT_FOUND")
+        if force:
+            skip_duplicates = False
 
         content = preview_path.read_bytes()
         resolved_hash = file_hash or content_sha256(content)
@@ -394,11 +398,16 @@ class AutobitsService:
                 "codigo orden de compra",
                 "código orden de compra",
             )
-            if compra:
-                text = str(compra).strip()
-                if text and (record.numero_compra or "").strip() != text:
-                    record.numero_compra = text
-                    changed = True
+            from domain.autobits.fields import canonical_numero_compra, looks_like_invoice_code
+
+            canon = canonical_numero_compra(compra or record.numero_compra, raw)
+            current = (record.numero_compra or "").strip() or None
+            if canon and current != canon:
+                record.numero_compra = canon
+                changed = True
+            elif not canon and looks_like_invoice_code(current):
+                record.numero_compra = None
+                changed = True
             if changed:
                 fixed += 1
         if fixed:
@@ -436,7 +445,7 @@ class AutobitsService:
             if not (record.numero_reserva or "").strip() and parsed_row.numero_reserva:
                 record.numero_reserva = parsed_row.numero_reserva
                 changed = True
-            if not (record.numero_compra or "").strip() and parsed_row.numero_compra:
+            if parsed_row.numero_compra and (record.numero_compra or "").strip() != parsed_row.numero_compra:
                 record.numero_compra = parsed_row.numero_compra
                 changed = True
             if parsed_row.raw and not record.raw_json:
@@ -547,10 +556,19 @@ class AutobitsService:
         }
 
     def to_record_dict(self, record: AutobitsRecordModel) -> dict:
-        from domain.autobits.fields import com_from_excel_record, excel_compra_reserva
+        from domain.autobits.fields import (
+            canonical_numero_compra,
+            com_from_excel_record,
+            excel_compra_reserva,
+            looks_like_invoice_code,
+        )
 
         compra, reserva = excel_compra_reserva(record)
-        com = com_from_excel_record(record)
+        com = com_from_excel_record(record) or canonical_numero_compra(
+            record.numero_compra, getattr(record, "raw_json", None)
+        )
+        if not com and looks_like_invoice_code(compra):
+            compra = None
         return {
             "id": record.id,
             "import_batch_id": record.import_batch_id,

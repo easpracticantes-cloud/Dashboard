@@ -354,7 +354,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.autobitsUpload?.unsubscribe();
     this.subiendoAutobits.set(true);
     this.autobitsUpload = this.autobitsApi
-      .uploadDirect(file, true, true)
+      .uploadDirect(file, true, true, this.carpetaActiva()?.id)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.subiendoAutobits.set(false))
@@ -362,7 +362,18 @@ export class WizardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (res) => {
           this.aplicarAutobits(res);
-          this.vincularAutobitsACarpeta(res.batch?.id);
+          if (res.folder?.id) {
+            this.aplicarCarpetaVinculada(res.folder as InvoiceFolder);
+            const batchId = res.batch?.id;
+            if (batchId && (res.folder.document_ids || []).length) {
+              this.reanalizarConAutobits(res.folder as InvoiceFolder, batchId);
+            }
+          } else {
+            if (res.folder_error) {
+              this.feedback.error(res.folder_error);
+            }
+            this.vincularAutobitsACarpeta(res.batch?.id);
+          }
           this.paso.set(2);
         },
         error: (err) => {
@@ -753,9 +764,9 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   batchIdAutobits(): number | undefined {
-    const folderBatch = this.carpetaActiva()?.autobits_batch_id;
     const sessionBatch = this.autobits()?.batch?.id;
-    return folderBatch ?? sessionBatch ?? undefined;
+    const folderBatch = this.carpetaActiva()?.autobits_batch_id;
+    return sessionBatch ?? folderBatch ?? undefined;
   }
 
   volverAAnalizarFacturas(): void {
@@ -999,19 +1010,33 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (!folder || !batchId) {
       return;
     }
+    if (folder.autobits_batch_id === batchId) {
+      return;
+    }
     this.foldersApi
-      .patch(folder.id, { autobits_batch_id: batchId, status: 'READY' })
+      .linkAutobits(folder.id, batchId)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (updated) => {
-          this.carpetaActiva.set(updated);
-          this.carpetas.update((list) => list.map((f) => (f.id === updated.id ? updated : f)));
-          this.startPoll();
+          this.aplicarCarpetaVinculada(updated);
+          if ((updated.document_ids || []).length) {
+            this.reanalizarConAutobits(updated, batchId);
+          }
         },
-        error: () => {
-          this.feedback.error('Autobits cargado, pero no se pudo vincular a la carpeta.');
+        error: (err) => {
+          this.feedback.error(
+            this.detalleError(err, 'Autobits cargado, pero no se pudo guardar en la carpeta.')
+          );
         },
       });
+  }
+
+  private aplicarCarpetaVinculada(updated: InvoiceFolder): void {
+    this.carpetaActiva.set(updated);
+    this.carpetas.update((list) => {
+      const rest = list.filter((f) => f.id !== updated.id);
+      return [updated, ...rest];
+    });
   }
 
   private idsDePaquete(

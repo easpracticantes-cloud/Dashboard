@@ -68,6 +68,10 @@ export class FoldersApiService {
     return this.http.patch<InvoiceFolder>(`${this.base}/${id}`, body);
   }
 
+  linkAutobits(id: number, batchId: number): Observable<InvoiceFolder> {
+    return this.http.post<InvoiceFolder>(`${this.base}/${id}/autobits`, { batch_id: batchId });
+  }
+
   addDocuments(id: number, documentIds: number[]): Observable<{ ok: boolean; added: number; folder: InvoiceFolder }> {
     return this.http.post<{ ok: boolean; added: number; folder: InvoiceFolder }>(
       `${this.base}/${id}/documents`,

@@ -414,9 +414,7 @@ class InvoiceFolderModel(Base):
     period_end: Mapped[str | None] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32), default="OPEN", index=True)
     document_ids_json: Mapped[str] = mapped_column(Text, default="[]")
-    autobits_batch_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("autobits_import_batches.id"), index=True
-    )
+    autobits_batch_id: Mapped[int | None] = mapped_column(Integer, index=True, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

@@ -65,6 +65,14 @@ export interface ImportResult {
   records?: AutobitsRecord[];
   reused?: boolean;
   aviso?: string | null;
+  folder?: {
+    id: number;
+    autobits_batch_id?: number | null;
+    document_ids?: number[];
+    status?: string;
+    name?: string;
+  } | null;
+  folder_error?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -74,11 +82,19 @@ export class AutobitsApiService {
   constructor(private readonly http: HttpClient) {}
 
   /** Importación automática en un solo paso (sin mapeo ni fechas). */
-  uploadDirect(file: File, autoCruzar = true, force = false): Observable<ImportResult> {
+  uploadDirect(
+    file: File,
+    autoCruzar = true,
+    force = false,
+    folderId?: number | null
+  ): Observable<ImportResult> {
     const form = new FormData();
     form.append('archivo', file, file.name);
     form.append('auto_cruzar', autoCruzar ? 'true' : 'false');
     form.append('force', force ? 'true' : 'false');
+    if (folderId && folderId > 0) {
+      form.append('folder_id', String(folderId));
+    }
     return this.http.post<ImportResult>(`${this.base}/upload`, form);
   }
 

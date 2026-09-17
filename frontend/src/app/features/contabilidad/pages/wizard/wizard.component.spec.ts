@@ -97,8 +97,10 @@ describe('WizardComponent carpetas + Autobits', () => {
     get: ReturnType<typeof vi.fn>;
     create: ReturnType<typeof vi.fn>;
     patch: ReturnType<typeof vi.fn>;
+    linkAutobits: ReturnType<typeof vi.fn>;
     addDocuments: ReturnType<typeof vi.fn>;
     ask: ReturnType<typeof vi.fn>;
+    recontramarcado: ReturnType<typeof vi.fn>;
   };
   let download: { download: ReturnType<typeof vi.fn> };
 
@@ -117,10 +119,23 @@ describe('WizardComponent carpetas + Autobits', () => {
       patch: vi.fn((_id: number, body: { autobits_batch_id?: number }) =>
         of(folder({ autobits_batch_id: body.autobits_batch_id, status: 'READY' }))
       ),
+      linkAutobits: vi.fn((id: number, batchId: number) =>
+        of(folder({ id, autobits_batch_id: batchId, status: 'READY' }))
+      ),
       addDocuments: vi.fn((id: number, documentIds: number[]) =>
         of({ ok: true, added: documentIds.length, folder: folder({ id, document_ids: documentIds }) })
       ),
       ask: vi.fn(() => of({ ok: true, respuesta: 'ok', documentos: 1, autobits: 1, folder_id: 7 })),
+      recontramarcado: vi.fn((id: number) =>
+        of({
+          ok: true,
+          updated: 0,
+          skipped: 0,
+          total: 0,
+          message: 'ok',
+          folder: folder({ id, autobits_batch_id: 11 }),
+        })
+      ),
     };
 
     await TestBed.configureTestingModule({

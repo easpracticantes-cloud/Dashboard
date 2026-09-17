@@ -11,6 +11,7 @@ sys.path.insert(0, str(SRC))
 from application.services.autobits_service import AutobitsService  # noqa: E402
 from domain.autobits.fields import (  # noqa: E402
     AUTOBITS_EXPORT_COLUMNS,
+    canonical_numero_compra,
     com_from_excel_record,
     com_from_value,
     prefer_canonical_columns,
@@ -109,3 +110,17 @@ def test_com_from_excel_record_prefers_canonical_com():
     })
     rec = _Row("FPFL-26895186", raw)
     assert com_from_excel_record(rec) == "COM007441"
+
+
+def test_canonical_numero_compra_persists_com_not_invoice():
+    import json
+
+    raw = {
+        "Codigo Orden de compra": "COM007441",
+        "Codigo Factura proveedor": "FE-6920",
+        "Referencia (Orden de Compra)": "HIN36005",
+    }
+    assert canonical_numero_compra("FE-6920", raw) == "COM007441"
+    assert canonical_numero_compra("HIN36005", json.dumps(raw)) == "COM007441"
+    assert canonical_numero_compra("C-1001", {"Compra": "C-1001"}) == "C-1001"
+    assert canonical_numero_compra("FE-6920", {"Factura": "FE-6920"}) is None

@@ -56,3 +56,43 @@ def test_delete_folder():
 
     listed = client.get("/api/folders")
     assert all(row["id"] != folder_id for row in listed.json()["items"])
+
+
+def test_link_autobits_batch_to_folder():
+    get_settings.cache_clear()
+    init_db()
+    from api_server import app
+    from infrastructure.persistence.database import SessionLocal
+    from infrastructure.persistence.models import ImportBatchModel
+
+    client = TestClient(app)
+    created = client.post("/api/folders", json={"name": "Semana COM"})
+    assert created.status_code == 200, created.text
+    folder_id = created.json()["id"]
+
+    db = SessionLocal()
+    try:
+        batch = ImportBatchModel(
+            filename="autobits.xlsx",
+            period_start="2026-09-13",
+            period_end="2026-09-19",
+            imported_by="test",
+            status="IMPORTADO",
+            total_rows=1,
+            imported_rows=1,
+        )
+        db.add(batch)
+        db.commit()
+        db.refresh(batch)
+        batch_id = batch.id
+    finally:
+        db.close()
+
+    linked = client.post(f"/api/folders/{folder_id}/autobits", json={"batch_id": batch_id})
+    assert linked.status_code == 200, linked.text
+    assert linked.json()["autobits_batch_id"] == batch_id
+    assert linked.json()["status"] == "READY"
+
+    got = client.get(f"/api/folders/{folder_id}")
+    assert got.status_code == 200
+    assert got.json()["autobits_batch_id"] == batch_id
