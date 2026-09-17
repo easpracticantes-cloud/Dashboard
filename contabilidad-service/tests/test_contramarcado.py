@@ -147,26 +147,40 @@ def test_com_en_ocr_texto():
     assert "COM007244" in result.value
 
 
-def test_com_desde_autobits():
+def test_no_usa_numero_factura_como_com():
+    """El COM del Excel gana; FE-/FPFL-/HIN nunca van al contramarcado."""
     result = build_contramarcado(
-        fecha_emision="02/08/2026",
+        fecha_emision="13/09/2026",
         tipo_documento="FE",
-        numero_factura="FPFL-18121030",
-        proveedor="FLYPASS",
+        numero_factura="FPFL-26895186",
+        proveedor="F2X",
         total=21200,
         extracted={},
         autobits_candidates=[
-            ComCandidate(
-                com="COM007244",
-                source=SOURCE_AUTOBITS,
-                score=95.0,
-                reasons=["documento_exacto", "proveedor", "valor", "fecha"],
-            )
+            ComCandidate(com="FPFL-26895186", source=SOURCE_AUTOBITS, score=95.0, reasons=["documento_exacto"]),
+            ComCandidate(com="COM007441", source=SOURCE_AUTOBITS, score=70.0, reasons=["proveedor", "valor"]),
         ],
     )
-    assert result.status == STATUS_GENERADO
-    assert result.source == SOURCE_AUTOBITS
-    assert result.value == "02082026 FE FPFL-18121030 FLYPASS $21200 COM007244"
+    assert result.com == "COM007441"
+    assert result.value.endswith("COM007441")
+    assert "FPFL-26895186" in result.value
+    assert not result.value.endswith("FPFL-26895186")
+
+
+def test_solo_factura_code_queda_pendiente():
+    result = build_contramarcado(
+        fecha_emision="12/09/2026",
+        tipo_documento="FE",
+        numero_factura="FE-6920",
+        proveedor="JAVIER",
+        total=84000,
+        extracted={},
+        autobits_candidates=[
+            ComCandidate(com="FE-6920", source=SOURCE_AUTOBITS, score=90.0, reasons=["documento_exacto"]),
+        ],
+    )
+    assert result.com is None
+    assert result.value.endswith("COM pendiente")
 
 
 def test_com_ausente_pendiente():

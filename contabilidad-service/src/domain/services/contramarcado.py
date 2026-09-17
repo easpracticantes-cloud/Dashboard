@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from domain.autobits.fields import looks_like_invoice_code
 from domain.matching.normalize import normalize_id, normalize_text
 
 _COM_RE = re.compile(r"\bCOM\s*0*\d{4,10}\b", re.IGNORECASE)
@@ -286,8 +287,12 @@ def resolve_com_from_candidates(
 
     # Prioridad 1: único COM en factura — solo si no hay Excel Autobits/cruce
     # o si ese COM también aparece en Autobits (evita OCR inventando COM).
-    unique_invoice = list(dict.fromkeys(invoice_coms))
-    ab_viable = [c for c in autobits_candidates if c.com and c.score >= min_score]
+    unique_invoice = [c for c in dict.fromkeys(invoice_coms) if c and not looks_like_invoice_code(c)]
+    ab_viable = [
+        c
+        for c in autobits_candidates
+        if c.com and c.score >= min_score and not looks_like_invoice_code(c.com)
+    ]
     ab_coms = {c.com for c in ab_viable}
     if len(unique_invoice) == 1:
         inv = unique_invoice[0]
@@ -382,11 +387,20 @@ def build_contramarcado(
 
         invoice_com, invoice_all = com_from_extracted(extracted, ocr_text)
         invoice_list = invoice_all if invoice_all else ([invoice_com] if invoice_com else [])
+        invoice_list = [c for c in invoice_list if c and not looks_like_invoice_code(c)]
+        if numero:
+            invoice_list = [
+                c for c in invoice_list
+                if normalize_id(c) != normalize_id(numero)
+            ]
 
         com, source, confidence, warning, cand_payload, record_id = resolve_com_from_candidates(
             invoice_list,
             autobits_candidates or [],
         )
+        if com and (looks_like_invoice_code(com) or (numero and normalize_id(com) == normalize_id(numero))):
+            com, source, record_id = None, SOURCE_NONE, None
+            warning = "No fue posible identificar automáticamente el COM."
 
         if not fecha or not numero or not valor_tag:
             missing = []

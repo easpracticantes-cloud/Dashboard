@@ -123,15 +123,24 @@ class MatchingEngine:
         doc_compra = ctx.compra
         doc_num = ctx.numero_documento
 
-        if doc_compra and record.numero_compra and normalize_id(doc_compra) == normalize_id(record.numero_compra):
+        from domain.autobits.fields import com_from_excel_record, excel_compra_reserva
+
+        excel_oc, excel_reserva = excel_compra_reserva(record)
+        excel_com = com_from_excel_record(record)
+
+        if doc_compra and excel_com and normalize_id(doc_compra) == normalize_id(excel_com):
+            score += 40
+            reasons.append("compra_exacta")
+        elif doc_compra and excel_oc and normalize_id(doc_compra) == normalize_id(excel_oc):
             score += 40
             reasons.append("compra_exacta")
         elif doc_num and record.numero_documento and normalize_id(doc_num) == normalize_id(record.numero_documento):
             score += 40
             reasons.append("documento_exacto")
-        elif doc_num and record.numero_compra and normalize_id(doc_num) == normalize_id(record.numero_compra):
-            score += 35
-            reasons.append("doc_compra_cruzado")
+        # Nunca tratar el número de factura como COM: solo sirve para localizar la fila.
+        elif doc_num and excel_oc and normalize_id(doc_num) == normalize_id(excel_oc):
+            score += 25
+            reasons.append("documento_en_oc")
 
         if ctx.nit and record.nit and normalize_nit(ctx.nit) == normalize_nit(record.nit):
             score += 25
@@ -157,8 +166,11 @@ class MatchingEngine:
             score += 5
             reasons.append("fecha")
 
-        if score > 100:
-            score = 100.0
+        if excel_com:
+            score += 8
+            reasons.append("oc_es_com")
+            if score > 100:
+                score = 100.0
 
         match_type = self.classify(score, reasons)
         diferencia = money_to_float(value_difference(ctx.valor, record.valor))
@@ -171,8 +183,8 @@ class MatchingEngine:
             valor_documento=money_to_float(ctx.valor),
             valor_autobits=money_to_float(record.valor),
             diferencia=diferencia,
-            numero_compra=record.numero_compra,
-            numero_reserva=record.numero_reserva,
+            numero_compra=excel_com,
+            numero_reserva=excel_reserva or record.numero_reserva,
             proveedor=record.proveedor or ctx.proveedor,
         )
 

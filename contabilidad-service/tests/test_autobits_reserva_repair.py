@@ -11,6 +11,8 @@ sys.path.insert(0, str(SRC))
 from application.services.autobits_service import AutobitsService  # noqa: E402
 from domain.autobits.fields import (  # noqa: E402
     AUTOBITS_EXPORT_COLUMNS,
+    com_from_excel_record,
+    com_from_value,
     prefer_canonical_columns,
     suggest_mapping,
     value_from_row_dict,
@@ -82,3 +84,28 @@ def test_parse_reads_reserva_even_with_bad_mapping(tmp_path):
 def test_value_from_row_dict():
     row = {"Codigo Reserva": " EAS1", "Otra": "x"}
     assert str(value_from_row_dict(row, "codigo reserva")).strip() == "EAS1"
+
+
+def test_com_from_value_never_invoice():
+    assert com_from_value("COM007441") == "COM007441"
+    assert com_from_value("FE-6920") is None
+    assert com_from_value("FPFL-26895186") is None
+    assert com_from_value("HIN36005") is None
+
+
+class _Row:
+    def __init__(self, compra, raw):
+        self.numero_compra = compra
+        self.numero_reserva = None
+        self.raw_json = raw
+
+
+def test_com_from_excel_record_prefers_canonical_com():
+    import json
+
+    raw = json.dumps({
+        "Codigo Orden de compra": "COM007441",
+        "Codigo Factura proveedor": "FPFL-26895186",
+    })
+    rec = _Row("FPFL-26895186", raw)
+    assert com_from_excel_record(rec) == "COM007441"

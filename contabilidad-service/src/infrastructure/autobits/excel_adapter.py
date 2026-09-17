@@ -321,14 +321,13 @@ class ExcelAutobitsAdapter:
             estado_compra = extract_estado_compra_from_raw(raw)
 
         # Si el mapeo IA apunta a una columna vacía/incorrecta, leer directo del Excel
-        numero_compra = _to_str(get("numero_compra")) or _to_str(
+        numero_compra = _to_str(
             value_from_row_dict(
                 row_dict,
                 "codigo orden de compra",
                 "código orden de compra",
-                "orden de compra",
             )
-        )
+        ) or _to_str(get("numero_compra"))
         numero_reserva = _to_str(get("numero_reserva")) or _to_str(
             value_from_row_dict(
                 row_dict,

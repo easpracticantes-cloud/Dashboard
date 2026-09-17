@@ -547,38 +547,17 @@ class AutobitsService:
         }
 
     def to_record_dict(self, record: AutobitsRecordModel) -> dict:
-        # Fuente de verdad: columna canónica del Excel en raw_json (si existe).
-        compra = record.numero_compra
-        reserva = record.numero_reserva
-        if record.raw_json:
-            try:
-                raw = json.loads(record.raw_json)
-            except json.JSONDecodeError:
-                raw = None
-            if isinstance(raw, dict):
-                from domain.autobits.fields import value_from_row_dict
+        from domain.autobits.fields import com_from_excel_record, excel_compra_reserva
 
-                canon_compra = value_from_row_dict(
-                    raw,
-                    "codigo orden de compra",
-                    "código orden de compra",
-                )
-                canon_reserva = value_from_row_dict(
-                    raw,
-                    "codigo reserva",
-                    "código reserva",
-                )
-                if canon_compra is not None and str(canon_compra).strip():
-                    compra = str(canon_compra).strip()
-                if canon_reserva is not None and str(canon_reserva).strip():
-                    reserva = str(canon_reserva).strip()
+        compra, reserva = excel_compra_reserva(record)
+        com = com_from_excel_record(record)
         return {
             "id": record.id,
             "import_batch_id": record.import_batch_id,
             "row_number": record.row_number,
             "proveedor": record.proveedor,
             "nit": record.nit,
-            "numero_compra": compra,
+            "numero_compra": com or compra,
             "numero_reserva": reserva,
             "numero_documento": record.numero_documento,
             "valor": record.valor,

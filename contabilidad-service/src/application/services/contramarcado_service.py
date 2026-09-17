@@ -7,6 +7,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from domain.autobits.fields import com_from_excel_record, com_from_value, looks_like_invoice_code
 from domain.matching.matching_engine import MatchingEngine, extract_document_context
 from domain.services.contramarcado import (
     SOURCE_AUTOBITS,
@@ -47,30 +48,25 @@ class ContramarcadoService:
         Si excel_com_only=True ignora el COM viejo del documento (puede estar mal)
         y solo usa el de la fila Autobits/cruce.
         """
-        from domain.autobits.fields import excel_compra_reserva
+        from domain.autobits.fields import com_from_excel_record, looks_like_invoice_code
 
         for x in self._crossing_rows(document):
             rid = getattr(x, "autobits_record_id", None)
             if rid:
                 record = self.autobits_repo.get_record(int(rid))
                 if record:
-                    compra, _ = excel_compra_reserva(record)
-                    com = normalize_com(compra) or normalize_com(compra if compra else None)
-                    # normalize_com may fail for non-COM codes like FE-788; keep raw Excel value
-                    if compra:
-                        return (normalize_com(compra) or str(compra).strip().upper()), SOURCE_CROSSING, int(rid)
-            com = normalize_com(getattr(x, "numero_compra", None))
-            raw = (getattr(x, "numero_compra", None) or "").strip()
-            if com or raw:
-                return (com or raw.upper()), SOURCE_CROSSING, rid
+                    com = com_from_excel_record(record)
+                    if com and not looks_like_invoice_code(com):
+                        return com, SOURCE_CROSSING, int(rid)
+            com = com_from_value(getattr(x, "numero_compra", None))
+            if com:
+                return com, SOURCE_CROSSING, rid
         if excel_com_only:
             return None, None, None
-        existing = normalize_com(getattr(document, "contramarcado_com", None))
-        source = (getattr(document, "contramarcado_source", None) or "").upper() or None
-        if existing and source in _LOCKED_SOURCES:
-            return existing, source, None
+        existing = com_from_value(getattr(document, "contramarcado_com", None))
         if existing:
-            return existing, source or SOURCE_CROSSING, None
+            source = (getattr(document, "contramarcado_source", None) or "").upper() or SOURCE_CROSSING
+            return existing, source, None
         return None, None, None
 
     def apply_for_document(
@@ -397,8 +393,6 @@ class ContramarcadoService:
         return crossings
 
     def _crossing_candidates(self, document: DocumentModel) -> list[ComCandidate]:
-        from domain.autobits.fields import excel_compra_reserva
-
         out: list[ComCandidate] = []
         for x in self._crossing_rows(document):
             com = None
@@ -406,13 +400,10 @@ class ContramarcadoService:
             if rid:
                 record = self.autobits_repo.get_record(int(rid))
                 if record:
-                    compra, _ = excel_compra_reserva(record)
-                    if compra:
-                        com = normalize_com(compra) or str(compra).strip().upper()
+                    com = com_from_excel_record(record)
             if not com:
-                raw = (getattr(x, "numero_compra", None) or "").strip()
-                com = normalize_com(raw) or (raw.upper() if raw else None)
-            if not com:
+                com = com_from_value(getattr(x, "numero_compra", None))
+            if not com or looks_like_invoice_code(com):
                 continue
             out.append(
                 ComCandidate(
@@ -435,8 +426,6 @@ class ContramarcadoService:
         exclude_record_ids: set[int] | None = None,
         exclude_coms: set[str] | None = None,
     ) -> list[ComCandidate]:
-        from domain.autobits.fields import excel_compra_reserva
-
         if batch_id:
             records = self.autobits_repo.list_records_for_batch(batch_id)
         else:
@@ -447,15 +436,16 @@ class ContramarcadoService:
 
         blocked_ids = exclude_record_ids or set()
         blocked_coms = exclude_coms or set()
+        invoice_no = (document.numero_documento or "").strip().upper()
         ctx = extract_document_context(document)
         out: list[ComCandidate] = []
         for record in records:
             if record.id in blocked_ids:
                 continue
-            compra, _ = excel_compra_reserva(record)
-            raw_compra = (compra or record.numero_compra or "").strip()
-            com = normalize_com(raw_compra) or (raw_compra.upper() if raw_compra else None)
-            if not com:
+            com = com_from_excel_record(record)
+            if not com or looks_like_invoice_code(com):
+                continue
+            if invoice_no and com.replace(" ", "") == invoice_no.replace(" ", "").replace("-", ""):
                 continue
             if com in blocked_coms:
                 continue

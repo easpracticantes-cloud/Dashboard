@@ -1,5 +1,8 @@
 """Campos internos y alias para mapeo de columnas Excel Autobits."""
 
+from __future__ import annotations
+
+import re
 from dataclasses import dataclass
 
 # Campos que el sistema entiende al importar Autobits
@@ -194,6 +197,41 @@ def prefer_canonical_columns(
     return out
 
 
+_COM_IN_TEXT = re.compile(r"COM\s*0*(\d{4,10})", re.IGNORECASE)
+
+
+def _parse_raw_json(raw_json):
+    if not raw_json:
+        return None
+    if isinstance(raw_json, dict):
+        return raw_json
+    try:
+        import json
+
+        raw = json.loads(raw_json)
+    except Exception:  # noqa: BLE001
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def com_from_value(raw: str | None) -> str | None:
+    """Solo acepta códigos tipo COM007441. Nunca un número de factura (FE-6920, FPFL-…)."""
+    if not raw:
+        return None
+    m = _COM_IN_TEXT.search(str(raw))
+    if not m:
+        return None
+    digits = m.group(1)
+    return f"COM{digits.zfill(6) if len(digits) <= 6 else digits}"
+
+
+def looks_like_invoice_code(raw: str | None) -> bool:
+    text = re.sub(r"[\s./]", "", str(raw or "").strip().upper())
+    if not text or _COM_IN_TEXT.search(text):
+        return False
+    return bool(re.match(r"^[A-Z]{1,12}-?\d{3,}$", text))
+
+
 def value_from_row_dict(row_dict: dict, *needles: str):
     """Lee un valor del Excel por nombre de encabezado, sin depender del mapeo IA."""
     if not isinstance(row_dict, dict) or not row_dict:
@@ -215,8 +253,25 @@ def value_from_row_dict(row_dict: dict, *needles: str):
     return None
 
 
+def com_from_excel_record(record) -> str | None:
+    """COM real de la fila Autobits (columna Código Orden de compra o cualquier celda COM…)."""
+    compra, _ = excel_compra_reserva(record)
+    com = com_from_value(compra)
+    if com:
+        return com
+    raw = _parse_raw_json(getattr(record, "raw_json", None))
+    if not raw:
+        return com_from_value(getattr(record, "numero_compra", None))
+    # Primero la columna canónica; si ahí hay factura, buscar COM en el resto de celdas.
+    for value in raw.values():
+        found = com_from_value(str(value) if value is not None else None)
+        if found:
+            return found
+    return None
+
+
 def excel_compra_reserva(record) -> tuple[str | None, str | None]:
-    """COM y reserva canónicos del Excel (raw_json), con fallback a columnas densas."""
+    """OC y reserva canónicos del Excel (raw_json), con fallback a columnas densas."""
     compra = (getattr(record, "numero_compra", None) or "").strip() or None
     reserva = (getattr(record, "numero_reserva", None) or "").strip() or None
     raw_json = getattr(record, "raw_json", None)

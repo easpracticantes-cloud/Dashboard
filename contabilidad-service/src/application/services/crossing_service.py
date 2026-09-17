@@ -121,14 +121,17 @@ class CrossingService:
         return {"created": created, "items": results}
 
     def resync_excel_com_for_batch(self, batch_id: int) -> int:
-        """Copia COM/reserva canónicos del Excel a los cruces del lote (sin tocar filas Autobits)."""
-        from domain.autobits.fields import excel_compra_reserva
+        """Copia COM real y reserva del Excel a filas Autobits/cruces (nunca el n° de factura)."""
+        from domain.autobits.fields import com_from_excel_record, excel_compra_reserva, looks_like_invoice_code
 
         records = self.autobits_repo.list_records_for_batch(batch_id)
         synced = 0
         for record in records:
             compra, reserva = excel_compra_reserva(record)
-            if compra and (record.numero_compra or "").strip() != compra:
+            com = com_from_excel_record(record)
+            if com:
+                record.numero_compra = com
+            elif compra and not looks_like_invoice_code(compra):
                 record.numero_compra = compra
             if reserva and (record.numero_reserva or "").strip() != reserva:
                 record.numero_reserva = reserva
@@ -136,13 +139,13 @@ class CrossingService:
             if not crossing:
                 continue
             changed = False
-            if compra and (crossing.numero_compra or "").strip() != compra:
-                crossing.numero_compra = compra
+            target_com = com
+            if target_com and (crossing.numero_compra or "").strip() != target_com:
+                crossing.numero_compra = target_com
                 changed = True
-            if reserva and (crossing.numero_reserva or "").strip() != (crossing.numero_reserva or ""):
-                if reserva != (crossing.numero_reserva or "").strip():
-                    crossing.numero_reserva = reserva
-                    changed = True
+            if reserva and reserva != (crossing.numero_reserva or "").strip():
+                crossing.numero_reserva = reserva
+                changed = True
             if changed:
                 synced += 1
         if synced:
@@ -320,11 +323,11 @@ class CrossingService:
         if candidate and candidate.autobits_record_id:
             record = next((r for r in records if r.id == candidate.autobits_record_id), None)
             if record:
-                from domain.autobits.fields import excel_compra_reserva
+                from domain.autobits.fields import com_from_excel_record, excel_compra_reserva
 
                 compra, reserva = excel_compra_reserva(record)
-                if compra:
-                    candidate.numero_compra = compra
+                com = com_from_excel_record(record)
+                candidate.numero_compra = com
                 if reserva:
                     candidate.numero_reserva = reserva
                 existing = self.crossing_repo.get_by_autobits_record(record.id)
@@ -347,13 +350,12 @@ class CrossingService:
         if existing:
             # La fila ya existía desde el Excel: la factura la completa.
             crossing = self._attach_document(existing, doc, candidate, estado, obs)
-            # Fuerza COM del Excel en el cruce (fuente de verdad).
             if record:
-                from domain.autobits.fields import excel_compra_reserva
+                from domain.autobits.fields import com_from_excel_record, excel_compra_reserva
 
-                compra, reserva = excel_compra_reserva(record)
-                if compra:
-                    crossing.numero_compra = compra
+                _, reserva = excel_compra_reserva(record)
+                com = com_from_excel_record(record)
+                crossing.numero_compra = com
                 if reserva:
                     crossing.numero_reserva = reserva
         else:
