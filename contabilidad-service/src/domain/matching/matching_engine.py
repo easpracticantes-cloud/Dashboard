@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from domain.enums import MatchType
 from domain.matching.normalize import (
+    invoice_numbers_match,
     names_similar,
     normalize_id,
     normalize_nit,
@@ -47,6 +48,7 @@ class DocumentMatchContext:
 def extract_document_context(doc: DocumentModel) -> DocumentMatchContext:
     compra = None
     reserva = None
+    numero = doc.numero_documento
     if doc.extracted_json:
         try:
             data = json.loads(doc.extracted_json)
@@ -56,13 +58,20 @@ def extract_document_context(doc: DocumentModel) -> DocumentMatchContext:
                 compra = compra.get("numero")
             if isinstance(reserva, dict):
                 reserva = reserva.get("numero")
+            numero = (
+                numero
+                or data.get("numero_factura")
+                or data.get("numero_documento")
+                or _nested(data, "documento", "numero")
+                or _nested(data, "documento", "numero_factura")
+            )
         except json.JSONDecodeError:
             pass
 
     proveedor = doc.provider.nombre if doc.provider else None
     nit = doc.provider.nit if doc.provider else None
     return DocumentMatchContext(
-        numero_documento=doc.numero_documento,
+        numero_documento=str(numero).strip() if numero else None,
         nit=nit,
         proveedor=proveedor,
         compra=str(compra) if compra else None,
@@ -107,6 +116,9 @@ class MatchingEngine:
 
         scored.sort(key=lambda c: c.score, reverse=True)
         best = scored[0]
+        if "documento_exacto" in best.reasons:
+            self._flag_ambiguity(best, scored)
+            return best
         if best.score < self.PROBABLE_THRESHOLD:
             return None
         self._flag_ambiguity(best, scored)
@@ -130,11 +142,11 @@ class MatchingEngine:
         excel_factura = excel_factura_proveedor(record)
 
         # La factura se localiza por Codigo Factura proveedor; el COM sale de esa misma fila.
-        if doc_num and excel_factura and normalize_id(doc_num) == normalize_id(excel_factura):
-            score += 50
+        if doc_num and excel_factura and invoice_numbers_match(doc_num, excel_factura):
+            score += 90
             reasons.append("documento_exacto")
-        elif doc_num and record.numero_documento and normalize_id(doc_num) == normalize_id(record.numero_documento):
-            score += 50
+        elif doc_num and record.numero_documento and invoice_numbers_match(doc_num, record.numero_documento):
+            score += 90
             reasons.append("documento_exacto")
         if doc_compra and excel_com and normalize_id(doc_compra) == normalize_id(excel_com):
             score += 40
@@ -143,7 +155,7 @@ class MatchingEngine:
             score += 40
             reasons.append("compra_exacta")
         # Nunca tratar el número de factura como COM: solo sirve para localizar la fila.
-        elif doc_num and excel_oc and normalize_id(doc_num) == normalize_id(excel_oc):
+        elif doc_num and excel_oc and invoice_numbers_match(doc_num, excel_oc):
             score += 25
             reasons.append("documento_en_oc")
 
@@ -171,11 +183,8 @@ class MatchingEngine:
             score += 5
             reasons.append("fecha")
 
-        if excel_com:
-            score += 8
-            reasons.append("oc_es_com")
-            if score > 100:
-                score = 100.0
+        if score > 100:
+            score = 100.0
 
         match_type = self.classify(score, reasons)
         diferencia = money_to_float(value_difference(ctx.valor, record.valor))
@@ -279,6 +288,9 @@ class MatchingEngine:
     def _flag_ambiguity(self, best: MatchCandidate, scored: list[MatchCandidate]) -> None:
         """Si hay dos candidatos probables casi empatados, no se trata como exacto."""
         if len(scored) < 2:
+            return
+        # El número de factura del Excel es 1:1: no empatar contra filas del mismo proveedor.
+        if "documento_exacto" in best.reasons:
             return
         second = scored[1]
         if second.score < self.PROBABLE_THRESHOLD:

@@ -436,8 +436,9 @@ class ContramarcadoService:
 
         blocked_ids = exclude_record_ids or set()
         blocked_coms = exclude_coms or set()
-        invoice_no = (document.numero_documento or "").strip().upper()
+        invoice_no = (document.numero_documento or "").strip()
         ctx = extract_document_context(document)
+        invoice_no = invoice_no or (ctx.numero_documento or "")
         out: list[ComCandidate] = []
         for record in records:
             if record.id in blocked_ids:
@@ -452,13 +453,14 @@ class ContramarcadoService:
             scored = self.matcher.score_pair(ctx, record)
             reasons = list(scored.reasons)
             score = scored.score
-            if document.numero_documento and record.numero_documento:
-                from domain.matching.normalize import normalize_id
+            from domain.autobits.fields import excel_factura_proveedor
+            from domain.matching.normalize import invoice_numbers_match
 
-                if normalize_id(document.numero_documento) == normalize_id(record.numero_documento):
-                    if "documento_exacto" not in reasons:
-                        score = max(score, 85.0)
-                        reasons.append("documento_exacto")
+            excel_factura = excel_factura_proveedor(record) or record.numero_documento
+            if invoice_no and excel_factura and invoice_numbers_match(invoice_no, excel_factura):
+                if "documento_exacto" not in reasons:
+                    reasons.append("documento_exacto")
+                score = max(score, 90.0)
             if score <= 0:
                 continue
             out.append(

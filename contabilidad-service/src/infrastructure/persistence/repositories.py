@@ -168,9 +168,10 @@ class DocumentRepository:
             DocumentStatus.CRUZANDO,
         ]
         if force:
-            # Reanálisis completo: incluir facturas ya cruzadas/aprobadas.
+            # Reanálisis: incluir ya cruzadas y las que el OCR dejó en ERROR con datos.
             eligible_states = [
                 *eligible_states,
+                DocumentStatus.ERROR,
                 DocumentStatus.APROBADO,
                 DocumentStatus.SUBSANACION,
                 DocumentStatus.AUTOBITS_PENDIENTE,

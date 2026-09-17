@@ -880,13 +880,22 @@ export class WizardComponent implements OnInit, OnDestroy {
           }
           this.refrescarFacturas(this.folderSeq);
           console.info('[CONTABILIDAD][REANALISIS] resultado final:', res);
-          this.feedback.success(
-            res.message ||
-              `Contramarcado actualizado con COM del Excel: ${res.updated} factura(s).`
-          );
-          if (res.skipped) {
+          const updated = Number(res.updated) || 0;
+          const skipped = Number(res.skipped) || 0;
+          const total = Number(res.total) || updated + skipped;
+          if (updated && skipped) {
+            this.feedback.info(
+              `COM del Excel en ${updated}/${total} factura(s). ` +
+                `${skipped} sin coincidencia de número de factura con "Codigo Factura proveedor".`
+            );
+          } else if (updated) {
+            this.feedback.success(
+              res.message || `Contramarcado actualizado con COM del Excel: ${updated} factura(s).`
+            );
+          } else {
             this.feedback.error(
-              `${res.skipped} factura(s) siguen sin COM: no tienen fila en el Excel de Autobits.`
+              'No se asignó COM: el número de factura no coincidió con ' +
+                '"Codigo Factura proveedor" del Excel de Autobits.'
             );
           }
         },

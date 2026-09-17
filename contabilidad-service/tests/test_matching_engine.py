@@ -34,7 +34,7 @@ def _doc(**kwargs) -> DocumentModel:
 
 def _record(**kwargs) -> AutobitsRecordModel:
     return AutobitsRecordModel(
-        id=1,
+        id=kwargs.get("id", 1),
         import_batch_id=1,
         proveedor=kwargs.get("proveedor", "Hotel Andino SAS"),
         nit=kwargs.get("nit", "900123456"),
@@ -139,3 +139,51 @@ def test_match_invoice_number_from_excel_factura_uses_com():
     assert candidate is not None
     assert candidate.numero_compra == "COM007441"
     assert "documento_exacto" in candidate.reasons
+
+
+def test_match_invoice_inside_ocr_blob_beats_same_provider_rows():
+    """El n° de factura dentro del contramarcado debe ganar a otras filas del mismo proveedor."""
+    import json
+
+    engine = MatchingEngine()
+    doc = _doc(
+        numero_documento="12092026 FE-6920 JAVIER $84000",
+        extracted_json="{}",
+        proveedor="Hotel Andino SAS",
+        nit="900123456",
+        total=84000,
+    )
+    winner = _record(
+        id=1,
+        numero_compra="COM007441",
+        numero_documento=None,
+        proveedor="Hotel Andino SAS",
+        nit="900123456",
+        valor=999999,
+        raw_json=json.dumps(
+            {
+                "Codigo Orden de compra": "COM007441",
+                "Codigo Factura proveedor": "FE-6920",
+            }
+        ),
+    )
+    decoy = _record(
+        id=2,
+        numero_compra="COM000111",
+        numero_documento=None,
+        proveedor="Hotel Andino SAS",
+        nit="900123456",
+        valor=84000,
+        raw_json=json.dumps(
+            {
+                "Codigo Orden de compra": "COM000111",
+                "Codigo Factura proveedor": "FE-1111",
+            }
+        ),
+    )
+    candidate = engine.find_best_match(doc, [winner, decoy])
+    assert candidate is not None
+    assert candidate.autobits_record_id == 1
+    assert candidate.numero_compra == "COM007441"
+    assert "documento_exacto" in candidate.reasons
+    assert "ambiguo" not in candidate.reasons

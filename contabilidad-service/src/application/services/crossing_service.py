@@ -116,7 +116,11 @@ class CrossingService:
                 excel_com_only=True,
             )
         except Exception:  # noqa: BLE001
-            pass
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "No se pudo escribir el contramarcado tras el cruce Autobits"
+            )
         self.db.commit()
         return {"created": created, "items": results}
 
@@ -311,7 +315,7 @@ class CrossingService:
     ) -> dict | None:
         ctx = extract_document_context(doc)
         candidate = self.matcher.find_best_match(doc, records)
-        if candidate and "ambiguo" in candidate.reasons:
+        if candidate and "ambiguo" in candidate.reasons and "documento_exacto" not in candidate.reasons:
             # No se ancla en silencio: se deja identificado como sin match.
             ambiguo = candidate
             candidate = self.matcher.build_sin_match(doc)

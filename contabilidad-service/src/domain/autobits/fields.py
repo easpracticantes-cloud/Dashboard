@@ -105,6 +105,9 @@ FIELD_ALIASES: dict[str, list[str]] = {
         "reservation",
     ],
     "numero_documento": [
+        "codigo factura proveedor",
+        "código factura proveedor",
+        "codigo factura",
         "factura",
         "numero factura",
         "número factura",
