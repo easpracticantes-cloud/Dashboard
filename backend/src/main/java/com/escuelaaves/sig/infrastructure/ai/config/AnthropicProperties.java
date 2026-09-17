@@ -13,6 +13,11 @@ public record AnthropicProperties(
          * (header HTTP {@code anthropic-workspace-id}). Nunca hardcodear.
          */
         String workspaceId,
+        /**
+         * Admin API key ({@code sk-ant-admin…}) para Usage/Cost report de la Consola.
+         * Distinta de la API key de Messages.
+         */
+        String adminApiKey,
         String modelFast,
         String modelReasoning,
         String baseUrl,
@@ -26,8 +31,10 @@ public record AnthropicProperties(
         double priceFastOutputPerMtok,
         double priceReasoningInputPerMtok,
         double priceReasoningOutputPerMtok,
-        /** Crédito Claude mostrado en el centro de mando. */
-        Double budgetUsd
+        /** Crédito prepago Claude mostrado en el centro de mando (top-up). */
+        Double budgetUsd,
+        /** Límite mensual del plan en Consola (ej. 500). */
+        Double monthlyLimitUsd
 ) {
     public AnthropicProperties {
         if (modelFast == null || modelFast.isBlank()) {
@@ -69,16 +76,29 @@ public record AnthropicProperties(
         if (budgetUsd == null || budgetUsd <= 0) {
             budgetUsd = 5.0;
         }
+        if (monthlyLimitUsd == null || monthlyLimitUsd <= 0) {
+            monthlyLimitUsd = 500.0;
+        }
         if (workspaceId != null) {
             workspaceId = workspaceId.trim();
             if (workspaceId.isEmpty()) {
                 workspaceId = null;
             }
         }
+        if (adminApiKey != null) {
+            adminApiKey = adminApiKey.trim();
+            if (adminApiKey.isEmpty()) {
+                adminApiKey = null;
+            }
+        }
     }
 
     public boolean hasApiKey() {
         return apiKey != null && !apiKey.isBlank();
+    }
+
+    public boolean hasAdminApiKey() {
+        return adminApiKey != null && !adminApiKey.isBlank();
     }
 
     public boolean hasWorkspaceId() {

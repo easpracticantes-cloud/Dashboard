@@ -39,8 +39,17 @@ export class CommandCenterComponent implements OnInit {
   readonly claudeBudgetUsd = signal(5);
   readonly claudeSpentUsd = signal(0);
   readonly claudeRemainingUsd = signal(5);
+  readonly claudeMonthLimitUsd = signal(500);
+  readonly claudeMonthUsedPct = signal(0);
   readonly claudeCalls = signal(0);
   readonly claudeUpdated = signal<string | null>(null);
+  readonly claudeBillingSource = signal<'anthropic_console' | 'local_estimate' | ''>('');
+  readonly claudeBillingNote = signal('');
+
+  readonly claudeFromAnthropic = computed(() => this.claudeBillingSource() === 'anthropic_console');
+  readonly claudeBillingLabel = computed(() =>
+    this.claudeFromAnthropic() ? 'Consola Anthropic' : 'Estimación local SIG'
+  );
 
   readonly claudeRemainingPct = computed(() => {
     const budget = this.claudeBudgetUsd();
@@ -132,12 +141,21 @@ export class CommandCenterComponent implements OnInit {
         const spent = Number(status.spentUsd);
         const remaining = Number(status.remainingUsd);
         this.claudeBudgetUsd.set(Number.isFinite(budget) && budget > 0 ? budget : 5);
-        this.claudeSpentUsd.set(Number.isFinite(spent) && spent > 0 ? spent : 0);
+        this.claudeSpentUsd.set(Number.isFinite(spent) && spent >= 0 ? spent : 0);
         this.claudeRemainingUsd.set(
           Number.isFinite(remaining) ? Math.max(0, remaining) : Math.max(0, this.claudeBudgetUsd() - this.claudeSpentUsd())
         );
+        const monthLimit = Number(status.monthLimitUsd);
+        this.claudeMonthLimitUsd.set(Number.isFinite(monthLimit) && monthLimit > 0 ? monthLimit : 500);
+        const monthPct = Number(status.monthUsedPct);
+        this.claudeMonthUsedPct.set(Number.isFinite(monthPct) ? Math.max(0, Math.min(100, monthPct)) : 0);
         this.claudeCalls.set(Number(status.callCount) || 0);
-        this.claudeUpdated.set(status.lastUsageAt || null);
+        this.claudeUpdated.set(status.billingFetchedAt || status.lastUsageAt || null);
+        const src = String(status.billingSource || '');
+        this.claudeBillingSource.set(
+          src === 'anthropic_console' ? 'anthropic_console' : src === 'local_estimate' ? 'local_estimate' : ''
+        );
+        this.claudeBillingNote.set(String(status.billingNote || ''));
         this.claudeLoading.set(false);
       },
       error: () => {

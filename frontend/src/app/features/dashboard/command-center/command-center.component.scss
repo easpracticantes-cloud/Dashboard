@@ -530,6 +530,44 @@ eas-command-center,
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--eas-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.cc-claude__pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--eas-mist) 70%, #fff);
+  color: var(--eas-muted);
+  border: 1px solid var(--eas-line-soft);
+  white-space: nowrap;
+}
+
+.cc-claude__pill.is-ok,
+.cc-claude__source.is-ok {
+  color: #146c43;
+  border-color: color-mix(in srgb, #146c43 35%, transparent);
+  background: color-mix(in srgb, #146c43 12%, #fff);
+}
+
+.cc-claude__pill.is-warn,
+.cc-claude__source.is-warn {
+  color: #9a6410;
+  border-color: color-mix(in srgb, #9a6410 35%, transparent);
+  background: color-mix(in srgb, #9a6410 12%, #fff);
+}
+
+.cc-claude__source {
+  font-weight: 700;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--eas-line-soft);
 }
 
 .cc-claude__value {

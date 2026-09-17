@@ -31,6 +31,7 @@ import com.escuelaaves.sig.domain.ai.model.ActionPlanOutcome;
 import com.escuelaaves.sig.domain.port.in.AIUseCase;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.entity.AiUsageLogEntity;
 import com.escuelaaves.sig.infrastructure.adapter.out.persistence.repository.AiUsageLogJpaRepository;
+import com.escuelaaves.sig.infrastructure.ai.adapters.anthropic.AnthropicBillingClient;
 import com.escuelaaves.sig.infrastructure.ai.config.AnthropicProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +69,7 @@ public class IntelligenceService implements AIUseCase {
     private final AnalyticsInsightPort analyticsInsightPort;
     private final AiUsageLogJpaRepository usageLogRepository;
     private final AnthropicProperties anthropicProperties;
+    private final AnthropicBillingClient anthropicBillingClient;
 
     private GenerativeAiPort ai() {
         return aiProviderFactory.getActiveProvider();
@@ -179,18 +183,59 @@ public class IntelligenceService implements AIUseCase {
     }
 
     private Map<String, Object> claudeBudgetSnapshot() {
-        BigDecimal spentBd = usageLogRepository.sumClaudeEstimatedCostUsd();
         double budget = anthropicProperties.budgetUsd() == null ? 5.0 : anthropicProperties.budgetUsd();
-        double spent = spentBd == null ? 0 : spentBd.doubleValue();
-        double remaining = Math.max(0, budget - spent);
+        double monthLimit = anthropicProperties.monthlyLimitUsd() == null
+                ? 500.0
+                : anthropicProperties.monthlyLimitUsd();
+
+        BigDecimal localSpentBd = usageLogRepository.sumClaudeEstimatedCostUsd();
+        double localSpent = localSpentBd == null ? 0 : localSpentBd.doubleValue();
+
+        var anthropic = anthropicBillingClient.fetchCurrentMonthBilling();
+        double monthSpent;
+        String billingSource;
+        String billingNote;
+        Instant billingFetchedAt = null;
+
+        if (anthropic.isPresent()) {
+            monthSpent = anthropic.get().monthSpentUsd().doubleValue();
+            billingSource = "anthropic_console";
+            billingNote = "Gasto del mes desde Consola Anthropic (cost_report). "
+                    + "El saldo usa el crédito prepago CLAUDE_BUDGET_USD menos ese gasto.";
+            billingFetchedAt = anthropic.get().fetchedAt();
+        } else {
+            monthSpent = localSpent;
+            billingSource = "local_estimate";
+            billingNote = anthropicProperties.hasAdminApiKey()
+                    ? "No se pudo leer cost_report; mostrando estimación local de ai_usage_logs (incompleta: no incluye Contabilidad/Consola)."
+                    : "Sin ANTHROPIC_ADMIN_API_KEY: estimación local de ai_usage_logs. "
+                            + "No coincide con Consola (faltan Contabilidad, playground y otros clientes). "
+                            + "Crea una Admin API key (sk-ant-admin…) en Consola → Settings.";
+        }
+
+        // Créditos de organización ≈ top-up configurado − gasto del periodo (mismo modelo que la Consola).
+        double remaining = Math.max(0, budget - monthSpent);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("budgetUsd", budget);
-        out.put("spentUsd", spent);
-        out.put("remainingUsd", remaining);
+        out.put("spentUsd", round4(monthSpent));
+        out.put("remainingUsd", round4(remaining));
+        out.put("monthSpentUsd", round4(monthSpent));
+        out.put("monthLimitUsd", monthLimit);
+        out.put("monthUsedPct", monthLimit > 0 ? Math.min(100, (monthSpent / monthLimit) * 100.0) : 0);
+        out.put("localEstimatedSpentUsd", round4(localSpent));
+        out.put("billingSource", billingSource);
+        out.put("billingNote", billingNote);
         out.put("callCount", usageLogRepository.countClaudeCalls());
         usageLogRepository.lastClaudeUsageAt()
                 .ifPresent(at -> out.put("lastUsageAt", at.toString()));
+        if (billingFetchedAt != null) {
+            out.put("billingFetchedAt", billingFetchedAt.toString());
+        }
         return out;
+    }
+
+    private static double round4(double v) {
+        return BigDecimal.valueOf(v).setScale(4, RoundingMode.HALF_UP).doubleValue();
     }
 
     public String startMemorySession(Long userId, String title) {

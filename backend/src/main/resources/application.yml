@@ -83,6 +83,8 @@ app:
       api-key: ${ANTHROPIC_API_KEY:}
       # Requerido si la key es identity-linked (header anthropic-workspace-id)
       workspace-id: ${ANTHROPIC_WORKSPACE_ID:}
+      # Admin API key (sk-ant-admin…) para igualar gasto con Consola Anthropic
+      admin-api-key: ${ANTHROPIC_ADMIN_API_KEY:}
       model-fast: ${AI_MODEL_FAST:claude-haiku-4-5-20251001}
       model-reasoning: ${AI_MODEL_REASONING:claude-sonnet-4-5-20250929}
       base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
@@ -95,7 +97,10 @@ app:
       price-fast-output-per-mtok: ${AI_PRICE_HAIKU_OUTPUT:5.0}
       price-reasoning-input-per-mtok: ${AI_PRICE_SONNET_INPUT:3.0}
       price-reasoning-output-per-mtok: ${AI_PRICE_SONNET_OUTPUT:15.0}
+      # Crédito prepago (top-up) mostrado como "créditos de la organización"
       budget-usd: ${CLAUDE_BUDGET_USD:5}
+      # Límite mensual del plan en Consola (ej. 500 US$)
+      monthly-limit-usd: ${CLAUDE_MONTHLY_LIMIT_USD:500}
     voice:
       provider: ${VOICE_PROVIDER:kokoro}
       model: ${VOICE_MODEL:kokoro}

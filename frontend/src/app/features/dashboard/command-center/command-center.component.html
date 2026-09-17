@@ -63,7 +63,7 @@
 
     <div class="cc-claude__grid">
       <div class="cc-claude__cell">
-        <p class="cc-claude__label">Saldo disponible</p>
+        <p class="cc-claude__label">Créditos de la organización</p>
         @if (claudeLoading()) {
           <p class="cc-claude__value">…</p>
         } @else {
@@ -72,32 +72,39 @@
             [class.is-low]="claudeLow()"
             [class.is-empty]="claudeEmpty()"
           >
-            {{ claudeRemainingUsd() | currency: 'USD' : 'symbol' : '1.2-4' }}
+            {{ claudeRemainingUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}
           </p>
           <div class="cc-claude__bar" role="progressbar" [attr.aria-valuenow]="claudeRemainingPct()" aria-valuemin="0" aria-valuemax="100">
             <i [style.width.%]="claudeRemainingPct()"></i>
           </div>
           <p class="cc-claude__hint">
-            De {{ claudeBudgetUsd() | currency: 'USD' : 'symbol' : '1.2-2' }} de crédito.
+            De {{ claudeBudgetUsd() | currency: 'USD' : 'symbol' : '1.2-2' }} de crédito prepago.
             @if (claudeEmpty()) {
               Crédito agotado.
-            } @else {
-              Baja a medida que se usa Claude.
             }
           </p>
         }
       </div>
       <div class="cc-claude__cell">
-        <p class="cc-claude__label">Gastado</p>
+        <p class="cc-claude__label">
+          Gasto este mes
+          @if (!claudeLoading() && !claudeUnavailable()) {
+            <span class="cc-claude__pill" [class.is-ok]="claudeFromAnthropic()" [class.is-warn]="!claudeFromAnthropic()">
+              {{ claudeMonthUsedPct() | number: '1.0-0' }}% utilizado
+            </span>
+          }
+        </p>
         @if (claudeLoading()) {
           <p class="cc-claude__value">…</p>
         } @else if (claudeUnavailable()) {
           <p class="cc-claude__value cc-claude__value--muted">Datos de consumo no disponibles</p>
         } @else {
-          <p class="cc-claude__value">{{ claudeSpentUsd() | currency: 'USD' : 'symbol' : '1.2-4' }}</p>
+          <p class="cc-claude__value">{{ claudeSpentUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}</p>
           <p class="cc-claude__hint">
-            {{ claudeCalls() }} llamada{{ claudeCalls() === 1 ? '' : 's' }} Claude.
-            Restado del crédito de {{ claudeBudgetUsd() | currency: 'USD' : 'symbol' : '1.2-2' }}.
+            de {{ claudeMonthLimitUsd() | currency: 'USD' : 'symbol' : '1.0-0' }} del límite del plan.
+            @if (claudeCalls() > 0) {
+              · {{ claudeCalls() }} llamada{{ claudeCalls() === 1 ? '' : 's' }} registradas en SIG.
+            }
           </p>
         }
       </div>
@@ -109,7 +116,14 @@
       } @else {
         <span>Sin fecha de uso reciente</span>
       }
-      <span title="Solo se suman eventos cuyo proveedor es Claude o Anthropic">Solo Claude</span>
+      <span
+        class="cc-claude__source"
+        [class.is-ok]="claudeFromAnthropic()"
+        [class.is-warn]="!claudeFromAnthropic() && !!claudeBillingSource()"
+        [title]="claudeBillingNote() || 'Origen del billing'"
+      >
+        {{ claudeBillingLabel() }}
+      </span>
     </footer>
   </article>
 

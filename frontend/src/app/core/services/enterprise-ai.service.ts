@@ -95,6 +95,13 @@ export interface AiProviderStatus {
   budgetUsd?: number;
   spentUsd?: number;
   remainingUsd?: number;
+  monthSpentUsd?: number;
+  monthLimitUsd?: number;
+  monthUsedPct?: number;
+  localEstimatedSpentUsd?: number;
+  billingSource?: string;
+  billingNote?: string;
+  billingFetchedAt?: string | null;
   callCount?: number;
   lastUsageAt?: string | null;
 }
