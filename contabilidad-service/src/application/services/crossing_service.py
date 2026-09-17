@@ -57,6 +57,7 @@ class CrossingService:
         *,
         batch_id: int | None = None,
         document_id: int | None = None,
+        document_ids: list[int] | None = None,
         force: bool = False,
         usuario: str = "SISTEMA",
         usar_excel_cruce: bool = False,
@@ -64,6 +65,7 @@ class CrossingService:
         documents = self.doc_repo.list_for_crossing(
             batch_id=batch_id,
             document_id=document_id,
+            document_ids=document_ids,
             force=force,
         )
         cruce_records = self.cruce_repo.list_latest_records() if usar_excel_cruce else []

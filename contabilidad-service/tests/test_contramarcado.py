@@ -59,6 +59,54 @@ def test_com_en_factura():
     assert result.value == "02082026 FE FPFL-18121030 FLYPASS $21200 COM007244"
 
 
+def test_ocr_com_no_pisa_autobits_distinto():
+    """Si el OCR lee un COM que no está en Autobits, gana el Excel."""
+    result = build_contramarcado(
+        fecha_emision="02/08/2026",
+        tipo_documento="FE",
+        numero_factura="FPFL-18121030",
+        proveedor="FLYPASS",
+        total=21200,
+        extracted={},
+        ocr_text="Referencia interna COM009999 sin relación con la OC",
+        autobits_candidates=[
+            ComCandidate(
+                com="COM007244",
+                source=SOURCE_AUTOBITS,
+                score=90.0,
+                reasons=["proveedor", "valor", "nit"],
+                record_id=11,
+            )
+        ],
+    )
+    assert result.status == STATUS_GENERADO
+    assert result.source == SOURCE_AUTOBITS
+    assert result.com == "COM007244"
+    assert result.record_id == 11
+
+
+def test_com_factura_coincide_con_autobits():
+    result = build_contramarcado(
+        fecha_emision="02/08/2026",
+        tipo_documento="FE",
+        numero_factura="FPFL-18121030",
+        proveedor="FLYPASS",
+        total=21200,
+        extracted={"compra": "COM007244"},
+        autobits_candidates=[
+            ComCandidate(
+                com="COM007244",
+                source=SOURCE_AUTOBITS,
+                score=95.0,
+                reasons=["compra_exacta"],
+                record_id=7,
+            )
+        ],
+    )
+    assert result.source == SOURCE_INVOICE
+    assert result.com == "COM007244"
+
+
 def test_com_en_ocr_texto():
     result = build_contramarcado(
         fecha_emision="2026-08-02",

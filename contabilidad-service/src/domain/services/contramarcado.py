@@ -36,6 +36,7 @@ class ComCandidate:
     reasons: list[str] = field(default_factory=list)
     proveedor: str | None = None
     numero_documento: str | None = None
+    record_id: int | None = None
 
 
 @dataclass
@@ -52,6 +53,7 @@ class ContramarcadoResult:
     empresa: str | None = None
     fecha_ddmmyyyy: str | None = None
     valor_tag: str | None = None
+    record_id: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,6 +69,7 @@ class ContramarcadoResult:
             "empresa": self.empresa,
             "fecha_ddmmyyyy": self.fecha_ddmmyyyy,
             "valor_tag": self.valor_tag,
+            "record_id": self.record_id,
         }
 
     def persist_fields(self) -> dict[str, Any]:
@@ -261,11 +264,11 @@ def resolve_com_from_candidates(
     *,
     min_score: float = 55.0,
     ambiguity_gap: float = 8.0,
-) -> tuple[str | None, str, float, str | None, list[dict[str, Any]]]:
+) -> tuple[str | None, str, float, str | None, list[dict[str, Any]], int | None]:
     """
     Decide COM final sin inventar.
 
-    Returns: (com, source, confidence, warning, candidates_payload)
+    Returns: (com, source, confidence, warning, candidates_payload, record_id)
     """
     cand_payload = [
         {
@@ -275,16 +278,23 @@ def resolve_com_from_candidates(
             "reasons": c.reasons,
             "proveedor": c.proveedor,
             "numero_documento": c.numero_documento,
+            "record_id": c.record_id,
         }
         for c in autobits_candidates
         if c.com
     ]
 
-    # Prioridad 1: único COM en factura
+    # Prioridad 1: único COM en factura — solo si no hay Excel Autobits/cruce
+    # o si ese COM también aparece en Autobits (evita OCR inventando COM).
     unique_invoice = list(dict.fromkeys(invoice_coms))
+    ab_viable = [c for c in autobits_candidates if c.com and c.score >= min_score]
+    ab_coms = {c.com for c in ab_viable}
     if len(unique_invoice) == 1:
-        return unique_invoice[0], SOURCE_INVOICE, 0.99, None, cand_payload
-    if len(unique_invoice) > 1:
+        inv = unique_invoice[0]
+        if not ab_coms or inv in ab_coms:
+            return inv, SOURCE_INVOICE, 0.99, None, cand_payload, None
+        # Hay Excel y el COM del OCR no está en Autobits → confiar en el cruce.
+    if len(unique_invoice) > 1 and not ab_coms:
         return (
             None,
             SOURCE_NONE,
@@ -292,10 +302,11 @@ def resolve_com_from_candidates(
             "No fue posible identificar automáticamente el COM: varios COM en la factura.",
             [{"com": c, "source": SOURCE_INVOICE, "score": 100.0, "reasons": ["factura"]} for c in unique_invoice]
             + cand_payload,
+            None,
         )
 
     # Prioridad 2: Autobits / cruces
-    viable = [c for c in autobits_candidates if c.com and c.score >= min_score]
+    viable = list(ab_viable)
     if not viable:
         return (
             None,
@@ -303,6 +314,7 @@ def resolve_com_from_candidates(
             0.0,
             "No fue posible identificar automáticamente el COM.",
             cand_payload,
+            None,
         )
 
     viable.sort(key=lambda c: c.score, reverse=True)
@@ -323,11 +335,12 @@ def resolve_com_from_candidates(
             round(best.score / 100.0, 3),
             "No fue posible identificar automáticamente el COM: varias coincidencias posibles.",
             cand_payload,
+            None,
         )
 
     winner = next(iter(top_coms.values()))
     conf = min(0.98, round(winner.score / 100.0, 3))
-    return winner.com, winner.source, conf, None, cand_payload
+    return winner.com, winner.source, conf, None, cand_payload, winner.record_id
 
 
 def build_contramarcado_string(
@@ -370,7 +383,7 @@ def build_contramarcado(
         invoice_com, invoice_all = com_from_extracted(extracted, ocr_text)
         invoice_list = invoice_all if invoice_all else ([invoice_com] if invoice_com else [])
 
-        com, source, confidence, warning, cand_payload = resolve_com_from_candidates(
+        com, source, confidence, warning, cand_payload, record_id = resolve_com_from_candidates(
             invoice_list,
             autobits_candidates or [],
         )
@@ -404,6 +417,7 @@ def build_contramarcado(
                 empresa=empresa,
                 fecha_ddmmyyyy=fecha,
                 valor_tag=valor_tag,
+                record_id=record_id,
             )
 
         value = build_contramarcado_string(
@@ -437,6 +451,7 @@ def build_contramarcado(
             empresa=empresa,
             fecha_ddmmyyyy=fecha,
             valor_tag=valor_tag,
+            record_id=record_id,
         )
     except Exception as exc:  # noqa: BLE001 — no tumbar el pipeline de facturas
         return ContramarcadoResult(

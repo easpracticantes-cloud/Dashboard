@@ -157,6 +157,7 @@ class DocumentRepository:
         *,
         batch_id: int | None = None,
         document_id: int | None = None,
+        document_ids: list[int] | None = None,
         force: bool = False,
     ) -> list[DocumentModel]:
         eligible_states = [
@@ -166,9 +167,20 @@ class DocumentRepository:
             DocumentStatus.REQUIERE_REVISION,
             DocumentStatus.CRUZANDO,
         ]
+        if force:
+            # Reanálisis completo: incluir facturas ya cruzadas/aprobadas.
+            eligible_states = [
+                *eligible_states,
+                DocumentStatus.APROBADO,
+                DocumentStatus.SUBSANACION,
+                DocumentStatus.AUTOBITS_PENDIENTE,
+                DocumentStatus.AUTOBITS_ACTUALIZADO,
+            ]
         q = self.db.query(DocumentModel).filter(DocumentModel.estado.in_(eligible_states))
         if document_id:
             q = q.filter(DocumentModel.id == document_id)
+        if document_ids:
+            q = q.filter(DocumentModel.id.in_(document_ids))
         if not force:
             # document_id es nullable (filas que vienen solo del Excel de Autobits):
             # hay que excluir los NULL o el NOT IN descarta todos los documentos.
@@ -508,6 +520,28 @@ class CrossingRepository:
             .order_by(AccountCrossingModel.updated_at.desc(), AccountCrossingModel.id.desc())
             .first()
         )
+
+    def detach_documents(self, document_ids: list[int]) -> int:
+        """Quita el vínculo factura↔cruce (sin borrar filas del Excel) para rematch 1:1."""
+        ids = [int(i) for i in document_ids if i]
+        if not ids:
+            return 0
+        rows = (
+            self.db.query(AccountCrossingModel)
+            .filter(AccountCrossingModel.document_id.in_(ids))
+            .all()
+        )
+        detached = 0
+        for row in rows:
+            if row.estado == CrossingStatus.PAGADO:
+                continue
+            row.document_id = None
+            row.valor_documento = None
+            row.diferencia = None
+            detached += 1
+        if detached:
+            self.db.flush()
+        return detached
 
     def get_by_autobits_record(self, autobits_record_id: int) -> AccountCrossingModel | None:
         """Fila del cruce de esa fila del Excel; prioriza la que ya tiene documento."""
