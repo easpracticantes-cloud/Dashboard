@@ -328,6 +328,42 @@ def excel_compra_reserva(record) -> tuple[str | None, str | None]:
     return compra, reserva
 
 
+def excel_nit(record) -> str | None:
+    """NIT del Excel (columna canónica o campo denso)."""
+    raw = _parse_raw_json(getattr(record, "raw_json", None) or getattr(record, "raw", None))
+    if raw:
+        found = value_from_row_dict(
+            raw,
+            "nit/cc proveedor (orden de compra)",
+            "nit/cc proveedor",
+            "nit proveedor",
+            "nit",
+        )
+        text = str(found).strip() if found is not None else ""
+        if text:
+            return text
+    nit = (getattr(record, "nit", None) or "").strip()
+    return nit or None
+
+
+def excel_fecha(record) -> str | None:
+    """Fecha de ejecución/compra del Excel."""
+    raw = _parse_raw_json(getattr(record, "raw_json", None) or getattr(record, "raw", None))
+    if raw:
+        found = value_from_row_dict(
+            raw,
+            "fecha de ejecución (reserva)",
+            "fecha de ejecucion (reserva)",
+            "fecha de compra",
+            "fecha",
+        )
+        text = str(found).strip() if found is not None else ""
+        if text:
+            return text
+    fecha = (getattr(record, "fecha", None) or "").strip()
+    return fecha or None
+
+
 def excel_factura_proveedor(record) -> str | None:
     """Número de factura del Excel Autobits (Codigo Factura proveedor)."""
     raw = _parse_raw_json(getattr(record, "raw_json", None) or getattr(record, "raw", None))

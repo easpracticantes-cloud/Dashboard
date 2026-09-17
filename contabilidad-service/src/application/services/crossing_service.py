@@ -14,7 +14,7 @@ from domain.autobits.observaciones import (
     resolve_crossing_estado,
 )
 from domain.enums import CrossingStatus, DocumentStatus, MatchType, RemediationType
-from domain.matching.matching_engine import MatchingEngine, extract_document_context
+from domain.matching.matching_engine import MatchingEngine, MatchCandidate, extract_document_context
 from domain.rules.rule_engine import RuleEngine
 from infrastructure.persistence.models import (
     AccountCrossingModel,
@@ -87,10 +87,11 @@ class CrossingService:
         used_record_ids: set[int] = set()
         created = 0
         results: list[dict] = []
+        assignments = self.matcher.assign_best_matches(documents, records)
 
         for doc in documents:
-            available = [r for r in records if r.id not in used_record_ids]
-            crossing_result = self._match_document(doc, available)
+            pre = assignments.get(int(doc.id)) if getattr(doc, "id", None) else None
+            crossing_result = self._match_document(doc, records, candidate=pre)
             if crossing_result:
                 results.append(crossing_result)
                 created += 1
@@ -312,11 +313,22 @@ class CrossingService:
         self,
         doc: DocumentModel,
         records: list[AutobitsRecordModel],
+        *,
+        candidate: MatchCandidate | None = None,
     ) -> dict | None:
         ctx = extract_document_context(doc)
-        candidate = self.matcher.find_best_match(doc, records)
-        if candidate and "ambiguo" in candidate.reasons and "documento_exacto" not in candidate.reasons:
-            # No se ancla en silencio: se deja identificado como sin match.
+        assigned = candidate is not None
+        if candidate is None:
+            candidate = self.matcher.find_best_match(doc, records)
+        if (
+            not assigned
+            and candidate
+            and "ambiguo" in candidate.reasons
+            and "documento_exacto" not in candidate.reasons
+            and "compra_exacta" not in candidate.reasons
+            and "valor" not in candidate.reasons
+        ):
+            # Sin ancla ni valor: no se asigna COM a ciegas.
             ambiguo = candidate
             candidate = self.matcher.build_sin_match(doc)
             candidate.reasons = ["ambiguo"] + [r for r in ambiguo.reasons if r != "ambiguo"]

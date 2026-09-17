@@ -187,3 +187,97 @@ def test_match_invoice_inside_ocr_blob_beats_same_provider_rows():
     assert candidate.numero_compra == "COM007441"
     assert "documento_exacto" in candidate.reasons
     assert "ambiguo" not in candidate.reasons
+
+
+def test_match_sin_numero_factura_usa_nit_y_valor():
+    """Excel sin Codigo Factura proveedor: cruza por NIT + valor y toma el COM."""
+    import json
+
+    engine = MatchingEngine()
+    doc = _doc(
+        numero_documento="FE-8888",
+        extracted_json='{"nit_o_identificacion": "900123456-1"}',
+        nit="900123456-1",
+        total=14300,
+        fecha_emision="2026-09-04",
+    )
+    record = _record(
+        id=3,
+        numero_compra="COM007441",
+        numero_documento=None,
+        nit="900123456",
+        valor=14300,
+        fecha="04/09/2026",
+        raw_json=json.dumps({"Codigo Orden de compra": "COM007441", "NIT/CC Proveedor (Orden de Compra)": "900123456"}),
+    )
+    candidate = engine.find_best_match(doc, [record])
+    assert candidate is not None
+    assert candidate.numero_compra == "COM007441"
+    assert "nit" in candidate.reasons
+    assert "valor" in candidate.reasons
+
+
+def test_assign_best_matches_same_nit_different_values():
+    """Dos facturas del mismo NIT se quedan con el COM de su propio valor."""
+    engine = MatchingEngine()
+    a = _doc(numero_documento="A-1", total=10000, fecha_emision="2026-09-01")
+    a.id = 10
+    b = _doc(numero_documento="B-2", total=25000, fecha_emision="2026-09-02")
+    b.id = 11
+    ra = _record(id=1, numero_compra="COM000001", numero_documento=None, valor=10000, fecha="2026-09-01")
+    rb = _record(id=2, numero_compra="COM000002", numero_documento=None, valor=25000, fecha="2026-09-02")
+    assigned = engine.assign_best_matches([a, b], [ra, rb])
+    assert assigned[10].numero_compra == "COM000001"
+    assert assigned[11].numero_compra == "COM000002"
+
+
+def test_nits_match_ignores_dv():
+    from domain.matching.normalize import nits_match
+
+    assert nits_match("900123456-1", "900123456")
+    assert not nits_match("900123456", "800000000")
+    """El n° de factura dentro del contramarcado debe ganar a otras filas del mismo proveedor."""
+    import json
+
+    engine = MatchingEngine()
+    doc = _doc(
+        numero_documento="12092026 FE-6920 JAVIER $84000",
+        extracted_json="{}",
+        proveedor="Hotel Andino SAS",
+        nit="900123456",
+        total=84000,
+    )
+    winner = _record(
+        id=1,
+        numero_compra="COM007441",
+        numero_documento=None,
+        proveedor="Hotel Andino SAS",
+        nit="900123456",
+        valor=999999,
+        raw_json=json.dumps(
+            {
+                "Codigo Orden de compra": "COM007441",
+                "Codigo Factura proveedor": "FE-6920",
+            }
+        ),
+    )
+    decoy = _record(
+        id=2,
+        numero_compra="COM000111",
+        numero_documento=None,
+        proveedor="Hotel Andino SAS",
+        nit="900123456",
+        valor=84000,
+        raw_json=json.dumps(
+            {
+                "Codigo Orden de compra": "COM000111",
+                "Codigo Factura proveedor": "FE-1111",
+            }
+        ),
+    )
+    candidate = engine.find_best_match(doc, [winner, decoy])
+    assert candidate is not None
+    assert candidate.autobits_record_id == 1
+    assert candidate.numero_compra == "COM007441"
+    assert "documento_exacto" in candidate.reasons
+    assert "ambiguo" not in candidate.reasons

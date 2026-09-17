@@ -886,7 +886,7 @@ export class WizardComponent implements OnInit, OnDestroy {
           if (updated && skipped) {
             this.feedback.info(
               `COM del Excel en ${updated}/${total} factura(s). ` +
-                `${skipped} sin coincidencia de número de factura con "Codigo Factura proveedor".`
+                `${skipped} sin coincidencia suficiente (número, NIT, valor o fecha) con el Excel.`
             );
           } else if (updated) {
             this.feedback.success(
@@ -894,8 +894,7 @@ export class WizardComponent implements OnInit, OnDestroy {
             );
           } else {
             this.feedback.error(
-              'No se asignó COM: el número de factura no coincidió con ' +
-                '"Codigo Factura proveedor" del Excel de Autobits.'
+              'No se asignó COM: ninguna factura coincidió con el Excel por número, NIT, valor, fecha o proveedor.'
             );
           }
         },

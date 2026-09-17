@@ -63,6 +63,62 @@ def normalize_nit(value: str | None) -> str:
     return re.sub(r"[^0-9]", "", str(value))
 
 
+def nits_match(a: str | None, b: str | None) -> bool:
+    """Compara NIT colombiano con o sin dígito de verificación."""
+    na, nb = normalize_nit(a), normalize_nit(b)
+    if not na or not nb:
+        return False
+    if na == nb:
+        return True
+    shorter, longer = (na, nb) if len(na) <= len(nb) else (nb, na)
+    # 900123456 vs 9001234561 (DV al final)
+    if len(shorter) >= 6 and longer.startswith(shorter) and len(longer) - len(shorter) <= 1:
+        return True
+    return False
+
+
+def parse_date(value) -> object:
+    """Normaliza fechas de factura/Excel a date o None."""
+    from datetime import date, datetime
+
+    if value is None or str(value).strip() == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    texto = str(value).strip()[:19]
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y", "%Y%m%d"):
+        try:
+            return datetime.strptime(texto[:10] if fmt != "%Y%m%d" else texto[:8], fmt).date()
+        except ValueError:
+            continue
+    # "12092026 FE-6920…" → ddmmyyyy al inicio
+    digits = re.sub(r"\D", "", texto)[:8]
+    if len(digits) == 8:
+        for fmt in ("%d%m%Y", "%Y%m%d"):
+            try:
+                return datetime.strptime(digits, fmt).date()
+            except ValueError:
+                continue
+    return None
+
+
+def date_proximity(a: str | None, b: str | None) -> tuple[int, str | None]:
+    """Puntos y razón según cercanía de fechas (mismo día, ±3 días, mismo mes)."""
+    da, db = parse_date(a), parse_date(b)
+    if not da or not db:
+        return 0, None
+    delta = abs((da - db).days)
+    if delta == 0:
+        return 18, "fecha"
+    if delta <= 3:
+        return 10, "fecha_cercana"
+    if da.year == db.year and da.month == db.month:
+        return 4, "fecha_mes"
+    return 0, None
+
+
 def names_similar(a: str | None, b: str | None) -> bool:
     na = normalize_text(a)
     nb = normalize_text(b)
