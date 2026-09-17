@@ -368,7 +368,7 @@ class AutobitsService:
         return None
 
     def repair_records_from_raw(self, batch_id: int) -> int:
-        """Rellena numero_reserva / numero_compra vacíos desde raw_json del Excel."""
+        """Alinea COM/reserva al Excel canónico en raw_json (nunca otras columnas)."""
         records = self.repo.list_records_for_batch(batch_id)
         fixed = 0
         for record in records:
@@ -379,25 +379,25 @@ class AutobitsService:
                 raw = {}
             if not isinstance(raw, dict):
                 continue
-            if not (record.numero_reserva or "").strip():
-                reserva = self._value_from_raw(
-                    raw,
-                    "codigo reserva",
-                    "código reserva",
-                    "numero reserva",
-                    "número reserva",
-                )
-                if reserva:
-                    record.numero_reserva = reserva
+            reserva = self._value_from_raw(
+                raw,
+                "codigo reserva",
+                "código reserva",
+            )
+            if reserva:
+                text = str(reserva).strip()
+                if text and (record.numero_reserva or "").strip() != text:
+                    record.numero_reserva = text
                     changed = True
-            if not (record.numero_compra or "").strip():
-                compra = self._value_from_raw(
-                    raw,
-                    "codigo orden de compra",
-                    "código orden de compra",
-                )
-                if compra:
-                    record.numero_compra = compra
+            compra = self._value_from_raw(
+                raw,
+                "codigo orden de compra",
+                "código orden de compra",
+            )
+            if compra:
+                text = str(compra).strip()
+                if text and (record.numero_compra or "").strip() != text:
+                    record.numero_compra = text
                     changed = True
             if changed:
                 fixed += 1
@@ -469,16 +469,10 @@ class AutobitsService:
         search: str | None = None,
         estado: str | None = None,
     ) -> tuple[list[dict], int]:
+        # Solo rellena COM/reserva VACÍOS desde raw canónico. Nunca re-parsea el Excel
+        # con un mapeo nuevo (eso era lo que cambiaba los códigos al refrescar).
         if batch_id:
             self.repair_records_from_raw(batch_id)
-            batch = self.repo.get_batch(batch_id)
-            if batch and batch.storage_path:
-                missing = any(
-                    not (r.numero_reserva or "").strip()
-                    for r in self.repo.list_records_for_batch(batch_id)[:20]
-                )
-                if missing:
-                    self.repair_records_from_storage(batch)
         items, total = self.repo.list_records(
             limit=limit,
             offset=offset,
@@ -553,14 +547,39 @@ class AutobitsService:
         }
 
     def to_record_dict(self, record: AutobitsRecordModel) -> dict:
+        # Fuente de verdad: columna canónica del Excel en raw_json (si existe).
+        compra = record.numero_compra
+        reserva = record.numero_reserva
+        if record.raw_json:
+            try:
+                raw = json.loads(record.raw_json)
+            except json.JSONDecodeError:
+                raw = None
+            if isinstance(raw, dict):
+                from domain.autobits.fields import value_from_row_dict
+
+                canon_compra = value_from_row_dict(
+                    raw,
+                    "codigo orden de compra",
+                    "código orden de compra",
+                )
+                canon_reserva = value_from_row_dict(
+                    raw,
+                    "codigo reserva",
+                    "código reserva",
+                )
+                if canon_compra is not None and str(canon_compra).strip():
+                    compra = str(canon_compra).strip()
+                if canon_reserva is not None and str(canon_reserva).strip():
+                    reserva = str(canon_reserva).strip()
         return {
             "id": record.id,
             "import_batch_id": record.import_batch_id,
             "row_number": record.row_number,
             "proveedor": record.proveedor,
             "nit": record.nit,
-            "numero_compra": record.numero_compra,
-            "numero_reserva": record.numero_reserva,
+            "numero_compra": compra,
+            "numero_reserva": reserva,
             "numero_documento": record.numero_documento,
             "valor": record.valor,
             "fecha": record.fecha,

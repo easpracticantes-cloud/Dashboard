@@ -408,7 +408,11 @@ class AutobitsRepository:
         search: str | None = None,
         estado: str | None = None,
     ) -> tuple[list[AutobitsRecordModel], int]:
-        q = self.db.query(AutobitsRecordModel).order_by(AutobitsRecordModel.created_at.desc())
+        # Orden estable del Excel (fila 1…N). created_at.desc desordenaba la tabla al refrescar.
+        q = self.db.query(AutobitsRecordModel).order_by(
+            AutobitsRecordModel.row_number.asc().nulls_last(),
+            AutobitsRecordModel.id.asc(),
+        )
         if batch_id:
             q = q.filter(AutobitsRecordModel.import_batch_id == batch_id)
         if estado:
@@ -459,6 +463,10 @@ class AutobitsRepository:
         return (
             self.db.query(AutobitsRecordModel)
             .filter(AutobitsRecordModel.import_batch_id == batch_id)
+            .order_by(
+                AutobitsRecordModel.row_number.asc().nulls_last(),
+                AutobitsRecordModel.id.asc(),
+            )
             .all()
         )
 

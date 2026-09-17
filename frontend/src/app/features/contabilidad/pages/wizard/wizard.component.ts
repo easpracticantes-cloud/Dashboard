@@ -793,9 +793,10 @@ export class WizardComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Conserva los COM del Excel; solo completa faltantes / regenera texto. */
+  /** Solo regenera contramarcado de facturas; el Excel Autobits no se toca. */
   private reanalizarConAutobits(folder: InvoiceFolder, batchId: number): void {
     this.reanalizando.set(true);
+    const frozenRecords = [...this.records()];
 
     this.foldersApi
       .recontramarcado(folder.id, {
@@ -809,13 +810,20 @@ export class WizardComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res) => {
-          if (res.folder) {
-            this.aplicarCarpeta(res.folder);
-          } else {
-            this.seleccionarCarpeta(folder.id);
+          // No recargar Autobits ni reordenar la tabla del Excel.
+          if (frozenRecords.length) {
+            this.records.set(frozenRecords);
           }
-          // El Excel Autobits no se reimporta: refrescar la misma tabla del lote.
-          this.cargarRecords(batchId);
+          // Solo refrescar facturas / carpeta, sin startPoll que vuelva a cruzar.
+          if (res.folder) {
+            this.carpetaActiva.set(res.folder);
+            this.carpetas.update((list) => {
+              const rest = list.filter((f) => f.id !== res.folder!.id);
+              return [res.folder!, ...rest];
+            });
+            this.documentos.set(this.docsFromFolderSummary(res.folder));
+          }
+          this.refrescarFacturas(this.folderSeq);
           this.feedback.success(
             res.message ||
               `COM del Excel conservados. ${res.updated} factura(s) actualizada(s).`
@@ -1021,9 +1029,11 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   private aplicarAutobits(res: ImportResult): void {
     this.autobits.set({ ...res, records: [...(res.records || [])] });
-    const fromRes = [...(res.records || [])];
+    const fromRes = [...(res.records || [])].sort(
+      (a, b) => (a.row_number || 0) - (b.row_number || 0) || (a.id || 0) - (b.id || 0)
+    );
     this.records.set(fromRes);
-    // Siempre refrescar desde API: recupera Codigo Reserva si el lote viejo lo tenía vacío
+    // Refrescar desde API en el mismo orden de filas del Excel (no created_at).
     this.cargarRecords(res.batch?.id);
     if (res.parse_errors?.length) {
       this.feedback.error(res.parse_errors.slice(0, 3).join(' · '));
