@@ -287,3 +287,45 @@ def test_export_endpoint_no_500_con_ocr_sucio(client):
     assert res.content[:2] == b"PK"
     validate_xlsx_bytes(res.content)
 
+
+def test_export_no_invoca_matching(client, monkeypatch):
+    hits = {"n": 0}
+
+    def boom(*_args, **_kwargs):
+        hits["n"] += 1
+        raise RuntimeError("matching no debe correr al generar Excel")
+
+    monkeypatch.setattr(
+        "application.services.crossing_service.CrossingService.run_matching",
+        boom,
+    )
+    db = SessionLocal()
+    try:
+        provider = ProviderModel(nombre="Hotel Listo", nit="900111222")
+        doc = DocumentModel(
+            filename="fe-listo.pdf",
+            tipo="FACTURA",
+            origen="CARGA_MANUAL",
+            estado=DocumentStatus.CRUZANDO,
+            numero_documento="FE-7001",
+            fecha_emision="2026-09-18",
+            total=33000,
+            provider=provider,
+        )
+        db.add_all([provider, doc])
+        db.commit()
+        db.refresh(doc)
+        doc_id = doc.id
+    finally:
+        db.close()
+
+    res = client.get(f"/api/documents/export-excel?document_ids={doc_id}")
+    assert res.status_code == 200, res.text
+    assert hits["n"] == 0
+    assert b"PK" == res.content[:2]
+    wb = load_workbook(io.BytesIO(res.content))
+    dumped = " | ".join(
+        str(v) for row in wb.active.iter_rows(values_only=True) for v in row if v is not None
+    )
+    assert "FE-7001" in dumped
+

@@ -54,7 +54,7 @@ export class ContabilidadDownloadService {
     const buffer = await res.arrayBuffer();
     const bytes = new Uint8Array(buffer);
     if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
-      throw new Error('La respuesta no es un Excel válido. No se descargó el archivo.');
+      throw new Error(this.mensajeCuerpoNoExcel(bytes));
     }
     const blob = new Blob([buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -135,5 +135,21 @@ export class ContabilidadDownloadService {
       return null;
     }
     return null;
+  }
+
+  private mensajeCuerpoNoExcel(bytes: Uint8Array): string {
+    try {
+      const text = new TextDecoder().decode(bytes.slice(0, 4000)).trim();
+      if (text.startsWith('{')) {
+        const parsed = JSON.parse(text) as { detail?: unknown; message?: string };
+        const detail = parsed.detail ?? parsed.message;
+        if (typeof detail === 'string' && detail.trim()) {
+          return detail.trim();
+        }
+      }
+    } catch {
+      /* no JSON */
+    }
+    return 'La respuesta no es un Excel válido. No se descargó el archivo.';
   }
 }

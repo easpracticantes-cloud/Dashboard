@@ -619,7 +619,7 @@ def test_export_solo_empresas_con_factura_y_datos_de_la_factura(client):
     assert ws["C2"].value.year == 2026
     assert ws["C2"].value.month == 3
     assert ws["C2"].value.day == 10
-    assert ws["D2"].value == "FAC-00125"
+    assert ws["D2"].value in (None, "")
     assert ws["F2"].value == 1500000
     assert ws["G2"].value == "FAC-00125"
 
@@ -700,7 +700,7 @@ def test_export_no_sustituye_factura_por_com_de_autobits(client):
     assert "2026-01-01" not in dumped
     wb = load_workbook(io.BytesIO(export.content))
     ws = wb[SINGLE_SHEET_NAME]
-    assert ws["D2"].value == "FAC-00125"
+    assert ws["D2"].value in (None, "")
     assert ws["F2"].value == 1500000
     assert ws["G2"].value == "FAC-00125"
 
@@ -821,7 +821,7 @@ def test_export_factura_sin_cruce_usa_datos_de_la_ia(client):
     assert ws["C2"].value.year == 2026
     assert ws["C2"].value.month == 8
     assert ws["C2"].value.day == 4
-    assert ws["D2"].value == "FPOS-61226"
+    assert ws["D2"].value in (None, "")
     assert ws["F2"].value == 14300
     assert ws["G2"].value == "FPOS-61226"
     assert ws["E2"].value in (None, "")
@@ -868,7 +868,7 @@ def test_export_usa_extracted_json_cuando_no_hay_proveedor_persistido(client):
     agosto = load_workbook(io.BytesIO(export.content))[SINGLE_SHEET_NAME]
     assert agosto["A2"].value == "JORGE HERNANDO CASTAÑO GIRALDO"
     assert agosto["B2"].value == "70905826-6"
-    assert agosto["D2"].value == "FPOS-61226"
+    assert agosto["D2"].value in (None, "")
     assert agosto["F2"].value == 14300
     assert agosto["G2"].value == "FPOS-61226"
 

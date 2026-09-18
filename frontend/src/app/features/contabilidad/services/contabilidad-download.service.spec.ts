@@ -73,6 +73,19 @@ describe('ContabilidadDownloadService Facturas Excel', () => {
     );
   });
 
+  it('si el BFF devuelve JSON con 200, muestra el detail', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => null },
+      arrayBuffer: async () =>
+        new TextEncoder().encode('{"detail":"Servicio Contabilidad no disponible"}').buffer,
+    });
+    await expect(service.download('/contabilidad/documents/export-excel')).rejects.toThrow(
+      'Servicio Contabilidad no disponible',
+    );
+  });
+
   it('404 en export se informa como error de generación, no como HTML', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,

@@ -468,14 +468,12 @@ class CruceExcelService:
         una factura concreta (factura → cruce → Autobits).
         """
         ids = self._normalize_document_ids(document_ids)
-        # batch_id es solo compatibilidad/matching. NUNCA reconstruye document_ids.
-        if batch_id:
-            from application.services.autobits_service import AutobitsService
-
-            AutobitsService(self.db).repair_records_from_raw(batch_id)
+        # Generar Excel es una lectura: no recruza ni llama a Claude aquí.
+        # El matching ya corrió al analizar facturas; si se rehace ahora
+        # (507 filas Autobits + IA) el proxy corta y el toast dice que no se generó.
+        _ = batch_id
         if ids:
-            self._assert_documents_ready(ids)
-            self._vincular_facturas(ids, batch_id, usuario)
+            ids = self._assert_documents_ready(ids)
         rows = self._filas_desde_facturas(ids)
         self._marcar_duplicados(rows)
         years = [r.year() for r in rows if r.year()]
@@ -956,20 +954,13 @@ class CruceExcelService:
                 out.append(doc_id)
         return out
 
-    def _assert_documents_ready(self, document_ids: list[int]) -> None:
+    def _assert_documents_ready(self, document_ids: list[int]) -> list[int]:
         docs = (
             self.db.query(DocumentModel)
             .filter(DocumentModel.id.in_(document_ids))
             .all()
         )
-        found = {doc.id for doc in docs}
-        missing = [doc_id for doc_id in document_ids if doc_id not in found]
-        if missing:
-            raise CruceExcelServiceError(
-                "No se encontraron las facturas solicitadas.",
-                "FACTURAS_NO_ENCONTRADAS",
-                404,
-            )
+        found = {doc.id: doc for doc in docs}
         ocupados = {DocumentStatus.RECIBIDO, DocumentStatus.PROCESANDO}
         pendientes = [
             doc.id for doc in docs if (doc.estado or "").upper() in {s.value for s in ocupados}
@@ -980,6 +971,14 @@ class CruceExcelService:
                 "FACTURAS_EN_PROCESO",
                 409,
             )
+        kept = [doc_id for doc_id in document_ids if doc_id in found]
+        if not kept:
+            raise CruceExcelServiceError(
+                "No se encontraron las facturas solicitadas.",
+                "FACTURAS_NO_ENCONTRADAS",
+                404,
+            )
+        return kept
 
     def _restringir_facturas_a_ids(self, rows: list[CruceExportRow], document_ids: list[int]) -> None:
         allowed = set(document_ids)

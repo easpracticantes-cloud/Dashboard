@@ -235,6 +235,7 @@ public class ContabilidadProxyController {
             }
         }
         headers.setAccept(List.of(MediaType.ALL));
+        headers.set(HttpHeaders.ACCEPT_ENCODING, "identity");
         injectSigIdentity(headers);
     }
 
@@ -263,7 +264,8 @@ public class ContabilidadProxyController {
         upstream.forEach((k, v) -> {
             if (k == null) return;
             String lower = k.toLowerCase();
-            if (lower.equals("transfer-encoding") || lower.equals("connection")) {
+            if (lower.equals("transfer-encoding") || lower.equals("connection")
+                    || lower.equals("content-encoding") || lower.equals("content-length")) {
                 return;
             }
             out.put(k, v);
