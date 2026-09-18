@@ -7,10 +7,12 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
+import logging
 
 from api.routers.autobits import router as autobits_router
 from api.routers.crossings import router as crossings_router
@@ -57,6 +59,15 @@ app.include_router(periods_router)
 app.include_router(ops_router)
 app.include_router(folders_router)
 
+_log = logging.getLogger("contabilidad")
+
+
+def _public_error_detail(exc: BaseException, fallback: str) -> str:
+    text = " ".join(str(exc).split()).strip()
+    if not text or text.lower() in {"internal server error", "500 internal server error"}:
+        return fallback
+    return text[:500]
+
 
 @app.exception_handler(PeriodClosedError)
 def _period_closed_handler(request: Request, exc: PeriodClosedError):
@@ -64,6 +75,47 @@ def _period_closed_handler(request: Request, exc: PeriodClosedError):
     return JSONResponse(
         status_code=409,
         content={"detail": exc.message, "code": exc.code},
+    )
+
+
+@app.exception_handler(ResponseValidationError)
+def _response_validation_handler(request: Request, exc: ResponseValidationError):
+    _log.exception("Respuesta inválida en %s", request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Contabilidad armó una respuesta inválida. Reintenta adjuntar el Excel.",
+            "code": "RESPONSE_VALIDATION",
+        },
+    )
+
+
+@app.exception_handler(Exception)
+def _unhandled_handler(request: Request, exc: Exception):
+    """Evita el toast vacío 'Internal Server Error' y deja el motivo real."""
+    if isinstance(exc, StarletteHTTPException):
+        detail = exc.detail
+        content = {"detail": detail} if not isinstance(detail, dict) else detail
+        if isinstance(detail, dict) and "detail" not in detail:
+            content = {"detail": detail}
+        return JSONResponse(status_code=exc.status_code, content=content)
+    if isinstance(exc, RequestValidationError):
+        return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    if isinstance(exc, PeriodClosedError):
+        return JSONResponse(
+            status_code=409,
+            content={"detail": exc.message, "code": exc.code},
+        )
+    _log.exception("Error no controlado en %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": _public_error_detail(
+                exc,
+                "Error interno en Contabilidad. Reintenta en unos segundos.",
+            ),
+            "code": "UNHANDLED",
+        },
     )
 
 

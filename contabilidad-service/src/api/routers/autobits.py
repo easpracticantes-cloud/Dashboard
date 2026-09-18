@@ -1,10 +1,12 @@
 """Routers API — dominio Autobits (Fase 3)."""
 
 import json
+import logging
+import math
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from api.deps import resolve_usuario
@@ -12,6 +14,7 @@ from application.services.autobits_service import AutobitsService, AutobitsServi
 from infrastructure.persistence.database import get_db
 
 router = APIRouter(prefix="/api/autobits", tags=["autobits"])
+log = logging.getLogger("contabilidad.autobits")
 
 
 class FieldInfo(BaseModel):
@@ -25,7 +28,7 @@ class ImportResponse(BaseModel):
     skipped_duplicates: int
     skipped_empty: int
     parse_errors: list[str] = []
-    detected_mapping: dict[str, str] | None = None
+    detected_mapping: dict | None = None
     sheet_name: str | None = None
     crossing: dict | None = None
     analysis_mode: str | None = None
@@ -83,6 +86,54 @@ def _first_int(*vals) -> int | None:
         if n > 0:
             return n
     return None
+
+
+def _json_safe(value):
+    if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+        return None
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    return value
+
+
+def _to_import_response(result: dict) -> ImportResponse:
+    """Nunca deje un ValidationError como HTTP 500 genérico."""
+    payload = dict(result or {})
+    mapping = payload.get("detected_mapping")
+    if isinstance(mapping, dict):
+        payload["detected_mapping"] = {
+            str(k): str(v) for k, v in mapping.items() if v is not None and str(v).strip()
+        }
+    errors = payload.get("parse_errors") or []
+    payload["parse_errors"] = [str(e) for e in errors if e is not None]
+    crossing = payload.get("crossing")
+    if isinstance(crossing, dict):
+        crossing = {k: v for k, v in crossing.items() if k != "items"}
+        payload["crossing"] = _json_safe(crossing)
+    records = payload.get("records") or []
+    if isinstance(records, list):
+        payload["records"] = [_json_safe(r) if isinstance(r, dict) else r for r in records[:200]]
+    notes = payload.get("ai_notes")
+    if notes is not None and not isinstance(notes, str):
+        payload["ai_notes"] = str(notes)
+    try:
+        return ImportResponse(**payload)
+    except ValidationError as exc:
+        log.exception("ImportResponse inválido: %s", exc)
+        batch = payload.get("batch") if isinstance(payload.get("batch"), dict) else {}
+        return ImportResponse(
+            batch=batch or {"id": 0, "filename": "", "status": "ERROR"},
+            imported_rows=int(payload.get("imported_rows") or 0),
+            skipped_duplicates=int(payload.get("skipped_duplicates") or 0),
+            skipped_empty=int(payload.get("skipped_empty") or 0),
+            parse_errors=[f"Respuesta incompleta al importar: {exc}"],
+            aviso=str(payload.get("aviso") or "El Excel se procesó pero la respuesta no se pudo serializar."),
+            reused=bool(payload.get("reused")),
+            folder=payload.get("folder") if isinstance(payload.get("folder"), dict) else None,
+            folder_error=payload.get("folder_error"),
+        )
 
 
 def _flag(*vals) -> bool:
@@ -157,8 +208,18 @@ async def upload_and_import(
             status_code=getattr(exc, "status_code", 400) or 400,
             detail=exc.message,
         ) from exc
-    result = _attach_upload_to_folder(db, result, parsed_folder_id)
-    return ImportResponse(**result)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("Fallo importando Autobits")
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo importar el Excel de Autobits: {exc}",
+        ) from exc
+    try:
+        result = _attach_upload_to_folder(db, result, parsed_folder_id)
+    except Exception as exc:  # noqa: BLE001
+        result = result or {}
+        result["folder_error"] = f"No se pudo guardar el Excel en la carpeta: {exc}"
+    return _to_import_response(result)
 
 
 @router.post("/preview", response_model=PreviewResponse)
@@ -202,9 +263,11 @@ def confirm_import(
             imported_by=resolve_usuario(request, imported_by),
         )
     except AutobitsServiceError as exc:
-        status = 404 if exc.code == "PREVIEW_NOT_FOUND" else 400
+        status = getattr(exc, "status_code", None) or (
+            404 if exc.code == "PREVIEW_NOT_FOUND" else 400
+        )
         raise HTTPException(status_code=status, detail=exc.message) from exc
-    return ImportResponse(**result)
+    return _to_import_response(result)
 
 
 @router.get("/batches/latest")

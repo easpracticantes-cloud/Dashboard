@@ -333,7 +333,7 @@ class AutobitsRepository:
             observaciones=getattr(parsed, "observaciones", None),
             estado_compra=getattr(parsed, "estado_compra", None),
             record_hash=parsed.record_hash(),
-            raw_json=json.dumps(parsed.raw or {}, ensure_ascii=False),
+            raw_json=json.dumps(parsed.raw or {}, ensure_ascii=False, default=str),
             estado=AutobitsRecordStatus.IMPORTADO,
         )
         self.db.add(record)

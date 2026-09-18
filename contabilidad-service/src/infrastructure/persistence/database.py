@@ -35,7 +35,8 @@ if _IS_SQLITE:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA busy_timeout=30000")
         cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA foreign_keys=ON")
+        # No activar foreign_keys: el SQLite histórico tiene huérfanos
+        # (Vaciar/cruces). Enforcear FK convierte imports y purges en HTTP 500.
         cursor.close()
 
 
@@ -63,6 +64,7 @@ def retry_on_sqlite_lock(operation: Callable[[], T], *, session: Session | None 
             if session is not None:
                 try:
                     session.rollback()
+                    session.expire_all()
                 except Exception:  # noqa: BLE001
                     pass
             time.sleep(delay)
@@ -376,5 +378,8 @@ def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

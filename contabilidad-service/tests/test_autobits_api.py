@@ -197,3 +197,98 @@ def test_autobits_upload_binds_folder_and_persists_com(client):
     records = client.get(f"/api/autobits/records?batch_id={data['batch']['id']}")
     assert records.status_code == 200
     assert records.json()["items"][0]["numero_compra"] == "COM007441"
+
+
+def test_upload_does_not_500_when_crossing_payload_is_huge(client):
+    from unittest.mock import patch
+
+    from infrastructure.ai.excel_ai_analyzer import ExcelAIAnalysis
+
+    xlsx = _make_xlsx_bytes()
+    fake = ExcelAIAnalysis(
+        mapping={
+            "proveedor": "Proveedor",
+            "nit": "NIT",
+            "numero_compra": "Compra",
+            "valor": "Valor",
+            "fecha": "Fecha",
+        },
+        sheet_notes="Mock",
+        mode="ia",
+    )
+    huge = {
+        "created": 507,
+        "updated": 0,
+        "changed": 0,
+        "archived": 0,
+        "skipped": 0,
+        "batch_id": 1,
+        "items": [{"id": i, "valor_autobits": float("nan")} for i in range(507)],
+    }
+    with patch(
+        "application.services.autobits_service.ExcelAIAnalyzer.analyze",
+        return_value=fake,
+    ), patch(
+        "application.services.crossing_service.CrossingService.seed_from_autobits",
+        return_value=huge,
+    ):
+        response = client.post(
+            "/api/autobits/upload",
+            files={
+                "archivo": (
+                    "reporte.xlsx",
+                    xlsx,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"auto_cruzar": "true", "force": "true"},
+        )
+    assert response.status_code == 200, response.text
+    crossing = response.json().get("crossing") or {}
+    assert crossing.get("created") == 507
+    assert "items" not in crossing
+
+
+def test_upload_unhandled_error_is_not_generic_internal_server_error(client):
+    from unittest.mock import patch
+
+    with patch(
+        "api.routers.autobits.AutobitsService.import_file_direct",
+        side_effect=RuntimeError("sqlite explode al adjuntar"),
+    ):
+        response = client.post(
+            "/api/autobits/upload",
+            files={"archivo": ("reporte.xlsx", _make_xlsx_bytes(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+    assert response.status_code == 500
+    detail = response.json().get("detail")
+    assert detail != "Internal Server Error"
+    assert "sqlite explode" in str(detail)
+
+
+def test_to_import_response_sanitizes_nan_and_mapping():
+    from api.routers.autobits import _to_import_response
+
+    model = _to_import_response(
+        {
+            "batch": {"id": 1, "filename": "a.xlsx"},
+            "imported_rows": 1,
+            "skipped_duplicates": 0,
+            "skipped_empty": 0,
+            "records": [{"valor": float("nan")}],
+            "crossing": {"created": 2, "items": [1, 2, 3]},
+            "detected_mapping": {"proveedor": 123, "nit": None},
+        }
+    )
+    data = model.model_dump()
+    assert data["records"][0]["valor"] is None
+    assert "items" not in (data.get("crossing") or {})
+    assert data["detected_mapping"]["proveedor"] == "123"
+
+
+def test_serialize_cell_nan_does_not_raise():
+    from infrastructure.autobits.excel_adapter import _serialize_cell
+
+    assert _serialize_cell(float("nan")) is None
+    assert _serialize_cell(float("inf")) is None
+    assert _serialize_cell(85000.0) == 85000

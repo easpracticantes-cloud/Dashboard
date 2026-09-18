@@ -8,8 +8,9 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import ObjectDeletedError
 
 from config.settings import get_settings
 from domain.autobits.fields import (
@@ -53,6 +54,46 @@ class AutobitsServiceError(Exception):
 
 def content_sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
+
+
+def _string_mapping(mapping: dict | None) -> dict[str, str]:
+    """Solo columnas con nombre texto; evita que Pydantic tumbe el POST /upload."""
+    out: dict[str, str] = {}
+    for key, value in (mapping or {}).items():
+        if value is None or value is False:
+            continue
+        text = str(value).strip()
+        if text:
+            out[str(key)] = text
+    return out
+
+
+def _crossing_summary(crossing: dict | None) -> dict | None:
+    """El wizard solo usa created/error; 507 filas en items reventaban el JSON del proxy."""
+    if not isinstance(crossing, dict):
+        return crossing
+    return {
+        "created": int(crossing.get("created") or 0),
+        "updated": int(crossing.get("updated") or 0),
+        "changed": int(crossing.get("changed") or 0),
+        "archived": int(crossing.get("archived") or 0),
+        "skipped": int(crossing.get("skipped") or 0),
+        "batch_id": crossing.get("batch_id"),
+        "error": crossing.get("error"),
+    }
+
+
+def _finite_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if number != number or number in (float("inf"), float("-inf")):
+        return None
+    return number
+
 
 
 class AutobitsService:
@@ -198,10 +239,10 @@ class AutobitsService:
                 file_hash=file_hash,
                 force=force,
             )
-            result["detected_mapping"] = {k: v for k, v in mapping.items() if v}
+            result["detected_mapping"] = _string_mapping(mapping)
             result["sheet_name"] = preview.sheet_name
             result["analysis_mode"] = analysis.mode
-            result["ai_notes"] = analysis.sheet_notes
+            result["ai_notes"] = str(analysis.sheet_notes or "") or None
             result["crossing"] = None
 
             if auto_cruzar and result["imported_rows"] > 0:
@@ -212,8 +253,12 @@ class AutobitsService:
                         batch_id=result["batch"]["id"],
                         usuario=imported_by,
                     )
-                    result["crossing"] = crossing
+                    result["crossing"] = _crossing_summary(crossing)
                 except Exception as exc:
+                    try:
+                        self.db.rollback()
+                    except Exception:  # noqa: BLE001
+                        pass
                     result["crossing"] = {"created": 0, "error": str(exc)}
 
             return result
@@ -320,6 +365,10 @@ class AutobitsService:
                 _persist, session=self.db
             )
         except OperationalError as exc:
+            try:
+                self.db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
             if is_sqlite_lock_error(exc):
                 raise AutobitsServiceError(
                     "No se pudo guardar el Excel: la base estaba ocupada (análisis de facturas). "
@@ -327,9 +376,34 @@ class AutobitsService:
                     "DB_BUSY",
                     503,
                 ) from exc
-            raise
+            raise AutobitsServiceError(
+                f"No se pudo guardar el Excel en la base: {exc}",
+                "DB_ERROR",
+                500,
+            ) from exc
+        except IntegrityError as exc:
+            try:
+                self.db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            raise AutobitsServiceError(
+                "No se pudo guardar el Excel: hay datos inconsistentes en la base. "
+                "Vacía las cargas o vuelve a adjuntar el archivo.",
+                "DB_INTEGRITY",
+                409,
+            ) from exc
+        except SQLAlchemyError as exc:
+            try:
+                self.db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            raise AutobitsServiceError(
+                f"No se pudo guardar el Excel: {exc}",
+                "DB_ERROR",
+                500,
+            ) from exc
 
-        self.db.refresh(batch)
+        batch = self._reload_batch(batch)
 
         # Recuperar reserva/COM aunque el mapeo previo haya fallado
         self.repair_records_from_raw(batch.id)
@@ -345,11 +419,37 @@ class AutobitsService:
             "imported_rows": visible,
             "skipped_duplicates": skipped_duplicates,
             "skipped_empty": parsed.skipped_empty,
-            "parse_errors": row_errors[:20],
+            "parse_errors": [str(e) for e in row_errors[:20] if e],
             "records": records[:200],
             "reused": False,
             "aviso": None,
         }
+
+    def _reload_batch(self, batch: ImportBatchModel) -> ImportBatchModel:
+        """Tras un retry/rollback la instancia puede quedar expirada."""
+        batch_id = getattr(batch, "id", None)
+        try:
+            self.db.refresh(batch)
+            return batch
+        except (SQLAlchemyError, ObjectDeletedError):
+            try:
+                self.db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+        if not batch_id:
+            raise AutobitsServiceError(
+                "El Excel se importó pero no se pudo recargar el lote. Vuelve a adjuntarlo.",
+                "REFRESH_FAILED",
+                500,
+            )
+        reloaded = self.repo.get_batch(int(batch_id))
+        if not reloaded:
+            raise AutobitsServiceError(
+                "El Excel se importó pero no se pudo recargar el lote. Vuelve a adjuntarlo.",
+                "REFRESH_FAILED",
+                500,
+            )
+        return reloaded
 
     def _result_from_existing_batch(self, batch: ImportBatchModel, *, aviso: str) -> dict:
         repaired = self.repair_records_from_raw(batch.id)
@@ -371,7 +471,7 @@ class AutobitsService:
             "records": records[:200],
             "reused": True,
             "aviso": aviso,
-            "detected_mapping": {k: v for k, v in mapping.items() if v},
+            "detected_mapping": _string_mapping(mapping),
             "sheet_name": None,
             "analysis_mode": "reused",
             "ai_notes": aviso,
@@ -658,7 +758,7 @@ class AutobitsService:
             "numero_compra": com or compra,
             "numero_reserva": reserva,
             "numero_documento": record.numero_documento,
-            "valor": record.valor,
+            "valor": _finite_float(record.valor),
             "fecha": record.fecha,
             "concepto": record.concepto,
             "observaciones": record.observaciones,

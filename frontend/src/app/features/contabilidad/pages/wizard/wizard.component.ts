@@ -1386,12 +1386,14 @@ export class WizardComponent implements OnInit, OnDestroy {
         try {
           const parsed = JSON.parse(trimmed) as { detail?: unknown; message?: string };
           const nested = this.formatDetail(parsed.detail ?? parsed.message);
-          if (nested) return this.withStatus(status, nested);
+          if (nested && !this.isGenericServerMessage(nested)) {
+            return this.withStatus(status, nested);
+          }
         } catch {
           /* plain text */
         }
       }
-      if (!trimmed.startsWith('<')) {
+      if (!trimmed.startsWith('<') && !this.isGenericServerMessage(trimmed)) {
         return this.withStatus(status, trimmed);
       }
     }
@@ -1399,7 +1401,9 @@ export class WizardComponent implements OnInit, OnDestroy {
     if (body && typeof body === 'object') {
       const obj = body as { detail?: unknown; message?: string; error?: string };
       const nested = this.formatDetail(obj.detail ?? obj.message ?? obj.error);
-      if (nested) return this.withStatus(status, nested);
+      if (nested && !this.isGenericServerMessage(nested)) {
+        return this.withStatus(status, nested);
+      }
     }
 
     if (status === 404) {
@@ -1445,6 +1449,14 @@ export class WizardComponent implements OnInit, OnDestroy {
       return String((d as { message: string }).message);
     }
     return null;
+  }
+
+  private isGenericServerMessage(message: string): boolean {
+    const normalized = message.trim().toLowerCase();
+    return (
+      normalized === 'internal server error'
+      || normalized === '500 internal server error'
+    );
   }
 
   private withStatus(status: number | undefined, message: string): string {

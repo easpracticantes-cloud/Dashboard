@@ -515,8 +515,11 @@ def _serialize_cell(value):
         return value.isoformat(sep=" ", timespec="seconds")
     if isinstance(value, date):
         return value.isoformat()
-    if isinstance(value, float) and value == int(value) and abs(value) < 1e15:
-        return int(value)
+    if isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            return None
+        if value == int(value) and abs(value) < 1e15:
+            return int(value)
     return value
 
 
