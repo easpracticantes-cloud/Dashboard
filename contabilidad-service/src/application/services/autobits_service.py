@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from config.settings import get_settings
@@ -32,6 +33,7 @@ from infrastructure.autobits.excel_adapter import (
     mapping_to_json,
 )
 from infrastructure.ai.excel_ai_analyzer import ExcelAIAnalyzer, ExcelAIAnalyzerError
+from infrastructure.persistence.database import is_sqlite_lock_error, retry_on_sqlite_lock
 from infrastructure.persistence.models import AutobitsRecordModel, ImportBatchModel
 from infrastructure.persistence.repositories import AuditRepository, AutobitsRepository
 
@@ -266,50 +268,67 @@ class AutobitsService:
         archive_path.parent.mkdir(parents=True, exist_ok=True)
         archive_path.write_bytes(content)
 
-        batch = self.repo.create_batch(
-            filename=archive_name,
-            period_start=period_start,
-            period_end=period_end,
-            column_mapping_json=mapping_to_json(mapping),
-            total_rows=len(parsed.rows) + parsed.skipped_empty,
-            storage_path=str(archive_path),
-            imported_by=imported_by,
-            file_hash=resolved_hash,
-        )
+        def _persist() -> tuple:
+            batch = self.repo.create_batch(
+                filename=archive_name,
+                period_start=period_start,
+                period_end=period_end,
+                column_mapping_json=mapping_to_json(mapping),
+                total_rows=len(parsed.rows) + parsed.skipped_empty,
+                storage_path=str(archive_path),
+                imported_by=imported_by,
+                file_hash=resolved_hash,
+            )
 
-        imported = 0
-        skipped_duplicates = 0
-        row_errors = list(parsed.errors)
+            imported = 0
+            skipped_duplicates = 0
+            row_errors = list(parsed.errors)
 
-        for row in parsed.rows:
-            if skip_duplicates:
-                existing = self.repo.find_duplicate_record(
-                    row.record_hash(),
-                    period_start,
-                    period_end,
-                )
-                if existing:
-                    self.repo.update_record_from_parsed(existing, row, batch_id=batch.id)
-                    skipped_duplicates += 1
-                    continue
-            self.repo.add_record(batch, row)
-            imported += 1
+            for row in parsed.rows:
+                if skip_duplicates:
+                    existing = self.repo.find_duplicate_record(
+                        row.record_hash(),
+                        period_start,
+                        period_end,
+                    )
+                    if existing:
+                        self.repo.update_record_from_parsed(existing, row, batch_id=batch.id)
+                        skipped_duplicates += 1
+                        continue
+                self.repo.add_record(batch, row)
+                imported += 1
 
-        self.repo.finalize_batch_stats(
-            batch,
-            imported_rows=imported,
-            skipped_rows=parsed.skipped_empty + skipped_duplicates,
-            error_count=len(row_errors),
-        )
+            self.repo.finalize_batch_stats(
+                batch,
+                imported_rows=imported,
+                skipped_rows=parsed.skipped_empty + skipped_duplicates,
+                error_count=len(row_errors),
+            )
 
-        self.audit.log(
-            "IMPORT_AUTOBITS",
-            "ImportBatch",
-            str(batch.id),
-            valor_nuevo=f"{imported} filas importadas",
-            usuario=imported_by,
-        )
-        self.db.commit()
+            self.audit.log(
+                "IMPORT_AUTOBITS",
+                "ImportBatch",
+                str(batch.id),
+                valor_nuevo=f"{imported} filas importadas",
+                usuario=imported_by,
+            )
+            self.db.commit()
+            return batch, imported, skipped_duplicates, row_errors
+
+        try:
+            batch, imported, skipped_duplicates, row_errors = retry_on_sqlite_lock(
+                _persist, session=self.db
+            )
+        except OperationalError as exc:
+            if is_sqlite_lock_error(exc):
+                raise AutobitsServiceError(
+                    "No se pudo guardar el Excel: la base estaba ocupada (análisis de facturas). "
+                    "Espera unos segundos y vuelve a adjuntarlo.",
+                    "DB_BUSY",
+                    503,
+                ) from exc
+            raise
+
         self.db.refresh(batch)
 
         # Recuperar reserva/COM aunque el mapeo previo haya fallado

@@ -1,8 +1,10 @@
 """Configuracion SQLAlchemy."""
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
+from typing import TypeVar
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from config.settings import get_settings
@@ -13,11 +15,60 @@ class Base(DeclarativeBase):
 
 
 settings = get_settings()
+_IS_SQLITE = (settings.database_url or "").startswith("sqlite")
+
 engine = create_engine(
     settings.database_url,
-    connect_args={"check_same_thread": False} if settings.database_url.startswith("sqlite") else {},
+    connect_args=(
+        {"check_same_thread": False, "timeout": 30} if _IS_SQLITE else {}
+    ),
+    pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+if _IS_SQLITE:
+
+    @event.listens_for(engine, "connect")
+    def _configure_sqlite(dbapi_connection, _connection_record) -> None:
+        """WAL + busy_timeout: lecturas (polling/OCR) no deben tumbar el Excel Autobits."""
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+
+T = TypeVar("T")
+
+
+def is_sqlite_lock_error(exc: BaseException) -> bool:
+    text_exc = str(exc).lower()
+    return "database is locked" in text_exc or "database is busy" in text_exc
+
+
+def retry_on_sqlite_lock(operation: Callable[[], T], *, session: Session | None = None, attempts: int = 8) -> T:
+    """Reintenta una escritura SQLite si otro hilo (OCR, polling) tiene el lock."""
+    import time
+
+    delay = 0.15
+    last: OperationalError | None = None
+    for attempt in range(max(1, attempts)):
+        try:
+            return operation()
+        except OperationalError as exc:
+            last = exc
+            if not _IS_SQLITE or not is_sqlite_lock_error(exc) or attempt >= attempts - 1:
+                raise
+            if session is not None:
+                try:
+                    session.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
+            time.sleep(delay)
+            delay = min(delay * 2, 1.5)
+    assert last is not None
+    raise last
 
 
 def init_db() -> None:

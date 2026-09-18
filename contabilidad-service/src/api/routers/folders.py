@@ -197,9 +197,18 @@ def list_folders(limit: int = 40, db: Session = Depends(get_db)):
         .limit(max(1, min(limit, 100)))
         .all()
     )
-    items = [_serialize(r, db) for r in rows]
+    dirty = False
+    items = []
+    for row in rows:
+        before = row.document_ids_json
+        items.append(_serialize(row, db))
+        if row.document_ids_json != before:
+            dirty = True
     try:
-        db.commit()
+        if dirty:
+            db.commit()
+        else:
+            db.rollback()
     except SQLAlchemyError:
         db.rollback()
     return {"total": len(items), "items": items}
@@ -232,9 +241,13 @@ def get_folder(folder_id: int, db: Session = Depends(get_db)):
     folder = db.get(InvoiceFolderModel, folder_id)
     if not folder:
         raise HTTPException(status_code=404, detail="Carpeta no encontrada.")
+    before = folder.document_ids_json
     payload = _serialize(folder, db)
     try:
-        db.commit()
+        if folder.document_ids_json != before:
+            db.commit()
+        else:
+            db.rollback()
     except SQLAlchemyError:
         db.rollback()
     return payload
