@@ -91,6 +91,10 @@ export class ContabilidadDownloadService {
     if (res.status === 403) {
       return 'No tienes permiso para este Excel.';
     }
+    const fromBody = await this.detalleDesdeCuerpo(res);
+    if (fromBody) {
+      return fromBody;
+    }
     const generaAlVuelo = /\/export(-excel|\.xlsx)?(\?|$)/i.test(url);
     if (res.status === 404) {
       return generaAlVuelo
@@ -103,14 +107,33 @@ export class ContabilidadDownloadService {
     if (res.status >= 500) {
       return 'No se pudo generar el Excel.';
     }
+    return 'No se pudo descargar el Excel.';
+  }
+
+  private async detalleDesdeCuerpo(res: Response): Promise<string | null> {
     try {
-      const body = (await res.json()) as { detail?: string };
-      if (body?.detail) {
-        return body.detail;
+      const body = (await res.clone().json()) as {
+        detail?: unknown;
+        message?: string;
+      };
+      const raw = body?.detail ?? body?.message;
+      if (typeof raw === 'string' && raw.trim()) {
+        const text = raw.trim();
+        const lower = text.toLowerCase();
+        if (lower === 'internal server error' || lower === '500 internal server error') {
+          return null;
+        }
+        return text;
+      }
+      if (Array.isArray(raw)) {
+        const parts = raw
+          .map((item) => (typeof item === 'string' ? item : (item as { msg?: string })?.msg || ''))
+          .filter(Boolean);
+        return parts.length ? parts.join(' ') : null;
       }
     } catch {
-      // ignore non-JSON
+      return null;
     }
-    return 'No se pudo descargar el Excel.';
+    return null;
   }
 }

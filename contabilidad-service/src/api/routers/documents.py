@@ -20,6 +20,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+import logging
 
 from api.deps import resolve_usuario
 from application.services.document_processing_service import get_document_processing_service
@@ -102,6 +103,7 @@ def _expand_zip_invoices(filename: str, content: bytes) -> list[tuple[str, bytes
     return out
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
+log = logging.getLogger("contabilidad.documents")
 
 
 class ConfidenceFields(BaseModel):
@@ -668,6 +670,12 @@ def exportar_excel_facturas(
         raise HTTPException(
             status_code=500,
             detail="No se pudo generar un Excel válido para Microsoft Excel.",
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        log.exception("Fallo generando Excel de cruce")
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo generar el Excel: {exc}",
         ) from exc
     return Response(
         content=content,

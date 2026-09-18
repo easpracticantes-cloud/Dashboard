@@ -224,3 +224,66 @@ def test_export_vacio_sigue_siendo_xlsx_valido(client):
     res = client.get("/api/documents/export-excel")
     assert res.status_code == 200
     validate_xlsx_bytes(res.content)
+
+
+def test_workbook_acepta_control_chars_de_ocr():
+    from decimal import Decimal
+
+    builder = CruceWorkbookBuilder()
+    content = builder.build(
+        [
+            CruceExportRow(
+                proveedor="Hotel\x00 Demo",
+                nit="900111222",
+                numero_compra="COM1",
+                fecha_ejecucion="2026-09-18",
+                valor=Decimal("15000"),
+                factura_cdc="FE-1",
+                concepto="Alojamiento\x0b con OCR sucio",
+                observaciones="línea\x1fquebrada",
+            )
+        ],
+        year=2026,
+    )
+    assert content[:2] == b"PK"
+    validate_xlsx_bytes(content)
+    wb = load_workbook(io.BytesIO(content))
+    dumped = " | ".join(
+        str(v)
+        for row in wb.active.iter_rows(values_only=True)
+        for v in row
+        if v is not None
+    )
+    assert "Hotel Demo" in dumped
+    assert "FE-1" in dumped
+    assert "\x00" not in dumped
+
+
+def test_export_endpoint_no_500_con_ocr_sucio(client):
+    db = SessionLocal()
+    try:
+        provider = ProviderModel(nombre="Proveedor\x00 OCR", nit="800111222")
+        doc = DocumentModel(
+            filename="fe-ocr.pdf",
+            tipo="FACTURA",
+            origen="CARGA_MANUAL",
+            estado=DocumentStatus.CRUZANDO,
+            numero_documento="FE-9001",
+            fecha_emision="2026-09-18",
+            total=22000,
+            concepto="Servicio\x0bhotel",
+            observaciones="nota\x1focr",
+            provider=provider,
+        )
+        db.add_all([provider, doc])
+        db.commit()
+        db.refresh(doc)
+        doc_id = doc.id
+    finally:
+        db.close()
+
+    res = client.get(f"/api/documents/export-excel?document_ids={doc_id}")
+    assert res.status_code == 200, res.text
+    assert res.content[:2] == b"PK"
+    validate_xlsx_bytes(res.content)
+

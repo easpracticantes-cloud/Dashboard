@@ -483,14 +483,21 @@ class CruceExcelService:
         content = self.workbook_builder.build(rows, year=year)
         today = datetime.now(timezone.utc).date().isoformat()
         filename = f"Cruce_Cuentas_{today}.xlsx"
-        self.audit.log(
-            "CRUCE_EXCEL_GENERADO",
-            "CruceExcel",
-            ",".join(str(i) for i in ids) or "sin-facturas",
-            valor_nuevo=f"{filename} · {len(rows)} facturas",
-            usuario=usuario,
-        )
-        self.db.commit()
+        try:
+            self.audit.log(
+                "CRUCE_EXCEL_GENERADO",
+                "CruceExcel",
+                ",".join(str(i) for i in ids) or "sin-facturas",
+                valor_nuevo=f"{filename} · {len(rows)} facturas",
+                usuario=usuario,
+            )
+            self.db.commit()
+        except Exception:  # noqa: BLE001
+            logger.exception("No se pudo auditar la generación del Excel")
+            try:
+                self.db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
         analisis = {
             "origen": "FACTURAS",
             "document_ids": ids,
@@ -516,8 +523,28 @@ class CruceExcelService:
                 )
             except CrossingServiceError as exc:
                 if exc.code not in {"NO_DATOS", "NO_AUTOBITS", "NO_CRUCE"}:
-                    raise CruceExcelServiceError(exc.message, exc.code) from exc
-        self._vincular_con_ia(document_ids, batch_id, usuario)
+                    logger.warning(
+                        "Matching de factura %s omitido al generar Excel: %s",
+                        doc_id,
+                        exc.message,
+                    )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Matching de factura %s falló; el Excel de cruce se genera igual",
+                    doc_id,
+                )
+                try:
+                    self.db.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
+        try:
+            self._vincular_con_ia(document_ids, batch_id, usuario)
+        except Exception:  # noqa: BLE001
+            logger.exception("Cruce IA omitido al generar Excel")
+            try:
+                self.db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
 
     def _vincular_con_ia(
         self,

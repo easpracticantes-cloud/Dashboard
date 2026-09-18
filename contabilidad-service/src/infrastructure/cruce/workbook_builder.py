@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+import math
 import os
+import re
 import tempfile
 from pathlib import Path
 
 from openpyxl import Workbook
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
@@ -48,17 +51,40 @@ def _fill(rgb: str) -> PatternFill:
 def _as_date(value: str | None):
     if not value:
         return None
-    text = str(value)[:10]
+    text = _safe_text(str(value)[:10])
     try:
         return datetime.strptime(text, "%Y-%m-%d").date()
     except ValueError:
-        return value
+        return text or None
 
 
 def _as_number(value: Decimal | None):
     if value is None:
         return None
-    return float(value)
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return number
+
+
+def _safe_text(value: object) -> str | None:
+    """openpyxl revienta el export si el OCR mete control chars (NUL, etc.)."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        value = str(value)
+    cleaned = ILLEGAL_CHARACTERS_RE.sub("", value)
+    cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", cleaned)
+    return cleaned
+
+
+def _safe_cell(value):
+    if isinstance(value, str):
+        return _safe_text(value)
+    return value
 
 
 class CruceWorkbookBuilder:
@@ -82,6 +108,8 @@ class CruceWorkbookBuilder:
             return content
         except XlsxIntegrityError:
             raise
+        except Exception as exc:
+            raise XlsxIntegrityError(f"No se pudo armar el XLSX: {exc}") from exc
         finally:
             if tmp_path:
                 Path(tmp_path).unlink(missing_ok=True)
@@ -132,7 +160,7 @@ class CruceWorkbookBuilder:
                 row.observaciones,
             ]
             for col, value in enumerate(values, start=1):
-                cell = ws.cell(i, col, value)
+                cell = ws.cell(i, col, _safe_cell(value))
                 cell.border = _THIN
                 if col in (3, 8) and isinstance(value, date):
                     cell.number_format = _DATE_FMT

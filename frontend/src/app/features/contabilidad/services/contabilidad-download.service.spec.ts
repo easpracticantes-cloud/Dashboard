@@ -79,6 +79,7 @@ describe('ContabilidadDownloadService Facturas Excel', () => {
       status: 404,
       headers: { get: () => null },
       text: async () => '<html>404</html>',
+      clone: () => ({ json: async () => { throw new Error('no json'); } }),
     });
     await expect(service.download('/contabilidad/documents/export-excel')).rejects.toThrow(
       'No se pudo generar el Excel.',
@@ -111,9 +112,28 @@ describe('ContabilidadDownloadService Facturas Excel', () => {
   });
 
   it('500 informa error de generación', async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, status: 500, headers: { get: () => null } });
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 500,
+      headers: { get: () => null },
+      clone: () => ({ json: async () => ({}) }),
+    });
     await expect(service.download('/contabilidad/documents/export-excel')).rejects.toThrow(
       'No se pudo generar el Excel.',
+    );
+  });
+
+  it('500 con detail del backend se muestra en el toast', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 500,
+      headers: { get: () => null },
+      clone: () => ({
+        json: async () => ({ detail: 'IllegalCharacterError: concepto con NUL' }),
+      }),
+    });
+    await expect(service.download('/contabilidad/documents/export-excel')).rejects.toThrow(
+      'IllegalCharacterError: concepto con NUL',
     );
   });
 });

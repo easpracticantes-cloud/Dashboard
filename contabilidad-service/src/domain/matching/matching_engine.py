@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 
 from domain.enums import MatchType
@@ -188,7 +189,19 @@ class MatchingEngine:
         else:
             strong = 0
         diff = abs(cand.diferencia) if cand.diferencia is not None else 10**12
-        return (strong, cand.score, -diff)
+        try:
+            diff = float(diff)
+        except (TypeError, ValueError, OverflowError):
+            diff = 10**12
+        if not math.isfinite(diff):
+            diff = 10**12
+        try:
+            score = float(cand.score or 0)
+        except (TypeError, ValueError, OverflowError):
+            score = 0.0
+        if not math.isfinite(score):
+            score = 0.0
+        return (strong, score, -diff)
 
     def is_acceptable(self, cand: MatchCandidate) -> bool:
         """No cruzar con un solo dato débil: hace falta identidad o combinación."""
