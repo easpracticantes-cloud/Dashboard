@@ -158,11 +158,19 @@ export class WizardComponent implements OnInit, OnDestroy {
   );
 
   readonly idsParaExcel = computed(() => {
-    // Con carpeta activa: SOLO sus document_ids (aunque esté vacía).
-    // No reutilizar facturas de la carpeta anterior ni el listado global.
+    // Con carpeta activa: solo facturas que todavía existen en la lista.
+    // document_ids fantasma (tras Vaciar) no deben inflar el KPI ni el Excel.
     const folder = this.carpetaActiva();
     if (folder) {
-      return [...(folder.document_ids || [])];
+      const live = this.documentos()
+        .map((d) => d.id)
+        .filter((id): id is number => typeof id === 'number' && Number.isFinite(id) && id > 0);
+      if (live.length) {
+        const claimed = new Set(folder.document_ids || []);
+        const scoped = live.filter((id) => !claimed.size || claimed.has(id));
+        return scoped.length ? scoped : live;
+      }
+      return [];
     }
     const operacion = this.idsFacturasOperacion().filter(
       (id): id is number => typeof id === 'number' && Number.isFinite(id)
@@ -179,7 +187,7 @@ export class WizardComponent implements OnInit, OnDestroy {
     return this.idsParaExcel().filter((id) => {
       const doc = byId.get(id);
       if (!doc) {
-        return true;
+        return false;
       }
       return !blocked.has((doc.estado || '').toUpperCase());
     });
@@ -204,7 +212,7 @@ export class WizardComponent implements OnInit, OnDestroy {
 
   readonly kpis = computed(() => ({
     autobits: this.autobits()?.imported_rows || this.records().length,
-    facturas: this.idsParaExcel().length || this.documentos().length,
+    facturas: this.documentos().length,
     revision: this.facturasRevision().length,
     carpetas: this.carpetas().length,
   }));
@@ -1155,6 +1163,9 @@ export class WizardComponent implements OnInit, OnDestroy {
   }
 
   private resetLocal(): void {
+    this.poll?.unsubscribe();
+    this.analizandoFacturas.set(false);
+    this.recontramarcadoPendiente = null;
     this.autobits.set(null);
     this.records.set([]);
     this.facturaItems.set([]);
@@ -1164,10 +1175,29 @@ export class WizardComponent implements OnInit, OnDestroy {
     this.chatMsgs.set([]);
     this.packMsg.set('');
     this.paso.set(1);
+    this.borrarBatchesSesion();
+    this.carpetas.update((list) =>
+      list.map((f) => ({
+        ...f,
+        document_ids: [],
+        document_count: 0,
+        documents: [],
+        autobits_batch_id: null,
+        status: 'OPEN',
+      }))
+    );
     const folder = this.carpetaActiva();
     if (folder) {
-      this.seleccionarCarpeta(folder.id);
+      this.carpetaActiva.set({
+        ...folder,
+        document_ids: [],
+        document_count: 0,
+        documents: [],
+        autobits_batch_id: null,
+        status: 'OPEN',
+      });
     }
+    this.cargarCarpetas(true);
   }
 
   private cargarRecords(batchId?: number): void {
@@ -1290,6 +1320,21 @@ export class WizardComponent implements OnInit, OnDestroy {
       return Number.isFinite(n) && n > 0 ? n : undefined;
     } catch {
       return undefined;
+    }
+  }
+
+  private borrarBatchesSesion(): void {
+    try {
+      const keys: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key?.startsWith(BATCH_KEY_PREFIX)) {
+          keys.push(key);
+        }
+      }
+      keys.forEach((key) => sessionStorage.removeItem(key));
+    } catch {
+      /* ignore */
     }
   }
 

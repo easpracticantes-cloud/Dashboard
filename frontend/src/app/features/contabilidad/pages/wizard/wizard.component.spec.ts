@@ -452,4 +452,32 @@ describe('WizardComponent carpetas + Autobits', () => {
       expect(docsApi.processBatch).not.toHaveBeenCalled();
     });
   });
+
+  it('vaciar deja la carpeta en 0 facturas aunque el chip tuviera IDs viejos', () => {
+    const fixture = createFixture();
+    const cmp = fixture.componentInstance;
+    const sucia = folder({
+      id: 7,
+      document_ids: [1, 2, 15],
+      document_count: 15,
+      documents: [],
+    });
+    cmp.carpetaActiva.set(sucia);
+    cmp.carpetas.set([sucia]);
+    cmp.documentos.set([]);
+    foldersApi.list.mockReturnValue(
+      of({ total: 1, items: [folder({ id: 7, document_ids: [], document_count: 0, documents: [] })] })
+    );
+    foldersApi.get.mockReturnValue(of(folder({ id: 7, document_ids: [], document_count: 0, documents: [] })));
+
+    cmp.confirmarVaciar();
+    fixture.detectChanges();
+
+    expect(autobitsApi.purgeExcels).toHaveBeenCalledWith(true);
+    expect(cmp.documentos().length).toBe(0);
+    expect(cmp.carpetaActiva()?.document_count).toBe(0);
+    expect(cmp.carpetaActiva()?.document_ids).toEqual([]);
+    expect(cmp.kpis().facturas).toBe(0);
+    expect(cmp.idsParaExcel()).toEqual([]);
+  });
 });

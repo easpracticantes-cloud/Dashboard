@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from application.services.document_service import DocumentService
 from domain.utils.period_utils import week_bounds_saturday
 from infrastructure.persistence.database import get_db
-from infrastructure.persistence.models import InvoiceFolderModel
+from infrastructure.persistence.models import DocumentModel, InvoiceFolderModel
 from infrastructure.persistence.repositories import AutobitsRepository, DocumentRepository
 
 router = APIRouter(prefix="/api/folders", tags=["folders"])
@@ -92,8 +92,28 @@ def _dump_ids(ids: list[int]) -> str:
     return json.dumps(uniq)
 
 
-def _serialize(folder: InvoiceFolderModel, db: Session | None = None) -> dict:
+def _alive_document_ids(ids: list[int], db: Session) -> list[int]:
+    """Quita IDs de facturas que ya no existen (p. ej. tras Vaciar)."""
+    if not ids:
+        return []
+    alive = {
+        int(row[0])
+        for row in db.query(DocumentModel.id).filter(DocumentModel.id.in_(ids)).all()
+    }
+    return [i for i in ids if i in alive]
+
+
+def prune_folder_document_ids(folder: InvoiceFolderModel, db: Session) -> list[int]:
+    """Alinea document_ids_json con facturas reales. No hace commit."""
     ids = _parse_ids(folder.document_ids_json)
+    kept = _alive_document_ids(ids, db)
+    if kept != ids:
+        folder.document_ids_json = _dump_ids(kept)
+    return kept
+
+
+def _serialize(folder: InvoiceFolderModel, db: Session | None = None) -> dict:
+    ids = prune_folder_document_ids(folder, db) if db else _parse_ids(folder.document_ids_json)
     docs_summary = []
     if db and ids:
         repo = DocumentRepository(db)
@@ -177,7 +197,12 @@ def list_folders(limit: int = 40, db: Session = Depends(get_db)):
         .limit(max(1, min(limit, 100)))
         .all()
     )
-    return {"total": len(rows), "items": [_serialize(r, db) for r in rows]}
+    items = [_serialize(r, db) for r in rows]
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+    return {"total": len(items), "items": items}
 
 
 @router.post("")
@@ -207,7 +232,12 @@ def get_folder(folder_id: int, db: Session = Depends(get_db)):
     folder = db.get(InvoiceFolderModel, folder_id)
     if not folder:
         raise HTTPException(status_code=404, detail="Carpeta no encontrada.")
-    return _serialize(folder, db)
+    payload = _serialize(folder, db)
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+    return payload
 
 
 @router.patch("/{folder_id}")
@@ -260,7 +290,7 @@ def add_documents(folder_id: int, body: FolderAddDocuments, db: Session = Depend
     folder = db.get(InvoiceFolderModel, folder_id)
     if not folder:
         raise HTTPException(status_code=404, detail="Carpeta no encontrada.")
-    current = _parse_ids(folder.document_ids_json)
+    current = prune_folder_document_ids(folder, db)
     repo = DocumentRepository(db)
     added = 0
     for raw in body.document_ids or []:

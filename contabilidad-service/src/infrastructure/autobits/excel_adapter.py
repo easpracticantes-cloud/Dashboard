@@ -4,16 +4,25 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
+import re
 
 from domain.autobits.fields import (
+    AUTOBITS_EXPORT_COLUMNS,
     AUTOBITS_FIELDS,
     ParsedAutobitsRow,
+    canonical_numero_compra,
+    deterministic_mapping,
+    looks_like_autobits_export,
+    normalize_excel_nit,
+    normalize_header,
     prefer_canonical_columns,
     suggest_mapping,
     value_from_row_dict,
 )
+from domain.matching.normalize import parse_date
+from domain.utils.money import to_money_or_none
 from openpyxl import load_workbook
 
 
@@ -41,42 +50,93 @@ class ExcelParseResult:
 
 
 def _to_float(value) -> float | None:
+    """Importes COP: 1.234.567,89 / $14.300 / 14300.0."""
     if value is None or value == "":
         return None
-    if isinstance(value, (int, float)):
-        return float(value)
+    if isinstance(value, str) and not value.strip():
+        return None
+    parsed = to_money_or_none(value)
+    if parsed is None:
+        return None
+    return float(parsed)
+
+
+_MESES = {
+    "ene": 1, "enero": 1, "jan": 1, "january": 1,
+    "feb": 2, "febrero": 2, "february": 2,
+    "mar": 3, "marzo": 3, "march": 3,
+    "abr": 4, "abril": 4, "apr": 4, "april": 4,
+    "may": 5, "mayo": 5,
+    "jun": 6, "junio": 6, "june": 6,
+    "jul": 7, "julio": 7, "july": 7,
+    "ago": 8, "agosto": 8, "aug": 8, "august": 8,
+    "sep": 9, "sept": 9, "septiembre": 9, "set": 9, "setiembre": 9, "september": 9,
+    "oct": 10, "octubre": 10, "october": 10,
+    "nov": 11, "noviembre": 11, "november": 11,
+    "dic": 12, "diciembre": 12, "dec": 12, "december": 12,
+}
+
+
+def _parse_spanish_date(texto: str) -> date | None:
+    match = re.match(
+        r"^(\d{1,2})[/\-\s.]+([a-záéíóúñ]{3,})[/\-\s.]+(\d{2,4})$",
+        texto.strip(),
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    day = int(match.group(1))
+    month = _MESES.get(match.group(2).lower())
+    year = int(match.group(3))
+    if year < 100:
+        year += 2000
+    if not month or not 1 <= day <= 31:
+        return None
     try:
-        texto = str(value).strip().replace("$", "").replace(" ", "")
-        if "," in texto and "." in texto:
-            texto = texto.replace(".", "").replace(",", ".")
-        elif "," in texto:
-            texto = texto.replace(",", ".")
-        return float(texto)
+        return date(year, month, day)
     except ValueError:
         return None
 
 
 def _to_date_str(value) -> str | None:
-    if value is None or value == "":
+    if value is None or (isinstance(value, str) and not value.strip()):
         return None
-    if isinstance(value, datetime):
-        return value.date().isoformat()
-    if isinstance(value, date):
-        return value.isoformat()
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        serial = float(value)
+        if 20000 <= serial <= 80000:
+            try:
+                return (date(1899, 12, 30) + timedelta(days=int(round(serial)))).isoformat()
+            except OverflowError:
+                pass
+        as_int = int(serial)
+        if 19900101 <= as_int <= 21001231:
+            parsed = parse_date(str(as_int))
+            if parsed:
+                return parsed.isoformat()
+    parsed = parse_date(value)
+    if parsed is not None:
+        return parsed.isoformat()
     texto = str(value).strip()
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
-        try:
-            return datetime.strptime(texto, fmt).date().isoformat()
-        except ValueError:
-            continue
-    return texto or None
+    spanish = _parse_spanish_date(texto)
+    if spanish:
+        return spanish.isoformat()
+    return texto[:10] if texto else None
 
 
 def _to_str(value) -> str | None:
     if value is None:
         return None
+    if isinstance(value, float) and value == int(value) and abs(value) < 1e15:
+        texto = str(int(value))
+        return texto or None
     texto = str(value).strip()
     return texto or None
+
+
+def _to_nit(value) -> str | None:
+    return normalize_excel_nit(value)
 
 
 def _read_workbook(path: Path):
@@ -92,8 +152,12 @@ def _read_workbook(path: Path):
 
 
 def _sheet_usefulness(columns: list[str], n_rows: int) -> int:
+    """Puntúa si una hoja es el reporte Autobits (no portada)."""
     joined = " ".join(columns).lower()
     score = n_rows
+    canon = {normalize_header(c) for c in AUTOBITS_EXPORT_COLUMNS}
+    headers = {normalize_header(c) for c in columns if c}
+    score += 40 * len(headers & canon)
     for hint in (
         "proveedor",
         "nit",
@@ -104,6 +168,7 @@ def _sheet_usefulness(columns: list[str], n_rows: int) -> int:
         "concepto",
         "observacion",
         "orden",
+        "factura",
     ):
         if hint in joined:
             score += 80
@@ -111,7 +176,7 @@ def _sheet_usefulness(columns: list[str], n_rows: int) -> int:
 
 
 def _pick_best_sheet(wb):
-    """Elige la hoja con más pinta de reporte Autobits (no la portada)."""
+    """Elige la hoja Autobits y, si hay varias iguales, junta las filas."""
     ranked: list[tuple[int, object, list[str], list]] = []
     for sheet in wb.worksheets:
         try:
@@ -128,8 +193,16 @@ def _pick_best_sheet(wb):
         columns, data_rows = _iter_data_rows(sheet)
         return sheet, columns, data_rows
     ranked.sort(key=lambda item: item[0], reverse=True)
-    _, sheet, columns, data_rows = ranked[0]
-    return sheet, columns, data_rows
+    _best_score, sheet, columns, data_rows = ranked[0]
+    best_norm = tuple(normalize_header(c) for c in columns)
+    merged = list(data_rows)
+    for score, _other, cols, rows in ranked[1:]:
+        if score < 160:
+            continue
+        if tuple(normalize_header(c) for c in cols) != best_norm:
+            continue
+        merged.extend(rows)
+    return sheet, columns, merged
 
 
 def _normalize_mapping(mapping: dict[str, str | None], columns: list[str]) -> dict[str, str | None]:
@@ -168,25 +241,35 @@ def _iter_data_rows(sheet) -> tuple[list[str], list[tuple[int, dict]]]:
         "observacion",
         "concepto",
         "fecha",
+        "factura",
     )
+    canon_headers = {normalize_header(c) for c in AUTOBITS_EXPORT_COLUMNS}
 
     def score_header(row) -> int:
         score = 0
+        hits = 0
         for cell in row:
             if cell is None:
                 continue
-            t = str(cell).strip().lower()
-            if not t or t.startswith("columna_"):
+            t = str(cell).strip()
+            if not t or t.lower().startswith("columna_"):
                 continue
-            if any(h in t for h in header_hints):
+            nt = normalize_header(t)
+            if nt in canon_headers:
+                score += 10
+                hits += 1
+            elif any(h in nt for h in header_hints):
                 score += 2
             elif not str(cell).replace(".", "").isdigit() and len(t) > 2:
                 score += 1
+        if hits >= 5:
+            score += 40
         return score
 
     best_idx = 0
     best_score = -1
-    for i, row in enumerate(all_rows[:20]):
+    scan_limit = min(len(all_rows), 40)
+    for i, row in enumerate(all_rows[:scan_limit]):
         sc = score_header(row or ())
         if sc > best_score:
             best_score = sc
@@ -248,7 +331,11 @@ class ExcelAutobitsAdapter:
             return ExcelPreviewResult(
                 columns=columns,
                 sample_rows=sample,
-                suggested_mapping=suggest_mapping(columns),
+                suggested_mapping=(
+                    deterministic_mapping(columns)
+                    if looks_like_autobits_export(columns)
+                    else suggest_mapping(columns)
+                ),
                 total_rows=len(data_rows),
                 sheet_name=sheet.title or "Sheet1",
             )
@@ -340,27 +427,61 @@ class ExcelAutobitsAdapter:
                 row_dict,
                 "codigo factura proveedor",
                 "código factura proveedor",
+                "codigo factura",
             )
         ) or _to_str(get("numero_documento"))
+        proveedor = _to_str(
+            value_from_row_dict(
+                row_dict,
+                "nombre proveedor (orden de compra)",
+                "nombre proveedor",
+            )
+        ) or _to_str(get("proveedor"))
+        nit = _to_nit(
+            value_from_row_dict(
+                row_dict,
+                "nit/cc proveedor (orden de compra)",
+                "nit/cc proveedor",
+                "nit proveedor",
+            )
+        ) or _to_nit(get("nit"))
+        fecha = _to_date_str(
+            value_from_row_dict(
+                row_dict,
+                "fecha de ejecución (reserva)",
+                "fecha de ejecucion (reserva)",
+                "fecha de compra",
+            )
+        ) or _to_date_str(get("fecha"))
+        if valor is None:
+            raw_total = value_from_row_dict(row_dict, "total", "valor", "valor total")
+            valor = _to_float(raw_total)
 
         parsed = ParsedAutobitsRow(
             row_number=row_number,
-            proveedor=_to_str(get("proveedor")),
-            nit=_to_str(get("nit")),
+            proveedor=proveedor,
+            nit=nit,
             numero_compra=numero_compra,
             numero_reserva=numero_reserva,
             numero_documento=numero_documento,
             valor=valor,
-            fecha=_to_date_str(get("fecha")),
-            concepto=_to_str(get("concepto")),
+            fecha=fecha,
+            concepto=_to_str(get("concepto")) or _to_str(
+                value_from_row_dict(row_dict, "nombre concepto", "concepto")
+            ),
             observaciones=observaciones,
             estado_compra=estado_compra,
             raw=raw,
             errors=errors or None,
         )
-        from domain.autobits.fields import canonical_numero_compra
-
         parsed.numero_compra = canonical_numero_compra(parsed.numero_compra, raw)
+        if parsed.proveedor and parsed.proveedor.strip().lower() in {"total", "totales", "suma"}:
+            parsed.proveedor = None
+            if not parsed.numero_compra and not parsed.numero_reserva and not parsed.numero_documento:
+                parsed.valor = None
+                parsed.nit = None
+                parsed.fecha = None
+                parsed.concepto = None
         return parsed
 
     def export_rows_csv(self, rows: list[dict]) -> str:
@@ -394,6 +515,8 @@ def _serialize_cell(value):
         return value.isoformat(sep=" ", timespec="seconds")
     if isinstance(value, date):
         return value.isoformat()
+    if isinstance(value, float) and value == int(value) and abs(value) < 1e15:
+        return int(value)
     return value
 
 

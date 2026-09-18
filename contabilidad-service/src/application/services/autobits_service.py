@@ -14,6 +14,13 @@ from config.settings import get_settings
 from domain.autobits.fields import (
     AUTOBITS_FIELDS,
     FIELD_LABELS,
+    deterministic_mapping,
+    excel_factura_proveedor,
+    excel_fecha,
+    excel_nit,
+    excel_proveedor,
+    excel_valor,
+    looks_like_autobits_export,
     prefer_canonical_columns,
     suggest_mapping,
 )
@@ -101,11 +108,15 @@ class AutobitsService:
 
     def _detect_period_from_rows(self, rows) -> tuple[str | None, str | None]:
         """Infere período desde fechas del Excel; si no hay, usa semana contable actual."""
+        from domain.matching.normalize import parse_date
         from domain.utils.period_utils import week_bounds_saturday
 
         fechas: list[str] = []
         for row in rows:
-            if getattr(row, "fecha", None):
+            parsed = parse_date(getattr(row, "fecha", None))
+            if parsed:
+                fechas.append(parsed.isoformat())
+            elif getattr(row, "fecha", None):
                 fechas.append(str(row.fecha)[:10])
         if fechas:
             fechas.sort()
@@ -157,12 +168,14 @@ class AutobitsService:
                 raise AutobitsServiceError(exc.message, exc.code) from exc
 
             mapping = analysis.mapping
-            # Forzar Codigo Reserva / Codigo Orden de compra del Excel Autobits real
-            heuristic = suggest_mapping(preview.columns)
-            for field in AUTOBITS_FIELDS:
-                if not mapping.get(field) and heuristic.get(field):
-                    mapping[field] = heuristic[field]
-            mapping = prefer_canonical_columns(mapping, preview.columns)
+            if looks_like_autobits_export(preview.columns):
+                mapping = deterministic_mapping(preview.columns)
+            else:
+                heuristic = suggest_mapping(preview.columns)
+                for field in AUTOBITS_FIELDS:
+                    if not mapping.get(field) and heuristic.get(field):
+                        mapping[field] = heuristic[field]
+                mapping = prefer_canonical_columns(mapping, preview.columns)
             mapped = [v for v in mapping.values() if v]
             if not mapped:
                 path.unlink(missing_ok=True)
@@ -372,7 +385,11 @@ class AutobitsService:
         return None
 
     def repair_records_from_raw(self, batch_id: int) -> int:
-        """Alinea COM/reserva al Excel canónico en raw_json (nunca otras columnas)."""
+        """Alinea COM/reserva/factura/NIT/valor/fecha al Excel canónico en raw_json."""
+        from domain.autobits.fields import canonical_numero_compra, looks_like_invoice_code
+        from domain.matching.normalize import parse_date
+        from domain.utils.money import values_close
+
         records = self.repo.list_records_for_batch(batch_id)
         fixed = 0
         for record in records:
@@ -398,8 +415,6 @@ class AutobitsService:
                 "codigo orden de compra",
                 "código orden de compra",
             )
-            from domain.autobits.fields import canonical_numero_compra, looks_like_invoice_code
-
             canon = canonical_numero_compra(compra or record.numero_compra, raw)
             current = (record.numero_compra or "").strip() or None
             if canon and current != canon:
@@ -408,7 +423,7 @@ class AutobitsService:
             elif not canon and looks_like_invoice_code(current):
                 record.numero_compra = None
                 changed = True
-            factura = self._value_from_raw(
+            factura = excel_factura_proveedor(record) or self._value_from_raw(
                 raw,
                 "codigo factura proveedor",
                 "código factura proveedor",
@@ -418,6 +433,27 @@ class AutobitsService:
                 if text and (record.numero_documento or "").strip() != text:
                     record.numero_documento = text
                     changed = True
+            nit = excel_nit(record)
+            if nit and (record.nit or "").strip() != nit:
+                record.nit = nit
+                changed = True
+            proveedor = excel_proveedor(record)
+            if proveedor and (record.proveedor or "").strip() != proveedor:
+                record.proveedor = proveedor
+                changed = True
+            fecha_raw = excel_fecha(record)
+            if fecha_raw:
+                parsed_fecha = parse_date(fecha_raw)
+                fecha = parsed_fecha.isoformat() if parsed_fecha else str(fecha_raw).strip()[:10]
+                if fecha and (record.fecha or "").strip() != fecha:
+                    record.fecha = fecha
+                    changed = True
+            nuevo_valor = excel_valor(record)
+            if nuevo_valor is not None and (
+                record.valor is None or not values_close(record.valor, nuevo_valor)
+            ):
+                record.valor = nuevo_valor
+                changed = True
             if changed:
                 fixed += 1
         if fixed:
@@ -457,6 +493,21 @@ class AutobitsService:
                 changed = True
             if parsed_row.numero_compra and (record.numero_compra or "").strip() != parsed_row.numero_compra:
                 record.numero_compra = parsed_row.numero_compra
+                changed = True
+            if parsed_row.numero_documento and (record.numero_documento or "").strip() != parsed_row.numero_documento:
+                record.numero_documento = parsed_row.numero_documento
+                changed = True
+            if parsed_row.nit and (record.nit or "").strip() != parsed_row.nit:
+                record.nit = parsed_row.nit
+                changed = True
+            if parsed_row.proveedor and (record.proveedor or "").strip() != parsed_row.proveedor:
+                record.proveedor = parsed_row.proveedor
+                changed = True
+            if parsed_row.fecha and (record.fecha or "").strip() != parsed_row.fecha:
+                record.fecha = parsed_row.fecha
+                changed = True
+            if parsed_row.valor is not None and record.valor != parsed_row.valor:
+                record.valor = parsed_row.valor
                 changed = True
             if parsed_row.raw and not record.raw_json:
                 record.raw_json = json.dumps(parsed_row.raw, ensure_ascii=False)

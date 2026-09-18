@@ -134,3 +134,62 @@ def test_purge_excels(client):
 
     latest = client.get("/api/autobits/batches/latest")
     assert latest.status_code == 404
+
+
+def test_purge_vacia_ids_de_carpeta_y_permite_resubir(client):
+    """Vaciar no puede dejar la carpeta con IDs fantasma (contador 15 y facturas 'revividas')."""
+    from infrastructure.persistence.database import SessionLocal
+    from infrastructure.persistence.models import DocumentModel, InvoiceFolderModel
+
+    folder = client.post("/api/folders", json={"name": "Semana fantasma"}).json()
+    folder_id = folder["id"]
+
+    db = SessionLocal()
+    try:
+        docs = [
+            DocumentModel(filename=f"f{i}.pdf", tipo="FACTURA", origen="CARGA_MANUAL")
+            for i in range(3)
+        ]
+        db.add_all(docs)
+        db.commit()
+        ids = [d.id for d in docs]
+        row = db.get(InvoiceFolderModel, folder_id)
+        row.document_ids_json = __import__("json").dumps(ids)
+        db.commit()
+    finally:
+        db.close()
+
+    listed = client.get("/api/folders")
+    assert listed.status_code == 200
+    chip = next(item for item in listed.json()["items"] if item["id"] == folder_id)
+    assert chip["document_count"] == 3
+
+    purged = client.delete("/api/autobits/excels?confirm=true")
+    assert purged.status_code == 200, purged.text
+    assert purged.json()["deleted"].get("documents", 0) >= 3
+    assert purged.json()["deleted"].get("folders_cleared", 0) >= 1
+
+    after = client.get(f"/api/folders/{folder_id}")
+    assert after.status_code == 200
+    body = after.json()
+    assert body["document_ids"] == []
+    assert body["document_count"] == 0
+    assert body["documents"] == []
+    assert body["autobits_batch_id"] is None
+
+    db = SessionLocal()
+    try:
+        nuevo = DocumentModel(filename="nueva.pdf", tipo="FACTURA", origen="CARGA_MANUAL")
+        db.add(nuevo)
+        db.commit()
+        db.refresh(nuevo)
+        new_id = nuevo.id
+    finally:
+        db.close()
+
+    linked = client.post(f"/api/folders/{folder_id}/documents", json={"document_ids": [new_id]})
+    assert linked.status_code == 200, linked.text
+    assert linked.json()["added"] == 1
+    assert linked.json()["folder"]["document_count"] == 1
+    assert linked.json()["folder"]["document_ids"] == [new_id]
+

@@ -14,6 +14,7 @@ from infrastructure.persistence.models import (
     DigitalPackageModel,
     DocumentModel,
     ImportBatchModel,
+    InvoiceFolderModel,
     PaymentModel,
     PaymentReceiptModel,
     ProcessingJobModel,
@@ -152,6 +153,7 @@ class ExcelPurgeService:
         deleted["jobs"] = docs.get("jobs", 0)
         deleted["packages"] = docs.get("packages", 0)
         deleted["files"] += docs.get("files", 0)
+        deleted["folders_cleared"] = docs.get("folders_cleared", 0)
 
         self.audit.log(
             "PURGE_EXCELS",
@@ -164,10 +166,11 @@ class ExcelPurgeService:
         return {"ok": True, "deleted": deleted}
 
     def purge_documents(self, *, commit: bool = True) -> dict:
-        """Borra facturas importadas y sus archivos. Deja cruces sin document_id."""
-        deleted = {"documents": 0, "jobs": 0, "packages": 0, "files": 0}
+        """Borra facturas importadas y desvincula las carpetas. Deja cruces sin document_id."""
+        deleted = {"documents": 0, "jobs": 0, "packages": 0, "files": 0, "folders_cleared": 0}
         docs = self.db.query(DocumentModel).all()
         if not docs:
+            deleted["folders_cleared"] = self._clear_folder_memberships()
             if commit:
                 self.db.commit()
             return deleted
@@ -216,9 +219,29 @@ class ExcelPurgeService:
                     deleted["files"] += 1
             except OSError:
                 pass
+        deleted["folders_cleared"] = self._clear_folder_memberships()
         if commit:
             self.db.commit()
         return deleted
+
+    def _clear_folder_memberships(self) -> int:
+        """Las carpetas guardan IDs en JSON: hay que vaciarlos o el chip sigue diciendo 15 facturas."""
+        n = 0
+        for folder in self.db.query(InvoiceFolderModel).all():
+            changed = False
+            raw = (folder.document_ids_json or "").strip()
+            if raw not in ("", "[]", "null"):
+                folder.document_ids_json = "[]"
+                changed = True
+            if folder.autobits_batch_id is not None:
+                folder.autobits_batch_id = None
+                changed = True
+            if (folder.status or "").upper() not in ("", "OPEN"):
+                folder.status = "OPEN"
+                changed = True
+            if changed:
+                n += 1
+        return n
 
     def _wipe_disk(self, batch_paths: list[Path]) -> int:
         removed = 0

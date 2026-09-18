@@ -96,3 +96,39 @@ def test_link_autobits_batch_to_folder():
     got = client.get(f"/api/folders/{folder_id}")
     assert got.status_code == 200
     assert got.json()["autobits_batch_id"] == batch_id
+
+
+def test_folder_count_ignora_facturas_borradas():
+    get_settings.cache_clear()
+    init_db()
+    from api_server import app
+    from infrastructure.persistence.database import SessionLocal
+    from infrastructure.persistence.models import DocumentModel, InvoiceFolderModel
+    import json
+
+    client = TestClient(app)
+    created = client.post("/api/folders", json={"name": "Con fantasmas"})
+    folder_id = created.json()["id"]
+
+    db = SessionLocal()
+    try:
+        doc = DocumentModel(filename="viva.pdf", tipo="FACTURA", origen="CARGA_MANUAL")
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+        alive_id = doc.id
+        folder = db.get(InvoiceFolderModel, folder_id)
+        folder.document_ids_json = json.dumps([alive_id, 999001, 999002])
+        db.commit()
+        db.delete(doc)
+        db.commit()
+    finally:
+        db.close()
+
+    got = client.get(f"/api/folders/{folder_id}")
+    assert got.status_code == 200
+    body = got.json()
+    assert body["document_ids"] == []
+    assert body["document_count"] == 0
+    assert body["documents"] == []
+

@@ -88,9 +88,20 @@ def parse_date(value) -> object:
     if isinstance(value, date):
         return value
     texto = str(value).strip()[:19]
-    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y", "%Y%m%d"):
+    for fmt in (
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%Y/%m/%d",
+        "%d.%m.%Y",
+        "%Y%m%d",
+        "%d/%m/%y",
+        "%d-%m-%y",
+        "%d.%m.%y",
+    ):
         try:
-            return datetime.strptime(texto[:10] if fmt != "%Y%m%d" else texto[:8], fmt).date()
+            piece = texto[:8] if fmt == "%Y%m%d" else texto[:10]
+            return datetime.strptime(piece, fmt).date()
         except ValueError:
             continue
     # "12092026 FE-6920…" → ddmmyyyy al inicio

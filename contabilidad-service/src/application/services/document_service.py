@@ -13,7 +13,7 @@ from application.services.period_service import PeriodService
 from config.settings import PROYECTO_RAIZ, get_settings
 from domain.enums import DocumentOrigin, DocumentStatus
 from domain.services.duplicate_detector import DuplicateCheckResult, DuplicateDetector
-from infrastructure.persistence.models import DocumentModel
+from infrastructure.persistence.models import DocumentModel, InvoiceFolderModel
 from infrastructure.persistence.repositories import AuditRepository, DocumentRepository
 
 settings = get_settings()
@@ -166,9 +166,22 @@ class DocumentService:
             valor_anterior=doc.estado,
             usuario=usuario,
         )
+        self._unlink_from_folders(doc_id)
         self.db.delete(doc)
         self.db.commit()
         return True
+
+    def _unlink_from_folders(self, doc_id: int) -> None:
+        for folder in self.db.query(InvoiceFolderModel).all():
+            try:
+                ids = json.loads(folder.document_ids_json or "[]")
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(ids, list) or doc_id not in ids:
+                continue
+            folder.document_ids_json = json.dumps(
+                [int(i) for i in ids if str(i).isdigit() and int(i) != doc_id]
+            )
 
     def parse_confidence(self, doc: DocumentModel) -> dict:
         if not doc.extracted_json:

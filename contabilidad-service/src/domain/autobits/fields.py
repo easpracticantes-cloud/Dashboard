@@ -80,12 +80,15 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "numero_compra": [
         "codigo orden de compra",
         "código orden de compra",
+        "codigo de orden de compra",
+        "nro orden de compra",
+        "numero orden de compra",
+        "número orden de compra",
         "orden de compra",
         "numero compra",
         "número compra",
         "no compra",
-        "compra",
-        "purchase",
+        "purchase order",
         "id compra",
         "codigo com",
         "código com",
@@ -94,6 +97,7 @@ FIELD_ALIASES: dict[str, list[str]] = {
         "nro com",
         "numero com",
         "número com",
+        "compra",
     ],
     "numero_reserva": [
         "codigo reserva",
@@ -107,13 +111,21 @@ FIELD_ALIASES: dict[str, list[str]] = {
     "numero_documento": [
         "codigo factura proveedor",
         "código factura proveedor",
+        "codigo factura del proveedor",
+        "nro factura proveedor",
+        "numero factura proveedor",
+        "código factura",
         "codigo factura",
-        "factura",
+        "factura proveedor",
         "numero factura",
         "número factura",
         "no factura",
+        "nro factura",
+        "num factura",
+        "factura",
         "numero documento",
         "número documento",
+        "invoice number",
         "invoice",
     ],
     "valor": [
@@ -129,6 +141,8 @@ FIELD_ALIASES: dict[str, list[str]] = {
         "fecha de ejecucion (reserva)",
         "fecha de ejecución",
         "fecha de ejecucion",
+        "fecha de compra",
+        "fecha compra",
         "fecha emision",
         "fecha emisión",
         "fecha factura",
@@ -158,8 +172,15 @@ FIELD_ALIASES: dict[str, list[str]] = {
 
 
 def normalize_header(value: str) -> str:
-    """Normaliza encabezado de columna para comparación."""
-    return " ".join(str(value or "").strip().lower().split())
+    """Normaliza encabezado: acentos, N°, puntos y paréntesis no deben romper el mapeo."""
+    import unicodedata
+
+    text = unicodedata.normalize("NFKD", str(value or "").strip().lower())
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = text.replace("nº", "nro").replace("n°", "nro").replace("n.o", "nro")
+    text = re.sub(r"[./_#|:;]+", " ", text)
+    text = re.sub(r"[()\[\]{}]", " ", text)
+    return " ".join(text.split())
 
 
 # Encabezados canónicos del export Autobits real: siempre tienen prioridad sobre la IA.
@@ -177,6 +198,7 @@ CANONICAL_COLUMN_PREFERENCES: dict[str, tuple[str, ...]] = {
     "fecha": (
         "fecha de ejecución (reserva)",
         "fecha de ejecucion (reserva)",
+        "fecha de compra",
     ),
     "concepto": ("nombre concepto",),
     "valor": ("total",),
@@ -232,46 +254,97 @@ def com_from_value(raw: str | None) -> str | None:
     return f"COM{digits.zfill(6) if len(digits) <= 6 else digits}"
 
 
+_INVOICE_PREFIX = re.compile(
+    r"^(FPOS|FPFL|FVPOS|FLYP|FACT|FAC|FEL|FEC|HIN|CDC|FE|FV|FC|FP)-?\d{3,}",
+    re.IGNORECASE,
+)
+
+
 def looks_like_invoice_code(raw: str | None) -> bool:
-    """Detecta códigos de factura (FE-6920, FPFL-…, HIN36005), no órdenes tipo C-1001."""
+    """Detecta códigos de factura (FE-6920, FPFL-…, FLYP, HIN36005), no órdenes tipo C-1001."""
     text = re.sub(r"[\s./]", "", str(raw or "").strip().upper())
     if not text or _COM_IN_TEXT.search(text):
         return False
-    return bool(re.match(r"^(FE|FV|FC|FP|FPOS|FPFL|FEL|HIN)-?\d{3,}$", text))
+    return bool(_INVOICE_PREFIX.match(text))
+
+
+def looks_like_autobits_export(columns: list[str]) -> bool:
+    """True si el Excel trae el esquema real de Autobits (no hace falta IA)."""
+    if not columns:
+        return False
+    norms = {normalize_header(c) for c in columns if c}
+    canon = {normalize_header(c) for c in AUTOBITS_EXPORT_COLUMNS}
+    hits = len(norms & canon)
+    if hits >= 6:
+        return True
+    claves = {
+        "codigo orden de compra",
+        "codigo reserva",
+        "codigo factura proveedor",
+        "nit cc proveedor orden de compra",
+        "nombre proveedor orden de compra",
+        "total",
+    }
+    return len(norms & claves) >= 4
+
+
+def deterministic_mapping(columns: list[str]) -> dict[str, str | None]:
+    """Mapeo fijo del export Autobits: canónico gana sobre alias."""
+    return prefer_canonical_columns(suggest_mapping(columns), columns)
 
 
 def value_from_row_dict(row_dict: dict, *needles: str):
-    """Lee un valor del Excel por nombre de encabezado, sin depender del mapeo IA."""
+    """Lee un valor del Excel por nombre de encabezado, respetando el orden de needles."""
     if not isinstance(row_dict, dict) or not row_dict:
         return None
-    norms = [normalize_header(n) for n in needles if n]
+    by_norm: dict[str, object] = {}
     for key, value in row_dict.items():
         if value is None or str(value).strip() == "":
             continue
-        if normalize_header(str(key)) in norms:
-            return value
-    for needle in sorted(norms, key=len, reverse=True):
-        if len(needle) < 5:
+        by_norm.setdefault(normalize_header(str(key)), value)
+    for needle in needles:
+        na = normalize_header(needle)
+        if na in by_norm:
+            return by_norm[na]
+    for needle in needles:
+        na = normalize_header(needle)
+        if len(na) < 5:
             continue
         for key, value in row_dict.items():
             if value is None or str(value).strip() == "":
                 continue
-            if needle in normalize_header(str(key)):
+            header = normalize_header(str(key))
+            if na != header and na in header:
                 return value
     return None
 
 
 def com_from_excel_record(record) -> str | None:
-    """COM real de la fila Autobits (columna Código Orden de compra o cualquier celda COM…)."""
+    """COM real de la fila Autobits (columna Código Orden de compra; nunca la factura)."""
+    raw = _parse_raw_json(getattr(record, "raw_json", None) or getattr(record, "raw", None))
+    if raw:
+        canon = value_from_row_dict(
+            raw,
+            "codigo orden de compra",
+            "código orden de compra",
+        )
+        com = com_from_value(str(canon) if canon is not None else None)
+        if com:
+            return com
     compra, _ = excel_compra_reserva(record)
     com = com_from_value(compra)
     if com:
         return com
-    raw = _parse_raw_json(getattr(record, "raw_json", None) or getattr(record, "raw", None))
+    com = com_from_value(getattr(record, "numero_compra", None))
+    if com:
+        return com
     if not raw:
-        return com_from_value(getattr(record, "numero_compra", None))
-    # Primero la columna canónica; si ahí hay factura, buscar COM en el resto de celdas.
-    for value in raw.values():
+        return None
+    # Último recurso: una celda COM… que no sea la columna de factura.
+    for key, value in raw.items():
+        header = normalize_header(str(key))
+        if "factura" in header:
+            continue
         found = com_from_value(str(value) if value is not None else None)
         if found:
             return found
@@ -328,6 +401,40 @@ def excel_compra_reserva(record) -> tuple[str | None, str | None]:
     return compra, reserva
 
 
+def normalize_excel_nit(value) -> str | None:
+    """NIT desde Excel: 900123456.0, 900.123.456-1 o notación científica."""
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return str(value) if value else None
+    if isinstance(value, float):
+        if value != value or value == 0:
+            return None
+        if abs(value) >= 1000 and abs(value - round(value)) < 1e-6:
+            return str(int(round(value)))
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    if re.fullmatch(r"\d+\.0+", text):
+        return text.split(".", 1)[0]
+    sci = re.fullmatch(r"[+\-]?\d+(?:\.\d+)?[eE][+\-]?\d+", text.replace(",", "."))
+    if sci:
+        try:
+            as_int = int(float(text.replace(",", ".")))
+            return str(as_int) if as_int else None
+        except ValueError:
+            pass
+    cleaned = re.sub(r"[^\d\-]", "", text).strip("-")
+    if not cleaned or not re.search(r"\d", cleaned):
+        return None
+    if cleaned.count("-") > 1:
+        cleaned = re.sub(r"\D", "", text)
+    return cleaned or None
+
+
 def excel_nit(record) -> str | None:
     """NIT del Excel (columna canónica o campo denso)."""
     raw = _parse_raw_json(getattr(record, "raw_json", None) or getattr(record, "raw", None))
@@ -339,11 +446,10 @@ def excel_nit(record) -> str | None:
             "nit proveedor",
             "nit",
         )
-        text = str(found).strip() if found is not None else ""
-        if text:
-            return text
-    nit = (getattr(record, "nit", None) or "").strip()
-    return nit or None
+        nit = normalize_excel_nit(found)
+        if nit:
+            return nit
+    return normalize_excel_nit(getattr(record, "nit", None))
 
 
 def excel_fecha(record) -> str | None:
@@ -362,6 +468,34 @@ def excel_fecha(record) -> str | None:
             return text
     fecha = (getattr(record, "fecha", None) or "").strip()
     return fecha or None
+
+
+def excel_proveedor(record) -> str | None:
+    raw = _parse_raw_json(getattr(record, "raw_json", None) or getattr(record, "raw", None))
+    if raw:
+        found = value_from_row_dict(
+            raw,
+            "nombre proveedor (orden de compra)",
+            "nombre proveedor",
+            "proveedor",
+        )
+        text = str(found).strip() if found is not None else ""
+        if text:
+            return text
+    nombre = (getattr(record, "proveedor", None) or "").strip()
+    return nombre or None
+
+
+def excel_valor(record) -> float | None:
+    from domain.utils.money import money_to_float
+
+    raw = _parse_raw_json(getattr(record, "raw_json", None) or getattr(record, "raw", None))
+    if raw:
+        found = value_from_row_dict(raw, "total", "valor", "valor total")
+        parsed = money_to_float(found) if found not in (None, "") else None
+        if parsed is not None:
+            return parsed
+    return money_to_float(getattr(record, "valor", None))
 
 
 def excel_factura_proveedor(record) -> str | None:
@@ -407,9 +541,23 @@ def suggest_mapping(columns: list[str]) -> dict[str, str | None]:
                 continue
             if field != "estado_compra" and "estado de la compra" in norm_col:
                 continue
+            # Referencia (Orden de compra) NO es el COM; NIT cliente no es NIT proveedor.
+            if field == "numero_compra" and ("referencia" in norm_col or "factura" in norm_col):
+                continue
+            if field == "numero_reserva" and "referencia" in norm_col:
+                continue
+            if field == "nit" and "cliente" in norm_col:
+                continue
+            if field == "proveedor" and "cliente" in norm_col:
+                continue
+            # Alias cortos ("compra", "factura") solo coinciden exactos; si no,
+            # "compra" ⊂ "fecha de compra" y el COM se pierde.
             if any(
-                len(normalize_header(a)) >= 4 and normalize_header(a) in norm_col
+                (" " in na or len(na) >= 10)
+                and len(na) >= 4
+                and na in norm_col
                 for a in aliases
+                for na in [normalize_header(a)]
             ):
                 mapping[field] = original
                 used_columns.add(original)

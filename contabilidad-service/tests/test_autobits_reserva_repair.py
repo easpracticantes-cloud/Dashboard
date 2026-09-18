@@ -124,3 +124,12 @@ def test_canonical_numero_compra_persists_com_not_invoice():
     assert canonical_numero_compra("HIN36005", json.dumps(raw)) == "COM007441"
     assert canonical_numero_compra("C-1001", {"Compra": "C-1001"}) == "C-1001"
     assert canonical_numero_compra("FE-6920", {"Factura": "FE-6920"}) is None
+
+
+def test_normalize_excel_nit_formats():
+    from domain.autobits.fields import normalize_excel_nit
+
+    assert normalize_excel_nit(900123456.0) == "900123456"
+    assert normalize_excel_nit("900.123.456-1") == "900123456-1"
+    assert normalize_excel_nit("9.00123456E+8") == "900123456"
+

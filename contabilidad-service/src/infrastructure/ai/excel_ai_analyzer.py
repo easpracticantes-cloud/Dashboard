@@ -7,7 +7,14 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from domain.autobits.fields import AUTOBITS_FIELDS, prefer_canonical_columns, suggest_mapping
+from domain.autobits.fields import (
+    AUTOBITS_FIELDS,
+    deterministic_mapping,
+    looks_like_autobits_export,
+    normalize_header,
+    prefer_canonical_columns,
+    suggest_mapping,
+)
 from infrastructure.ai.anthropic_client import AnthropicClient, AnthropicClientError
 
 
@@ -79,6 +86,18 @@ class ExcelAIAnalyzer:
         if not columns:
             raise ExcelAIAnalyzerError("El Excel no tiene encabezados.", "EMPTY_SHEET")
 
+        # Export Autobits real: mapeo determinista. La IA no debe "adivinar" COM/factura.
+        if looks_like_autobits_export(columns):
+            mapping = deterministic_mapping(columns)
+            period_start, period_end = _period_from_samples(sample_rows)
+            return ExcelAIAnalysis(
+                mapping=mapping,
+                period_start=period_start,
+                period_end=period_end,
+                sheet_notes="Mapeo canónico del export Autobits (sin IA).",
+                mode="canonico",
+            )
+
         if self.available():
             try:
                 return self._analyze_with_ai(columns, sample_rows, total_rows, filename)
@@ -120,18 +139,22 @@ Eres un asistente contable. Analizas un reporte Excel exportado desde Autobits (
 Debes ENTENDER la hoja aunque el orden o nombres varíen ligeramente.
 Deduce el significado por encabezados y valores de ejemplo.
 
-Formato típico real de Autobits (referencia):
+Formato típico real de Autobits (referencia, usa estos nombres EXACTOS si aparecen):
 - "NIT/CC Proveedor (Orden de Compra)" → nit
 - "Nombre Proveedor (Orden de Compra)" → proveedor
-- "Codigo Orden de compra" → numero_compra
+- "Codigo Orden de compra" → numero_compra   (COM007441, NUNCA un número de factura)
 - "Codigo Reserva" → numero_reserva
-- "Fecha de ejecución (Reserva)" → fecha
+- "Codigo Factura proveedor" → numero_documento   (FE-6920, FPOS-65985, HIN-36005…)
+- "Fecha de ejecución (Reserva)" → fecha   (si no existe, "Fecha de compra")
 - "Nombre concepto" → concepto
 - "Total" → valor
-- "OBSERVACIONES" → observaciones (notas: pendiente, efectivo, etc.)
+- "OBSERVACIONES" → observaciones
 - "estado de la compra" → estado_compra
-Columnas que normalmente se IGNORAN (null): "Moneda", "SI", "NO"
-(No hay columna de número de factura en este export; numero_documento puede ser null.)
+Columnas que se IGNORAN (null): "Moneda", "SI", "NO", "Comprador (Orden de Compra)",
+"Referencia (Orden de Compra)", "Referencia (Reserva)", "Vendedor (Reserva)",
+"NIT/CC Cliente (Reserva)", "Nombre Cliente (Reserva)".
+NO mapees "Referencia (Orden de Compra)" a numero_compra.
+NO mapees "Codigo Factura proveedor" a numero_compra.
 
 Archivo: {filename or "reporte.xlsx"}
 Total de filas de datos: {total_rows}
@@ -181,7 +204,9 @@ Reglas:
 - SÍ mapea OBSERVACIONES → observaciones y estado de la compra → estado_compra.
 - Prioriza Total → valor, Nombre Proveedor → proveedor, NIT/CC → nit.
 - SIEMPRE mapea "Codigo Reserva" → numero_reserva (es obligatorio para el cruce).
-- SIEMPRE mapea "Codigo Orden de compra" → numero_compra.
+- SIEMPRE mapea "Codigo Orden de compra" → numero_compra (solo el COM, p.ej. COM007441).
+- SIEMPRE mapea "Codigo Factura proveedor" → numero_documento si esa columna existe.
+- Si no hay "Fecha de ejecución (Reserva)", usa "Fecha de compra" → fecha.
 """
 
     def _analyze_with_ai(
@@ -244,6 +269,23 @@ Reglas:
             mode="ia",
             raw_ai=data,
         )
+
+
+def _period_from_samples(sample_rows: list[dict]) -> tuple[str | None, str | None]:
+    from domain.matching.normalize import parse_date
+
+    fechas: list[str] = []
+    for row in sample_rows or []:
+        for key, val in row.items():
+            if "fecha" not in normalize_header(str(key)):
+                continue
+            parsed = parse_date(val)
+            if parsed:
+                fechas.append(parsed.isoformat())
+    if not fechas:
+        return None, None
+    fechas.sort()
+    return fechas[0], fechas[-1]
 
 
 def _clean_date(value: Any) -> str | None:
